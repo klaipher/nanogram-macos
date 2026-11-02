@@ -92,7 +92,7 @@ private struct EditSettingsValues {
 
 private func updateFrontMrz(file: String, relative: SecureIdRequestedFormFieldValue, updateState: @escaping ((PassportState)->PassportState)->Void) {
     if let image = NSImage(contentsOfFile: file) {
-        let string = recognizeMRZ(image.precomposed(), nil)
+        recognizeMRZ(image.precomposed(), completion: { string in
         let mrz = TGPassportMRZ.parseLines(string?.components(separatedBy: "\n"))
         let localFile:SecureIdVerificationDocument = .local(SecureIdVerificationLocalDocument(id: arc4random64(), resource: LocalFileReferenceMediaResource(localFilePath: file, randomId: arc4random64()), state: .uploading(0)))
         
@@ -127,6 +127,7 @@ private func updateFrontMrz(file: String, relative: SecureIdRequestedFormFieldVa
             }
             return current.withUpdatedFrontSide(localFile, for: relative.valueKey)
         }
+        })
     }
 }
  
@@ -2291,7 +2292,7 @@ private func identityEntries( _ state: PassportState, context: (any AccountConte
                         filePanel(with: photoExts, allowMultiple: false, for: context.window, completion: { files in
                             if let file = files?.first {
                                 if let image = NSImage(contentsOfFile: file) {
-                                    let string = recognizeMRZ(image.precomposed(), nil)
+                                    recognizeMRZ(image.precomposed(), completion: { string in
                                     let mrz = TGPassportMRZ.parseLines(string?.components(separatedBy: "\n"))
                                     let localFile:SecureIdVerificationDocument = .local(SecureIdVerificationLocalDocument(id: arc4random64(), resource: LocalFileReferenceMediaResource(localFilePath: file, randomId: arc4random64()), state: .uploading(0)))
                                     
@@ -2307,6 +2308,7 @@ private func identityEntries( _ state: PassportState, context: (any AccountConte
                                         }
                                         return current.withUpdatedBackSide(localFile, for: relative.valueKey)
                                     }
+                                    })
                                 }
                             }
                         })
