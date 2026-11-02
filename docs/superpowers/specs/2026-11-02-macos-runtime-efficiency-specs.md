@@ -919,7 +919,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   `sysmon.py` wsCores and gpu% and the Quartz Debug frame meter with and without the hint.
 - **Confidence**: medium (the mechanism is documented; the size on macOS was not measured).
 
-### H2. CDN media parts are AES-CTR decrypted one 16-byte CommonCrypto call at a time; use native `kCCModeCTR` (iOS `a566a470`) — `todo`
+### H2. CDN media parts are AES-CTR decrypted one 16-byte CommonCrypto call at a time; use native `kCCModeCTR` (iOS `a566a470`) — `done (f4bb74b, core 1e9c875)`
 
 - **Evidence**: in `submodules/telegram-ios/submodules/MtProtoKit/Sources/MTAes.m`, `:279-330` creates an ECB cryptor and
   `nextKeystreamBlock` (`:322-329`) makes one `CCCryptorUpdate` per 16 bytes; `:352-395` loops it with a manual XOR.
