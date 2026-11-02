@@ -33,21 +33,30 @@ public final class SoftwareVideoLayerFrameManager {
     private var aspect: CGFloat = 1.0
     
     private let hintVP9: Bool
+    private let primaryDimensions: PixelDimensions?
+    private let secondaryDimensions: PixelDimensions?
+    private var hardwareSlot: HardwareDecoderSlot?
     
     public var onRender:(()->Void)?
     
     public init(account: Account, fileReference: FileMediaReference, layerHolder: SampleBufferLayer) {
         var resource = fileReference.media.resource
         var secondaryResource: MediaResource?
+        var primaryDimensions = fileReference.media.dimensions
+        var secondaryDimensions: PixelDimensions?
         self.hintVP9 = fileReference.media.mimeType == "video/webm"
         for attribute in fileReference.media.attributes {
             if case .Video = attribute {
                 if let thumbnail = fileReference.media.videoThumbnails.first {
                     resource = thumbnail.resource
                     secondaryResource = fileReference.media.resource
+                    secondaryDimensions = primaryDimensions
+                    primaryDimensions = thumbnail.dimensions
                 }
             }
         }
+        self.primaryDimensions = primaryDimensions
+        self.secondaryDimensions = secondaryDimensions
         
         nextWorker += 1
         self.account = account
@@ -76,23 +85,28 @@ public final class SoftwareVideoLayerFrameManager {
             secondarySignal = .single(nil)
         }
         
-        let firstReady: Signal<String, NoError> = combineLatest(
+        let firstReady: Signal<(String, Bool), NoError> = combineLatest(
             self.account.postbox.mediaBox.resourceData(self.resource, option: .complete(waitUntilFetchStatus: false)),
             secondarySignal
             )
-            |> mapToSignal { first, second -> Signal<String, NoError> in
+            |> mapToSignal { first, second -> Signal<(String, Bool), NoError> in
                 if let second = second {
-                    return .single(second)
+                    return .single((second, true))
                 } else if first.complete {
-                    return .single(first.path)
+                    return .single((first.path, false))
                 } else {
                     return .complete()
                 }
             }
         
-        self.dataDisposable.set((firstReady |> deliverOn(applyQueue)).start(next: { [weak self] path in
+        self.dataDisposable.set((firstReady |> deliverOn(applyQueue)).start(next: { [weak self] path, isSecondary in
             if let strongSelf = self {
-                let _ = strongSelf.source.swap(SoftwareVideoSource(path: path, hintVP9: strongSelf.hintVP9, unpremultiplyAlpha: true, useHardwareAcceleration: SoftwareVideoLayerFrameManager.usesHardwareDecoding && !strongSelf.hintVP9))
+                let dimensions = isSecondary ? strongSelf.secondaryDimensions : strongSelf.primaryDimensions
+                strongSelf.hardwareSlot = nil
+                if SoftwareVideoLayerFrameManager.usesHardwareDecoding && !strongSelf.hintVP9, let dimensions = dimensions {
+                    strongSelf.hardwareSlot = GifTileHardwareDecoding.acquireSlot(width: Int(dimensions.width), height: Int(dimensions.height))
+                }
+                let _ = strongSelf.source.swap(SoftwareVideoSource(path: path, hintVP9: strongSelf.hintVP9, unpremultiplyAlpha: true, useHardwareAcceleration: strongSelf.hardwareSlot != nil))
             }
         }))
     }
