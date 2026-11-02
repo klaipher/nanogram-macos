@@ -1,6 +1,7 @@
 import Cocoa
 import ApiCredentials
 import CrashRecoveryUI
+import NanogramKit
 
 @_silgen_name("OPENSSL_init_crypto")
 private func OPENSSL_init_crypto(_ opts: UInt64, _ settings: OpaquePointer?) -> Int32
@@ -100,5 +101,6 @@ installPeerModerationUIHooks()
 installChannelSettingsUIHooks()
 installAudioPlayerUIHooks()
 installPeerInfoUIHooks()
+Nanogram.installHooks()
 
 _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)

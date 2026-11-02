@@ -923,6 +923,7 @@
 		7110771E0000000000000005 /* TLottie in Frameworks */ = {isa = PBXBuildFile; productRef = 7110771E0000000000000003 /* TLottie */; };
 		B2011E3EB7D84C48A0B9509D /* CrashRecoveryUI in Frameworks */ = {isa = PBXBuildFile; productRef = A49FDE6EE2CE45CC94854F90 /* CrashRecoveryUI */; };
 		E9E2F04E0D564351A4C88842 /* CrashReports in Frameworks */ = {isa = PBXBuildFile; productRef = 4E0F0513AE01455B9C8A6FD8 /* CrashReports */; };
+		BEB8EEE9CA6F8D7ED137DCE0 /* NanogramKit in Frameworks */ = {isa = PBXBuildFile; productRef = BFC5AF74E6B2903F72D15B71 /* NanogramKit */; };
 		341A9B85F159A5C4199FEC2E /* UniqueGiftBackground in Frameworks */ = {isa = PBXBuildFile; productRef = B761798CA4CFE188189A6AB9 /* UniqueGiftBackground */; };
 		3B2F0A0B83362EF95967966A /* UniqueGiftRenderer in Frameworks */ = {isa = PBXBuildFile; productRef = 0DEAB1872DFD395632341A0A /* UniqueGiftRenderer */; };
 		66AE41BE414E764871381E57 /* NetworkLab in Frameworks */ = {isa = PBXBuildFile; productRef = 7469DEC40E415EE810C9011D /* NetworkLab */; };
@@ -1957,6 +1958,7 @@
 		7110771E0000000000000001 /* TLottie */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TLottie; path = packages/TLottie; sourceTree = "<group>"; };
 		2314496AC5714CD1BDBAF6C8 /* CrashRecoveryUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CrashRecoveryUI; path = packages/CrashRecoveryUI; sourceTree = "<group>"; };
 		DFD6737EF55F4DC5A158E555 /* CrashReports */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CrashReports; path = packages/CrashReports; sourceTree = "<group>"; };
+		C4F9B6306F3975B867FEA590 /* NanogramKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NanogramKit; path = packages/NanogramKit; sourceTree = "<group>"; };
 		04850EEC74576A5B5C55CF1F /* UniqueGiftBackground */ = {isa = PBXFileReference; lastKnownFileType = folder; name = UniqueGiftBackground; path = packages/UniqueGiftBackground; sourceTree = "<group>"; };
 		2FF937DA37A90C3D60A05B22 /* UniqueGiftRenderer */ = {isa = PBXFileReference; lastKnownFileType = folder; name = UniqueGiftRenderer; path = packages/UniqueGiftRenderer; sourceTree = "<group>"; };
 		135C0F65AB94955A910FF4E2 /* NetworkLab */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NetworkLab; path = packages/NetworkLab; sourceTree = "<group>"; };
@@ -2088,6 +2090,7 @@
 				5105D43394A54BCB8773E53C /* QrStudioUI in Frameworks */,
 				B2011E3EB7D84C48A0B9509D /* CrashRecoveryUI in Frameworks */,
 				E9E2F04E0D564351A4C88842 /* CrashReports in Frameworks */,
+				BEB8EEE9CA6F8D7ED137DCE0 /* NanogramKit in Frameworks */,
 				341A9B85F159A5C4199FEC2E /* UniqueGiftBackground in Frameworks */,
 				3B2F0A0B83362EF95967966A /* UniqueGiftRenderer in Frameworks */,
 				66AE41BE414E764871381E57 /* NetworkLab in Frameworks */,
@@ -2768,6 +2771,7 @@
 				7110771E0000000000000001 /* TLottie */,
 				2314496AC5714CD1BDBAF6C8 /* CrashRecoveryUI */,
 				DFD6737EF55F4DC5A158E555 /* CrashReports */,
+				C4F9B6306F3975B867FEA590 /* NanogramKit */,
 				04850EEC74576A5B5C55CF1F /* UniqueGiftBackground */,
 				2FF937DA37A90C3D60A05B22 /* UniqueGiftRenderer */,
 				135C0F65AB94955A910FF4E2 /* NetworkLab */,
@@ -3716,6 +3720,7 @@
 				7110771E0000000000000002 /* TLottie */,
 				A49FDE6EE2CE45CC94854F90 /* CrashRecoveryUI */,
 				4E0F0513AE01455B9C8A6FD8 /* CrashReports */,
+				BFC5AF74E6B2903F72D15B71 /* NanogramKit */,
 				B761798CA4CFE188189A6AB9 /* UniqueGiftBackground */,
 				0DEAB1872DFD395632341A0A /* UniqueGiftRenderer */,
 				7469DEC40E415EE810C9011D /* NetworkLab */,
@@ -5963,6 +5968,10 @@
 		4E0F0513AE01455B9C8A6FD8 /* CrashReports */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CrashReports;
+		};
+		BFC5AF74E6B2903F72D15B71 /* NanogramKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NanogramKit;
 		};
 		B761798CA4CFE188189A6AB9 /* UniqueGiftBackground */ = {
 			isa = XCSwiftPackageProductDependency;
