@@ -34,7 +34,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 
 ## Quick fixes (S)
 
-### M1. Unchanged peers and cached peer data are rewritten on every update, rebuilding every live history view — `todo`, verified
+### M1. Unchanged peers and cached peer data are rewritten on every update, rebuilding every live history view — `done (dd412d9)`, verified
 
 - **Evidence**: `submodules/telegram-ios/submodules/Postbox/Sources/Postbox.swift:2867-2872` (`updatePeers` always
   calls `peerTable.set` and marks the peer updated, even when identical); `:2999-3005` (`updatePeerCachedData`, the
