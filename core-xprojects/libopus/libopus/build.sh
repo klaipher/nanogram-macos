@@ -22,8 +22,11 @@ CROSS_TOP_MAC="$(xcode-select -p)/Platforms/MacOSX.platform"
 CROSS_SDK_MAC="MacOSX.sdk"
 
 
-SOURCE_DIR="$OUT_DIR/opus-1.3.1"
-SOURCE_ARCHIVE="$SRC_DIR/opus-1.3.1.tar.gz"
+SOURCE_DIR="$OUT_DIR/opus-1.6.1"
+SOURCE_ARCHIVE="$SRC_DIR/opus-1.6.1.tar.gz"
+SOURCE_SHA256="6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1"
+
+echo "$SOURCE_SHA256  $SOURCE_ARCHIVE" | shasum -a 256 -c -
 
 rm -rf "$SOURCE_DIR"
 
@@ -57,7 +60,7 @@ do
   mkdir -p "${ROOTDIR}"
     
   SDKROOT=$CROSS_TOP_MAC/Developer/SDKs/$CROSS_SDK_MAC
-  CFLAGS="-arch ${ARCH2:-${ARCH1}} -pipe -isysroot ${SDKROOT} -Os -DNDEBUG"
+  CFLAGS="-arch ${ARCH2:-${ARCH1}} -pipe -isysroot ${SDKROOT} -O2 -DNDEBUG"
   CFLAGS+=" -mmacosx-version-min=$DEPLOYMENT_TARGET ${EXTRA_CFLAGS}"
   
   
