@@ -156,7 +156,7 @@ func installChatListUIHooks() {
         return formatPhoneNumber(context: context.concrete, number: number)
     }, crashReportCard: { context in
         return crashReportStore.reports |> deliverOnMainQueue |> map { reports -> ChatListCrashReportCard? in
-            guard let newest = reports.first else {
+            guard let newest = reports.first, !crashReportsBotUsername.isEmpty else {
                 return nil
             }
             let title = reports.count == 1 ? strings().crashReportCardTitle : strings().crashReportCardTitleTimesOther(reports.count)

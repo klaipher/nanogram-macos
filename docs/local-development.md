@@ -89,6 +89,23 @@ Shaders: Xcode 27 copies `.copy("*.metal")` package resources as source, and Met
 CallVideoLayer, DustLayer and MetalEngine compile their shaders (XCODE27.md item 3), and `buildcheck` fails any
 app that ships a `.metal` file.
 
+## Branding and Telegram-owned endpoints
+
+- The app is `Nanogram.app/Contents/MacOS/Nanogram` (`PRODUCT_NAME` for the `Telegram` target in
+  `Nanogram.xcconfig`); its Swift module stays `Telegram`, because the MainMenu.xib files name it. The app menu
+  says Nanogram: `Branding.apply(to:)` (NanogramKit) renames "About/Hide/Quit Telegram" at launch instead of
+  editing seven xib files; Telegram features ("Telegram Premium", "Telegram FAQ") keep their names.
+  `appName` (TelegramUtils) is "Nanogram" under `NANOGRAM`, which renames window titles, alerts and About.
+- Icon: the dark Comet. `Telegram-Mac/AppIcon.icon` (macOS 26+) is the iOS fork's `Nanogram.icon`; the
+  pre-26 PNGs in `AppIcon.appiconset` and `TelegramShare/icon.icns` are rendered from `nanogram/icon/NanogramComet.svg`
+  by `swift tools/dev/nanogram/render-mac-icon.swift` (re-run after changing the SVG).
+- Under `NANOGRAM`: no crash-report bot (`macos_stable_updater_bot`; the chat-list crash card is hidden), no
+  MTProto updater channel (the internal updater source is never chosen), App Store links go to our app
+  (id6829268176), crash recovery's website button opens our releases page. No Telegram Sparkle feed in either
+  edition: `SFEED_URL` is empty for mas and our appcast for direct.
+- `tg build` fails when any file in the bundle contains a Telegram update, crash-bot or store endpoint, or when
+  the app, executable, share extension or copyright still say Telegram (`tools/dev/nanogram/branding.py`).
+
 ## Native libraries
 
 `tg frameworks` runs upstream's `scripts/configure_frameworks.sh` with our xcconfig (`XCODE_XCCONFIG_FILE`) and

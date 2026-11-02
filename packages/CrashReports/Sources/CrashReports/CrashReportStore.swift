@@ -1,7 +1,11 @@
 import Foundation
 import SwiftSignalKit
 
+#if NANOGRAM
+public let crashReportsBotUsername = ""
+#else
 public let crashReportsBotUsername = "macos_stable_updater_bot"
+#endif
 
 public struct CrashReport: Equatable {
     public let url: URL

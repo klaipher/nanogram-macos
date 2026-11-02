@@ -262,7 +262,9 @@ func AppUpdateViewController() -> InputDataController {
     
 }
 
-#if STABLE
+#if NANOGRAM
+private let updates_channel_xml = ""
+#elseif STABLE
 private let updates_channel_xml = "macos_stable_updates_xml"
 #else
 private let updates_channel_xml = "macos_beta_updates_xml"
@@ -792,7 +794,7 @@ func updater_resetWithUpdaterSource(_ source: UpdaterSource, force: Bool = true)
 private func alternateUpdaterSource(_ source: UpdaterSource) -> UpdaterSource? {
     switch source {
     case let .external(context):
-        #if STABLE || DEBUG || BETA
+        #if (STABLE || DEBUG || BETA) && !NANOGRAM
         if let context = context {
             return .internal(context: context)
         }

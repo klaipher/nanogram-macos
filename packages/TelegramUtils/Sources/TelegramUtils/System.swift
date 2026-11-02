@@ -14,7 +14,11 @@ import TelegramTheme
 #endif
 
 
+#if NANOGRAM
+public let appName = "Nanogram"
+#else
 public let appName = "Telegram"
+#endif
 public let kMediaImageExt = "jpg";
 public let kMediaGifExt = "mov";
 public let kMediaVideoExt = "mp4";

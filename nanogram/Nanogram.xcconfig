@@ -32,3 +32,15 @@ PROVISIONING_PROFILE_SPECIFIER =
 // Telegram's unused Firebase config (FirebaseApp.configure() is commented out upstream);
 // editions add their own exclusions through NANOGRAM_EDITION_EXCLUDED_FILES.
 EXCLUDED_SOURCE_FILE_NAMES = $(inherited) GoogleService-Info.plist $(NANOGRAM_EDITION_EXCLUDED_FILES)
+
+// Branding: the app is Nanogram.app/Contents/MacOS/Nanogram. Its Swift module stays "Telegram": the
+// MainMenu.xib files and ObjC bridging refer to it by that name.
+NANOGRAM_PRODUCT_NAME_Telegram = Nanogram
+PRODUCT_NAME = $(NANOGRAM_PRODUCT_NAME_$(TARGET_NAME):default=$(inherited))
+NANOGRAM_MODULE_NAME_Telegram = Telegram
+PRODUCT_MODULE_NAME = $(NANOGRAM_MODULE_NAME_$(TARGET_NAME):default=$(inherited))
+
+// No Telegram update feed (upstream's Debug/Release xcconfigs point Sparkle at mac-updates.telegram.org);
+// the direct edition sets its own.
+SFEED_URL =
+DSA_PEM_FILE =

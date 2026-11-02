@@ -1186,7 +1186,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                     applicationUpdateUrlPrefix = nil
                                 }
                                 setAppUpdaterBaseDomain(applicationUpdateUrlPrefix)
-                                #if STABLE || BETA || DEBUG
+                                #if (STABLE || BETA || DEBUG) && !NANOGRAM
                                 updater_resetWithUpdaterSource(.internal(context: context.context))
                                 #else
                                 updater_resetWithUpdaterSource(.external(context: context.context))
@@ -1252,7 +1252,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                             applicationUpdateUrlPrefix = nil
                                         }
                                         setAppUpdaterBaseDomain(applicationUpdateUrlPrefix)
-                                        #if STABLE
+                                        #if STABLE && !NANOGRAM
                                         if let context = self.contextValue?.context {
                                             updater_resetWithUpdaterSource(.internal(context: context))
                                         } else {
@@ -1348,7 +1348,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     @IBAction func checkForUpdates(_ sender: Any) {
         #if !APP_STORE && !NANOGRAM_MAS
             showModal(with: InputDataModalController(AppUpdateViewController()), for: window)
-            #if STABLE
+            #if STABLE && !NANOGRAM
                 if let context = self.contextValue?.context {
                     updater_resetWithUpdaterSource(.internal(context: context))
                 } else {

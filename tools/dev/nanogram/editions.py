@@ -14,7 +14,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from nanogram import config
+from nanogram import branding, config
 from nanogram.buildcheck import _is_macho, find_app, main_executable
 
 EDITIONS = ("mas", "direct")
@@ -149,6 +149,8 @@ def main(argv: list[str] | None = None) -> int:
     app = stash_app(args.products, args.configuration, args.edition) if args.products else \
         stashed_app(args.configuration, args.edition)
     problems = check_edition(inspect_app(app), args.edition)
+    problems += branding.check_names(app)
+    problems += [f"Telegram endpoint in the bundle: {hit}" for hit in branding.find_forbidden(app)]
     for problem in problems:
         print(f"editions: {problem}", file=sys.stderr)
     if problems:

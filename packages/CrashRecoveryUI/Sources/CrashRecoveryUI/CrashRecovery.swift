@@ -55,8 +55,13 @@ private func systemPalette() -> ColorPalette {
     return whitePalette
 }
 
+#if NANOGRAM
+private let appStoreURL = URL(string: "macappstore://apps.apple.com/app/id6829268176")!
+private let websiteURL = URL(string: "https://github.com/klaipher/nanogram-releases/releases/latest")!
+#else
 private let appStoreURL = URL(string: "macappstore://apps.apple.com/app/id747648890")!
 private let websiteURL = URL(string: "https://macos.telegram.org")!
+#endif
 
 private enum Text {
     static let title = strings().crashRecoveryTitle

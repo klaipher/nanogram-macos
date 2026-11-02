@@ -7,3 +7,7 @@ NANOGRAM_ENTITLEMENTS_TelegramShare = nanogram/entitlements/NanogramShare.entitl
 CODE_SIGN_ENTITLEMENTS = $(NANOGRAM_ENTITLEMENTS_$(TARGET_NAME):default=$(inherited))
 
 ENABLE_HARDENED_RUNTIME = YES
+
+// Sparkle reads our appcast, published (by the owner) with each direct release. AppUpdateViewController
+// force-unwraps URL(SUFeedURL), so the direct edition must never ship an empty feed.
+SFEED_URL = https:/$()/github.com/klaipher/nanogram-releases/releases/latest/download/appcast.xml

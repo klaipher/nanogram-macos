@@ -16,5 +16,6 @@ public enum Nanogram {
             return true
         }
         guard first else { return }
+        Branding.installMenuHook()
     }
 }
