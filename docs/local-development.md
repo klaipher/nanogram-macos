@@ -106,6 +106,29 @@ app that ships a `.metal` file.
 - `tg build` fails when any file in the bundle contains a Telegram update, crash-bot or store endpoint, or when
   the app, executable, share extension or copyright still say Telegram (`tools/dev/nanogram/branding.py`).
 
+## Sparkle (direct edition)
+
+The direct edition updates from `https://github.com/klaipher/nanogram-releases/releases/latest/download/appcast.xml`
+(`SFEED_URL` in `nanogram/editions/direct.xcconfig`), with EdDSA signatures only: Info.plist `SUPublicEDKey` comes
+from `SPARKLE_ED_PUBLIC_KEY` in the same file, and there is no DSA key. We stay on upstream's Sparkle 1.21 (it
+checks EdDSA for `.zip` app updates; installer packages would need DSA): Sparkle 2 would rewrite upstream's
+updater file. Nothing is published from here; the owner publishes releases and the appcast.
+
+- `tools/dev/tg sparkle-key` creates the private key once at `~/.config/nanogram-macos/sparkle_ed25519` (folder
+  0700, file 0600: a base64 32-byte RFC 8032 seed, the format Sparkle 2's `sign_update --ed-key-file` reads) and
+  prints the public key. It never overwrites an existing key and never prints the private one. Back the key up
+  outside this Mac: losing it means installed copies reject every later update.
+- `tools/dev/tg sparkle-key sign <archive>` prints the appcast enclosure attributes
+  (`sparkle:edSignature="…" length="…"`). Sparkle 1.21's own `generate_keys`/`sign_update` keep the key in the
+  login Keychain only, so `tools/dev/nanogram/sparkle.py` builds a small helper from Sparkle's vendored ed25519
+  code into `~/.cache/nanogram-macos/sparkle-ed25519/`; the key reaches it on stdin only.
+- `tg build` fails a direct app without our feed or a valid `SUPublicEDKey`, and a mas app with any feed.
+
+Xcode can reuse a cached build description without re-reading an edition xcconfig (seen here: build mas, edit
+`direct.xcconfig`, build direct → the new setting missing from Info.plist). `tg build` therefore drops the cached
+`XCBuildData/*.xcbuilddata` descriptions when the edition's xcconfig files changed since that edition's last build;
+compiled objects stay, so the build is still incremental.
+
 ## Native libraries
 
 `tg frameworks` runs upstream's `scripts/configure_frameworks.sh` with our xcconfig (`XCODE_XCCONFIG_FILE`) and

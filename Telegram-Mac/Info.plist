@@ -93,6 +93,8 @@
 	<string>${SFEED_URL}</string>
 	<key>SUPublicDSAKeyFile</key>
 	<string>${DSA_PEM_FILE}</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_ED_PUBLIC_KEY)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>SFCompactRounded-Semibold.otf</string>

@@ -4,6 +4,7 @@ import plistlib
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -50,6 +51,19 @@ class EditionRulesTests(unittest.TestCase):
         problems = editions.check_edition(self.facts(sparkle_embedded=True, hardened_runtime=True), "direct")
         self.assertTrue(any("sandbox" in p for p in problems))
 
+    def test_direct_needs_our_feed_and_ed_key(self):
+        base = dict(entitlements={"com.apple.security.application-groups": [GROUP]}, sparkle_embedded=True,
+                    hardened_runtime=True)
+        problems = editions.check_edition(self.facts(**base), "direct")
+        self.assertTrue(any("SUFeedURL" in p for p in problems), problems)
+        self.assertTrue(any("SUPublicEDKey" in p for p in problems), problems)
+        good = self.facts(**base, sparkle_feed=editions.SPARKLE_FEED_URL, sparkle_public_key="A" * 43 + "=")
+        self.assertEqual(editions.check_edition(good, "direct"), [])
+
+    def test_mas_has_no_feed(self):
+        problems = editions.check_edition(self.facts(sparkle_feed="https://example.org/appcast.xml"), "mas")
+        self.assertTrue(any("SUFeedURL" in p for p in problems), problems)
+
     def test_missing_group_rejected(self):
         facts = self.facts(entitlements={"com.apple.security.app-sandbox": True})
         self.assertTrue(any(GROUP in p for p in editions.check_edition(facts, "mas")))
@@ -63,6 +77,60 @@ class EditionRulesTests(unittest.TestCase):
             full.pop(key)
         self.assertEqual(development, full)
         self.assertNotIn("com.apple.developer.associated-domains", full)
+
+class BuildDescriptionTests(unittest.TestCase):
+    """Xcode reused a cached build description after an edition xcconfig changed (seen in Task 9: mas build,
+    edit direct.xcconfig, direct build → Info.plist without the new setting). tg build drops the cache then."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.editions_dir = root / "nanogram" / "editions"
+        self.editions_dir.mkdir(parents=True)
+        (root / "nanogram" / "Nanogram.xcconfig").write_text("ARCHS = arm64\n")
+        self.xcconfig = self.editions_dir / "direct.xcconfig"
+        self.xcconfig.write_text('#include "../Nanogram.xcconfig"\nSFEED_URL = a\n')
+        self.derived = root / "DerivedData"
+        self.descriptions = self.derived / "Build" / "Intermediates.noindex" / "XCBuildData"
+        self.descriptions.mkdir(parents=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def cached(self):
+        (self.descriptions / "734b.xcbuilddata").mkdir(exist_ok=True)
+        (self.descriptions / "build.db").write_text("db")
+
+    def refresh(self):
+        return editions.refresh_build_descriptions(self.xcconfig, "direct", self.derived)
+
+    def test_unchanged_settings_keep_the_cache(self):
+        self.refresh()
+        self.cached()
+        self.assertFalse(self.refresh())
+        self.assertTrue((self.descriptions / "734b.xcbuilddata").exists())
+
+    def test_changed_edition_xcconfig_drops_descriptions_only(self):
+        self.refresh()
+        self.cached()
+        self.xcconfig.write_text(self.xcconfig.read_text() + "SPARKLE_ED_PUBLIC_KEY = k\n")
+        self.assertTrue(self.refresh())
+        self.assertFalse((self.descriptions / "734b.xcbuilddata").exists())
+        self.assertEqual((self.descriptions / "build.db").read_text(), "db")
+
+    def test_changed_included_xcconfig_drops_descriptions(self):
+        self.refresh()
+        self.cached()
+        (self.editions_dir.parent / "Nanogram.xcconfig").write_text("ARCHS = arm64\nPRODUCT_NAME = x\n")
+        self.assertTrue(self.refresh())
+
+    def test_each_edition_tracked_separately(self):
+        self.refresh()
+        self.cached()
+        self.assertTrue(editions.refresh_build_descriptions(self.xcconfig, "mas", self.derived))
+        self.cached()
+        self.assertFalse(self.refresh())
+
 
 @unittest.skipUnless(BOTH_BUILT, NOT_BUILT)
 class BuiltEditionsTests(unittest.TestCase):

@@ -31,6 +31,12 @@ cmd_frameworks() { py frameworks "$@"; }
 # Writes the gitignored NanogramSecrets.swift (api_id/api_hash); prints only the path, never the values.
 cmd_credentials() { py credentials || die "cannot generate API credentials"; }
 
+# Sparkle EdDSA key for the direct edition: creates ~/.config/nanogram-macos/sparkle_ed25519 (0600) once and
+# prints the public key (SUPublicEDKey); `tg sparkle-key sign <archive>` prints the appcast signature.
+cmd_sparkle_key() {
+  if [ "${1:-}" = sign ]; then py sparkle sign "${@:2}"; else py sparkle public-key; fi
+}
+
 # Idempotent working-tree fixes inside submodules (tools/dev/nanogram/localfixes.py).
 cmd_localfixes() { py localfixes || die "cannot apply local submodule fixes"; }
 
@@ -77,6 +83,7 @@ cmd_build() {
   log="$ROOT/build-output/last-build.log"
   cmd_localfixes
   cmd_credentials
+  py editions --edition "$edition" --before-build "$derived"
 
   say "Building $configuration ($edition edition), log: build-output/last-build.log"
   local start=$SECONDS status=0
@@ -121,6 +128,7 @@ usage: tools/dev/tg <command> [options]
   credentials      generate NanogramSecrets.swift from ~/.config/telegram-ios/api-credentials.json
   build            build the app [--release] [--edition mas|direct]
   xcode [edition]  open the workspace in Xcode with our settings (quit Xcode first)
+  sparkle-key      create the Sparkle EdDSA key once, print its public key [sign <archive>]
   run              build and launch the app
   test             swift test for our packages
   lint             tglint on changed Swift files
@@ -142,6 +150,7 @@ main() {
     credentials) cmd_credentials ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;
+    sparkle-key) cmd_sparkle_key "$@" ;;
     run|test|lint|warnings|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;

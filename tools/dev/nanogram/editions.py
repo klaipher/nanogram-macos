@@ -6,6 +6,9 @@ Both: bundle org.klaipher.Nanogram, the same app group, the same data prefix (In
 from __future__ import annotations
 
 import argparse
+import hashlib
+import base64
+import binascii
 import plistlib
 import re
 import shutil
@@ -14,7 +17,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from nanogram import branding, config
+from nanogram import branding, config, sparkle
 from nanogram.buildcheck import _is_macho, find_app, main_executable
 
 EDITIONS = ("mas", "direct")
@@ -26,10 +29,12 @@ GROUPS = "com.apple.security.application-groups"
 # (Nanogram-MAS.entitlements, used when exporting with the App Store profile), left out of the
 # development set that profile-less local builds sign with.
 PROFILE_ONLY_KEYS = ("com.apple.developer.maps",)
+SPARKLE_FEED_URL = sparkle.FEED_URL
 SPARKLE_SYMBOL = re.compile(r"_OBJC_CLASS_\$_(SU|SPU)[A-Z]\w*|Sparkle")
 APPS_DIR = config.BUILD_OUTPUT / "apps"
 
-__all__ = ["AppFacts", "inspect_app", "check_edition", "stash_app", "stashed_app", "main_executable"]
+__all__ = ["AppFacts", "inspect_app", "check_edition", "stash_app", "stashed_app", "main_executable",
+           "refresh_build_descriptions"]
 
 
 @dataclass
@@ -41,6 +46,8 @@ class AppFacts:
     entitlements: dict
     hardened_runtime: bool
     extension_entitlements: dict = field(default_factory=dict)
+    sparkle_feed: str = ""
+    sparkle_public_key: str = ""
 
 
 def _entitlements(bundle: Path) -> dict:
@@ -83,7 +90,16 @@ def inspect_app(app: Path) -> AppFacts:
         entitlements=_entitlements(app),
         hardened_runtime=_hardened_runtime(app),
         extension_entitlements=_entitlements(extensions[0]) if extensions else {},
+        sparkle_feed=info.get("SUFeedURL", ""),
+        sparkle_public_key=info.get("SUPublicEDKey", ""),
     )
+
+
+def _is_ed25519_public_key(value: str) -> bool:
+    try:
+        return len(base64.b64decode(value, validate=True)) == 32
+    except (binascii.Error, ValueError):
+        return False
 
 
 def check_edition(facts: AppFacts, edition: str) -> list[str]:
@@ -105,6 +121,8 @@ def check_edition(facts: AppFacts, edition: str) -> list[str]:
         if facts.sparkle_embedded:
             problems.append("mas app embeds Contents/Frameworks/Sparkle.framework")
         problems += [f"mas app references Sparkle: {s}" for s in facts.sparkle_symbols]
+        if facts.sparkle_feed:
+            problems.append(f"mas app has a SUFeedURL ({facts.sparkle_feed})")
         if "com.apple.developer.associated-domains" in facts.entitlements:
             problems.append("mas app claims associated domains (Telegram's webcredentials)")
     else:
@@ -114,7 +132,43 @@ def check_edition(facts: AppFacts, edition: str) -> list[str]:
             problems.append("direct app does not embed Sparkle.framework")
         if not facts.hardened_runtime:
             problems.append("direct app is not signed with the hardened runtime")
+        if facts.sparkle_feed != SPARKLE_FEED_URL:
+            problems.append(f"direct app SUFeedURL is {facts.sparkle_feed!r}, expected {SPARKLE_FEED_URL}")
+        if not _is_ed25519_public_key(facts.sparkle_public_key):
+            problems.append("direct app has no valid SUPublicEDKey (base64 32-byte ed25519 key): see tg sparkle-key")
     return problems
+
+
+INCLUDE_RE = re.compile(r'^\s*#include\??\s+"([^"]+)"', re.M)
+
+
+def _xcconfig_files(xcconfig: Path) -> list[Path]:
+    files, pending = [], [Path(xcconfig)]
+    while pending:
+        path = pending.pop(0).resolve()
+        if path in files or not path.is_file():
+            continue
+        files.append(path)
+        pending += [path.parent / name for name in INCLUDE_RE.findall(path.read_text())]
+    return files
+
+
+def refresh_build_descriptions(xcconfig: Path, edition: str, derived: Path) -> bool:
+    """Drops Xcode's cached build descriptions when this edition's xcconfig (or one it includes) changed since
+    the edition was last built. Xcode can reuse a cached description without re-reading the -xcconfig file
+    (mas build, edit direct.xcconfig, direct build: the new setting never reached Info.plist). Only the
+    *.xcbuilddata descriptions go; build.db and compiled objects stay, so the build stays incremental."""
+    digest = hashlib.sha256()
+    for path in _xcconfig_files(xcconfig):
+        digest.update(str(path).encode() + b"\0" + path.read_bytes() + b"\0")
+    stamp = Path(derived) / f"nanogram-xcconfig-{edition}.sha256"
+    unchanged = stamp.is_file() and stamp.read_text().strip() == digest.hexdigest()
+    if not unchanged:
+        for description in (Path(derived) / "Build" / "Intermediates.noindex" / "XCBuildData").glob("*.xcbuilddata"):
+            shutil.rmtree(description)
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(digest.hexdigest() + "\n")
+    return not unchanged
 
 
 def _edition_dir(configuration: str, edition: str) -> Path:
@@ -143,9 +197,18 @@ def stashed_app(configuration: str, edition: str) -> Path:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="tg editions")
     parser.add_argument("--edition", required=True, choices=EDITIONS)
-    parser.add_argument("--configuration", required=True)
+    parser.add_argument("--configuration")
     parser.add_argument("--products", type=Path, help="stash the app from this products dir first")
+    parser.add_argument("--before-build", type=Path, metavar="DERIVED_DATA",
+                        help="only drop stale build descriptions for this edition, then exit")
     args = parser.parse_args(argv)
+    if args.before_build:
+        xcconfig = config.ROOT / "nanogram" / "editions" / f"{args.edition}.xcconfig"
+        if refresh_build_descriptions(xcconfig, args.edition, args.before_build):
+            print(f"editions: {args.edition} settings changed since its last build; Xcode recomputes its build description")
+        return 0
+    if not args.configuration:
+        parser.error("--configuration is required")
     app = stash_app(args.products, args.configuration, args.edition) if args.products else \
         stashed_app(args.configuration, args.edition)
     problems = check_edition(inspect_app(app), args.edition)
