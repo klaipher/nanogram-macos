@@ -275,6 +275,7 @@ final class ChatVoiceTranscriptionView: View {
                 rotation.toValue = -CGFloat.pi * 2
                 rotation.duration = 3.2
                 rotation.repeatCount = .infinity
+                rotation.setDecorativeLoopFrameRate()
                 rotation.isRemovedOnCompletion = false
                 ring.add(rotation, forKey: "rotation")
             }
@@ -284,6 +285,7 @@ final class ChatVoiceTranscriptionView: View {
                 animation.toValue = [1, 1.15, 1.3]
                 animation.duration = 1.4
                 animation.repeatCount = .infinity
+                animation.setDecorativeLoopFrameRate()
                 animation.isRemovedOnCompletion = false
                 shimmer.add(animation, forKey: "shimmer")
             }

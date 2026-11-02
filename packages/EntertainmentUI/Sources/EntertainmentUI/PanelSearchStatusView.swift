@@ -90,6 +90,7 @@ final class PanelSearchStatusView: View {
                 animation.toValue = [1, 1.5, 2]
                 animation.duration = 1.4
                 animation.repeatCount = .infinity
+                animation.setDecorativeLoopFrameRate()
                 shimmer.add(animation, forKey: "searchShimmer")
             }
         } else {

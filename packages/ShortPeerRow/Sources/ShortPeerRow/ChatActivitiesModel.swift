@@ -154,6 +154,7 @@ final class ChatActivityIndicatorLayer: SimpleLayer {
             animation.values = frameValues
             animation.duration = self.loopDuration
             animation.repeatCount = .infinity
+            animation.setDecorativeLoopFrameRate()
             animation.isRemovedOnCompletion = false
             layer.add(animation, forKey: keyPath)
         }

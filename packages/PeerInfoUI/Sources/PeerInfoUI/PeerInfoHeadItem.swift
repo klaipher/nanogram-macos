@@ -1284,6 +1284,7 @@ private class GiftIconLayer: SimpleLayer {
             hoverAnimation.toValue = downDistance
             hoverAnimation.autoreverses = true
             hoverAnimation.repeatCount = .infinity
+            hoverAnimation.setDecorativeLoopFrameRate()
             hoverAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             hoverAnimation.beginTime = beginTime
             hoverAnimation.isAdditive = true
@@ -1301,6 +1302,7 @@ private class GiftIconLayer: SimpleLayer {
             wiggleAnimation.toValue = toRotationAngle
             wiggleAnimation.autoreverses = true
             wiggleAnimation.repeatCount = .infinity
+            wiggleAnimation.setDecorativeLoopFrameRate()
             wiggleAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             wiggleAnimation.beginTime = beginTime
             wiggleAnimation.isAdditive = true
@@ -1316,6 +1318,7 @@ private class GiftIconLayer: SimpleLayer {
             glowAnimation.toValue = 1.2
             glowAnimation.autoreverses = true
             glowAnimation.repeatCount = .infinity
+            glowAnimation.setDecorativeLoopFrameRate()
             glowAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             glowAnimation.beginTime = beginTime
             self.shadowLayer.add(glowAnimation, forKey: "glow")

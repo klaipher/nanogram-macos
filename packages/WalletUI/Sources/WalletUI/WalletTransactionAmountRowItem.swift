@@ -286,6 +286,7 @@ private final class WalletPendingAmountShimmerView: View {
         animation.isAdditive = true
         animation.duration = 1.0
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
         maskLayer.add(animation, forKey: "walletPendingShimmer")
     }

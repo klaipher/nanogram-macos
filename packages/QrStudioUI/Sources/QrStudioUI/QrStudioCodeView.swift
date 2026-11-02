@@ -281,6 +281,7 @@ final class QrStudioPlaneLayer: SimpleLayer {
         animation.duration = sticker.period
         animation.calculationMode = .discrete
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.isRemovedOnCompletion = false
         animation.beginTime = self.convertTime(CACurrentMediaTime(), from: nil)
         self.add(animation, forKey: QrStudioPlaneLayer.animationKey)

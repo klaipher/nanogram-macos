@@ -1510,6 +1510,7 @@ extension WalletCardView {
                 march.toValue = -9 * unit
                 march.duration = 0.9
                 march.repeatCount = .infinity
+                march.setDecorativeLoopFrameRate()
                 stickerHintLayer.add(march, forKey: "hintMarch")
             }
             stickerHintLayer.opacity = 1

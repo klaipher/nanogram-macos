@@ -112,6 +112,7 @@ public final class GroupCallSecureEmojiView: Control {
                         animation.timingFunction = CAMediaTimingFunction(name: .linear)
                         animation.autoreverses = false
                         animation.repeatCount = .infinity
+                        animation.setDecorativeLoopFrameRate()
                         
                         pendingContainerView.layer?.add(animation, forKey: "offsetCycle")
                     }

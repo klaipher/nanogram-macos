@@ -228,6 +228,7 @@ public final class GroupCallRecorderRowView : GeneralContainableRowView {
                 animation.duration = 1.0
                 animation.autoreverses = true
                 animation.repeatCount = .infinity
+                animation.setDecorativeLoopFrameRate()
                 animation.isRemovedOnCompletion = false
                 animation.fillMode = CAMediaTimingFillMode.forwards
                 

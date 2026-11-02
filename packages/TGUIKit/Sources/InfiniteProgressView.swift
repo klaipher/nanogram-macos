@@ -135,6 +135,7 @@ public final class InfiniteProgressView: View {
             group.animations = [grow, shrink]
             group.duration = 2.5
             group.repeatCount = .infinity
+            group.setDecorativeLoopFrameRate()
             group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             pLayer.add(group, forKey: Self.indefiniteAnimationKey)
         }
@@ -153,6 +154,7 @@ public final class InfiniteProgressView: View {
             basicAnimation.fromValue = NSNumber(value: fromValue)
             basicAnimation.toValue = NSNumber(value: fromValue + Float.pi * 2.0)
             basicAnimation.repeatCount = Float.infinity
+            basicAnimation.setDecorativeLoopFrameRate()
             basicAnimation.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)
             basicAnimation.beginTime = 0.0
             

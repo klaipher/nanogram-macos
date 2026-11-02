@@ -113,6 +113,7 @@ public final class ShimmerEffectForegroundView: View {
             animation = self.imageView.layer!.makeAnimation(from: 0.0 as NSNumber, to: (containerSize.width + gradientHeight) as NSNumber, keyPath: "position.x", timingFunction: .easeOut, duration: duration, delay: 0, mediaTimingFunction: nil, removeOnCompletion: true, additive: true)
             if !isStatic {
                 animation.repeatCount = Float.infinity
+                animation.setDecorativeLoopFrameRate()
                 animation.beginTime = 1.0
             }
         } else {
@@ -122,6 +123,7 @@ public final class ShimmerEffectForegroundView: View {
             
             if !isStatic {
                 animation.repeatCount = Float.infinity
+                animation.setDecorativeLoopFrameRate()
                 animation.beginTime = 1.0
             }
         }

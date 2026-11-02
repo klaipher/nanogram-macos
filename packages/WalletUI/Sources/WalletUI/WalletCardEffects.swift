@@ -713,6 +713,7 @@ public final class WalletCardEffectsLayers {
         animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         animation.autoreverses = true
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.beginTime = CACurrentMediaTime() - Double(delay)
         star.add(animation, forKey: "twinkle")
     }

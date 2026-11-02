@@ -182,6 +182,7 @@ public final class InstantPageV2ThinkingView: View {
             additive: true
         )
         animation.repeatCount = Float.infinity
+        animation.setDecorativeLoopFrameRate()
         self.maskLayer.add(animation, forKey: Self.animationKey)
     }
 }

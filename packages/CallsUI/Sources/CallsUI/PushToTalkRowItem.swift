@@ -158,6 +158,7 @@ public final class PushToTalkRowView: GeneralContainableRowView {
             animation.duration = 0.8
             animation.timingFunction = .init(name: .easeInEaseOut)
             animation.repeatCount = .infinity
+            animation.setDecorativeLoopFrameRate()
             animation.autoreverses = true
             shimmerView.layer?.add(animation, forKey: "opacity")
         }

@@ -417,6 +417,7 @@ public final class ContextAddReactionsListView : View, StickerFramesCollector  {
                 bounce.timingFunctions = [CAMediaTimingFunction(name: .easeInEaseOut), CAMediaTimingFunction(name: .easeInEaseOut)]
                 bounce.duration = 0.7
                 bounce.repeatCount = .infinity
+                bounce.setDecorativeLoopFrameRate()
                 bounce.isAdditive = true
                 bounce.beginTime = now + 0.25 + Double(i) * 0.08
                 bounce.fillMode = .backwards

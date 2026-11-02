@@ -350,6 +350,7 @@ public class MediaDustView: View {
         falloffAnimation1.isRemovedOnCompletion = false
         falloffAnimation1.autoreverses = true
         falloffAnimation1.repeatCount = .infinity
+        falloffAnimation1.setDecorativeLoopFrameRate()
         falloffAnimation1.duration = 2.0
         falloffAnimation1.fromValue = -20.0 as NSNumber
         falloffAnimation1.toValue = 60.0 as NSNumber
@@ -362,6 +363,7 @@ public class MediaDustView: View {
         positionAnimation1.isRemovedOnCompletion = false
         positionAnimation1.autoreverses = true
         positionAnimation1.repeatCount = .infinity
+        positionAnimation1.setDecorativeLoopFrameRate()
         positionAnimation1.duration = 3.0
         positionAnimation1.calculationMode = .discrete
 
@@ -381,6 +383,7 @@ public class MediaDustView: View {
         falloffAnimation2.isRemovedOnCompletion = false
         falloffAnimation2.autoreverses = true
         falloffAnimation2.repeatCount = .infinity
+        falloffAnimation2.setDecorativeLoopFrameRate()
         falloffAnimation2.duration = 2.0
         falloffAnimation2.fromValue = -20.0 as NSNumber
         falloffAnimation2.toValue = 60.0 as NSNumber
@@ -393,6 +396,7 @@ public class MediaDustView: View {
         positionAnimation2.isRemovedOnCompletion = false
         positionAnimation2.autoreverses = true
         positionAnimation2.repeatCount = .infinity
+        positionAnimation2.setDecorativeLoopFrameRate()
         positionAnimation2.duration = 3.0
         positionAnimation2.calculationMode = .discrete
 

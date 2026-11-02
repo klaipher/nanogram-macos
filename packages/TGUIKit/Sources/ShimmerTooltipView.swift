@@ -119,6 +119,7 @@ public final class ShimmerTooltipView: View {
             animation.toValue = frame.width + ShimmerTooltipView.shimmerWidth / 2
             animation.duration = 2.2
             animation.repeatCount = .infinity
+            animation.setDecorativeLoopFrameRate()
             shimmerBand.add(animation, forKey: "shimmer")
         }
     }
