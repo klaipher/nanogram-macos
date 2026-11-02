@@ -822,7 +822,7 @@ final class AccountContext {
         }
         
         updateDifferenceDisposable.set((Signal<Void, NoError>.single(Void())
-            |> delay(5, queue: Queue.mainQueue()) |> restart).start(next: { [weak self, weak account] in
+            |> delay(30, queue: Queue.mainQueue()) |> restart).start(next: { [weak self, weak account] in
                 if let account = account, account.network.globalTime > 0 {
                     self?.timeDifference = floor(account.network.globalTime - Date().timeIntervalSince1970)
                 }
