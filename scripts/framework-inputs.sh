@@ -141,14 +141,14 @@ framework_required_outputs() {
         wallet-engine)
             local XCFRAMEWORK="$1/packages/WalletEngine/wallet_engineFFI.xcframework"
             printf '%s\n' "$BUILD_DIR/libwallet_engine.a" "$BUILD_DIR/WalletEngineFFI.swift" \
-                "$XCFRAMEWORK/Info.plist" "$XCFRAMEWORK/macos-arm64_x86_64/libwallet_engine.a" \
-                "$XCFRAMEWORK/macos-arm64_x86_64/Headers/"{wallet_engineFFI.h,module.modulemap}
+                "$XCFRAMEWORK/Info.plist" "$XCFRAMEWORK/macos-arm64/libwallet_engine.a" \
+                "$XCFRAMEWORK/macos-arm64/Headers/"{wallet_engineFFI.h,module.modulemap}
             ;;
         mtproto-engine)
             local XCFRAMEWORK="$1/submodules/telegram-ios/submodules/MTProtoRustEngine/MTProtoEngineFFI.xcframework"
             printf '%s\n' "$BUILD_DIR/libmtproto_engine_ffi.a" "$XCFRAMEWORK/Info.plist" \
-                "$XCFRAMEWORK/macos-arm64_x86_64/libmtproto_engine_ffi.a" \
-                "$XCFRAMEWORK/macos-arm64_x86_64/Headers/MTProtoEngineFFI/"{mtproto_engine.h,module.modulemap}
+                "$XCFRAMEWORK/macos-arm64/libmtproto_engine_ffi.a" \
+                "$XCFRAMEWORK/macos-arm64/Headers/MTProtoEngineFFI/"{mtproto_engine.h,module.modulemap}
             ;;
         *) return 1 ;;
     esac
@@ -213,6 +213,7 @@ framework_stamp() {
     echo "lib=$LIB"
     echo "xcode=${FRAMEWORK_XCODE_VERSION:-$(xcodebuild -version 2>/dev/null | tr '\n' ' ')}"
     echo "deployment=${MACOSX_DEPLOYMENT_TARGET:-default}"
+    echo "archs=${ARCHS:-default}"
     framework_extra_fingerprint "$LIB"
     while IFS= read -r INPUT; do
         [ -n "$INPUT" ] || continue

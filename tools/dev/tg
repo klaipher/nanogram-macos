@@ -26,6 +26,22 @@ config_value() { python3 -c "from nanogram import config; print(config.$1)"; }
 
 cmd_doctor() { py doctor; }
 
+cmd_frameworks() { py frameworks "$@"; }
+
+cmd_setup() {
+  say "Fetching submodules"
+  git submodule sync --recursive >/dev/null
+  git submodule update --init --recursive --jobs 8
+  local toolchain
+  toolchain="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml)"
+  [ -n "$toolchain" ] || die "cannot read the Rust toolchain pinned in submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml"
+  command -v rustup >/dev/null || die "rustup missing: brew install rustup"
+  say "Installing Rust $toolchain (pinned upstream)"
+  rustup toolchain install "$toolchain" --profile minimal
+  rustup target add --toolchain "$toolchain" aarch64-apple-darwin
+  cmd_frameworks
+}
+
 edition_xcconfig() {
   local file="$ROOT/nanogram/editions/$1.xcconfig"
   [ -f "$file" ] || die "unknown edition '$1' (no $file)"
@@ -91,7 +107,7 @@ usage: tools/dev/tg <command> [options]
 
   setup            submodules, Rust toolchain, native libraries
   doctor           check prerequisites
-  frameworks       build the native libraries (arm64)
+  frameworks       build the native libraries (arm64) [--verify-only]
   build            build the app [--release] [--edition mas|direct]
   xcode [edition]  open the workspace in Xcode with our settings (quit Xcode first)
   run              build and launch the app
@@ -110,9 +126,11 @@ main() {
   [ $# -gt 0 ] && shift
   case "$cmd" in
     doctor) cmd_doctor "$@" ;;
+    setup) cmd_setup "$@" ;;
+    frameworks) cmd_frameworks "$@" ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;
-    setup|frameworks|run|test|lint|warnings|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;
+    run|test|lint|warnings|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;
   esac

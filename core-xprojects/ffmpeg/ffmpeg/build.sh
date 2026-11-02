@@ -79,10 +79,6 @@ DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
 
 if [ "$COMPILE" ]
 then
-	if [ ! `which yasm` ]; then
-		echo 'Yasm not found'
-		exit 1
-	fi
 	if [ ! `which pkg-config` ]; then
 		echo 'pkg-config not found'
 		exit 1

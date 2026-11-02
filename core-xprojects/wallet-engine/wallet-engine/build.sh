@@ -15,8 +15,6 @@ if [ -z "$SOURCE_DIR" ] || [ -z "$BUILD_DIR" ] || [ -z "$PACKAGE_DIR" ]; then
     exit 1
 fi
 
-DEPLOYMENT_TARGET="10.15"
-
 if [ ! -f "$SOURCE_DIR/Cargo.toml" ]; then
     echo "wallet-engine sources are missing at $SOURCE_DIR"
     echo "Check out the submodule first:"
@@ -49,23 +47,20 @@ mkdir -p "$BUILD_DIR"
 
 cd "$SOURCE_DIR"
 
-for RUST_TARGET in aarch64-apple-darwin x86_64-apple-darwin; do
+for RUST_TARGET in aarch64-apple-darwin; do
     if [ -x "$RUSTUP_BIN" ]; then
         "$RUSTUP_BIN" target add "$RUST_TARGET" >/dev/null 2>&1 || true
     fi
-    MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" build \
+    env -u MACOSX_DEPLOYMENT_TARGET CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" build \
         --package wallet-engine \
         --release \
         --locked \
         --target "$RUST_TARGET"
 done
 
-lipo -create \
-    "$BUILD_DIR/lib/aarch64-apple-darwin/release/libwallet_engine.a" \
-    "$BUILD_DIR/lib/x86_64-apple-darwin/release/libwallet_engine.a" \
-    -output "$BUILD_DIR/libwallet_engine.a"
+cp "$BUILD_DIR/lib/aarch64-apple-darwin/release/libwallet_engine.a" "$BUILD_DIR/libwallet_engine.a"
 
-CARGO="$CARGO_BIN" CARGO_TARGET_DIR="$BUILD_DIR/xtask" "$CARGO_BIN" run \
+env -u MACOSX_DEPLOYMENT_TARGET CARGO="$CARGO_BIN" CARGO_TARGET_DIR="$BUILD_DIR/xtask" "$CARGO_BIN" run \
     --manifest-path xtask/Cargo.toml \
     --target-dir "$BUILD_DIR/xtask" \
     --locked \

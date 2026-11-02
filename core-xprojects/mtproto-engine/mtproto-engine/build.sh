@@ -13,8 +13,6 @@ if [ -z "$SOURCE_DIR" ] || [ -z "$BUILD_DIR" ] || [ -z "$PACKAGE_DIR" ]; then
     exit 1
 fi
 
-DEPLOYMENT_TARGET="10.13"
-
 if [ ! -f "$SOURCE_DIR/Cargo.toml" ]; then
     echo "mtproto-engine sources are missing at $SOURCE_DIR"
     echo "Check out the telegram-ios submodule first:"
@@ -47,21 +45,18 @@ mkdir -p "$BUILD_DIR"
 
 cd "$SOURCE_DIR"
 
-for RUST_TARGET in aarch64-apple-darwin x86_64-apple-darwin; do
+for RUST_TARGET in aarch64-apple-darwin; do
     if [ -x "$RUSTUP_BIN" ]; then
         "$RUSTUP_BIN" target add "$RUST_TARGET" >/dev/null 2>&1 || true
     fi
-    MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" build \
+    env -u MACOSX_DEPLOYMENT_TARGET CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" build \
         --package mtproto-ffi \
         --release \
         --locked \
         --target "$RUST_TARGET"
 done
 
-lipo -create \
-    "$BUILD_DIR/lib/aarch64-apple-darwin/release/libmtproto_engine_ffi.a" \
-    "$BUILD_DIR/lib/x86_64-apple-darwin/release/libmtproto_engine_ffi.a" \
-    -output "$BUILD_DIR/libmtproto_engine_ffi.a"
+cp "$BUILD_DIR/lib/aarch64-apple-darwin/release/libmtproto_engine_ffi.a" "$BUILD_DIR/libmtproto_engine_ffi.a"
 
 HEADERS_DIR="$BUILD_DIR/headers"
 rm -rf "$HEADERS_DIR"

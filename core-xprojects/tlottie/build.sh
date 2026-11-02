@@ -8,7 +8,6 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/submodules/tlottie"
 ENGINE_TOOLCHAIN_FILE="$ROOT_DIR/submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml"
 BUILD_DIR="$SCRIPT_DIR/build"
-DEPLOYMENT_TARGET="10.13"
 
 if [ ! -f "$SOURCE_DIR/Cargo.toml" ]; then
     echo "tlottie sources are missing at $SOURCE_DIR"
@@ -50,11 +49,11 @@ if [ -x "$RUSTUP_BIN" ]; then
     INSTALLED_TARGETS="$("$RUSTUP_BIN" target list --installed --toolchain "$TOOLCHAIN")"
 fi
 
-for RUST_TARGET in aarch64-apple-darwin x86_64-apple-darwin; do
+for RUST_TARGET in aarch64-apple-darwin; do
     if [ -x "$RUSTUP_BIN" ] && ! printf '%s\n' "$INSTALLED_TARGETS" | grep -qx "$RUST_TARGET"; then
         "$RUSTUP_BIN" target add --toolchain "$TOOLCHAIN" "$RUST_TARGET" >/dev/null 2>&1
     fi
-    RUSTUP_TOOLCHAIN="$TOOLCHAIN" MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" rustc \
+    env -u MACOSX_DEPLOYMENT_TARGET RUSTUP_TOOLCHAIN="$TOOLCHAIN" CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" rustc \
         --manifest-path "$SOURCE_DIR/Cargo.toml" \
         --lib \
         --release \
@@ -67,10 +66,7 @@ done
 
 MERGED_LIBRARY="$(mktemp "$BUILD_DIR/libtlottie.XXXXXX")"
 trap 'rm -f "$MERGED_LIBRARY"' EXIT
-lipo -create \
-    "$BUILD_DIR/lib/aarch64-apple-darwin/release/libtlottie.a" \
-    "$BUILD_DIR/lib/x86_64-apple-darwin/release/libtlottie.a" \
-    -output "$MERGED_LIBRARY"
+cp "$BUILD_DIR/lib/aarch64-apple-darwin/release/libtlottie.a" "$MERGED_LIBRARY"
 
 if ! cmp -s "$MERGED_LIBRARY" "$BUILD_DIR/libtlottie.a"; then
     mv "$MERGED_LIBRARY" "$BUILD_DIR/libtlottie.a"

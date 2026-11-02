@@ -50,9 +50,7 @@ buildOneArch() {
     mv ${folder}/lib/libopenh264.a ${folder}/libopenh264.a
 }
 
-# Build for arm64 and x86_64 architectures
 buildOneArch arm64
-buildOneArch x86_64
 
 # Ensure the output include directory exists and copy headers from one architecture
 cp -R ${BUILD_DIR}/arm64/include ${USED_PREFIX}/include
@@ -61,7 +59,7 @@ cp -R ${BUILD_DIR}/arm64/include ${USED_PREFIX}/include
 mkdir -p ${USED_PREFIX}/lib
 
 # Use lipo to create a universal binary
-lipo -create ${BUILD_DIR}/arm64/libopenh264.a ${BUILD_DIR}/x86_64/libopenh264.a -output ${USED_PREFIX}/lib/libopenh264.a
+lipo -create ${BUILD_DIR}/arm64/libopenh264.a -output ${USED_PREFIX}/lib/libopenh264.a
 
 echo "Successfully created a universal binary at: ${USED_PREFIX}/lib/libopenh264.a"
 echo "Headers are available at: ${USED_PREFIX}/include"

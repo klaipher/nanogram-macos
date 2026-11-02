@@ -147,7 +147,7 @@ function build_for ()
     "no-tests" \
   )
 
-  ./Configure $PLATFORM -mmacosx-version-min=10.13 no-shared no-tests --prefix="${ABS_TMP_DIR}/${ARCH}" || exit 1
+  ./Configure $PLATFORM -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET no-shared no-tests --prefix="${ABS_TMP_DIR}/${ARCH}" || exit 1
   
   make build_libs || exit 2
   unset CROSS_TOP
@@ -183,8 +183,10 @@ done
 lipo -create -output ${BUILD_DIR}build/openssl/lib/libssl.a $LIBSSLA
 lipo -create -output ${BUILD_DIR}build/openssl/lib/libcrypto.a $LIBCRYPTO
 else
-mv "${BUILD_DIR}build/$ARCHS/libssl.a" "${BUILD_DIR}build/libssl.a"
-mv "${BUILD_DIR}build/$ARCHS/libcrypto.a" "${BUILD_DIR}build/libcrypto.a"
+mkdir -p ${BUILD_DIR}build/openssl/lib
+mv $SOURCE_DIR/include ${BUILD_DIR}build/openssl/include
+mv "${BUILD_DIR}build/$ARCHS/libssl.a" "${BUILD_DIR}build/openssl/lib/libssl.a"
+mv "${BUILD_DIR}build/$ARCHS/libcrypto.a" "${BUILD_DIR}build/openssl/lib/libcrypto.a"
 fi
 
 

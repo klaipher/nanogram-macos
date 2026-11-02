@@ -50,15 +50,13 @@ fi
 
 # ---------------------------------------------------------------------------
 # 2. Build tools (Homebrew packages)
-#    NOTE: nasm (OpenH264) and meson (dav1d) are required but were missing from
-#    the original INSTALL.md list.
+#    NOTE: meson (dav1d) is required but was missing from the original
+#    INSTALL.md list. Apple Silicon only: no x86 assemblers (nasm, yasm).
 # ---------------------------------------------------------------------------
 BREW_PACKAGES=(
   cmake        # libwebp / mozjpeg / tde2e / webrtc (tg_owt)
   ninja        # webrtc (tg_owt), dav1d
   meson        # dav1d
-  nasm         # OpenH264 (x86_64 assembly)
-  yasm         # ffmpeg / libvpx assembly
   openssl@1.1  # used by several configure steps
   zlib
   autoconf
@@ -68,21 +66,6 @@ BREW_PACKAGES=(
 )
 log "Installing build dependencies: ${BREW_PACKAGES[*]}"
 brew install "${BREW_PACKAGES[@]}"
-
-# ---------------------------------------------------------------------------
-# 3. Rosetta 2 (Apple Silicon only)
-#    The tde2e/td build compiles a code-generation tool (tl-parser) for the
-#    x86_64 slice and RUNS it during the build. On Apple Silicon that requires
-#    Rosetta, otherwise it fails with "Bad CPU type in executable".
-# ---------------------------------------------------------------------------
-if [ "$ARCH" = "arm64" ]; then
-  if arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
-    log "Rosetta 2 already available"
-  else
-    log "Installing Rosetta 2 (needed to run the x86_64 codegen tool during the build)"
-    softwareupdate --install-rosetta --agree-to-license
-  fi
-fi
 
 # ---------------------------------------------------------------------------
 # 4. Xcode (full IDE, with command line tools selected)

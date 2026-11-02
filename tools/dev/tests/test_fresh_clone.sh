@@ -21,6 +21,7 @@ cd "$WORK/repo"
 [ ! -e third-party/widget-sandbox ] || fail "private submodule third-party/widget-sandbox still referenced"
 
 if [ "${NANOGRAM_FULL:-0}" = "1" ]; then
+    export NANOGRAM_CACHE_DIR="$WORK/cache"
     tools/dev/tg setup || fail "tg setup failed"
     tools/dev/tg build || fail "tg build failed"
 fi
