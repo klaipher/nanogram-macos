@@ -198,6 +198,7 @@ private final class HLSJSServerSource: SharedHLSServerSource {
                     subscriber.putNext((partialFile, 0 ..< cachedData.length, Int(size)))
                     subscriber.putCompletion()
                 } else {
+                    TempBox.shared.dispose(partialFile)
                     #if DEBUG
                     print("Error writing cached file to disk")
                     #endif
@@ -208,6 +209,7 @@ private final class HLSJSServerSource: SharedHLSServerSource {
             
             // 2) Otherwise, we fetch from the network
             guard let fetchResource = postbox.mediaBox.fetchResource else {
+                TempBox.shared.dispose(partialFile)
                 return EmptyDisposable
             }
             
@@ -239,6 +241,9 @@ private final class HLSJSServerSource: SharedHLSServerSource {
                 partialPath: partialFile.path,
                 metaPath: metaFile.path
             ) else {
+                TempBox.shared.dispose(partialFile)
+                TempBox.shared.dispose(completeFile)
+                TempBox.shared.dispose(metaFile)
                 return EmptyDisposable
             }
             
@@ -912,7 +917,9 @@ private final class SharedHLSVideoJSContext: NSObject {
     
     private static func sendResponseFileAndClose(id: Int, file: TempBoxFile, fileRange: Range<Int>, range: Range<Int>, totalSize: Int, completion: @escaping ([String: Any]) -> Void) {
         Queue.concurrentDefaultQueue().async {
-            if let data = try? Data(contentsOf: URL(fileURLWithPath: file.path), options: .mappedIfSafe).subdata(in: fileRange) {
+            let data = try? Data(contentsOf: URL(fileURLWithPath: file.path), options: .mappedIfSafe).subdata(in: fileRange)
+            TempBox.shared.dispose(file)
+            if let data {
                 completion([
                     "status": 200,
                     "statusText": "OK",
@@ -1749,6 +1756,7 @@ private final class SourceBuffer {
             }
             combinedData.append(data)
             guard (try? combinedData.write(to: URL(fileURLWithPath: tempFile.path), options: .atomic)) != nil else {
+                TempBox.shared.dispose(tempFile)
                 Queue.mainQueue().async {
                     guard let strongSelf = self else {
                         completion(RangeSet())
@@ -1767,13 +1775,16 @@ private final class SourceBuffer {
             {
                 Queue.mainQueue().async {
                     guard let strongSelf = self else {
+                        TempBox.shared.dispose(tempFile)
                         completion(RangeSet())
                         return
                     }
                     if strongSelf.currentUpdateId != updateId {
+                        TempBox.shared.dispose(tempFile)
                         return
                     }
                     if fragmentInfo.duration.value == 0 {
+                        TempBox.shared.dispose(tempFile)
                         strongSelf.initializationData = data
                         completion(strongSelf.ranges)
                     } else {
@@ -1781,7 +1792,7 @@ private final class SourceBuffer {
                         let item = ChunkMediaPlayerPart(
                             startTime: fragmentInfo.startTime.seconds,
                             endTime: fragmentInfo.startTime.seconds + fragmentInfo.duration.seconds,
-                            content: ChunkMediaPlayerPart.TempFile(file: tempFile, ignoreAudioEditList: true),
+                            content: ChunkMediaPlayerPart.TempFile(file: tempFile, ignoreAudioEditList: true, deletesFileOnRelease: true),
                             codecName: videoCodecName,
                             offsetTime: 0
                         )
@@ -1794,6 +1805,7 @@ private final class SourceBuffer {
                 }
             } else {
                 assertionFailure()
+                TempBox.shared.dispose(tempFile)
                 Queue.mainQueue().async {
                     guard let strongSelf = self else {
                         completion(RangeSet())
