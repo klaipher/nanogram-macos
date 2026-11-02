@@ -179,3 +179,69 @@ final class RoundVideoSizeTests: XCTestCase {
         XCTAssertEqual(avcProfileIndication(description), 100)
     }
 }
+
+private func makePCMSampleBuffer(sampleRate: Double, frames: Int, startFrame: Int) -> CMSampleBuffer {
+    var asbd = AudioStreamBasicDescription(mSampleRate: sampleRate, mFormatID: kAudioFormatLinearPCM, mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked, mBytesPerPacket: 2, mFramesPerPacket: 1, mBytesPerFrame: 2, mChannelsPerFrame: 1, mBitsPerChannel: 16, mReserved: 0)
+    var format: CMAudioFormatDescription?
+    CMAudioFormatDescriptionCreate(allocator: nil, asbd: &asbd, layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &format)
+    var samples = [Int16](repeating: 0, count: frames)
+    for i in 0 ..< frames {
+        samples[i] = Int16(sin(2.0 * Double.pi * 440.0 * Double(startFrame + i) / sampleRate) * 8000.0)
+    }
+    var block: CMBlockBuffer?
+    CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: frames * 2, blockAllocator: nil, customBlockSource: nil, offsetToData: 0, dataLength: frames * 2, flags: 0, blockBufferOut: &block)
+    samples.withUnsafeBytes { bytes in
+        _ = CMBlockBufferReplaceDataBytes(with: bytes.baseAddress!, blockBuffer: block!, offsetIntoDestination: 0, dataLength: frames * 2)
+    }
+    var sampleBuffer: CMSampleBuffer?
+    CMAudioSampleBufferCreateReadyWithPacketDescriptions(allocator: nil, dataBuffer: block!, formatDescription: format!, sampleCount: frames, presentationTimeStamp: CMTime(value: CMTimeValue(startFrame), timescale: CMTimeScale(sampleRate)), packetDescriptions: nil, sampleBufferOut: &sampleBuffer)
+    return sampleBuffer!
+}
+
+final class RoundVideoAudioTests: XCTestCase {
+    func testAudioTrackKeepsTheSourceRate() {
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.audioSampleRate(forSourceSampleRate: 48000), 48000)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.audioSampleRate(forSourceSampleRate: 44100), 44100)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.audioSampleRate(forSourceSampleRate: 24000), 48000)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.audioSampleRate(forSourceSampleRate: 16000), 48000)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.audioSampleRate(forSourceSampleRate: 0), 48000)
+    }
+
+    func testRoundVideoAudioIsWrittenAt48kMono() throws {
+        let settings = TGMediaVideoConversionPresetSettings.audioSettings(for: TGMediaVideoConversionPresetVideoMessage, bitrate: 64, sourceSampleRate: 48000) as! [String: Any]
+        XCTAssertEqual(settings[AVSampleRateKey] as? Double, 48000)
+        XCTAssertEqual(settings[AVNumberOfChannelsKey] as? Int, 1)
+
+        let url = URL(fileURLWithPath: NSTemporaryDirectory() + "round_audio_\(UUID().uuidString).m4a")
+        defer {
+            try? FileManager.default.removeItem(at: url)
+        }
+        let writer = try AVAssetWriter(outputURL: url, fileType: .m4a)
+        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
+        input.expectsMediaDataInRealTime = false
+        writer.add(input)
+        XCTAssertTrue(writer.startWriting())
+        writer.startSession(atSourceTime: .zero)
+        var frame = 0
+        while frame < 48000 {
+            while !input.isReadyForMoreMediaData {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            XCTAssertTrue(input.append(makePCMSampleBuffer(sampleRate: 48000, frames: 1024, startFrame: frame)))
+            frame += 1024
+        }
+        input.markAsFinished()
+        let done = DispatchSemaphore(value: 0)
+        writer.finishWriting {
+            done.signal()
+        }
+        done.wait()
+        XCTAssertEqual(writer.status, .completed, "\(String(describing: writer.error))")
+
+        let track = try XCTUnwrap(AVURLAsset(url: url).tracks(withMediaType: .audio).first)
+        let description = try XCTUnwrap(track.formatDescriptions.first.map { $0 as! CMAudioFormatDescription })
+        let asbd = try XCTUnwrap(CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee)
+        XCTAssertEqual(asbd.mSampleRate, 48000)
+        XCTAssertEqual(asbd.mChannelsPerFrame, 1)
+    }
+}

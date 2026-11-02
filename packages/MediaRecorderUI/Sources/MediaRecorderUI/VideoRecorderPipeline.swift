@@ -152,6 +152,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     private static let queue: Queue = Queue(name: "org.telegram.InstantVideoQueue")
     
     private let startRecordAfterAudioBuffer:Atomic<Bool> = Atomic(value: false)
+    private var resumeAfterAudioBuffer: Bool = false
     private var pipelineSetupFailed: Bool = false
 
     public static let videoMessageMaxDuration: Double = 60
@@ -333,6 +334,12 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
                 return
             }
             
+            if self.resumeAfterAudioBuffer {
+                self.resumeAfterAudioBuffer = false
+                self.continueRecordingAfterResume()
+                return
+            }
+            
             if isPaused {
                 return
             }
@@ -398,7 +405,8 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     }
     
     private func configureRecorderTracks() {
-        let audioSettings = TGMediaVideoConversionPresetSettings.audioSettings(for: TGMediaVideoConversionPresetVideoMessage, bitrate: Int32(config.audioBitrate))
+        let sourceSampleRate = self.outputAudioFormatDescription.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mSampleRate } ?? 48000.0
+        let audioSettings = TGMediaVideoConversionPresetSettings.audioSettings(for: TGMediaVideoConversionPresetVideoMessage, bitrate: Int32(config.audioBitrate), sourceSampleRate: sourceSampleRate)
         recorder.addAudioTrack(withSourceFormatDescription: outputAudioFormatDescription, settings: audioSettings)
         let size = CGSize(width: self.outputSide, height: self.outputSide)
         let videoSettings = TGMediaVideoConversionPresetSettings.videoSettings(for: TGMediaVideoConversionPresetVideoMessage, dimensions: size, bitrate: Int32(config.videoBitrate))
@@ -416,7 +424,47 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             self.isPaused = true
             self.renderingEnabled = false
             self.recorder.finishRecording()
+            self.closeMicrophone()
         }
+    }
+    
+    private func closeMicrophone() {
+        guard let audioDeviceInput = self.audioDeviceInput else {
+            return
+        }
+        self.session.beginConfiguration()
+        self.session.removeInput(audioDeviceInput)
+        self.session.commitConfiguration()
+        self.audioDeviceInput = nil
+    }
+    
+    private func reopenMicrophone() {
+        guard self.audioDeviceInput == nil, let audioDevice = self.audioDevice else {
+            return
+        }
+        self.setSelectedAudioDevice(audioDevice)
+        if self.audioDeviceInput == nil {
+            self.session.stopRunning()
+            self.setSelectedAudioDevice(audioDevice)
+            self.session.startRunning()
+        }
+        self.audioConnection = self.audioOutput.connection(with: .audio)
+    }
+    
+    private func continueRecordingAfterResume() {
+        if self.isDiscarded {
+            return
+        }
+        switch self.status {
+        case .stoppingRecording, .finishRecording, .stopped, .failed:
+            return
+        default:
+            break
+        }
+        self.configureRecorderTracks()
+        self.isPaused = false
+        self.renderingEnabled = true
+        self.status = .recording
     }
     
     public func resume() {
@@ -432,11 +480,24 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             let nextURL = URL(fileURLWithPath: next)
             self.currentURL = nextURL
             self.recorder = TGVideoCameraMovieRecorder(url: nextURL, delegate: self, callbackQueue: VideoRecorderPipeline.queue.queue)
-            self.configureRecorderTracks()
-            
-            self.isPaused = false
-            self.renderingEnabled = true
-            self.status = .recording
+            if self.audioDevice != nil {
+                let previousAudioFormatDescription = self.outputAudioFormatDescription
+                self.outputAudioFormatDescription = nil
+                self.resumeAfterAudioBuffer = true
+                self.reopenMicrophone()
+                VideoRecorderPipeline.queue.after(3.0, {
+                    guard self.resumeAfterAudioBuffer else {
+                        return
+                    }
+                    self.resumeAfterAudioBuffer = false
+                    if self.outputAudioFormatDescription == nil {
+                        self.outputAudioFormatDescription = previousAudioFormatDescription
+                    }
+                    self.continueRecordingAfterResume()
+                })
+            } else {
+                self.continueRecordingAfterResume()
+            }
         }
     }
     

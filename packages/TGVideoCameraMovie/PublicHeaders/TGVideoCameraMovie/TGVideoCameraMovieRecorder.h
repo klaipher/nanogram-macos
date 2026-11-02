@@ -22,6 +22,8 @@ typedef enum
 + (NSInteger)videoMessageSideForDiameter:(NSInteger)diameter;
 + (NSDictionary *)videoSettingsForPreset:(TGMediaVideoConversionPreset)preset dimensions:(CGSize)dimensions bitrate:(int)bitrate;
 + (NSDictionary *)audioSettingsForPreset:(TGMediaVideoConversionPreset)preset bitrate:(int)bitrate;
++ (NSDictionary *)audioSettingsForPreset:(TGMediaVideoConversionPreset)preset bitrate:(int)bitrate sourceSampleRate:(double)sourceSampleRate;
++ (double)audioSampleRateForSourceSampleRate:(double)sourceSampleRate;
 
 @end
 
