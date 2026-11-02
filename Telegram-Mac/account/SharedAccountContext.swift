@@ -599,6 +599,20 @@ class SharedAccountContext {
         }).start()
     }
     
+    @discardableResult
+    func releaseAccountCaches() -> Int {
+        assert(Queue.mainQueue().isCurrent())
+        guard let value = self.activeAccountsValue else {
+            return 0
+        }
+        for (_, account, _) in value.accounts {
+            account.postbox.clearCaches()
+            account.viewTracker.pruneThrottleState()
+        }
+        value.currentAuth?.postbox.clearCaches()
+        return value.accounts.count + (value.currentAuth == nil ? 0 : 1)
+    }
+    
     private var launchActions:[AccountRecordId : LaunchNavigation] = [:]
     
    

@@ -12,6 +12,8 @@ import UniqueGiftBackground
 public final class MemoryPressureMonitor {
     private let source: DispatchSourceMemoryPressure
     private var trimTimer: SwiftSignalKit.Timer?
+    private var inactiveReleaseTimer: SwiftSignalKit.Timer?
+    public var releaseAccountCaches: (() -> Int)?
     private var observers: [NSObjectProtocol] = []
 
     public init() {
@@ -24,16 +26,20 @@ public final class MemoryPressureMonitor {
         let center = NotificationCenter.default
         self.observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.scheduleInactiveTrim()
+            self?.scheduleInactiveRelease()
         })
         self.observers.append(center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.trimTimer?.invalidate()
             self?.trimTimer = nil
+            self?.inactiveReleaseTimer?.invalidate()
+            self?.inactiveReleaseTimer = nil
         })
     }
 
     deinit {
         self.source.cancel()
         self.trimTimer?.invalidate()
+        self.inactiveReleaseTimer?.invalidate()
         for observer in self.observers {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -48,8 +54,9 @@ public final class MemoryPressureMonitor {
         UniqueGiftPatternGlyphs.shared.removeAll()
         #endif
         URLCache.shared.removeAllCachedResponses()
+        let accounts = self.releaseAccountCaches?() ?? 0
         let released = self.trimAllocator()
-        Logger.shared.log("Memory", "pressure \(event.contains(.critical) ? "critical" : "warning"): image caches purged, allocator released \(released / 1024) KB")
+        Logger.shared.log("Memory", "pressure \(event.contains(.critical) ? "critical" : "warning"): image caches purged, postbox caches cleared for \(accounts) accounts, allocator released \(released / 1024) KB")
     }
 
     private func scheduleInactiveTrim() {
@@ -62,6 +69,20 @@ public final class MemoryPressureMonitor {
             Logger.shared.log("Memory", "inactive trim released \(released / 1024) KB")
         }, queue: .mainQueue())
         self.trimTimer = timer
+        timer.start()
+    }
+    
+    private func scheduleInactiveRelease() {
+        self.inactiveReleaseTimer?.invalidate()
+        let timer = SwiftSignalKit.Timer(timeout: 10 * 60, repeat: false, completion: { [weak self] in
+            guard let self, !NSApp.isActive else {
+                return
+            }
+            let accounts = self.releaseAccountCaches?() ?? 0
+            let released = self.trimAllocator()
+            Logger.shared.log("Memory", "inactive for 10 min: postbox caches cleared for \(accounts) accounts, allocator released \(released / 1024) KB")
+        }, queue: .mainQueue())
+        self.inactiveReleaseTimer = timer
         timer.start()
     }
 

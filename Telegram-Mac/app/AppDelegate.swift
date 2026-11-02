@@ -967,6 +967,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 let sharedApplicationContext = SharedApplicationContext(sharedContext: sharedContext, notificationManager: sharedNotificationManager, sharedWakeupManager: sharedWakeupManager)
                 
                 self.sharedApplicationContextValue = sharedApplicationContext
+                self.memoryPressureMonitor?.releaseAccountCaches = { [weak sharedContext] in
+                    return sharedContext?.releaseAccountCaches() ?? 0
+                }
                 
                 self.supportAccountContextValue = .init(applicationContext: sharedApplicationContext)
                 
