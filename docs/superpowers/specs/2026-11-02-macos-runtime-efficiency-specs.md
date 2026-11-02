@@ -91,7 +91,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: `3d30de4c`, `f997e5c0`, `9bc6231a`, `718f4692`; ports as is.
 - **Perflab**: same Postbox harness as M1. With an account, the power-audit idle sampler with a channel open.
 
-### M3. Four 1 Hz main-queue clock-offset loops per account, plus a 5 s one in AccountContext and a 10 s folder poll — `partial (795c4f8): folder poll 10→60 s (DEBUG 10 s) done; the 3 core time-offset loops are no-ops: their first signal never completes, so then(delay)|>restart reads the offset once and never repeats (probe: 1 read in 1 s at a 0.1 s delay) — no wake-ups to remove; AccountContext 5 s timer is Mac app code, not in this group`, verified
+### M3. Four 1 Hz main-queue clock-offset loops per account, plus a 5 s one in AccountContext and a 10 s folder poll — `done (795c4f8, e605e56; core 3ec2f14, 3a11ddd)`, verified
 
 - **Evidence**: TelegramCore `State/ManagedAutoremoveMessageOperations.swift:44-62` (used twice, `isRemove`
   true/false) and `:140-158` (stories), `State/ManagedPeerTimestampAttributeOperations.swift:49-61`: each is
