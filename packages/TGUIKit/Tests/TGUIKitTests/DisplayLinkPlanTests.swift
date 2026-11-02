@@ -219,4 +219,25 @@ final class DisplayLinkPlanTests: XCTestCase {
         XCTAssertEqual(driver.droppedFrames, 11)
         XCTAssertEqual(driver.presentedFrames, 108)
     }
+
+    func testLinksChangedFromACallbackAreSafe() {
+        let source = FakeDisplayLinkSource(maximumFramesPerSecond: 120)
+        let driver = self.makeDriver(source)
+        var spawned: [SharedDisplayLinkDriver.Link] = []
+        var first: SharedDisplayLinkDriver.Link?
+        var ticks = 0
+        first = driver.add(framesPerSecond: .max, { _ in
+            ticks += 1
+            first?.invalidate()
+            spawned.append(driver.add(framesPerSecond: .fps(30), { _ in }))
+            spawned.first?.invalidate()
+        })
+        XCTAssertEqual(source.run(seconds: 0.1), 1)
+        XCTAssertTrue(source.isPaused)
+        XCTAssertEqual(ticks, 1)
+        withExtendedLifetime(first) {}
+        XCTAssertEqual(source.plan?.preferred, 120)
+        spawned.removeAll()
+        XCTAssertEqual(source.run(seconds: 0.1), 0)
+    }
 }

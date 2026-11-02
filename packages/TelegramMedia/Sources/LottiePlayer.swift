@@ -300,7 +300,7 @@ private final class RenderFpsLoop {
     }
     
     private let duration: Double
-    private var timer: SwiftSignalKit.Timer?
+    private var clock: DisplayLinkQueueClock?
     private let values:QueueLocalObject<Values>
     private let queue: Queue
     init(duration: Double, queue: Queue, suspended: Bool) {
@@ -318,11 +318,11 @@ private final class RenderFpsLoop {
     }
     
     private func startTimer() {
-        let timer = SwiftSignalKit.Timer(timeout: duration, repeat: true, completion: { [weak self] in
+        let clock = DisplayLinkQueueClock(frameDuration: duration, queue: queue, tick: { [weak self] in
             self?.loop()
-        }, queue: queue)
-        self.timer = timer
-        timer.start()
+        })
+        self.clock = clock
+        clock.start()
     }
     
     func setSuspended(_ suspended: Bool) {
@@ -331,9 +331,9 @@ private final class RenderFpsLoop {
                 return
             }
             if suspended {
-                self.timer?.invalidate()
-                self.timer = nil
-            } else if self.timer == nil {
+                self.clock?.stop()
+                self.clock = nil
+            } else if self.clock == nil {
                 self.startTimer()
             }
         }

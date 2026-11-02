@@ -163,7 +163,10 @@ public final class SharedDisplayLinkDriver {
         }
         
         public func invalidate() {
-            self.isValid = false
+            if self.isValid {
+                self.isValid = false
+                self.driver.requestUpdate()
+            }
         }
     }
     
@@ -194,7 +197,7 @@ public final class SharedDisplayLinkDriver {
     public var maximumFramesPerSecondLimit: Int? {
         didSet {
             if self.maximumFramesPerSecondLimit != oldValue {
-                self.update()
+                self.requestUpdate()
             }
         }
     }
@@ -233,13 +236,13 @@ public final class SharedDisplayLinkDriver {
             return
         }
         source.setScreen(self.targetScreen)
-        self.update()
+        self.requestUpdate()
     }
     
     public func updateForegroundState(_ isActive: Bool) {
         if self.isInForeground != isActive {
             self.isInForeground = isActive
-            self.update()
+            self.requestUpdate()
         }
     }
     
@@ -252,6 +255,12 @@ public final class SharedDisplayLinkDriver {
     }
     
     private func update() {
+        self.requests.removeAll(where: { request in
+            guard let link = request.link else {
+                return true
+            }
+            return !link.isValid
+        })
         var requested: [FramesPerSecond] = []
         for request in self.requests {
             if let link = request.link, link.isValid && !link.isPaused {
@@ -339,7 +348,7 @@ public final class SharedDisplayLinkDriver {
         let link = LinkImpl(driver: self, framesPerSecond: framesPerSecond, update: update)
         self.requests.append(RequestContext(link: link, framesPerSecond: framesPerSecond))
         
-        self.update()
+        self.requestUpdate()
         
         return link
     }
