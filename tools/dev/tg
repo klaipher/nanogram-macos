@@ -28,6 +28,9 @@ cmd_doctor() { py doctor; }
 
 cmd_frameworks() { py frameworks "$@"; }
 
+# Writes the gitignored NanogramSecrets.swift (api_id/api_hash); prints only the path, never the values.
+cmd_credentials() { py credentials || die "cannot generate API credentials"; }
+
 cmd_setup() {
   say "Fetching submodules"
   git submodule sync --recursive >/dev/null
@@ -68,17 +71,16 @@ cmd_build() {
   derived="$(config_value DERIVED_DATA)"
   mkdir -p "$ROOT/build-output"
   log="$ROOT/build-output/last-build.log"
+  cmd_credentials
 
   say "Building $configuration ($edition edition), log: build-output/last-build.log"
   local start=$SECONDS status=0
-  # Signing is off until the Nanogram identity and editions exist (stage 1 tasks 6-7);
-  # the linker still signs ad hoc, so the app runs on Apple Silicon.
   xcodebuild build \
     -workspace Telegram-Mac.xcworkspace -scheme "$scheme" -configuration "$configuration" \
     -destination 'platform=macOS,arch=arm64' -derivedDataPath "$derived" \
     -xcconfig "$xcconfig" \
     "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$conditions" \
-    COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY= \
+    COMPILER_INDEX_STORE_ENABLE=NO \
     -showBuildTimingSummary ${extra[@]+"${extra[@]}"} > "$log" 2>&1 || status=$?
   local elapsed=$((SECONDS - start))
   if [ "$status" != 0 ]; then
@@ -94,6 +96,7 @@ cmd_build() {
 cmd_xcode() {
   local edition="${1:-direct}" xcconfig
   xcconfig="$(edition_xcconfig "$edition")"
+  cmd_credentials
   if pgrep -x Xcode >/dev/null; then
     warn "Xcode is already running and will not see XCODE_XCCONFIG_FILE; quit it first, then run tg xcode again"
   fi
@@ -108,6 +111,7 @@ usage: tools/dev/tg <command> [options]
   setup            submodules, Rust toolchain, native libraries
   doctor           check prerequisites
   frameworks       build the native libraries (arm64) [--verify-only]
+  credentials      generate NanogramSecrets.swift from ~/.config/telegram-ios/api-credentials.json
   build            build the app [--release] [--edition mas|direct]
   xcode [edition]  open the workspace in Xcode with our settings (quit Xcode first)
   run              build and launch the app
@@ -128,6 +132,7 @@ main() {
     doctor) cmd_doctor "$@" ;;
     setup) cmd_setup "$@" ;;
     frameworks) cmd_frameworks "$@" ;;
+    credentials) cmd_credentials ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;
     run|test|lint|warnings|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;

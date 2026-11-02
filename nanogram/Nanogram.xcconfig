@@ -15,3 +15,19 @@ LLVM_LTO[config=Release] = YES_THIN
 DEAD_CODE_STRIPPING[config=Release] = YES
 SWIFT_OPTIMIZATION_LEVEL[config=Release] = -O
 SWIFT_COMPILATION_MODE[config=Release] = wholemodule
+
+// Identity. Xcode has no per-target xcconfig conditions, so per-target values are looked up by
+// TARGET_NAME; every other target (Sparkle, workspace subprojects, packages) keeps its own value.
+DEVELOPMENT_TEAM = YGTMYL879P
+NANOGRAM_BUNDLE_ID_Telegram = org.klaipher.Nanogram
+NANOGRAM_BUNDLE_ID_TelegramShare = org.klaipher.Nanogram.MacShare
+PRODUCT_BUNDLE_IDENTIFIER = $(NANOGRAM_BUNDLE_ID_$(TARGET_NAME):default=$(inherited))
+
+// Local builds sign with the team's Apple Development identity, no provisioning profile
+// (nothing we use is a restricted entitlement on macOS). Distribution signing happens at export.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Apple Development
+PROVISIONING_PROFILE_SPECIFIER =
+
+// Telegram's unused Firebase config (FirebaseApp.configure() is commented out upstream).
+EXCLUDED_SOURCE_FILE_NAMES = $(inherited) GoogleService-Info.plist

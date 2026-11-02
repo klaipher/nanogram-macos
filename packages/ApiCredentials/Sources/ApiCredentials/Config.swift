@@ -2,17 +2,17 @@ import Cocoa
 
 public final class ApiEnvironment {
     public static var apiId:Int32 {
-        return 9
+        return NanogramSecrets.apiId
     }
     public static var apiHash:String {
-        return "3975f648bb682ee889f35483bc618d1c"
+        return NanogramSecrets.apiHash
     }
     
     public static var bundleId: String {
-        return "ru.keepcoder.Telegram"
+        return "org.klaipher.Nanogram"
     }
     public static var teamId: String {
-        return "6N38VWS5BX"
+        return "YGTMYL879P"
     }
     
     
