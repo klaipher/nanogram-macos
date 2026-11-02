@@ -416,7 +416,7 @@ private final class PeerCallLabSession {
     }
 
     private func capture(window: Window, name: String) {
-        guard let image = CGWindowListCreateImage(.null, .optionIncludingWindow, CGWindowID(window.windowNumber), [.boundsIgnoreFraming, .bestResolution]) else {
+        guard let image = windowListCreateImage(.null, .optionIncludingWindow, CGWindowID(window.windowNumber), [.boundsIgnoreFraming, .bestResolution]) else {
             NSLog("PeerCallLab: window capture failed")
             return
         }

@@ -11,15 +11,11 @@ CompileC /DerivedData/Build/Intermediates.noindex/RLottie_Xcode.build/Debug/RLot
     
     Using response file: /DerivedData/Build/Intermediates.noindex/RLottie_Xcode.build/Debug/RLottie.build/Objects-normal/arm64/82b82416624d2658e5098eb0a28c15c5-common-args.resp
     
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c++ -target arm64-apple-macos15.0 @/DerivedData/Build/Intermediates.noindex/RLottie_Xcode.build/Debug/RLottie.build/Objects-normal/arm64/82b82416624d2658e5098eb0a28c15c5-common-args.resp -c -o /DerivedData/Build/Intermediates.noindex/RLottie_Xcode.build/Debug/RLottie.build/Objects-normal/arm64/vrle.o /RLottie_Xcode.build/Debug/RLottie.build/Objects-normal/arm64/vrle.o
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c++ -target arm64-apple-macos15.0 @/DerivedData/Build/Intermediates.noindex/RLottie_Xcode.build/Debug/RLottie.build/Objects-normal/arm64/82b82416624d2658e5098eb0a28c15c5-common-args.resp -c -o /DerivedData/Build/Intermediates.noindex/RLottie_Xcode.build/Debug/RLottie.build/Objects-normal/arm64/vrle.o
 
 CompileMetalFile /src/packages/WalletUI/Sources/WalletUI/WalletStickerWave.metal (in target 'WalletUI_WalletUI' from project 'WalletUI')
     cd /src/packages/WalletUI
     /Metal.xctoolchain/usr/bin/metal -c -target air64-apple-macos15.0 -o /DerivedData/Build/Intermediates.noindex/WalletUI.build/Debug/WalletUI_WalletUI-b.build/Metal/WalletStickerWave.air /src/packages/WalletUI/Sources/WalletUI/WalletStickerWave.metal
-
-Ld /DerivedData/Build/Intermediates.noindex/Sparkle.build/Debug/fileop.build/Objects-normal/arm64/Binary/fileop normal arm64 (in target 'fileop' from project 'Sparkle')
-    cd /src/submodules/Sparkle
-    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -reproducible -target arm64-apple-macos15.0 -Os -o /DerivedData/Build/Intermediates.noindex/Sparkle.build/Debug/fileop.build/Objects-normal/arm64/Binary/fileop
 
 Ld /DerivedData/Build/Products/Debug/TelegramApi.o normal (in target 'TelegramApi' from project 'TelegramApi')
     cd /src/submodules/telegram-ios/submodules/TelegramApi

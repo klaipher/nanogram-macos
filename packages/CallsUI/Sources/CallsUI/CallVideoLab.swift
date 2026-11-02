@@ -371,7 +371,7 @@ private final class CallVideoLabSession {
     }
 
     private func captureWindow(_ window: Window, name: String) {
-        guard let image = CGWindowListCreateImage(.null, .optionIncludingWindow, CGWindowID(window.windowNumber), [.boundsIgnoreFraming, .bestResolution]) else {
+        guard let image = windowListCreateImage(.null, .optionIncludingWindow, CGWindowID(window.windowNumber), [.boundsIgnoreFraming, .bestResolution]) else {
             NSLog("CallVideoLab: window capture failed")
             return
         }

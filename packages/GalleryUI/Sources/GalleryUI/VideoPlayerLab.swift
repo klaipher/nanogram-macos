@@ -1134,7 +1134,7 @@ extension VideoPlayerLabSession {
     }
 
     fileprivate func captureLabWindow(_ window: NSWindow, name: String) {
-        guard let image = CGWindowListCreateImage(.null, .optionIncludingWindow, CGWindowID(window.windowNumber), [.boundsIgnoreFraming, .bestResolution]) else {
+        guard let image = windowListCreateImage(.null, .optionIncludingWindow, CGWindowID(window.windowNumber), [.boundsIgnoreFraming, .bestResolution]) else {
             return
         }
         let width = image.width

@@ -1065,7 +1065,7 @@ open class Window: NSWindow {
     
     public func windowImageShot() -> CGImage? {
         if windowNumber >= 0 {
-            return CGWindowListCreateImage(CGRect.null, [.optionIncludingWindow], CGWindowID(windowNumber), [.boundsIgnoreFraming])
+            return windowListCreateImage(CGRect.null, [.optionIncludingWindow], CGWindowID(windowNumber), [.boundsIgnoreFraming])
         } else {
             return nil
         }

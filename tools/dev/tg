@@ -63,7 +63,7 @@ cmd_build() {
     -xcconfig "$xcconfig" \
     "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$conditions" \
     COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY= \
-    -showBuildTimingSummary "${extra[@]}" > "$log" 2>&1 || status=$?
+    -showBuildTimingSummary ${extra[@]+"${extra[@]}"} > "$log" 2>&1 || status=$?
   local elapsed=$((SECONDS - start))
   if [ "$status" != 0 ]; then
     grep -E '(error|fatal error):' "$log" | sort -u | head -30 >&2 || true
