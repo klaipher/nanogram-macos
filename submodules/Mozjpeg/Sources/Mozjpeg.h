@@ -12,3 +12,5 @@ FOUNDATION_EXPORT const unsigned char MozjpegVersionString[];
 NSData * _Nullable compressJPEGData(CGImageRef _Nonnull sourceImage, int quality);
 NSArray<NSNumber *> * _Nonnull extractJPEGDataScans(NSData * _Nonnull data);
 NSData * _Nullable compressMiniThumbnail(CGImageRef _Nonnull image);
+void setJPEGPreservesWideGamut(bool preserves);
+bool jpegPreservesWideGamut(void);

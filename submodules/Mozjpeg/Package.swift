@@ -19,12 +19,17 @@ let package = Package(
             name: "Mozjpeg",
             dependencies: [],
             path: ".",
+            exclude: ["Tests"],
             publicHeadersPath: "Sources",
             cSettings: [
                 .headerSearchPath("Sources"),
                 .headerSearchPath("SharedHeaders/libmozjpeg"),
                 .headerSearchPath("SharedHeaders/ios-mozjpeg"),
             ]),
+        .testTarget(
+            name: "MozjpegTests",
+            dependencies: [.target(name: "Mozjpeg")],
+            path: "Tests"),
     ]
 )///../../submodules/telegram-ios/third-party/mozjpeg/mozjpeg
 
