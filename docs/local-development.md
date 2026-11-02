@@ -173,3 +173,37 @@ What we changed in the build scripts:
 
 Upstream's universal run also failed twice in the wallet engine (the Rust host proc-macro bug above) before a
 manual workaround; the arm64 run built every library on the first try (webrtc after the 14.0 fix).
+
+## Keeping up with upstream
+
+`upstream` holds Telegram's real history (`telegram/master`, no snapshot commits), so our merges have proper
+bases and a generic fix can go upstream as a pull request. Only upstream's commits ever land on `upstream`.
+
+```sh
+tools/dev/tg sync-upstream             # on main, with a clean working tree
+tools/dev/tg sync-upstream --no-build  # fetch and merge only
+tools/dev/tg sync-upstream --after-merge  # post-merge steps after you resolved a conflicted merge
+```
+
+What it does (`tools/dev/nanogram/sync.py`, then `tools/dev/tg`):
+
+1. Fetches `telegram/master` (the `telegram` remote is added if missing) and fast-forwards `upstream` to it with
+   a compare-and-swap `update-ref`. If `upstream` is ahead of or has diverged from `telegram/master` it stops:
+   upstream rewrote history, or one of our commits landed on `upstream` — look before resetting anything.
+2. `git merge upstream` into the current branch. A merge with nothing new exits quietly; uncommitted changes to
+   tracked files stop it (a dirty submodule working tree, such as the local MetalEngine fix, does not).
+3. On conflicts nothing is resolved or committed: the merge stays in progress, the conflicted paths are listed
+   and the exit status is 1. Resolve, `git add`, `git commit`, then `tools/dev/tg sync-upstream --after-merge`;
+   or `git merge --abort`. Our changes sit in our own files and small hook lines, so conflicts should be few.
+4. If upstream moved its `submodules/telegram-ios` pin, it prints the commands that rebase our `nanogram-mac`
+   branch of the telegram-ios fork onto the new pin (`git rebase --onto <new> <old> nanogram-mac`) and point the
+   superproject at it. That rebase is done by hand: its conflicts are TelegramCore code, not tooling.
+5. After a clean merge: `git submodule update --init --recursive`, the local submodule fixes (`localfixes.py`),
+   `tg frameworks` (rebuilds only libraries whose stamp changed), `tg warnings --update` (a clean debug build with
+   buildcheck and the edition checks; warnings that arrive with upstream code join
+   `nanogram/warnings-baseline.json` and never block a sync), then `tg check`. Commit the baseline if it changed.
+
+Rehearsed 2026-11-02 in a temporary clone: `telegram/master` had nothing new since the fork (exit "nothing to
+merge"); replaying our commits onto upstream's tip minus 5 and syncing merged those 5 real upstream commits
+(23 files) cleanly in about a second, and the result was byte-identical to `nanogram/stage1`; an edit on a line
+upstream changed stopped with that one path listed, `MERGE_HEAD` set and nothing committed.
