@@ -62,7 +62,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: `f997e5c0`, `718f4692` (iOS spec "Found and fixed while measuring"); ports as is.
 - **Perflab**: extend PostboxCacheLab with a "replay unchanged peers into N live views" benchmark.
 
-### M2. Channel polls, views polls and history validation write values that did not change — `todo`, verified
+### M2. Channel polls, views polls and history validation write values that did not change — `done (7136832)`, verified
 
 - **Evidence** (TelegramCore `Sources/State/`): `AccountStateManagementUtils.swift:4943-4947` (`.UpdateChannelState`
   always calls `setPeerChatState`); `:3652-3667` (`channelDifferenceEmpty` still stores the same pts); `:3262-3266`
