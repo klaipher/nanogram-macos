@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<trace-query-result>
+<node xpath='//trace-toc[1]/run[1]/data[1]/table[2]'>
+<row><sample-time id="1" fmt="00:00.002">2000000</sample-time><backtrace id="2"><frame id="3" name="AppDelegate.applicationDidFinishLaunching(_:)"><binary id="4" name="Telegram"/></frame><frame id="5" name="main"><binary ref="4"/></frame><frame id="6" name="start"><binary id="7" name="dyld"/></frame></backtrace></row>
+<row><sample-time id="8" fmt="00:00.001">1000000</sample-time><backtrace id="9"><frame id="10" name="Postbox.init()"><binary ref="4"/></frame><frame ref="5"/><frame ref="6"/></backtrace></row>
+<row><sample-time id="11" fmt="00:00.003">3000000</sample-time><backtrace id="12"><frame id="13" name="objc_msgSend"><binary id="14" name="libobjc.A.dylib"/></frame><frame ref="3"/><frame ref="5"/></backtrace></row>
+</node>
+</trace-query-result>
