@@ -187,7 +187,7 @@ public final class Auth_AwaitingResetView: View {
         } else if timer == nil {
             timer = .init(timeout: 1, repeat: true, completion: { [weak self] in
                 self?.updateTimerValue()
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             timer?.start()
         }
         self.header.updateText(self.number, resetInText: timerSeconds <= 0 ? strings().loginNewResetAble : strings().loginNewResetWillAble)

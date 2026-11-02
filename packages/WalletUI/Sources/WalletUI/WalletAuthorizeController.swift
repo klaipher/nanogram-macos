@@ -291,7 +291,7 @@ private final class WalletAuthorizeController: ModalViewController {
                 self.cooldownTimer?.invalidate()
                 self.cooldownTimer = nil
             }
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         cooldownTimer = timer
         timer.start()
     }

@@ -120,7 +120,7 @@ final class ChatRemovalUndoView: Control {
         let timer = SwiftSignalKit.Timer(timeout: untilNext > 0.001 ? untilNext : 1, repeat: false, completion: { [weak self] in
             self?.updateSeconds(animated: true)
             self?.scheduleTick()
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         self.timer = timer
         timer.start()
     }

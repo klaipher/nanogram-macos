@@ -649,7 +649,7 @@ private class AdMessageView : Control {
 
         self.timer = SwiftSignalKit.Timer(timeout: maxDuration, repeat: false, completion: { [weak arguments] in
             arguments?.maybeNext(message)
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         
         self.timer?.start()
         

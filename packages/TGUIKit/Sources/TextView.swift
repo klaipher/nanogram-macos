@@ -3745,7 +3745,7 @@ open class TextView: Control, NSViewToolTipOwner, ViewDisplayDelegate {
             } else {
                 self.cancelLongHoverTimer()
             }
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         longHoverTimer = timer
         timer.start()
     }

@@ -233,7 +233,7 @@ public final class MediaPlayerView: View {
                                     strongSelf.startPolling()
                                 }
                             }
-                        }, queue: Queue.mainQueue())
+                        }, queue: Queue.mainQueue(), leeway: .precise)
                         strongSelf.timer?.start()
                     case .finished:
                         break

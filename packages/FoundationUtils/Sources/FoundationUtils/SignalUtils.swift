@@ -14,7 +14,7 @@ public func countdown(_ count:Double, delay:Double) -> Signal<Double,Void> {
                 timer?.invalidate()
                 timer = nil
             }
-        }, queue: Queue.mainQueue())
+        }, queue: Queue.mainQueue(), leeway: .precise)
         timer?.start()
         return ActionDisposable(action: {
             timer?.invalidate()
@@ -33,7 +33,7 @@ public func `repeat`<T, E>(_ delay:Double, onQueue:Queue) -> (Signal<T, E>) -> S
                  _ = signal.start(next: { (next) in
                     subscriber.putNext(next)
                 })
-            }, queue: onQueue)
+            }, queue: onQueue, leeway: .precise)
              
             timer?.start()
             

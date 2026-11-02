@@ -585,7 +585,7 @@ public func StarGift_SelfAuction_Controller(context: (any AccountContextProtocol
     
     let nextTimer = SwiftSignalKit.Timer(timeout: 2.5, repeat: true, completion: { [weak arguments] in
         arguments?.makeNextPattern()
-    }, queue: .mainQueue())
+    }, queue: .mainQueue(), leeway: .precise)
     
     nextTimer.start()
     

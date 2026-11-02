@@ -757,7 +757,7 @@ private final class MediaPlayerContext {
                 let nextTickDelay = max(0.0, fullUntil - timestamp) / self.baseRate
                 let tickTimer = SwiftSignalKit.Timer(timeout: nextTickDelay, repeat: false, completion: { [weak self] in
                     self?.tick()
-                }, queue: self.queue)
+                }, queue: self.queue, leeway: .precise)
                 self.tickTimer = tickTimer
                 tickTimer.start()
             } else {
@@ -774,7 +774,7 @@ private final class MediaPlayerContext {
                     
                     let tickTimer = SwiftSignalKit.Timer(timeout: nextTickDelay, repeat: false, completion: { [weak self] in
                         self?.tick()
-                    }, queue: self.queue)
+                    }, queue: self.queue, leeway: .precise)
                     self.tickTimer = tickTimer
                     tickTimer.start()
                 } else {

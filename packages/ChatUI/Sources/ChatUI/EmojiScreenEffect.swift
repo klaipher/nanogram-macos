@@ -540,7 +540,7 @@ public final class EmojiScreenEffect {
         if enjoyTimer == nil, !enqueuedToEnjoy.isEmpty {
             enjoyTimer = .init(timeout: 1.0, repeat: false, completion: { [weak self] in
                 self?.performEnjoyAction()
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             enjoyTimer?.start()
         }
     }
@@ -566,7 +566,7 @@ public final class EmojiScreenEffect {
             if self.timers[msgId] == nil {
                 self.timers[msgId] = .init(timeout: 1, repeat: false, completion: { [weak self] in
                     self?.performServerActions(for: msgId)
-                }, queue: .mainQueue())
+                }, queue: .mainQueue(), leeway: .precise)
                 self.timers[msgId]?.start()
             }
         }

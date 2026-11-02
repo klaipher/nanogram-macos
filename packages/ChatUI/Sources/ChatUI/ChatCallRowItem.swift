@@ -135,7 +135,7 @@ public class ChatCallRowItem: ChatRowItem {
                     return
                 }
                 self.copyAndUpdate(animated: true)
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             self.activeConferenceUpdateTimer?.start()
         }
 

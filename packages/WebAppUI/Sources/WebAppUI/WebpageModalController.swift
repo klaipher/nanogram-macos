@@ -190,7 +190,7 @@ private final class BotEmojiStatusPermissionRowView : GeneralRowView {
                     index = 0
                 }
             }
-            self?.timer = .init(timeout: 2, repeat: true, completion: invokeNext, queue: .mainQueue())
+            self?.timer = .init(timeout: 2, repeat: true, completion: invokeNext, queue: .mainQueue(), leeway: .precise)
             
             self?.timer?.start()
             invokeNext()

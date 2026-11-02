@@ -251,7 +251,7 @@ public final class ContextAddReactionsListView : View, StickerFramesCollector  {
                 } else {
                     self.cancelLargeHold()
                 }
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             largeHoldTimer?.start()
         }
 

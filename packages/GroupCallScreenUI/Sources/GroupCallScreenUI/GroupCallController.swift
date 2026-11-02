@@ -2194,7 +2194,7 @@ public final class GroupCallUIController : ViewController {
         let launchIdleTimer:()->Void = { [weak self] in
             let timer = SwiftSignalKit.Timer(timeout: 2.0, repeat: false, completion: { [weak self] in
                 self?.genericView.idleHide()
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             
             self?.idleTimer = timer
             timer.start()

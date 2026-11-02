@@ -2079,7 +2079,7 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
                 self.stickTimeoutAction = nil
                 action?()
             }
-        }, queue: Queue.mainQueue())
+        }, queue: Queue.mainQueue(), leeway: .precise)
         stickTimeoutTimer = timer
         timer.start()
     }

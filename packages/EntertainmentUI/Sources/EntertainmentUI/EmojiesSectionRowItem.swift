@@ -664,7 +664,7 @@ private final class EmojiesSectionRowView : TableRowView, ModalPreviewRowViewPro
             } else {
                 self.cancelLargeHold()
             }
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         largeHoldTimer?.start()
     }
 

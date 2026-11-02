@@ -331,7 +331,7 @@ public final class ReactionCarouselView: View {
                     updated = totatCount - 1
                 }
                 self?.scrollTo(updated, playReaction: true, duration: 0.5, clockwise: nil)
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             
             self?.timer?.start()
         })

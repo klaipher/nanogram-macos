@@ -131,7 +131,7 @@ final class ChatLayerTextLinkState: NSObject, NSViewToolTipOwner, Disposable {
             }
             self.preview = disposable
             self.timer = nil
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         self.timer = timer
         timer.start()
     }

@@ -263,7 +263,7 @@ private final class PremiumBoardingHeaderView : TableRowView {
                 
         timer = SwiftSignalKit.Timer(timeout: 5.0, repeat: true, completion: { [weak self] in
             self?.premiumView?.playAgain()
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         
         timer?.start()
         

@@ -81,7 +81,7 @@ private class ActiveCallView : View {
         self.statusTimer = SwiftSignalKit.Timer(timeout: untilNextSecond, repeat: false, completion: { [weak self] in
             self?.updateDuration(transition: .animated(duration: 0.2, curve: .easeOut))
             self?.scheduleTick()
-        }, queue: Queue.mainQueue())
+        }, queue: Queue.mainQueue(), leeway: .precise)
         self.statusTimer?.start()
     }
     
