@@ -87,7 +87,7 @@ open class TableAnimationInterface: NSObject {
                     _ = table.viewNecessary(at: idx, makeIfNecessary: true)
                 }
                 table.layoutSubtreeIfNeeded()
-                table.window?.displayIfNeeded()
+                table.displayIfNeeded()
                 for idx in added[0].index ..< range.length {
                     
                     if let view = table.viewNecessary(at: idx), let layer = view.layer {
