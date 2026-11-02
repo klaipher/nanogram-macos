@@ -135,7 +135,8 @@ static GLuint TGCreateTextureWithImage(CGImageRef image)
     CMVideoDimensions dimensions = CMVideoFormatDescriptionGetDimensions(inputFormatDescription);
     CGFloat minSide = MIN(dimensions.width, dimensions.height);
     CGFloat maxSide = MAX(dimensions.width, dimensions.height);
-    CGSize outputSize = CGSizeMake(minSide, minSide);
+    CGFloat outputSide = _outputSide > 0 ? MIN(minSide, (CGFloat)_outputSide) : minSide;
+    CGSize outputSize = CGSizeMake(outputSide, outputSide);
     
     _aspectRatio = minSide / maxSide;
     [self updateTextureVertices];

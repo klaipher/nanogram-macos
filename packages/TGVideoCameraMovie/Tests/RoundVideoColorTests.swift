@@ -128,3 +128,54 @@ final class RoundVideoColorTests: XCTestCase {
         XCTAssertEqual(CVBufferCopyAttachment(buffer, kCVImageBufferTransferFunctionKey, nil) as? String, kCVImageBufferTransferFunction_ITU_R_709_2 as String)
     }
 }
+
+private func avcProfileIndication(_ description: CMFormatDescription) -> UInt8? {
+    guard let atoms = CMFormatDescriptionGetExtension(description, extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms) as? [String: Any], let avcC = atoms["avcC"] as? Data, avcC.count > 1 else {
+        return nil
+    }
+    return avcC[avcC.startIndex + 1]
+}
+
+final class RoundVideoSizeTests: XCTestCase {
+    private let sideKey = "videoMessageSide"
+
+    override func setUp() {
+        super.setUp()
+        UserDefaults.standard.removeObject(forKey: self.sideKey)
+    }
+
+    override func tearDown() {
+        UserDefaults.standard.removeObject(forKey: self.sideKey)
+        super.tearDown()
+    }
+
+    func testRoundVideoSideFollowsServerDiameter() {
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: 384), 384)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: 480), 480)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: 385), 384)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: 0), 384)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: 4096), 640)
+    }
+
+    func testExplicitSideOverrideIsHonoured() {
+        UserDefaults.standard.set(300, forKey: self.sideKey)
+        XCTAssertEqual(TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: 384), 300)
+    }
+
+    func testRoundVideoIsEncodedAtTheDiameterWithHighProfile() throws {
+        let side = TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: 384)
+        let settings = TGMediaVideoConversionPresetSettings.videoSettings(for: TGMediaVideoConversionPresetVideoMessage, dimensions: CGSize(width: side, height: side), bitrate: 1000) as! [String: Any]
+        let compression = settings[AVVideoCompressionPropertiesKey] as? [String: Any]
+        XCTAssertEqual(compression?[AVVideoProfileLevelKey] as? String, AVVideoProfileLevelH264HighAutoLevel)
+        XCTAssertEqual(compression?[AVVideoH264EntropyModeKey] as? String, AVVideoH264EntropyModeCABAC)
+
+        let url = try writeMovie(settings: settings, width: side, height: side, color: (40, 120, 200))
+        defer {
+            try? FileManager.default.removeItem(at: url)
+        }
+        let track = try XCTUnwrap(AVURLAsset(url: url).tracks(withMediaType: .video).first)
+        XCTAssertEqual(track.naturalSize, CGSize(width: 384, height: 384))
+        let description = try XCTUnwrap(track.formatDescriptions.first.map { $0 as! CMFormatDescription })
+        XCTAssertEqual(avcProfileIndication(description), 100)
+    }
+}

@@ -34,6 +34,18 @@
     }
 }
 
++ (NSInteger)videoMessageSideForDiameter:(NSInteger)diameter
+{
+    NSNumber *explicitSide = [self _vmSide];
+    if (explicitSide != nil && explicitSide.integerValue > 0)
+        return explicitSide.integerValue;
+    
+    if (diameter <= 0)
+        diameter = 384;
+    diameter = MAX(240, MIN(640, diameter));
+    return diameter & ~1;
+}
+
 + (bool)keepAudioForPreset:(TGMediaVideoConversionPreset)preset
 {
     return preset != TGMediaVideoConversionPresetAnimation;
@@ -77,7 +89,9 @@
     {
     AVVideoAverageBitRateKey: @(bitrate * 1000),
     AVVideoCleanApertureKey: videoCleanApertureSettings,
-    AVVideoPixelAspectRatioKey: videoAspectRatioSettings
+    AVVideoPixelAspectRatioKey: videoAspectRatioSettings,
+    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+    AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC
     };
     
     return @

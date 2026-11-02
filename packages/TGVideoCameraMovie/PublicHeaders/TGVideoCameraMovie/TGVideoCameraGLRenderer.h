@@ -10,6 +10,7 @@
 @property (nonatomic, assign) CGFloat opacity;
 @property (nonatomic, readonly) bool hasPreviousPixelbuffer;
 @property (nonatomic, assign) NSInteger decorationFrame;
+@property (nonatomic, assign) NSInteger outputSide;
 
 - (void)setDecorationWatermark:(CGImageRef)watermark planeFrames:(CGImageRef)planeFrames planeFrameCount:(NSInteger)planeFrameCount;
 - (bool)prepareForInputWithFormatDescription:(CMFormatDescriptionRef)inputFormatDescription outputRetainedBufferCountHint:(size_t)outputRetainedBufferCountHint;

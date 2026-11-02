@@ -100,6 +100,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     public let session: AVCaptureSession = AVCaptureSession()
     
     public let config: VideoMessageConfig
+    public let outputSide: Int
     
     private var status: VideoCameraRecordingStatus = .idle {
         didSet {
@@ -163,12 +164,14 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         self.currentURL = url
         self.liveUploading = liveUploading
         self.config = config
+        self.outputSide = TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: config.diameter)
         super.init()
         
         recorder = TGVideoCameraMovieRecorder(url: url, delegate: self, callbackQueue: VideoRecorderPipeline.queue.queue)
         
         renderer.orientation = .portrait
         renderer.mirror = true
+        renderer.outputSide = self.outputSide
         if let decoration = roundVideoDecoration() {
             renderer.setDecorationWatermark(decoration.watermark, planeFrames: decoration.planeFrames, planeFrameCount: roundVideoPlaneFrameCount)
         }
@@ -211,7 +214,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         
         videoOutput.alwaysDiscardsLateVideoFrames = false
 
-        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferIOSurfacePropertiesKey as String: [:], kCVPixelBufferWidthKey as String: 500, kCVPixelBufferHeightKey as String: 500]
+        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferIOSurfacePropertiesKey as String: [:]]
         
         videoOutput.setSampleBufferDelegate(self, queue: VideoRecorderPipeline.queue.queue)
         session.addOutput(videoOutput)
@@ -397,7 +400,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     private func configureRecorderTracks() {
         let audioSettings = TGMediaVideoConversionPresetSettings.audioSettings(for: TGMediaVideoConversionPresetVideoMessage, bitrate: Int32(config.audioBitrate))
         recorder.addAudioTrack(withSourceFormatDescription: outputAudioFormatDescription, settings: audioSettings)
-        let size: CGSize = TGMediaVideoConversionPresetSettings.maximumSize(for: TGMediaVideoConversionPresetVideoMessage)
+        let size = CGSize(width: self.outputSide, height: self.outputSide)
         let videoSettings = TGMediaVideoConversionPresetSettings.videoSettings(for: TGMediaVideoConversionPresetVideoMessage, dimensions: size, bitrate: Int32(config.videoBitrate))
         recorder.addVideoTrack(withSourceFormatDescription: outputVideoFormatDescription, transform: CGAffineTransform.identity, settings: videoSettings)
         
