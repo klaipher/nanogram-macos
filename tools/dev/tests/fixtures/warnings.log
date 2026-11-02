@@ -1,0 +1,21 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild build -workspace Telegram-Mac.xcworkspace -scheme Telegram
+
+SwiftCompile normal arm64 Compiling\ Window.swift /ROOT/packages/TGUIKit/Sources/Window.swift (in target 'TGUIKit' from project 'TGUIKit')
+/ROOT/packages/TGUIKit/Sources/Window.swift:10:5: warning: 'foo()' is deprecated: use bar() [#DeprecatedDeclaration]
+/ROOT/packages/TGUIKit/Sources/Window.swift:10:5: warning: 'foo()' is deprecated: use bar() [#DeprecatedDeclaration]
+   10 |     foo()
+      |     `- warning: 'foo()' is deprecated: use bar() [#DeprecatedDeclaration]
+/ROOT/packages/TGUIKit/Sources/Window.swift:22:9: warning: capture of 'self' with non-Sendable type 'Window' in a '@Sendable' closure
+/ROOT/submodules/telegram-ios/submodules/TelegramCore/Sources/Account.swift:5:1: warning: var 'x' is not concurrency-safe
+/ROOT/submodules/telegram-ios/submodules/sqlcipher/Sources/sqlite3.c:100:3: warning: implicit conversion loses integer precision [-Wshorten-64-to-32]
+/ROOT/submodules/telegram-ios/third-party/rnnoise/src/denoise.c:7:2: warning: unused variable 'k' [-Wunused-variable]
+/ROOT/submodules/Sparkle/Sparkle/SUUpdater.m:42:1: warning: 'NSURLConnection' is deprecated [-Wdeprecated-declarations]
+/ROOT/Telegram-Mac/utils/UNUserNotifications.swift:3:3: warning: 'NSUserNotification' was deprecated in macOS 11.0
+/ROOT/packages/NanogramKit/Sources/NanogramKit/Nanogram.swift:1:1: warning: our code cannot have warnings
+/ROOT/packages/NanogramUpdater/Sources/NanogramUpdater/Updater.swift:1:1: warning: our code cannot have warnings
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.2.sdk/usr/include/c++/v1/__memory/unique_ptr.h:761:30: warning: 'RtcEventLogFactory' is deprecated [-Wdeprecated-declarations]
+clang: warning: no such include directory: '/DD/Build/Intermediates.noindex/Sparkle.build/DerivedSources' [-Wmissing-include-dirs]
+/ROOT/packages/TGUIKit/Sources/Window.swift:30:1: error: not a warning
+ld: warning: ignoring duplicate libraries: '-lc++'
+** BUILD SUCCEEDED **

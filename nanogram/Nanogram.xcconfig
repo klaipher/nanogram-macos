@@ -47,5 +47,7 @@ DSA_PEM_FILE =
 
 // Strictness A for upstream code: the same data-race checks our packages have, reported as warnings and
 // counted per package in nanogram/warnings-baseline.json (tg warnings). Our packages build in Swift 6 mode
-// with warnings as errors on top of this.
-OTHER_SWIFT_FLAGS = $(inherited) -strict-concurrency=complete
+// with warnings as errors on top of this. TelegramCore's manifest adds -warnings-as-errors, which would turn its
+// new concurrency warnings into errors (Swift has no umbrella group for -Wwarning); there the baseline is the gate.
+NANOGRAM_SWIFT_FLAGS_TelegramCore = -no-warnings-as-errors
+OTHER_SWIFT_FLAGS = $(inherited) -strict-concurrency=complete $(NANOGRAM_SWIFT_FLAGS_$(TARGET_NAME))
