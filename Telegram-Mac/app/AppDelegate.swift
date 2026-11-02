@@ -1171,7 +1171,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                 self.executeUrlAfterLogin = nil
                                 execute(inapp: inApp(for: executeUrlAfterLogin.nsstring, context: context.context))
                             }
-                            #if !APP_STORE
+                            #if !APP_STORE && !NANOGRAM_MAS
                             networkDisposable.set((context.context.account.postbox.preferencesView(keys: [PreferencesKeys.networkSettings]) |> delay(5.0, queue: Queue.mainQueue()) |> deliverOnMainQueue).start(next: { settings in
                                 let settings = settings.values[PreferencesKeys.networkSettings]?.get(NetworkSettings.self)
                                 
@@ -1237,7 +1237,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                     window.makeKeyAndOrderFront(nil)
                                     showModal(with: context.modal, for: window, animated: presentAuthAnimated)
                                     
-                                    #if !APP_STORE
+                                    #if !APP_STORE && !NANOGRAM_MAS
                                     networkDisposable.set((context.account.postbox.preferencesView(keys: [PreferencesKeys.networkSettings]) |> delay(5.0, queue: Queue.mainQueue()) |> deliverOnMainQueue).start(next: { settings in
                                         let settings = settings.values[PreferencesKeys.networkSettings]?.get(NetworkSettings.self)
                                         
@@ -1346,7 +1346,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
 
 
     @IBAction func checkForUpdates(_ sender: Any) {
-        #if !APP_STORE
+        #if !APP_STORE && !NANOGRAM_MAS
             showModal(with: InputDataModalController(AppUpdateViewController()), for: window)
             #if STABLE
                 if let context = self.contextValue?.context {
@@ -1361,7 +1361,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     }
     
     override func awakeFromNib() {
-        #if APP_STORE
+        #if APP_STORE || NANOGRAM_MAS
         if let menu = NSApp.mainMenu?.item(at: 0)?.submenu, let sparkleItem = menu.item(withTag: 1000) {
             menu.removeItem(sparkleItem)
         }
@@ -1383,7 +1383,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     
     @objc func checkUpdates() {
-        #if !APP_STORE
+        #if !APP_STORE && !NANOGRAM_MAS
         showModal(with: InputDataModalController(AppUpdateViewController()), for: window)
         #endif
     }
@@ -1431,7 +1431,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     }
     
     private func crashRecoveryUpdate() -> CrashRecoveryUpdate {
-        #if APP_STORE
+        #if APP_STORE || NANOGRAM_MAS
         return .appStore
         #elseif GITHUB || DEBUG
         return .website
@@ -1649,7 +1649,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
             clearCrashMarker(folder: containerUrl)
         }
         
-        #if !APP_STORE
+        #if !APP_STORE && !NANOGRAM_MAS
             updateAppIfNeeded()
         #endif
         

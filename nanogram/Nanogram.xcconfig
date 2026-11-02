@@ -29,5 +29,6 @@ CODE_SIGN_STYLE = Manual
 CODE_SIGN_IDENTITY = Apple Development
 PROVISIONING_PROFILE_SPECIFIER =
 
-// Telegram's unused Firebase config (FirebaseApp.configure() is commented out upstream).
-EXCLUDED_SOURCE_FILE_NAMES = $(inherited) GoogleService-Info.plist
+// Telegram's unused Firebase config (FirebaseApp.configure() is commented out upstream);
+// editions add their own exclusions through NANOGRAM_EDITION_EXCLUDED_FILES.
+EXCLUDED_SOURCE_FILE_NAMES = $(inherited) GoogleService-Info.plist $(NANOGRAM_EDITION_EXCLUDED_FILES)

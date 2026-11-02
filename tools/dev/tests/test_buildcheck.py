@@ -43,6 +43,16 @@ class LogTests(unittest.TestCase):
     def test_empty_log_rejected(self):
         self.assertTrue(buildcheck.check_log("** BUILD SUCCEEDED **\n"))
 
+    def test_no_op_build_log_accepted(self):
+        log = ("Command line invocation:\n    xcodebuild build -workspace W.xcworkspace\n\n"
+               "Build settings from command line:\n    ARCHS = arm64\n\nCreateBuildDescription\n\n"
+               "** BUILD SUCCEEDED **\n")
+        self.assertEqual(buildcheck.check_log(log), [])
+
+    def test_failed_no_op_log_rejected(self):
+        log = "Command line invocation:\n    xcodebuild build\n\nBuild settings from command line:\n\n** BUILD FAILED **\n"
+        self.assertTrue(buildcheck.check_log(log))
+
     def test_release_requires_O3_from_response_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             resp = Path(tmp) / "common-args.resp"
@@ -105,6 +115,15 @@ class BinaryTests(unittest.TestCase):
             problems = buildcheck.check_binary(app)
             self.assertTrue(any("12.0" in p for p in problems), problems)
 
+
+    def test_uncompiled_metal_shader_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(tmp, build_binary(tmp, ["arm64"], "15.0"))
+            resources = app / "Contents" / "Resources" / "MetalEngine_MetalEngine.bundle" / "Contents" / "Resources"
+            resources.mkdir(parents=True)
+            (resources / "MetalEngineShaders.metal").write_text("kernel void k() {}")
+            problems = buildcheck.check_binary(app)
+            self.assertTrue(any("MetalEngineShaders.metal" in p and "metallib" in p for p in problems), problems)
 
 class FindAppTests(unittest.TestCase):
     def test_find_app_picks_the_app_with_an_extension(self):

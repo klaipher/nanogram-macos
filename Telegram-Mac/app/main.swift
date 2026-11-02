@@ -3,6 +3,8 @@ import ApiCredentials
 import CrashRecoveryUI
 import NanogramKit
 
+guard SingleInstance.ensure() else { exit(0) }
+
 @_silgen_name("OPENSSL_init_crypto")
 private func OPENSSL_init_crypto(_ opts: UInt64, _ settings: OpaquePointer?) -> Int32
 

@@ -100,6 +100,11 @@ def _blocks(log: str):
             yield action, label, parsed[0], parsed[1]
 
 
+def _is_successful_xcodebuild_log(log: str) -> bool:
+    return ("Command line invocation:" in log and "Build settings from command line:" in log
+            and "** BUILD SUCCEEDED **" in log)
+
+
 def check_log(log: str, release: bool = False, min_os: str = MIN_OS) -> list[str]:
     """Problems found in an xcodebuild log; empty when every compile is arm64 for macOS `min_os`."""
     problems = _Problems()
@@ -134,6 +139,9 @@ def check_log(log: str, release: bool = False, min_os: str = MIN_OS) -> list[str
         if release and action == "Ld" and "-flto=thin" not in args:
             problems.add("link without -flto=thin", label)
     if seen == 0:
+        # A no-change rebuild compiles nothing; accept it only when the log is recognisably xcodebuild's own.
+        if _is_successful_xcodebuild_log(log):
+            return []
         return ["no compile or link commands found in the log (was it an xcodebuild log of a real build?)"]
     return problems.render()
 
@@ -173,12 +181,17 @@ def main_executable(app: Path) -> Path:
 
 
 def check_binary(app: Path, min_os: str = MIN_OS) -> list[str]:
-    """Problems in a built .app: any Mach-O that is not arm64-only, or a main binary not built for `min_os`."""
+    """Problems in a built .app: any Mach-O that is not arm64-only, a main binary not built for `min_os`,
+    or a Metal shader shipped as source."""
     app = Path(app)
     if not app.is_dir():
         return [f"{app} does not exist"]
     problems = []
     for path in sorted(p for p in app.rglob("*") if p.is_file() and not p.is_symlink()):
+        if path.suffix == ".metal":
+            problems.append(f"{path.relative_to(app.parent)}: Metal source shipped instead of a compiled metallib "
+                            "(a package copies it as a resource; see XCODE27.md item 3)")
+            continue
         if not _is_macho(path):
             continue
         archs = _archs(path)

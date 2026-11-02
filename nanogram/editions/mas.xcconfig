@@ -1,0 +1,14 @@
+// Mac App Store / TestFlight edition: sandboxed, no Sparkle. tg adds the NANOGRAM_MAS condition, which
+// compiles out the Sparkle call sites; Sparkle.framework is neither linked nor embedded.
+// tools/dev/tg build --edition mas passes it with -xcconfig.
+#include "../Nanogram.xcconfig"
+
+// Local builds sign without a provisioning profile, so they use the development set (the distribution set
+// minus profile-only keys such as Maps); tg testflight passes
+// NANOGRAM_MAS_ENTITLEMENTS=nanogram/entitlements/Nanogram-MAS.entitlements with the App Store profile.
+NANOGRAM_MAS_ENTITLEMENTS = nanogram/entitlements/Nanogram-MAS-Development.entitlements
+NANOGRAM_ENTITLEMENTS_Telegram = $(NANOGRAM_MAS_ENTITLEMENTS)
+NANOGRAM_ENTITLEMENTS_TelegramShare = nanogram/entitlements/NanogramShare.entitlements
+CODE_SIGN_ENTITLEMENTS = $(NANOGRAM_ENTITLEMENTS_$(TARGET_NAME):default=$(inherited))
+
+NANOGRAM_EDITION_EXCLUDED_FILES = Sparkle.framework

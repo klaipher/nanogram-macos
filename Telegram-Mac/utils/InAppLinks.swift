@@ -2192,7 +2192,7 @@ private func updateAppAsYouWish(text: String, updateApp: Bool) {
     if updateApp {
         verifyAlert_button(for: mainWindow, header: appName, information: text, ok: strings().alertButtonOKUpdateApp, cancel: strings().modalCancel, option: nil, successHandler: { _ in
             if updateApp {
-                #if APP_STORE
+                #if APP_STORE || NANOGRAM_MAS
                 execute(inapp: inAppLink.external(link: itunesAppLink, false))
                 #else
                 (NSApp.delegate as? AppDelegate)?.checkForUpdates(updateApp)

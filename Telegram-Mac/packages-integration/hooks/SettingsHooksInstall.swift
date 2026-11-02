@@ -352,7 +352,7 @@ func installSettingsUIHooks() {
         return ChatListFiltersListController(context: context as! AccountContext)
     }, appUpdateStateText: { state in
         var text: String = ""
-        #if !APP_STORE
+        #if !APP_STORE && !NANOGRAM_MAS
         if let state = state as? AppUpdateState {
             switch state.loadingState {
             case let .loading(_, current, total):
@@ -371,14 +371,14 @@ func installSettingsUIHooks() {
         return text
     }, appUpdateState: {
         let appUpdateState: Signal<Any?, NoError>
-        #if APP_STORE
+        #if APP_STORE || NANOGRAM_MAS
             appUpdateState = .single(nil)
         #else
         appUpdateState = appUpdateStateSignal |> map(Optional.init)
         #endif
         return appUpdateState
     }, pushAppUpdate: { navigation in
-        #if !APP_STORE
+        #if !APP_STORE && !NANOGRAM_MAS
         navigation.push(AppUpdateViewController(), false)
         #endif
     }, openFaq: { context in

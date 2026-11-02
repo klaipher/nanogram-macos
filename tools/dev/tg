@@ -31,10 +31,14 @@ cmd_frameworks() { py frameworks "$@"; }
 # Writes the gitignored NanogramSecrets.swift (api_id/api_hash); prints only the path, never the values.
 cmd_credentials() { py credentials || die "cannot generate API credentials"; }
 
+# Idempotent working-tree fixes inside submodules (tools/dev/nanogram/localfixes.py).
+cmd_localfixes() { py localfixes || die "cannot apply local submodule fixes"; }
+
 cmd_setup() {
   say "Fetching submodules"
   git submodule sync --recursive >/dev/null
   git submodule update --init --recursive --jobs 8
+  cmd_localfixes
   local toolchain
   toolchain="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml)"
   [ -n "$toolchain" ] || die "cannot read the Rust toolchain pinned in submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml"
@@ -71,6 +75,7 @@ cmd_build() {
   derived="$(config_value DERIVED_DATA)"
   mkdir -p "$ROOT/build-output"
   log="$ROOT/build-output/last-build.log"
+  cmd_localfixes
   cmd_credentials
 
   say "Building $configuration ($edition edition), log: build-output/last-build.log"
@@ -91,6 +96,8 @@ cmd_build() {
   local check_args=(--log "$log" --products "$derived/Build/Products/$configuration")
   [ "$release" = 1 ] && check_args+=(--release)
   py buildcheck "${check_args[@]}" || die "buildcheck failed: the settings layer did not reach every target"
+  py editions --edition "$edition" --configuration "$configuration" --products "$derived/Build/Products/$configuration" \
+    || die "the $edition edition is wrong (signing, sandbox or Sparkle); see above"
 }
 
 cmd_xcode() {

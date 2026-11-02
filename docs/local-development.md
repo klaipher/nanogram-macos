@@ -40,6 +40,55 @@ tools/dev/tg xcode          # direct edition; `tg xcode mas` for the App Store e
 It opens the workspace with `XCODE_XCCONFIG_FILE` pointing at the edition xcconfig, which Xcode applies like
 `-xcconfig`. Quit Xcode first: an Xcode that is already running keeps its old environment.
 
+## Identity, credentials and editions
+
+- Bundle `org.klaipher.Nanogram`, share extension `org.klaipher.Nanogram.MacShare`, team `YGTMYL879P`, one app
+  group `YGTMYL879P.org.klaipher.Nanogram` for both editions. Xcode has no per-target xcconfig conditions, so
+  `Nanogram.xcconfig` picks the bundle ID (and the edition file the entitlements) by `TARGET_NAME`; every other
+  target keeps its own value. Upstream's project file is untouched.
+- `tg credentials` (run by `tg build` and `tg xcode`) writes the gitignored
+  `packages/ApiCredentials/Sources/ApiCredentials/NanogramSecrets.swift` (mode 0600) from
+  `~/.config/telegram-ios/api-credentials.json`, only when it changes. It prints the path, never the values.
+- Local builds sign with the team's Apple Development identity and no provisioning profile.
+
+| | `mas` (TestFlight / App Store) | `direct` (Developer ID, Sparkle) |
+|---|---|---|
+| Build | `tg build --edition mas` | `tg build` / `tg build --edition direct` |
+| Conditions | `NANOGRAM STABLE NANOGRAM_MAS` | `NANOGRAM STABLE` |
+| Sandbox | yes | no (hardened runtime) |
+| Sparkle | compiled out, not linked, not embedded | embedded |
+| Entitlements | `nanogram/entitlements/Nanogram-MAS.entitlements` | `Nanogram-Direct.entitlements` |
+
+The share extension is sandboxed in both (`NanogramShare.entitlements`). Every `tg build` also runs
+`tools/dev/nanogram/editions.py`, which fails the build if an edition is wrong (sandbox, app group, hardened
+runtime, any Sparkle symbol or load command in the mas binaries). It also keeps an APFS clone of each
+edition's app in `build-output/apps/<Configuration>-<edition>/`, so both editions exist side by side for tests.
+Switching edition changes a compilation condition, so the next build recompiles every Swift module.
+
+### Two editions on one Mac
+
+Both editions use the same bundle ID, app group and data folder (`SOURCE` from the configuration: `debug` for
+Debug builds, `stable` for Release, in either edition), so switching editions keeps accounts and cache, and Debug
+builds never touch a Release build's data. Only one Nanogram may run at a time: `SingleInstance.ensure()`
+(NanogramKit, called first thing in `main.swift`) makes a later launch activate the running instance and quit
+before it touches the shared data. Two simultaneous launches resolve to the older one (lower pid on a tie).
+
+`NANOGRAM_LAUNCH_TESTS=1 python3 -m unittest tools/dev/tests/test_editions.py` launches the direct build, then
+the mas build, and checks that the second quits within 5 s and the first stays frontmost.
+
+Checked on 2026-11-02 without an account (code level; the owner has no Telegram account on this Mac): each Debug
+edition launched alone reaches the login screen and writes to the same
+`~/Library/Group Containers/YGTMYL879P.org.klaipher.Nanogram/debug/` folder, including the same pre-login account
+record, so the sandboxed mas build reads what the direct build wrote. Still to do with a real account: log in on
+direct, quit, open mas and see the same account and chats without logging in again.
+
+Local signing uses no provisioning profile, so local mas builds sign with
+`Nanogram-MAS-Development.entitlements`: the distribution set `Nanogram-MAS.entitlements` minus keys macOS
+honours only with a profile (Maps). `tg testflight` signs with the full set and the App Store profile.
+Shaders: Xcode 27 copies `.copy("*.metal")` package resources as source, and MetalEngine then traps at launch.
+CallVideoLayer, DustLayer and MetalEngine compile their shaders (XCODE27.md item 3), and `buildcheck` fails any
+app that ships a `.metal` file.
+
 ## Native libraries
 
 `tg frameworks` runs upstream's `scripts/configure_frameworks.sh` with our xcconfig (`XCODE_XCCONFIG_FILE`) and
