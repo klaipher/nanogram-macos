@@ -123,7 +123,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **Perflab**: the core loops are not in upstream's power audit; #11 is listed, not fixed. The loops start only for a
   logged-in account, so without one use the stress test; with the account, `syssample.py` idle wake-ups/min.
 
-### M4. Deadline polls are re-fetched every 0.5 s once the time since posting has passed again — `todo`, verified (corrected)
+### M4. Deadline polls are re-fetched every 0.5 s once the time since posting has passed again — `done (1ac6562)`, verified (corrected)
 
 - **Evidence**: TelegramCore `State/AccountViewTracker.swift:548` (only `deadlineTimeout` is checked; `deadlineDate`
   is ignored); `:556` `remainingTime = timestamp - startDate - 1` (time since posting, not time left); `:573-583`
