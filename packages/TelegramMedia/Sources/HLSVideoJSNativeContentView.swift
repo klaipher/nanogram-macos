@@ -316,13 +316,7 @@ public final class HLSQualitySet {
     public let playlistFiles: [Int: FileMediaReference]
     public let thumbnails: [Int: (file: FileMediaReference, fileMap: FileMediaReference)]
     
-    public init?(baseFile: FileMediaReference) {
-        
-        
-        func isNativeVideoCodecSupported(videoCodec: String) -> Bool {
-            return videoCodec == "h264" || videoCodec == "h265" || videoCodec == "avc" || videoCodec == "hevc"
-        }
-        
+    public init?(baseFile: FileMediaReference, isHardwareAv1Supported: Bool = internal_isHardwareAv1Supported) {
         var qualityFiles: [Int: FileMediaReference] = [:]
         var thumbnailFiles: [FileMediaReference] = []
         var thumbnailFileMaps: [Int: (mapFile: FileMediaReference, thumbnailFileId: Int64)] = [:]
@@ -352,7 +346,7 @@ public final class HLSQualitySet {
             } else {
                 for attribute in alternativeFile.attributes {
                     if case let .Video(_, size, _, _, _, videoCodec) = attribute {
-                        if let videoCodec, isNativeVideoCodecSupported(videoCodec: videoCodec) {
+                        if let videoCodec, HLSCodecSelection.isSupported(videoCodec: videoCodec, isHardwareAv1Supported: isHardwareAv1Supported) {
                             let key = Int(min(size.width, size.height))
                             if let currentFile = qualityFiles[key] {
                                 var currentCodec: String?
@@ -361,8 +355,7 @@ public final class HLSQualitySet {
                                         currentCodec = videoCodec
                                     }
                                 }
-                                if let currentCodec, (currentCodec == "av1" || currentCodec == "av01") {
-                                } else {
+                                if HLSCodecSelection.replaces(currentCodec: currentCodec, with: videoCodec) {
                                     qualityFiles[key] = baseFile.withMedia(alternativeFile)
                                 }
                             } else {
