@@ -1203,7 +1203,6 @@
 		2747FD3A2927BFBE0045B95C /* menu_hide.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = menu_hide.tgs; sourceTree = "<group>"; };
 		2747FD3D292CD4530045B95C /* menu_report_false_positive.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = menu_report_false_positive.tgs; sourceTree = "<group>"; };
 		2747FD412930FD570045B95C /* global_autoremove.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = global_autoremove.tgs; sourceTree = "<group>"; };
-		2748D44427C61DCF0057CF99 /* libtgvoip.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = libtgvoip.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		274952812AA1E79E00499498 /* hand_animation.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = hand_animation.tgs; sourceTree = "<group>"; };
 		274952862AA48A7200499498 /* menu_lighting.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = menu_lighting.tgs; sourceTree = "<group>"; };
 		274B9E3F273008EB009993C7 /* sent.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = sent.mp3; sourceTree = "<group>"; };
@@ -1897,7 +1896,6 @@
 		D098C71A1D7E175A007784E4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D098C71F1D7E175A007784E4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D098C7381D7E1A62007784E4 /* Telegram-Mac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Telegram-Mac.entitlements"; sourceTree = "<group>"; };
-		D09D836D24A6205500120F73 /* libtgvoip.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = libtgvoip.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0A1B2C3D4E5F60000000002 /* WalletContext */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WalletContext; path = "submodules/telegram-ios/submodules/WalletContext"; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60000000012 /* WalletBackupCrypto */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WalletBackupCrypto; path = "submodules/telegram-ios/submodules/WalletBackupCrypto"; sourceTree = "<group>"; };
 		D0A1B2C3D4E5F60000000300 /* wallet_word_list.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = wallet_word_list.tgs; sourceTree = "<group>"; };
@@ -3546,7 +3544,6 @@
 				279BD40B29B71FA200A8B640 /* Network.framework */,
 				27D913092833A1C9007CF40F /* StoreKit.framework */,
 				27034075282CF79E00D0156C /* SceneKit.framework */,
-				2748D44427C61DCF0057CF99 /* libtgvoip.framework */,
 				27D43DB327917798006968A6 /* libmac_framework_objc_static.a */,
 				27D43DB12791774A006968A6 /* libcrypto.a */,
 				27D43DAF27917747006968A6 /* libssl.a */,
@@ -3567,7 +3564,6 @@
 				D0076EE725685A50007EF588 /* AppCenter.framework */,
 				D0983E162568373E00467703 /* AppCenterAnalytics.framework */,
 				D0983E182568373E00467703 /* AppCenterCrashes.framework */,
-				D09D836D24A6205500120F73 /* libtgvoip.framework */,
 				D06E38AB24A5F3B700C7D03A /* Metal.framework */,
 				D06E38AA24A5F3B700C7D03A /* MetalKit.framework */,
 				A7377E5B23B5E99500AD3ADD /* libxml2.tbd */,
@@ -4888,7 +4884,6 @@
 				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
 				GCC_WARN_ABOUT_POINTER_SIGNEDNESS = NO;
 				HEADERMAP_USES_VFS = YES;
-				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/submodules/libtgvoip";
 				INFOPLIST_FILE = "Telegram-Mac/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -5114,7 +5109,6 @@
 				GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO = NO;
 				GCC_WARN_ABOUT_POINTER_SIGNEDNESS = NO;
 				HEADERMAP_USES_VFS = YES;
-				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/submodules/libtgvoip";
 				INFOPLIST_FILE = "Telegram-Mac/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
