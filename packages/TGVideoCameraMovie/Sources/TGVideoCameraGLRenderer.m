@@ -620,7 +620,13 @@ bail:
         (id)kCVPixelBufferWidthKey : @(width),
         (id)kCVPixelBufferHeightKey : @(height),
         (id)kCVPixelFormatOpenGLCompatibility : @true,
-        (id)kCVPixelBufferIOSurfacePropertiesKey : @{ }
+        (id)kCVPixelBufferIOSurfacePropertiesKey : @{ },
+        (id)kCVBufferPropagatedAttachmentsKey : @
+        {
+            (id)kCVImageBufferYCbCrMatrixKey : (id)kCVImageBufferYCbCrMatrix_ITU_R_709_2,
+            (id)kCVImageBufferColorPrimariesKey : (id)kCVImageBufferColorPrimaries_ITU_R_709_2,
+            (id)kCVImageBufferTransferFunctionKey : (id)kCVImageBufferTransferFunction_ITU_R_709_2
+        }
     };
     
     NSDictionary *pixelBufferPoolOptions = @{ (id)kCVPixelBufferPoolMinimumBufferCountKey : @(maxBufferCount) };

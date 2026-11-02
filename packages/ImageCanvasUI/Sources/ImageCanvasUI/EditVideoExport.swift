@@ -610,6 +610,11 @@ public enum EditVideoExport {
                     AVVideoAverageBitRateKey: quality.videoBitrate,
                     AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
                     AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC
+                ],
+                AVVideoColorPropertiesKey: [
+                    AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                    AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                    AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
                 ]
             ])
             videoInput.expectsMediaDataInRealTime = false

@@ -22,9 +22,14 @@ let package = Package(
             name: "TGVideoCameraMovie",
             dependencies: [],
             path: ".",
+            exclude: ["Tests"],
             publicHeadersPath: "PublicHeaders/TGVideoCameraMovie",
             cSettings: [
                 .headerSearchPath("PublicHeaders/TGVideoCameraMovie")
             ]),
+        .testTarget(
+            name: "TGVideoCameraMovieTests",
+            dependencies: [.target(name: "TGVideoCameraMovie")],
+            path: "Tests"),
     ]
 )

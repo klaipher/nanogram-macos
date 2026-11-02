@@ -85,7 +85,13 @@
     AVVideoCodecKey: AVVideoCodecTypeH264,
     AVVideoCompressionPropertiesKey: codecSettings,
     AVVideoWidthKey: @((NSInteger)dimensions.width),
-    AVVideoHeightKey: @((NSInteger)dimensions.height)
+    AVVideoHeightKey: @((NSInteger)dimensions.height),
+    AVVideoColorPropertiesKey: @
+    {
+    AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+    AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+    AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+    }
     };
 }
 
