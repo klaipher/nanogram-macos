@@ -61,12 +61,14 @@ edition_xcconfig() {
   echo "$file"
 }
 
-# tg build [--release] [--edition mas|direct] [-- extra xcodebuild args]
+# tg build [--release] [--clean] [--edition mas|direct] [-- extra xcodebuild args]
+# --clean deletes DerivedData/Build first, so every file compiles and every warning is in the log.
 cmd_build() {
-  local release=0 edition=direct extra=()
+  local release=0 clean=0 edition=direct extra=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --release) release=1 ;;
+      --clean) clean=1 ;;
       --edition) [ $# -ge 2 ] || die "--edition needs mas or direct"; edition="$2"; shift ;;
       --) shift; extra=("$@"); break ;;
       *) die "unknown build option: $1" ;;
@@ -83,6 +85,10 @@ cmd_build() {
   log="$ROOT/build-output/last-build.log"
   cmd_localfixes
   cmd_credentials
+  if [ "$clean" = 1 ]; then
+    say "Cleaning ${derived}/Build"
+    rm -rf "${derived:?}/Build"
+  fi
   py editions --edition "$edition" --before-build "$derived"
 
   say "Building $configuration ($edition edition), log: build-output/last-build.log"
@@ -107,6 +113,26 @@ cmd_build() {
     || die "the $edition edition is wrong (signing, sandbox or Sparkle); see above"
 }
 
+# tg warnings [--update] [--log FILE]: counts upstream warnings of a clean debug build (built here unless
+# --log names one) and fails when a package has more than nanogram/warnings-baseline.json allows.
+cmd_warnings() {
+  local log="" args=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --update) args+=(--update) ;;
+      --log) [ $# -ge 2 ] || die "--log needs a file"; log="$2"; shift ;;
+      *) die "unknown warnings option: $1" ;;
+    esac
+    shift
+  done
+  if [ -z "$log" ]; then
+    cmd_build --clean
+    log="$ROOT/build-output/warnings-build.log"
+    cp "$ROOT/build-output/last-build.log" "$log"
+  fi
+  py warnings --log "$log" ${args[@]+"${args[@]}"}
+}
+
 cmd_xcode() {
   local edition="${1:-direct}" xcconfig
   xcconfig="$(edition_xcconfig "$edition")"
@@ -126,13 +152,13 @@ usage: tools/dev/tg <command> [options]
   doctor           check prerequisites
   frameworks       build the native libraries (arm64) [--verify-only]
   credentials      generate NanogramSecrets.swift from ~/.config/telegram-ios/api-credentials.json
-  build            build the app [--release] [--edition mas|direct]
+  build            build the app [--release] [--clean] [--edition mas|direct]
   xcode [edition]  open the workspace in Xcode with our settings (quit Xcode first)
   sparkle-key      create the Sparkle EdDSA key once, print its public key [sign <archive>]
   run              build and launch the app
   test             swift test for our packages
   lint             tglint on changed Swift files
-  warnings         compare upstream warnings with the baseline [--update]
+  warnings         clean debug build, compare upstream warnings with the baseline [--update] [--log FILE]
   check            everything a push must pass
   sync-upstream    merge telegram/master
   testflight       archive and upload the mas edition
@@ -151,7 +177,8 @@ main() {
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;
     sparkle-key) cmd_sparkle_key "$@" ;;
-    run|test|lint|warnings|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;
+    warnings) cmd_warnings "$@" ;;
+    run|test|lint|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;
   esac

@@ -44,3 +44,8 @@ PRODUCT_MODULE_NAME = $(NANOGRAM_MODULE_NAME_$(TARGET_NAME):default=$(inherited)
 // the direct edition sets its own.
 SFEED_URL =
 DSA_PEM_FILE =
+
+// Strictness A for upstream code: the same data-race checks our packages have, reported as warnings and
+// counted per package in nanogram/warnings-baseline.json (tg warnings). Our packages build in Swift 6 mode
+// with warnings as errors on top of this.
+OTHER_SWIFT_FLAGS = $(inherited) -strict-concurrency=complete
