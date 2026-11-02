@@ -585,7 +585,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: related to R19; the iOS SharedWakeupManager is already event-driven.
 - **Perflab**: upstream #10 and #13c, listed, not fixed.
 
-### M24. Chat list views re-query the chat list on every Postbox transaction — `todo`, verified
+### M24. Chat list views re-query the chat list on every Postbox transaction — `done (core 5751188)`, verified
 
 - **Evidence**: Postbox `ChatListViewState.swift:1048-1049` (`if true || hadRemovals { self.fillSpace(…) }`);
   `:177-260` (a list anchored at the top always has fewer than `halfLimit` entries above, so it queries every time);
@@ -630,7 +630,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: `7ddeada8` ("Found and fixed while measuring").
 - **Perflab**: video-player lab; add a temp-dir byte count to its report.
 
-### M26. Up to 30 chat-history preload views stay live and are replayed on every transaction, also while hidden — `todo`, verified (medium confidence)
+### M26. Up to 30 chat-history preload views stay live and are replayed on every transaction, also while hidden — `done (f4e1837, core 19875d3): option A`, verified (medium confidence)
 
 - **Evidence**: `packages/ChatListUI/Sources/ChatListUI/ChatListController.swift:1459-1477` (up to 30 items, set only
   when on screen, never cleared when the window goes away); TelegramCore `State/ChatHistoryPreloadManager.swift:439`
@@ -674,7 +674,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   fallback tests to the SwiftPM MediaPlayer package. With the account, `run.sh gif-panel hw`.
 - **iOS cross-ref**: `019e8379`, `4cc94ee2`, `42836192`; iOS CLAUDE.md "Upgrading the vendored FFmpeg".
 
-### M28. MediaBox rewrites the partial-file map after every downloaded chunk — `todo`, verified
+### M28. MediaBox rewrites the partial-file map after every downloaded chunk — `done (core 0ff4315)`, verified
 
 - **Evidence**: Postbox `MediaBoxFileContextV2Impl.swift:494-534` (after each write: `fileMap.fill`,
   `fileMap.serialize(to: metaPath)`, `storageBox?.update`); `MediaBoxFileMap.swift:204-230` (open, seek, re-encode
@@ -939,7 +939,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   MtProtoKit SwiftPM test target (`Package.swift:32-35`). Add a 64 MiB micro-benchmark in 128 KiB parts before and after.
 - **Confidence**: high.
 
-### H3. The Rust engine's network availability polls `SCNetworkReachability` every 5 s with zero leeway; use NWPath events — `todo`
+### H3. The Rust engine's network availability polls `SCNetworkReachability` every 5 s with zero leeway; use NWPath events — `done (core a001272)`
 
 - **Evidence**: `MtProtoKit/Sources/MTNetworkAvailability.m:58-88` (an `SCNetworkReachability` for 0.0.0.0, plus a repeating 5.0 s
   `MTTimer` for the object's lifetime) and `MTTimer.m:68` (`dispatch_source_set_timer(..., 0)`, no leeway).
