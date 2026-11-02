@@ -80,6 +80,7 @@ final class PieChartTests: XCTestCase {
     }
 
     func testParticlesKeepMovingAtRestAndStopWhenHiddenOrMotionIsReduced() throws {
+        try skipWhenDisplayLinksCannotTick()
         let chart = makeChart()
         let window = NSWindow(contentRect: chart.bounds, styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -129,6 +130,7 @@ final class PieChartTests: XCTestCase {
     }
 
     func testFirstNonanimatedUpdateStillMorphsFromEqualSlices() throws {
+        try skipWhenDisplayLinksCannotTick()
         let chart = makeChart()
         let section = try XCTUnwrap(try sections(in: chart).first)
         let mask = try XCTUnwrap(section.mask as? CAShapeLayer)

@@ -71,6 +71,7 @@ public final class PerfLabScrollMeasurement {
             "frames": Double(stats.frames),
             "frameDurationMs": stats.frameDuration * 1000.0,
             "hitches": Double(stats.hitches),
+            "droppedFrames": Double(stats.droppedFrames),
             "hitchesOver33ms": Double(stats.longHitches),
             "hitchTimeMs": stats.hitchTime * 1000.0,
             "hitchTimePercent": duration > 0 ? stats.hitchTime / duration * 100.0 : 0,

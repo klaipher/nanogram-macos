@@ -171,7 +171,7 @@ public final class SharedDisplayLinkDriver {
         weak var link: LinkImpl?
         let framesPerSecond: FramesPerSecond
         
-        var lastDuration: Double = 0.0
+        var accumulator = DisplayLinkFrameAccumulator()
         
         init(link: LinkImpl, framesPerSecond: FramesPerSecond) {
             self.link = link
@@ -179,17 +179,36 @@ public final class SharedDisplayLinkDriver {
         }
     }
     
-    private var displayLink: DisplayLink?
+    private let makeSource: () -> SharedDisplayLinkSource?
+    private var source: SharedDisplayLinkSource?
     private var requests: [RequestContext] = []
     private(set) var deliveredEvents: Int = 0
+    private var dropCounter = DisplayLinkDropCounter()
+    private(set) var plan: DisplayLinkRatePlan?
     
     private var isInForeground: Bool = false
     private var isProcessingEvent: Bool = false
     private var isUpdateRequested: Bool = false
     private var observers: [NSObjectProtocol] = []
     
-    private init() {
-        self.isInForeground = true
+    public var maximumFramesPerSecondLimit: Int? {
+        didSet {
+            if self.maximumFramesPerSecondLimit != oldValue {
+                self.update()
+            }
+        }
+    }
+    
+    public var droppedFrames: Int {
+        return self.dropCounter.droppedFrames
+    }
+    
+    public var presentedFrames: Int {
+        return self.dropCounter.frames
+    }
+    
+    private convenience init() {
+        self.init(makeSource: makeDefaultSharedDisplayLinkSource)
 
         let center = NotificationCenter.default
         for name in [NSWindow.didBecomeKeyNotification, NSWindow.didChangeScreenNotification, NSApplication.didChangeScreenParametersNotification] {
@@ -197,20 +216,24 @@ public final class SharedDisplayLinkDriver {
                 self?.updateDisplay()
             }))
         }
-        
+    }
+    
+    init(makeSource: @escaping () -> SharedDisplayLinkSource?) {
+        self.makeSource = makeSource
+        self.isInForeground = true
         self.update()
     }
     
-    private var targetDisplay: CGDirectDisplayID {
-        let screen = NSApp?.keyWindow?.screen ?? NSApp?.mainWindow?.screen ?? NSScreen.main
-        if let number = screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
-            return CGDirectDisplayID(number.uint32Value)
-        }
-        return CGMainDisplayID()
+    private var targetScreen: NSScreen? {
+        return NSApp?.keyWindow?.screen ?? NSApp?.mainWindow?.screen ?? NSScreen.main
     }
     
-    private func updateDisplay() {
-        self.displayLink?.setDisplay(self.targetDisplay)
+    func updateDisplay() {
+        guard let source = self.source else {
+            return
+        }
+        source.setScreen(self.targetScreen)
+        self.update()
     }
     
     public func updateForegroundState(_ isActive: Bool) {
@@ -229,70 +252,64 @@ public final class SharedDisplayLinkDriver {
     }
     
     private func update() {
-        var hasActiveItems = false
-        var maxFramesPerSecond: FramesPerSecond = .fps(60)
+        var requested: [FramesPerSecond] = []
         for request in self.requests {
             if let link = request.link, link.isValid && !link.isPaused {
-                if link.framesPerSecond > maxFramesPerSecond {
-                    maxFramesPerSecond = link.framesPerSecond
-                }
-                hasActiveItems = true
+                requested.append(link.framesPerSecond)
             }
         }
         
-        if self.isInForeground && hasActiveItems {
-            let displayLink: DisplayLink?
-            if let current = self.displayLink {
-                displayLink = current
-            } else {
-                displayLink = DisplayLink()
-                displayLink?.callback = { [weak displayLink, weak self] frames in
-                    if let displayLink = displayLink {
-                        self?.displayLinkEvent(duration: displayLink.timestamp, frames: frames)
-                    }
+        if self.isInForeground && !requested.isEmpty {
+            if self.source == nil {
+                let source = self.makeSource()
+                source?.onFrame = { [weak self] timestamp, targetTimestamp in
+                    self?.displayLinkEvent(timestamp: timestamp, targetTimestamp: targetTimestamp)
                 }
-                self.displayLink = displayLink
+                source?.setScreen(self.targetScreen)
+                self.source = source
             }
-            displayLink?.setDisplay(self.targetDisplay)
-            displayLink?.gate.setFramesUntilDue(1)
-            displayLink?.start()
-        } else {
-            if let displayLink = self.displayLink {
-                self.displayLink = nil
-                displayLink.cancel()
+            guard let source = self.source else {
+                return
             }
+            let plan = DisplayLinkRatePlan.make(requested: requested, screenMaximum: source.maximumFramesPerSecond, limit: self.maximumFramesPerSecondLimit)
+            self.plan = plan
+            source.apply(plan)
+            if source.isPaused {
+                self.dropCounter.reset()
+                source.isPaused = false
+            }
+        } else if let source = self.source, !source.isPaused {
+            source.isPaused = true
         }
     }
     
-    private func displayLinkEvent(duration: TimeInterval, frames: Int) {
+    private func displayLinkEvent(timestamp: Double, targetTimestamp: Double) {
         self.isProcessingEvent = true
         self.deliveredEvents += 1
-        let elapsed = duration * Double(frames)
-        
+        let screenMaximum = Double(self.plan?.maximum ?? 60)
+        let frameDuration = targetTimestamp > timestamp ? targetTimestamp - timestamp : 1.0 / screenMaximum
+        let expectedInterval = max(frameDuration, 1.0 / Double(self.plan?.preferred ?? 60))
+        let gap = self.dropCounter.record(timestamp: timestamp, interval: expectedInterval)
+        let elapsed = min(gap ?? frameDuration, 0.25)
         
         var removeIndices: [Int]?
         loop: for i in 0 ..< self.requests.count {
             let request = self.requests[i]
             if let link = request.link, link.isValid {
                 if !link.isPaused {
-                    var itemDuration = duration
+                    var itemDuration = CGFloat(frameDuration)
                     
                     switch request.framesPerSecond {
                     case let .fps(value):
-                        let secondsPerFrame = 1.0 / CGFloat(value)
-                        itemDuration = secondsPerFrame
-                        request.lastDuration += elapsed
-                        if request.lastDuration >= secondsPerFrame * 0.95 {
-                            //print("item \(link) accepting cycle: \(request.lastDuration - duration) + \(duration) = \(request.lastDuration) >= \(secondsPerFrame)")
-                        } else {
-                            //print("item \(link) skipping cycle: \(request.lastDuration - duration) + \(duration) < \(secondsPerFrame)")
+                        let secondsPerFrame = 1.0 / Double(value)
+                        itemDuration = CGFloat(secondsPerFrame)
+                        if !request.accumulator.advance(by: elapsed, secondsPerFrame: secondsPerFrame) {
                             continue loop
                         }
                     case .max:
                         break
                     }
                     
-                    request.lastDuration = 0.0
                     link.update(itemDuration)
                 }
             } else {
@@ -315,30 +332,7 @@ public final class SharedDisplayLinkDriver {
         if self.isUpdateRequested {
             self.isUpdateRequested = false
             self.update()
-        } else {
-            self.displayLink?.gate.setFramesUntilDue(self.framesUntilNextDueLink(period: duration))
         }
-    }
-    
-    private func framesUntilNextDueLink(period: TimeInterval) -> Int {
-        guard period > 0 else {
-            return 1
-        }
-        var result = Int.max
-        for request in self.requests {
-            guard let link = request.link, link.isValid, !link.isPaused else {
-                continue
-            }
-            switch request.framesPerSecond {
-            case .max:
-                return 1
-            case let .fps(value):
-                let remaining = (1.0 / Double(value)) * 0.95 - Double(request.lastDuration)
-                let frames = Int(ceil(remaining / period - 1e-3))
-                result = min(result, max(1, frames))
-            }
-        }
-        return result == Int.max ? 1 : result
     }
     
     public func add(framesPerSecond: FramesPerSecond = .fps(60), _ update: @escaping (CGFloat) -> Void) -> Link {

@@ -5,6 +5,7 @@ import QuartzCore
 public final class PerfLabFrameStats {
     public private(set) var frames: Int = 0
     public private(set) var hitches: Int = 0
+    public private(set) var droppedFrames: Int = 0
     public private(set) var longHitches: Int = 0
     public private(set) var hitchTime: Double = 0
     public private(set) var worstGap: Double = 0
@@ -17,6 +18,7 @@ public final class PerfLabFrameStats {
         if gap > frameDuration * 1.5 {
             self.hitches += 1
             self.hitchTime += gap - frameDuration
+            self.droppedFrames += max(0, Int((gap / frameDuration).rounded()) - 1)
         }
         if gap > 0.0334 {
             self.longHitches += 1
