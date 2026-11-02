@@ -71,7 +71,8 @@ public func makeLottieImage(from zippedData: Data,
 }
 
 
-private let cacheThreadPool = ThreadPool(threadCount: 1, threadPriority: 0.1)
+private let cacheThreadPool = ThreadPool(threadCount: 1, qos: .utility)
+private let animationCacheThreadPool = ThreadPool(threadCount: 2, qos: .utility)
 
 
 public func fetchCachedResourceRepresentation(account: Account, resource: MediaResource, representation: CachedMediaResourceRepresentation) -> Signal<CachedMediaResourceRepresentationResult, NoError> {
@@ -392,7 +393,7 @@ private func fetchCachedAnimatedStickerRepresentation(account: Account, resource
         data = account.postbox.mediaBox.resourceData(resource, option: .complete(waitUntilFetchStatus: false))
     }
 
-    return data |> deliverOn(lottieThreadPool) |> map { resourceData -> (CGImage?, Data?, MediaResourceData) in
+    return data |> deliverOn(animationCacheThreadPool) |> map { resourceData -> (CGImage?, Data?, MediaResourceData) in
         if resourceData.complete {
             if let data = try? Data(contentsOf: URL(fileURLWithPath: resourceData.path), options: [.mappedIfSafe]) {
                 return (nil, data, resourceData)
@@ -760,7 +761,7 @@ private func fetchCachedSlotRepresentation(account: Account, data: [(Data, Int32
         return ActionDisposable {
             
         }
-    } |> runOn(lottieThreadPool)
+    } |> runOn(animationCacheThreadPool)
 }
 
 private func fetchCachedDiceRepresentation(account: Account, data: Data, representation: CachedDiceRepresentation) -> Signal<CachedMediaResourceRepresentationResult, NoError> {
@@ -817,12 +818,12 @@ private func fetchCachedDiceRepresentation(account: Account, data: Data, represe
         return ActionDisposable {
             
         }
-    } |> runOn(lottieThreadPool)
+    } |> runOn(animationCacheThreadPool)
 }
 
 public func getAnimatedStickerThumb(data: Data, size: NSSize = NSMakeSize(512, 512)) -> Signal<String?, NoError> {
     
-    return .single(data) |> deliverOn(lottieThreadPool) |> map { data -> String? in
+    return .single(data) |> deliverOn(animationCacheThreadPool) |> map { data -> String? in
         var dataValue: Data! = TGGUnzipData(data, 8 * 1024 * 1024)
         if dataValue == nil {
             dataValue = data

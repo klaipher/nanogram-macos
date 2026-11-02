@@ -16,7 +16,7 @@ import InlineStickersShare
 import InlineStickers
 #endif
 #endif
-public let graphicsThreadPool = ThreadPool(threadCount: 5, threadPriority: 1)
+public let graphicsThreadPool = ThreadPool(threadCount: 5, qos: .userInitiated)
 
 public enum PeerPhoto {
     case peer(Peer, TelegramMediaImageRepresentation?, PeerNameColor?, [String], Message?, CGFloat?)

@@ -9,7 +9,7 @@ import CoreMedia
 import TelegramMediaPlayer
 
 private let applyQueue = Queue()
-private let workers = ThreadPool(threadCount: 3, threadPriority: 0.2)
+private let workers = ThreadPool(threadCount: 3, qos: .utility)
 private var nextWorker = 0
 
 public final class SoftwareVideoLayerFrameManager {

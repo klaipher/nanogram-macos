@@ -2,7 +2,7 @@ import Cocoa
 import AVFoundation
 import SwiftSignalKit
 
-private let threadPool = ThreadPool(threadCount: 2, threadPriority: 0.3)
+private let threadPool = ThreadPool(threadCount: 2, qos: .userInitiated)
 
 private final class ImageRenderState {
     private var lock = os_unfair_lock()
