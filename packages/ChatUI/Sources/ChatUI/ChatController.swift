@@ -9795,6 +9795,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         }
     }
     
+    private var lastAppliedTransitionIsLoading: Bool?
+
     func applyTransition(_ transition:TableUpdateTransition, initialData:ChatHistoryCombinedInitialData, isLoading: Bool, processedView: ChatHistoryView) {
         
                 
@@ -9845,21 +9847,21 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         #if DEBUG
         let mergeProbe = ChatMergeProbe.begin(table: genericView.tableView, transition: transition)
         #endif
-        genericView.tableView.merge(with: transition, appearAnimated: appearAnimated)
+        let merged = genericView.tableView.merge(with: transition, appearAnimated: appearAnimated)
         #if DEBUG
         ChatMergeProbe.end(mergeProbe, transition: transition, visible: genericView.tableView.visibleRows(), table: genericView.tableView)
         #endif
         chatInteraction.voiceSendFlight?.tableDidUpdate()
         self.textSendFlight?.tableDidUpdate()
         chatInteraction.mediaSendFlight?.tableDidUpdate()
-        self.lastFloatingCollectKey = nil
-        collectFloatingPhotos(animated: animated && transition.state.isNone, currentAnimationRows: currentAnimationRows)
-
-        
-        self.genericView.tableView.notifyScrollHandlers()
-        
-                   
         let showsCachedAnchor = processedView.originalView?.isAnchorOnlyWhileLoading == true
+        let skipsViewWork = !merged && transition.isEmpty && lastAppliedTransitionIsLoading == isLoading
+        lastAppliedTransitionIsLoading = isLoading
+        if !skipsViewWork {
+            self.lastFloatingCollectKey = nil
+            collectFloatingPhotos(animated: animated && transition.state.isNone, currentAnimationRows: currentAnimationRows)
+            self.genericView.tableView.notifyScrollHandlers()
+        }
         genericView.change(state: isLoading && !showsCachedAnchor ? .progress : .visible, animated: processedView.originalView != nil)
         if !isLoading {
             self.historyTransitionApplied = true
@@ -9911,11 +9913,13 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         self.chatInteraction.invokeInitialAction(includeAuto: true, animated: false)
         
         
-        genericView.tableView.enumerateVisibleViews(with: { view in
-            if let view = view as? ChatRowView {
-                view.updateBackground(animated: transition.animated, item: view.item)
-            }
-        })
+        if !skipsViewWork {
+            genericView.tableView.enumerateVisibleViews(with: { view in
+                if let view = view as? ChatRowView {
+                    view.updateBackground(animated: transition.animated, item: view.item)
+                }
+            })
+        }
         
         
         
@@ -9957,7 +9961,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             }
         }
         
-        if !isLoading {
+        if !isLoading, !skipsViewWork {
             var items:[ChatRowItem] = []
             var animatedEmojiItems:[ChatRowItem] = []
             var effectItems:[ChatRowItem] = []

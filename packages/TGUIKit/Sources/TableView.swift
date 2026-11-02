@@ -3416,6 +3416,9 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
         if transition.isEmpty, lastAppliedScroll == transition.state {
             return false
         }
+        if transition.isEmpty, transition.searchState == nil, case .none = transition.state, let lastAppliedScroll, case .none = lastAppliedScroll {
+            return false
+        }
             
         self.lastAppliedScroll = transition.state
         
