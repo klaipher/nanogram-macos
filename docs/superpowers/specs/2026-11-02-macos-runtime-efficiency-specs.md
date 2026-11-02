@@ -146,7 +146,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: R1, done in `9bc6231a`; ports as is.
 - **Perflab**: upstream #31, "suspected", not fixed.
 
-### M5. Memory pressure never reaches Postbox: table caches, the SQLite page cache and AccountViewTracker throttle maps grow for the whole uptime — `todo`, verified
+### M5. Memory pressure never reaches Postbox: table caches, the SQLite page cache and AccountViewTracker throttle maps grow for the whole uptime — `done (934ac65, core d985e78)`, verified
 
 - **Evidence**: `Telegram-Mac/utils/MemoryPressureMonitor.swift:42-53` (the handler purges image, Lottie, gift and URL
   caches and calls `malloc_zone_pressure_relief`, nothing else; the 20 s inactive trim at `:55-66` only trims malloc);
@@ -258,7 +258,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: `019e8379` (probe skip, VP9 open ~23× cheaper); the lazy decoder is Mac code.
 - **Perflab**: DecodeBench without an account; emoji-panel `warm`/`cold` with one.
 
-### M9. SQLite: `LIMIT ?` statements re-prepare on every call, BEGIN/COMMIT are parsed per transaction, the WAL is unbounded — `todo`, verified
+### M9. SQLite: `LIMIT ?` statements re-prepare on every call, BEGIN/COMMIT are parsed per transaction, the WAL is unbounded — `done (core 0319e83)`, verified
 
 - **Evidence**: `submodules/telegram-ios/submodules/sqlcipher/Package.swift:27-44` (no `SQLITE_ENABLE_QPSG`);
   Postbox `SqliteValueBox.swift:995,1059,1155,1219` (cached range statements with `LIMIT ?`), `:668-683`
@@ -281,7 +281,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: `9dbf0f93` (R9 re-done); ports as is.
 - **Perflab**: PostboxCacheLab package shape.
 
-### M10. Comment threads re-emit on every read-state change of their discussion group — `todo`, verified
+### M10. Comment threads re-emit on every read-state change of their discussion group — `done (core 10e47fe)`, verified
 
 - **Evidence**: Postbox `MessageHistoryView.swift:706-709`: `.UpdateReadState` sets `hasChanges = true` for every
   non-thread view, also views without transient read states (comment threads use `.external`).
@@ -394,7 +394,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   `--cpumask` on a sample file.
 - **iOS cross-ref**: `64fc8c95` (same bug in the simulator cross file).
 
-### M16. RangeSet is not inlinable and checks invariants in release — `todo`, verified (measure first)
+### M16. RangeSet is not inlinable and checks invariants in release — `done (core 09ee786)`, verified (measure first)
 
 - **Evidence**: `submodules/telegram-ios/submodules/Utils/RangeSet/Sources/*.swift` (no `@inlinable`);
   `RangeSet.swift:64-77` (`_checkInvariants` on every construction, all builds); hot callers in other modules:
