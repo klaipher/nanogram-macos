@@ -1,0 +1,17 @@
+// Nanogram build settings for every target: the app, the workspace subprojects and the SwiftPM packages.
+// tools/dev/tg passes it with -xcconfig (Xcode UI: XCODE_XCCONFIG_FILE, see `tg xcode`), which ranks above
+// project and target settings, so upstream's project files stay untouched.
+
+MACOSX_DEPLOYMENT_TARGET = 15.0
+ARCHS = arm64
+VALID_ARCHS = arm64
+ONLY_ACTIVE_ARCH = YES
+
+SWIFT_OPTIMIZATION_LEVEL[config=Debug] = -Onone
+LLVM_LTO[config=Debug] = NO
+
+GCC_OPTIMIZATION_LEVEL[config=Release] = 3
+LLVM_LTO[config=Release] = YES_THIN
+DEAD_CODE_STRIPPING[config=Release] = YES
+SWIFT_OPTIMIZATION_LEVEL[config=Release] = -O
+SWIFT_COMPILATION_MODE[config=Release] = wholemodule

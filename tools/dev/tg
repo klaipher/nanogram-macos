@@ -22,7 +22,68 @@ py() { python3 -m "nanogram.$1" "${@:2}"; }
 
 not_yet() { die "tg $1 is not implemented yet"; }
 
+config_value() { python3 -c "from nanogram import config; print(config.$1)"; }
+
 cmd_doctor() { py doctor; }
+
+edition_xcconfig() {
+  local file="$ROOT/nanogram/editions/$1.xcconfig"
+  [ -f "$file" ] || die "unknown edition '$1' (no $file)"
+  echo "$file"
+}
+
+# tg build [--release] [--edition mas|direct] [-- extra xcodebuild args]
+cmd_build() {
+  local release=0 edition=direct extra=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --release) release=1 ;;
+      --edition) [ $# -ge 2 ] || die "--edition needs mas or direct"; edition="$2"; shift ;;
+      --) shift; extra=("$@"); break ;;
+      *) die "unknown build option: $1" ;;
+    esac
+    shift
+  done
+  local xcconfig scheme configuration conditions derived log
+  xcconfig="$(edition_xcconfig "$edition")"
+  if [ "$release" = 1 ]; then scheme=Release configuration=Release; else scheme=Telegram configuration=Debug; fi
+  conditions='$(inherited) NANOGRAM STABLE'
+  [ "$edition" = mas ] && conditions="$conditions NANOGRAM_MAS"
+  derived="$(config_value DERIVED_DATA)"
+  mkdir -p "$ROOT/build-output"
+  log="$ROOT/build-output/last-build.log"
+
+  say "Building $configuration ($edition edition), log: build-output/last-build.log"
+  local start=$SECONDS status=0
+  # Signing is off until the Nanogram identity and editions exist (stage 1 tasks 6-7);
+  # the linker still signs ad hoc, so the app runs on Apple Silicon.
+  xcodebuild build \
+    -workspace Telegram-Mac.xcworkspace -scheme "$scheme" -configuration "$configuration" \
+    -destination 'platform=macOS,arch=arm64' -derivedDataPath "$derived" \
+    -xcconfig "$xcconfig" \
+    "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$conditions" \
+    COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY= \
+    -showBuildTimingSummary "${extra[@]}" > "$log" 2>&1 || status=$?
+  local elapsed=$((SECONDS - start))
+  if [ "$status" != 0 ]; then
+    grep -E '(error|fatal error):' "$log" | sort -u | head -30 >&2 || true
+    die "build failed after ${elapsed}s (exit $status); full log: $log"
+  fi
+  say "Built in ${elapsed}s; checking architectures and deployment target"
+  local check_args=(--log "$log" --products "$derived/Build/Products/$configuration")
+  [ "$release" = 1 ] && check_args+=(--release)
+  py buildcheck "${check_args[@]}" || die "buildcheck failed: the settings layer did not reach every target"
+}
+
+cmd_xcode() {
+  local edition="${1:-direct}" xcconfig
+  xcconfig="$(edition_xcconfig "$edition")"
+  if pgrep -x Xcode >/dev/null; then
+    warn "Xcode is already running and will not see XCODE_XCCONFIG_FILE; quit it first, then run tg xcode again"
+  fi
+  say "Opening the workspace with XCODE_XCCONFIG_FILE=${xcconfig#"$ROOT"/}"
+  open --env "XCODE_XCCONFIG_FILE=$xcconfig" -a Xcode "$ROOT/Telegram-Mac.xcworkspace"
+}
 
 usage() {
   cat <<USAGE
@@ -32,7 +93,7 @@ usage: tools/dev/tg <command> [options]
   doctor           check prerequisites
   frameworks       build the native libraries (arm64)
   build            build the app [--release] [--edition mas|direct]
-  xcode            open the workspace in Xcode with our settings
+  xcode [edition]  open the workspace in Xcode with our settings (quit Xcode first)
   run              build and launch the app
   test             swift test for our packages
   lint             tglint on changed Swift files
@@ -49,7 +110,9 @@ main() {
   [ $# -gt 0 ] && shift
   case "$cmd" in
     doctor) cmd_doctor "$@" ;;
-    setup|frameworks|build|xcode|run|test|lint|warnings|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;
+    build) cmd_build "$@" ;;
+    xcode) cmd_xcode "$@" ;;
+    setup|frameworks|run|test|lint|warnings|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;
   esac

@@ -1,0 +1,18 @@
+CompileC /DerivedData/Build/Intermediates.noindex/Sparkle.build/Release/fileop.build/Objects-normal/x86_64/fileop.o /src/submodules/Sparkle/fileop/fileop.m normal x86_64 objective-c com.apple.compilers.llvm.clang.1_0.compiler (in target 'fileop' from project 'Sparkle')
+    cd /src/submodules/Sparkle
+    
+    Using response file: /DerivedData/Build/Intermediates.noindex/Sparkle.build/Release/fileop.build/Objects-normal/x86_64/e6072d4f65d7061329687fe24e3d63a7-common-args.resp
+    
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x objective-c -target x86_64-apple-macos12.0 @/DerivedData/Build/Intermediates.noindex/Sparkle.build/Release/fileop.build/Objects-normal/x86_64/e6072d4f65d7061329687fe24e3d63a7-common-args.resp -c -o /DerivedData/Build/Intermediates.noindex/Sparkle.build/Release/fileop.build/Objects-normal/x86_64/fileop.o
+
+Ld /DerivedData/Build/Intermediates.noindex/Sparkle.build/Release/fileop.build/Objects-normal/x86_64/Binary/fileop normal x86_64 (in target 'fileop' from project 'Sparkle')
+    cd /src/submodules/Sparkle
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -reproducible -target x86_64-apple-macos12.0 -Os -o /DerivedData/Build/Intermediates.noindex/Sparkle.build/Release/fileop.build/Objects-normal/x86_64/Binary/fileop
+
+SwiftDriver ChatUI normal x86_64 com.apple.xcode.tools.swift.compiler (in target 'ChatUI' from project 'ChatUI')
+    cd /src
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -parse-as-library -module-name ChatUI -O @/DerivedData/Build/Intermediates.noindex/ChatUI.build/Release/ChatUI-t.build/Objects-normal/x86_64/ChatUI.SwiftFileList -target x86_64-apple-macos12.0 -c
+
+SwiftDriver ChatUI normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ChatUI' from project 'ChatUI')
+    cd /src
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -parse-as-library -module-name ChatUI -O @/DerivedData/Build/Intermediates.noindex/ChatUI.build/Release/ChatUI-t.build/Objects-normal/arm64/ChatUI.SwiftFileList -target arm64-apple-macos12.0 -c
