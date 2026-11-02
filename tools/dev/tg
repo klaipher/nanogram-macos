@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# tg — local development helper for Nanogram for macOS.
+# Argument parsing only; the logic lives in tools/dev/nanogram/*.py.
+# See docs/local-development.md.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+
+export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+if [ -z "${DEVELOPER_DIR:-}" ]; then
+  DEVELOPER_DIR="$(xcode-select -p 2>/dev/null || true)"
+  export DEVELOPER_DIR
+fi
+export PYTHONPATH="$ROOT/tools/dev${PYTHONPATH:+:$PYTHONPATH}"
+
+say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
+die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+
+py() { python3 -m "nanogram.$1" "${@:2}"; }
+
+not_yet() { die "tg $1 is not implemented yet"; }
+
+cmd_doctor() { py doctor; }
+
+usage() {
+  cat <<USAGE
+usage: tools/dev/tg <command> [options]
+
+  setup            submodules, Rust toolchain, native libraries
+  doctor           check prerequisites
+  frameworks       build the native libraries (arm64)
+  build            build the app [--release] [--edition mas|direct]
+  xcode            open the workspace in Xcode with our settings
+  run              build and launch the app
+  test             swift test for our packages
+  lint             tglint on changed Swift files
+  warnings         compare upstream warnings with the baseline [--update]
+  check            everything a push must pass
+  sync-upstream    merge telegram/master
+  testflight       archive and upload the mas edition
+  release-direct   notarized dmg + appcast for the direct edition (local)
+USAGE
+}
+
+main() {
+  local cmd="${1:-help}"
+  [ $# -gt 0 ] && shift
+  case "$cmd" in
+    doctor) cmd_doctor "$@" ;;
+    setup|frameworks|build|xcode|run|test|lint|warnings|check|sync-upstream|testflight|release-direct) not_yet "$cmd" ;;
+    help|-h|--help) usage ;;
+    *) usage >&2; die "unknown command: $cmd" ;;
+  esac
+}
+
+main "$@"

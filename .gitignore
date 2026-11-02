@@ -29,3 +29,9 @@ core-xprojects/tlottie/build
 .swiftpm/
 .ci-build-logs/
 *.profraw
+
+# Nanogram
+/build-output/
+packages/ApiCredentials/Sources/ApiCredentials/NanogramSecrets.swift
+nanogram/local.json
+__pycache__/
