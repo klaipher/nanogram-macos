@@ -1132,7 +1132,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   (E and P residency) with an offscreen emoji-heavy LottiePlayer in PowerLabs.
 - **Confidence**: high (the mechanism was measured on this Mac; the energy gain is an estimate).
 
-### H14. Video stickers and video emoji decode VP9 on the CPU with libvpx, then convert and scale at full size; decode on VideoToolbox (iOS `632f1d87`/`06d7091f`) — `partial (091fa70): VP9Hardware port + hardware sticker reader in WebmRenderer done; VT-side scaling, fused conversion and the hardware cache builder not ported`
+### H14. Video stickers and video emoji decode VP9 on the CPU with libvpx, then convert and scale at full size; decode on VideoToolbox (iOS `632f1d87`/`06d7091f`) — `done (091fa70, 8c6be9c; core b504f7e): VP9Hardware + hardware sticker reader + fused bit-exact YUVA conversion; VT-side scaling measured and rejected (quality) — see ledger`
 
 - **Evidence**: `core-xprojects/ffmpeg/ffmpeg/build.sh:63,69`: the only VP9 decoder is `libvpx_vp9`, and the hwaccels are h264/hevc/av1.
   `SoftwareVideoLayerFrameManager.swift:42,95` (`&& !hintVP9`). `LottiePlayer.swift:1800-1812` (`WebmRenderer` over `SoftwareVideoSource(hintVP9: true)`) and
@@ -1368,7 +1368,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   `log stream --predicate 'subsystem == "com.apple.UserNotifications"'` shows the result.
 - **Confidence**: medium (whether macOS renders the avatar for this app needs a run).
 
-### H25. GIF tiles each own an AVSampleBufferDisplayLayer fed a new CMSampleBuffer per frame plus two queue hops; try IOSurface `layer.contents` — `partial (b0fbff2): the unused layer pool now reuses tile layers; the IOSurface contents path is unmeasured (onscreen harness, display asleep)` (measure first, after M27 and H5)
+### H25. GIF tiles each own an AVSampleBufferDisplayLayer fed a new CMSampleBuffer per frame plus two queue hops; try IOSurface `layer.contents` — `partial (b0fbff2, fba12dc): the layer pool reuses tile layers and resets their state; the IOSurface contents path is not done (YUV IOSurface contents and colour need the onscreen harness) — see ledger` (measure first, after M27 and H5)
 
 - **Evidence**: `packages/TelegramMedia/Sources/SampleBufferPool.swift:36-53`: the `pool` is never read, and `takeSampleBufferLayer()` always creates a new
   `SampleBufferLayerImpl`. `SoftwareVideoLayerFrameManager.swift:100-130`: each tick hops to `applyQueue`, calls `enqueue(frame.sampleBuffer)`, then
@@ -1900,7 +1900,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H11 | done | 73de50e |
 | H12 | done | 1a0cdb0 |
 | H13 | done | 52ffa2d, core df65bdef |
-| H14 | partial | 091fa70 |
+| H14 | done | 091fa70, 8c6be9c; core b504f7e |
 | H15 | stage 1 | — |
 | H16 | done | c18caa9 |
 | H17 | done | 12d814a, fdbdce8, 5a1bb3f |
@@ -1911,7 +1911,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H22 | done | 9ad344d |
 | H23 | done | ac06da6 |
 | H24 | partial | 0eb0950 |
-| H25 | partial | b0fbff2 |
+| H25 | partial | b0fbff2, fba12dc |
 | H26 | done (Debug switch, off) | d28fbeb |
 | H27 | done | 02d4e35, 4e1b17f |
 | H28 | done | 9efe49a, f292f45 (tgcalls e7b02f1, df6280d) |
