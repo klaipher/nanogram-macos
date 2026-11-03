@@ -1412,7 +1412,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 
 ### Large (L)
 
-### H28. Screen sharing uses the legacy CGDisplayStream/CGWindowListCreateImage capture (obsoleted at a macOS 15 deployment target) and scales and converts every full-resolution frame on the CPU; move to ScreenCaptureKit — `partial (9efe49a): SCStream capturer done; picker/thumbnails still legacy`
+### H28. Screen sharing uses the legacy CGDisplayStream/CGWindowListCreateImage capture (obsoleted at a macOS 15 deployment target) and scales and converts every full-resolution frame on the CPU; move to ScreenCaptureKit — `done (9efe49a, f292f45; tgcalls e7b02f1, df6280d): SCStream capturer, picker list from SCShareableContent, tiles via SCScreenshotManager, preview via SCStream; legacy behind tgcalls.useLegacyScreenCapture; SCContentSharingPicker/system audio not adopted (ledger)`
 
 - **Evidence**: `submodules/tgcalls/tgcalls/desktop_capturer/DesktopCaptureSourceManager.cpp:42-50` (webrtc `DesktopCapturer`).
   `submodules/tg_owt/src/modules/desktop_capture/mac/screen_capturer_mac.mm:440-494` (`CGDisplayStreamCreate`, full pixel size, BGRA).
@@ -1594,7 +1594,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: CameraNeo `VideoRecorder.swift:774-781` (AAC at the source rate and channel count).
 - **Confidence**: medium (pause behaviour verified in code; HFP timing needs hardware).
 
-### Q5. Screen shares are converted to limited-range YUV but every Telegram Apple renderer decodes full range, so blacks are grey; fixes H28's `'420v'` too — `partial: SCStream 420f/601 done by H28 (9efe49a); libyuv J420 switch is an owner decision (cross-client)`
+### Q5. Screen shares are converted to limited-range YUV but every Telegram Apple renderer decodes full range, so blacks are grey; fixes H28's `'420v'` too — `done (512d9ed; tgcalls e9a1405): limited-range BT.601 kept and tagged end to end (owner decision)`
 
 - **Evidence**: `submodules/tgcalls/tgcalls/desktop_capturer/DesktopCaptureSourceHelper.cpp:207-217` (`libyuv::ConvertToI420(..., FOURCC_ARGB)`, BT.601 limited range:
   `tg_owt/.../libyuv/source/row_common.cc:562`, `(66R+129G+25B+0x1080)>>8`). The receivers decode as full-range BT.601 with no 16/219 expansion:
@@ -1664,7 +1664,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 
 ### Medium (M)
 
-### Q9. AirPods and Bluetooth headsets: notes, circles and calls always open the headset mic, dropping the AirPods to HFP; honour the chosen mic and offer the Mac's built-in mic — `done (85d4081, b78de4d; option off by default)`
+### Q9. AirPods and Bluetooth headsets: notes, circles and calls always open the headset mic, dropping the AirPods to HFP; honour the chosen mic and offer the Mac's built-in mic — `done (85d4081, b78de4d, e79807e; option off by default)`
 
 - **Evidence**: there is no macOS opt-in (see the intro). The voice recorder always binds the system default input (`packages/TelegramMedia/Sources/AudioRecorder.swift:457-466`), and it has an
   upsampler written for the 16/24 kHz HFP rates (`:720-741`, covered by H16). Round video uses `AVCaptureDevice.default(for: .audio)`
@@ -1768,7 +1768,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: the same idea as `58bda613`/`d5d3b440`/`7d600b48` (tags must describe the pixels), applied to decode. The iOS code is identical.
 - **Confidence**: medium (code verified; the visible effect depends on VT, which the harness measures).
 
-### Q14. Call-video renderers ignore the frame's YCbCr matrix and range and always use full-range BT.601 — `partial: CallVideoLayer renderers (221326e); tgcalls I420 renderer not changed`
+### Q14. Call-video renderers ignore the frame's YCbCr matrix and range and always use full-range BT.601 — `done (221326e, 5f53c41; tgcalls 6f098d2)`
 
 - **Evidence**: `packages/CallVideoLayer/Sources/CallScreenShaders.metal:353-356,475-482` and `Resources/shaders/MetalFunctions.metal:56-71` use fixed full-range BT.601 coefficients.
   `CallVideoLayer/Sources/MetalVideoRenderView.swift:9-10,76,107` copies I420 into `420f` without range conversion. `tgcalls/platform/darwin/macOS/TGRTCMTLI420Renderer.mm:59` sends every frame, hardware
@@ -1784,7 +1784,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 
 ### Large (L)
 
-### Q15. Calls use WebRTC's plain AUHAL device module with software AEC3/NS, not Apple voice processing, so Voice Isolation, Wide Spectrum and the system echo canceller never apply — `dropped: needs a VPIO ADM in tgcalls verified by an ERLE harness on real hardware (ledger ruling)`
+### Q15. Calls use WebRTC's plain AUHAL device module with software AEC3/NS, not Apple voice processing, so Voice Isolation, Wide Spectrum and the system echo canceller never apply — `not done: VPIO ADM not landed this round (ledger ruling)`
 
 - **Evidence**: `submodules/tgcalls/tgcalls/v2/InstanceV2Impl.cpp:2150-2175` (on macOS `webrtc::AudioDeviceModule::Create(kPlatformDefaultAudio)`; only `WEBRTC_IOS` gets
   `AudioDeviceModuleIOS`), and `:1123-1124,150-153` (default AudioProcessing with AEC3 and NS on). Group calls: `group/GroupInstanceCustomImpl.cpp:4339-4398` (the same ADM) and `:2311-2320` (RNNoise).
@@ -1914,21 +1914,21 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H25 | partial | b0fbff2 |
 | H26 | not done (ruling) | — |
 | H27 | done | 02d4e35 |
-| H28 | partial | 9efe49a |
+| H28 | done | 9efe49a, f292f45 (tgcalls e7b02f1, df6280d) |
 | Q1 | done | 2955fe5 core |
 | Q2 | done | b23b004 core, 36315cc |
 | Q3 | done | 0879d4e |
 | Q4 | done | 0ee33a3 |
-| Q5 | partial | 9efe49a (via H28) |
+| Q5 | done | 512d9ed (tgcalls e9a1405) |
 | Q6 | done | tgcalls 9ab1773, c66b2ea |
 | Q7 | done | 0a053b6 core |
 | Q8 | done | dab5e38, f51c974; Debug Settings switch, off |
-| Q9 | done | 85d4081, b78de4d; option off by default |
+| Q9 | done | 85d4081, b78de4d, e79807e; option off by default |
 | Q10 | done | ddfa750 |
 | Q11 | done | 2be3958, cc4584b |
 | Q12 | done | fa42c17, 107ee55 |
 | Q13 | done | 3afe194 core |
-| Q14 | partial | 221326e |
-| Q15 | dropped | — |
+| Q14 | done | 221326e, 5f53c41 (tgcalls 6f098d2) |
+| Q15 | not done | — (ledger ruling) |
 
 Integration fixes: 6fe2eb1, 4c375e3 (`CGWindowListCreateImage` is unavailable at the macOS 15 target; looked up at runtime).
