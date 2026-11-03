@@ -1224,7 +1224,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   `TASK_POWER_INFO` wake-ups, old vs new). The existing rate tests must still pass.
 - **Confidence**: medium.
 
-### H18. Translation falls back to scraping Google's private `gtx` endpoint with a spoofed User-Agent; use Apple's on-device Translation framework through the existing TelegramCore hook — `partial (d0a7c3e): macOS 26+ on-device path, gtx deleted; macOS 15-25 hidden-view path and the download-consent sheet not done (server fallback)`
+### H18. Translation falls back to scraping Google's private `gtx` endpoint with a spoofed User-Agent; use Apple's on-device Translation framework through the existing TelegramCore hook — `done (a6b83b6, d0a7c3e): macOS 26+ on device; macOS 15-25 Telegram server by default, hidden-view on-device path behind a Debug switch (off); installed pairs only, no download-consent sheet`
 
 - **Evidence**: `packages/Translate/Sources/Translate/Translate.swift:277-282,334` (random fake browser User-Agents) and `:321-365`
   (`translate.googleapis.com/translate_a/single?client=gtx`, the URL split into pieces, sent over `URLSession.shared`).
@@ -1248,7 +1248,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   A SwiftPM test on macOS 26 translating en→de with installed models. `strings` on the binary shows no `translate_a`, and `nettop` shows no googleapis.com connection.
 - **Confidence**: high.
 
-### H19. Voice messages are transcribed only by the Premium/trial server; add on-device transcription with the composer's SpeechAnalyzer engine — `partial (0f80540): engine + action done; results are not labelled local-only and the switch has no UI yet (UserDefaults nanogram.localVoiceTranscription)`
+### H19. Voice messages are transcribed only by the Premium/trial server; add on-device transcription with the composer's SpeechAnalyzer engine — `done (baf87d7, 0f80540): on-device results labelled, Debug switch (on)`
 
 - **Evidence**: `packages/ChatUI/Sources/ChatUI/ChatController.swift:7221-7290` (Premium and trial checks, then only
   `engine.messages.transcribeAudio` at `:7273`). `ChatInputDictationEngine.swift:405-433,614-680` already runs SpeechAnalyzer/SpeechTranscriber with
@@ -1327,7 +1327,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   format and attachments. In DecodeBench, render one frame through software and through VT and compare with `compare_rgba.py`.
 - **Confidence**: medium.
 
-### H23. Photo Live Text is a custom Vision stack that runs on every gallery photo and rewrites one shared Postbox blob per photo; use VisionKit — `partial (9d62367): custom UI kept (one Vision pass, per-photo file cache, 1 s dwell, shared CIContext); VisionKit overlay not adopted`
+### H23. Photo Live Text is a custom Vision stack that runs on every gallery photo and rewrites one shared Postbox blob per photo; use VisionKit — `done (ac06da6): VisionKit Live Text overlay, nothing stored; onscreen interaction not checked (display asleep)`
 
 - **Evidence**: `packages/GalleryUI/Sources/GalleryUI/GalleryRecognition.swift:46-75` (every photo at magnify 1 and visible starts `TextRecognizing.recognize`).
   `packages/TextRecognizing/Sources/TextRecognizing/TextRecognizing.swift:202-262` (accurate OCR, then a second `perform` for barcodes, and `NLLanguageRecognizer` per line)
@@ -1384,7 +1384,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   CPU, wake-ups and wsCores, and window captures compared with `compare_rgba.py`.
 - **Confidence**: low.
 
-### H26. Picture-in-picture is a custom floating panel plus an off-screen helper window; use system PiP with an AVSampleBufferDisplayLayer content source — `todo — product decision, not started in the runtime run, see ledger ruling` (product decision)
+### H26. Picture-in-picture is a custom floating panel plus an off-screen helper window; use system PiP with an AVSampleBufferDisplayLayer content source — `done (d28fbeb): system PiP behind a Debug switch (off, Telegram PiP stays default); onscreen check with a person pending` (product decision)
 
 - **Evidence**: `packages/GalleryUI/Sources/GalleryUI/PIPVideoWindow.swift:96-170` (a `.nonactivatingPanel` with `.canJoinAllSpaces/.fullScreenAuxiliary`, a second
   `Window` parked at (3000,3000) at `:109-110`, hand-written snapping and an event monitor). No `AVPictureInPictureController` anywhere. Playback is already
@@ -1398,7 +1398,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 - **How to verify**: in the VideoPlayerLab/MediaPlaybackLab host with a local file, check `isPictureInPicturePossible`, start and stop, and confirm that delegate play, pause and seek reach the player.
 - **Confidence**: medium.
 
-### H27. No App Intents, Shortcuts or Focus filter — `done (02d4e35); app-target hooks: done, no test (app target has no test bundle)` (integration, no efficiency gain)
+### H27. No App Intents, Shortcuts or Focus filter — `done (02d4e35, 4e1b17f)` (integration, no efficiency gain)
 
 - **Evidence**: no `AppIntents`, `AppShortcutsProvider`, `SetFocusFilterIntent` or INIntent handling in `Telegram-Mac/` or `packages/`, and no `NSUserActivityTypes`.
   The only system entry point is the CoreSpotlight continuation (`AppDelegate.swift:1756-1766`).
@@ -1904,16 +1904,16 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H15 | stage 1 | — |
 | H16 | done | c18caa9 |
 | H17 | done | 12d814a, fdbdce8, 5a1bb3f |
-| H18 | partial | d0a7c3e |
-| H19 | partial | 0f80540 |
+| H18 | done | a6b83b6, d0a7c3e |
+| H19 | done | baf87d7, 0f80540 |
 | H20 | partial | 9a9b5c4, core 0b40f53 |
 | H21 | done | cff6487 |
 | H22 | done | 9ad344d |
-| H23 | partial | 9d62367 |
+| H23 | done | ac06da6 |
 | H24 | partial | 0eb0950 |
 | H25 | partial | b0fbff2 |
-| H26 | not done (ruling) | — |
-| H27 | done (app hooks: no test) | 02d4e35 |
+| H26 | done (Debug switch, off) | d28fbeb |
+| H27 | done | 02d4e35, 4e1b17f |
 | H28 | done | 9efe49a, f292f45 (tgcalls e7b02f1, df6280d) |
 | Q1 | done | 2955fe5 core |
 | Q2 | done (part 1 recorder: no test) | b23b004 core, 36315cc |
