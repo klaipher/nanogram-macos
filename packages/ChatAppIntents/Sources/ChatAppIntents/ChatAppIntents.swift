@@ -135,9 +135,9 @@ public enum ChatIntentError: Error, CustomLocalizedStringResourceConvertible {
     public var localizedStringResource: LocalizedStringResource {
         switch self {
         case .locked:
-            return "Telegram is locked with a passcode."
+            return "Nanogram is locked with a passcode."
         case .unavailable:
-            return "Telegram is not ready yet."
+            return "Nanogram is not ready yet."
         case .emptyText:
             return "The message is empty."
         case .failed:
@@ -203,7 +203,7 @@ public struct SendMessageIntent: AppIntent {
 
 @available(macOS 13.0, *)
 public struct ChatFocusFilterIntent: SetFocusFilterIntent {
-    public static var title: LocalizedStringResource = "Set Telegram Notifications"
+    public static var title: LocalizedStringResource = "Set Nanogram Notifications"
     public static var description: IntentDescription? = IntentDescription("Only notify about chats in the chosen accounts or folders while this Focus is on.")
 
     @Parameter(title: "Accounts")
