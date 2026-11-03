@@ -103,10 +103,13 @@ public final class SoftwareVideoLayerFrameManager {
             if let strongSelf = self {
                 let dimensions = isSecondary ? strongSelf.secondaryDimensions : strongSelf.primaryDimensions
                 strongSelf.hardwareSlot = nil
-                if SoftwareVideoLayerFrameManager.usesHardwareDecoding && !strongSelf.hintVP9, let dimensions = dimensions {
-                    strongSelf.hardwareSlot = GifTileHardwareDecoding.acquireSlot(width: Int(dimensions.width), height: Int(dimensions.height))
+                var skipLoopFilter = false
+                if SoftwareVideoLayerFrameManager.usesHardwareDecoding {
+                    let options = GifTileHardwareDecoding.decoderOptions(width: dimensions.map { Int($0.width) }, height: dimensions.map { Int($0.height) }, hintVP9: strongSelf.hintVP9)
+                    strongSelf.hardwareSlot = options.slot
+                    skipLoopFilter = options.skipLoopFilter
                 }
-                let _ = strongSelf.source.swap(SoftwareVideoSource(path: path, hintVP9: strongSelf.hintVP9, unpremultiplyAlpha: true, useHardwareAcceleration: strongSelf.hardwareSlot != nil))
+                let _ = strongSelf.source.swap(SoftwareVideoSource(path: path, hintVP9: strongSelf.hintVP9, unpremultiplyAlpha: true, useHardwareAcceleration: strongSelf.hardwareSlot != nil, skipLoopFilter: skipLoopFilter))
             }
         }))
     }
