@@ -1,0 +1,51 @@
+# Ported from Telegram-iOS 5ac4d079 (tools/dev/lint/swiftlint.yml), unchanged.
+# SwiftLint config for new code. tools/dev/lint/tglint.py runs it on changed files and
+# keeps only violations on changed lines, so existing upstream code never fails it.
+# Rules: crash risks only (force operations, Int32 overflow, narrowing conversions).
+only_rules:
+  - force_cast
+  - force_try
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - unowned_variable_capture
+  - custom_rules
+
+force_cast: error
+force_try: error
+force_unwrapping: error
+implicitly_unwrapped_optional: warning
+unowned_variable_capture: warning
+
+custom_rules:
+  # Build 202611011645 crashed at every launch: `statusTimestamp + 1` on an Int32 presence
+  # timestamp that the server sets to Int32.max. Swift traps on overflow.
+  # Matches a timestamp-like name (or an explicit Int32(...)) followed by +, -, * and an
+  # integer literal. tglint.py drops a match when the name is declared as a wide type
+  # (Int, Int64, Double, ...) earlier in the same file.
+  int32_timestamp_arithmetic:
+    name: "Int32 timestamp arithmetic"
+    regex: '(?-s)(?:\b(?:[a-z_]\w*(?:Timestamp|Until|Date|Expires|Expiration|Deadline|Activity|Seen)|timestamp|until|date|deadline|expires)\b|\bInt32\((?:[^()\n]|\([^()\n]*\))*\))\s*[-+*]=?\s*\d[\d_]*(?![\d_.eExXpP])'
+    excluded_match_kinds:
+      - comment
+      - comment.mark
+      - comment.url
+      - doccomment
+      - doccomment.field
+      - string
+    message: "Int32 arithmetic on a timestamp can trap (server values can be Int32.max). Widen first: Int64(x) + 1. If x is already 64-bit, add // swiftlint:disable:this int32_timestamp_arithmetic"
+    severity: error
+
+  # Int32(someDouble) traps on NaN, infinity and out-of-range values; Int32(someInt) traps
+  # when the value does not fit.
+  narrowing_integer_conversion:
+    name: "Narrowing integer conversion"
+    regex: '(?-s)\b(?:Int8|Int16|Int32|UInt8|UInt16|UInt32|UInt64|UInt)\((?!\s*(?:truncatingIfNeeded|clamping|exactly|bitPattern|truncating|littleEndian|bigEndian|ascii|_)\s*:)(?!\s*-?\d[\d_]*\s*\))'
+    excluded_match_kinds:
+      - comment
+      - comment.mark
+      - comment.url
+      - doccomment
+      - doccomment.field
+      - string
+    message: "This conversion traps when the value does not fit (or is NaN/infinite). Use clamping:, exactly: or truncatingIfNeeded:, or check the range first."
+    severity: warning

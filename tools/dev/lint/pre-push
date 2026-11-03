@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# git pre-push hook: lint the pushed lines, then tools/dev/tg check (ported from Telegram-iOS 5ac4d079).
+# Install with: python3 tools/dev/lint/tglint.py install-hook
+# Skip once: git push --no-verify. Lint only: TG_PRE_PUSH_CHECK=0 git push
+set -euo pipefail
+exec python3 "$(dirname "${BASH_SOURCE[0]}")/tglint.py" pre-push "$@"

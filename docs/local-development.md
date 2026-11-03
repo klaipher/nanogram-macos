@@ -40,6 +40,34 @@ tools/dev/tg xcode          # direct edition; `tg xcode mas` for the App Store e
 It opens the workspace with `XCODE_XCCONFIG_FILE` pointing at the edition xcconfig, which Xcode applies like
 `-xcconfig`. Quit Xcode first: an Xcode that is already running keeps its old environment.
 
+## Strictness, lint and `tg check`
+
+Our packages (`packages/Nanogram*`) build in Swift 6 mode with warnings as errors. Upstream code gets the same
+data-race checks as warnings (`-strict-concurrency=complete` in `nanogram/Nanogram.xcconfig`); TelegramCore's
+manifest adds `-warnings-as-errors`, so there `-no-warnings-as-errors` keeps them warnings (Swift has no umbrella
+diagnostic group to pass to `-Wwarning`).
+
+```sh
+tools/dev/tg warnings           # clean debug build, then compare with nanogram/warnings-baseline.json
+tools/dev/tg warnings --update  # write the counts as the new baseline (after fixing warnings, or a sync)
+tools/dev/tg lint               # SwiftLint on changed Swift lines (working tree vs HEAD; --base REV, --commits A..B)
+tools/dev/tg test               # swift test: NanogramKit + changed packages that have Tests/ (or name packages)
+tools/dev/tg check              # tooling tests, lint, tg warnings (its build runs buildcheck), tg test
+python3 tools/dev/lint/tglint.py install-hook   # pre-push hook: lint the pushed lines, then tg check
+```
+
+- `tg warnings` counts unique `path:line:col: warning:` lines per package (`packages/<P>`,
+  `submodules/telegram-ios/{submodules,third-party}/<P>`, `submodules/<P>`, else `app`). A count may only go down;
+  only `tg sync-upstream` raises it. It needs a clean build because Xcode does not repeat the warnings of files it
+  does not recompile.
+- `tg lint` is `tools/dev/lint/tglint.py`, ported from the iOS fork (Telegram-iOS `5ac4d079`): crash-risk rules
+  only (force try/cast/unwrap, Int32 timestamp overflow, narrowing conversions), changed lines only, with
+  `submodules/`, `third-party/`, `core-xprojects/` and `build-output/` excluded. SwiftLint 0.65.1 is downloaded
+  (checksum checked) into `~/.cache/nanogram-macos/tools` on first use.
+- `tg check` and `tg test` look at the changes since the merge-base with the branch's upstream (or
+  `origin/<branch>`); pass `--base REV` to choose. Every step runs and the failures are listed at the end.
+  The pre-push hook skips once with `git push --no-verify`; `TG_PRE_PUSH_CHECK=0` lints only.
+
 ## Identity, credentials and editions
 
 - Bundle `org.klaipher.Nanogram`, share extension `org.klaipher.Nanogram.MacShare`, team `YGTMYL879P`, one app

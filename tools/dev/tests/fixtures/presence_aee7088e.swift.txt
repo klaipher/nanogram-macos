@@ -1,0 +1,62 @@
+import Foundation
+import UIKit
+import SwiftSignalKit
+import TelegramCore
+
+public enum PeerPresenceStatusRefreshMode {
+    // Refresh whenever "online" / "last seen ..." text can change.
+    case statusText
+    // Refresh only when the online state flips (chat list online dot).
+    case onlineState
+}
+
+// Seconds until the presence-derived UI can change, relative to `timestamp` (unix time with fraction).
+// Returns .infinity when nothing will change.
+public func peerPresenceStatusRefreshTimeout(_ presence: EnginePeer.Presence, relativeTo timestamp: Double, isOnline: Bool?, mode: PeerPresenceStatusRefreshMode) -> Double {
+    // Presence is compared against whole seconds, so a change at second `s` is visible from `s` on.
+    // Aim at that boundary from the precise time: aiming at `s` from a truncated clock fired inside
+    // the same second and re-armed with zero timeouts until it passed.
+    // 64-bit math: presence timestamps come from the server and can be Int32.max ("online with no end",
+    // e.g. the Telegram service account), where adding to them in Int32 traps.
+    func until(_ second: Int64) -> Double {
+        return max(0.05, Double(second) - timestamp)
+    }
+    let now = Int64(timestamp)
+    switch presence.status {
+    case let .present(statusTimestamp):
+        let statusTimestamp = Int64(statusTimestamp)
+        if statusTimestamp >= Int64(Int32.max) {
+            // Online with no end: nothing will change.
+            return Double.infinity
+        }
+        if statusTimestamp >= now {
+            // Online through `statusTimestamp`, offline from the next second.
+            return until(statusTimestamp + 1)
+        } else {
+            if let isOnline = isOnline, isOnline {
+                return 1.0
+            }
+            if case .onlineState = mode {
+                return Double.infinity
+            }
+            let difference = now - statusTimestamp
+            if difference < 31 {
+                return until(statusTimestamp + 31)
+            } else if difference < 60 * 60 {
+                // "N minutes ago" changes at every whole minute.
+                return until(statusTimestamp + (difference / 60 + 1) * 60)
+            } else {
+                return Double.infinity
+            }
+        }
+    case .recently:
+        let activeUntil = Int64(presence.lastActivity) + 30
+        if activeUntil >= now {
+            return until(activeUntil + 1)
+        } else {
+            return Double.infinity
+        }
+    case .longTimeAgo, .lastWeek, .lastMonth:
+        return Double.infinity
+    }
+}

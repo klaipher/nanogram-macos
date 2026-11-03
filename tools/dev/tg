@@ -179,6 +179,70 @@ cmd_xcode() {
   open --env "XCODE_XCCONFIG_FILE=$xcconfig" -a Xcode "$ROOT/Telegram-Mac.xcworkspace"
 }
 
+tglint() { python3 "$ROOT/tools/dev/lint/tglint.py" "$@"; }
+
+# tg lint [--base REV | --commits A..B] [--strict]: SwiftLint (pinned, installed on first use) on changed lines.
+cmd_lint() {
+  tglint install >/dev/null || die "cannot install SwiftLint (python3 tools/dev/lint/tglint.py install)"
+  tglint lint "$@"
+}
+
+# tg test [--base REV] [package ...]: swift test for the named packages, or for NanogramKit plus every package
+# with a Tests/ folder changed since REV (default: where unpushed work starts).
+cmd_test() {
+  local base="" packages=() package failed=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base) [ $# -ge 2 ] || die "--base needs a revision"; base="$2"; shift ;;
+      -*) die "unknown test option: $1" ;;
+      *) packages+=("$1") ;;
+    esac
+    shift
+  done
+  if [ ${#packages[@]} = 0 ]; then
+    while IFS= read -r package; do packages+=("$package"); done < <(tglint affected-packages ${base:+--base "$base"})
+  fi
+  for package in "${packages[@]}"; do
+    [ -f "$ROOT/packages/$package/Package.swift" ] || die "no package packages/$package"
+    say "swift test packages/$package"
+    swift test --package-path "$ROOT/packages/$package" || failed+=("$package")
+  done
+  [ ${#failed[@]} = 0 ] || die "tests failed: ${failed[*]}"
+}
+
+# tg check [--base REV]: everything a push must pass (the pre-push hook runs it): tooling tests, lint of the
+# unpushed lines, a clean debug build with buildcheck, editions and the warning baseline, package tests.
+# Every step runs; exit 1 when any failed.
+cmd_check() {
+  local base=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base) [ $# -ge 2 ] || die "--base needs a revision"; base="$2"; shift ;;
+      *) die "unknown check option: $1" ;;
+    esac
+    shift
+  done
+  [ -n "$base" ] || base="$(tglint default-base)"
+  local tg="$ROOT/tools/dev/tg" start=$SECONDS failed=() step step_start
+  local steps=("tools/dev/tests/run.sh" "lint --base $base" "warnings" "test --base $base")
+  for step in "${steps[@]}"; do
+    say "check: $step"
+    step_start=$SECONDS
+    local status=0
+    # shellcheck disable=SC2086 # steps are word lists
+    case "$step" in
+      tools/*) "$ROOT/$step" || status=$? ;;
+      *) "$tg" $step || status=$? ;;
+    esac
+    [ "$status" = 0 ] || failed+=("$step")
+    say "check: $step: $([ "$status" = 0 ] && echo ok || echo "FAILED ($status)") in $((SECONDS - step_start))s"
+  done
+  if [ ${#failed[@]} != 0 ]; then
+    die "tg check failed after $((SECONDS - start))s: ${failed[*]}"
+  fi
+  say "tg check passed in $((SECONDS - start))s"
+}
+
 usage() {
   cat <<USAGE
 usage: tools/dev/tg <command> [options]
@@ -191,10 +255,10 @@ usage: tools/dev/tg <command> [options]
   xcode [edition]  open the workspace in Xcode with our settings (quit Xcode first)
   sparkle-key      create the Sparkle EdDSA key once, print its public key [sign <archive>]
   run              build and launch the app
-  test             swift test for our packages
-  lint             tglint on changed Swift files
+  test             swift test: NanogramKit + changed packages with Tests/ [--base REV] [package ...]
+  lint             SwiftLint on changed Swift lines [--base REV | --commits A..B] [--strict]
   warnings         clean debug build, compare upstream warnings with the baseline [--update] [--log FILE]
-  check            everything a push must pass
+  check            tests, lint, clean build + warnings, package tests (pre-push gate) [--base REV]
   sync-upstream    fast-forward upstream, merge it, rebuild, update the warning baseline [--no-build] [--after-merge]
   testflight       archive and upload the mas edition
   release-direct   notarized dmg + appcast for the direct edition (local)
@@ -214,7 +278,10 @@ main() {
     sparkle-key) cmd_sparkle_key "$@" ;;
     warnings) cmd_warnings "$@" ;;
     sync-upstream) cmd_sync_upstream "$@" ;;
-    run|test|lint|check|testflight|release-direct) not_yet "$cmd" ;;
+    lint) cmd_lint "$@" ;;
+    test) cmd_test "$@" ;;
+    check) cmd_check "$@" ;;
+    run|testflight|release-direct) not_yet "$cmd" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;
   esac
