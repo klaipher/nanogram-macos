@@ -737,6 +737,28 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     
     private let folderUpdatesDisposable = MetaDisposable()
 
+    private func requestChatListPageIfNeeded() {
+        guard let view = previousChatList.with({ $0 }) else {
+            return
+        }
+        let tableView = genericView.tableView
+        let viewport = tableView.frame.height
+        guard viewport > 0 else {
+            return
+        }
+        let offset = tableView.documentOffset.y
+        let remainingBelow = tableView.documentSize.height - offset - viewport
+        let next = ChatListPaging.nextPageRequest(remainingAbove: offset, remainingBelow: remainingBelow, viewport: viewport, hasLater: view.hasLater, hasEarlier: view.hasEarlier, firstAnchor: view.items.first?.index, lastAnchor: view.items.last?.index, lastRequested: lastRequestedPageAnchor)
+        guard let next else {
+            return
+        }
+        lastRequestedPageAnchor = next.anchor
+        _ = animated.swap(false)
+        updateFilter {
+            $0.withUpdatedRequest(.Index(next.anchor, nil), removeAnimation: true)
+        }
+    }
+    
     public func updateFilter(_ f:(FilterData)->FilterData) {
         
         let data = f(stateValue.with { $0.filterData })
@@ -756,11 +778,15 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             var previous = previous
             var current = f(previous.filterData)
             if ChatListUIHooks.shared.chatListFilterId(previous.filterData.filter) != ChatListUIHooks.shared.chatListFilterId(current.filter) {
-                current = current.withUpdatedRequest(.Initial(max(Int(context.window.frame.height / 70) + 3, 12), nil), removeAnimation: false).withUpdatedIsTop(true)
+                current = current.withUpdatedRequest(.Initial(50, nil), removeAnimation: false).withUpdatedIsTop(true)
                 changedFolder = true
             }
             previous.filterData = current
             return previous
+        }
+        
+        if case .Initial = stateValue.with({ $0.filterData.request }) {
+            self.lastRequestedPageAnchor = nil
         }
         
         if changedFolder {
@@ -774,6 +800,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     }
     
     private let previousChatList:Atomic<EngineChatList?> = Atomic(value: nil)
+    private var lastRequestedPageAnchor: EngineChatList.Item.Index?
     private let first = Atomic(value:true)
     private let chatListVisibility = ValuePromise<Bool>(true, ignoreRepeated: true)
     private lazy var chatListVisibilityObserver = WindowVisibilityObserver(onChange: { [weak self] visible in
@@ -1051,7 +1078,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             }
             
 
-            _ = previousChatList.swap(update.list)
+            let previousList = previousChatList.swap(update.list)
             var prepare:[(EngineChatList.Item, UIChatAdditionalItem?)] = []
             for value in update.list.items {
                 prepare.append((value, nil))
@@ -1212,6 +1239,10 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 animated = false
             }
             
+            if update.list.isLoading || previousList?.isLoading == true {
+                animated = false
+            }
+            
             
             let layoutUpdated = previousLayout.swap(context.layout) != context.layout
                         
@@ -1235,6 +1266,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition -> Signal<Void, NoError> in
             self?.enqueueTransition(transition)
             _ = chatListAppliedOnce.swap(true)
+            self?.requestChatListPageIfNeeded()
             return .complete()
         }
         
@@ -1268,6 +1300,10 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }))
         
         
+        genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] _ in
+            self?.requestChatListPageIfNeeded()
+        }))
+        
         genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] scroll in
            
             var refreshStoryPeerIds:[PeerId] = []
@@ -1295,39 +1331,16 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             self?.removeRevealStateIfNeeded(nil)
 
             if let strongSelf = self, let view = view {
-                var messageIndex:EngineChatList.Item.Index?
-                
                 let isTop: Bool
-                
                 switch scroll.direction {
                 case .bottom:
-                    if view.hasEarlier {
-                        messageIndex = view.items.first?.index
-                        isTop = false
-                    } else {
-                        isTop = true
-                    }
+                    isTop = !view.hasEarlier
                 case .top:
-                    if view.hasLater {
-                        messageIndex = view.items.last?.index
-                        isTop = false
-                    } else {
-                        isTop = true
-                    }
+                    isTop = !view.hasLater
                 case .none:
                     isTop = true
                 }
-                if let messageIndex = messageIndex {
-                    _ = animated.swap(false)
-                    if let timestamp = strongSelf.state?.filterData.requestTimestamp {
-                        if timestamp + 0.5 > CACurrentMediaTime() {
-                            return
-                        }
-                    }
-                    strongSelf.updateFilter {
-                        $0.withUpdatedRequest(.Index(messageIndex, nil), removeAnimation: true).withUpdatedIsTop(isTop)
-                    }
-                } else {
+                if strongSelf.stateValue.with({ $0.filterData.isTop }) != isTop {
                     strongSelf.updateFilter {
                         $0.withUpdatedIsTop(isTop)
                     }
