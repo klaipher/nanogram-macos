@@ -234,6 +234,9 @@ private final class VideoView : View, MediaView {
     
     var didFinish:((NSView)->Void)? = nil
 
+    deinit {
+        statusDisposable.dispose()
+    }
     
     required init(frame frameRect: NSRect) {
         playerView = .init(frame: frameRect.size.bounds)
