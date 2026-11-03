@@ -11619,7 +11619,10 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 }
             }
             if let until = value.slowMode?.validUntil, until > self.context.timestamp {
-                let signal = Signal<Void, NoError>.single(Void()) |> then(.single(Void()) |> delay(0.2, queue: .mainQueue()) |> restart)
+                let ticks = Signal<Void, NoError>.single(Void()) |> then(.single(Void()) |> delay(SecondTick.delayToNextSecond(now: Date().timeIntervalSince1970), queue: .mainQueue()) |> restart)
+                let signal = historyVisibility.get() |> mapToSignal { visible -> Signal<Void, NoError> in
+                    return visible ? ticks : .complete()
+                }
                 slowModeDisposable.set(signal.start(next: { [weak self] in
                     if let `self` = self {
                         if until < self.context.timestamp {

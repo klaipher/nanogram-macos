@@ -706,8 +706,8 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 
                 let autoNightSignal = viewDidChangedAppearance.get() |> mapToSignal { _ in
                     return autoNightSettings(accountManager: accountManager) |> mapToSignal { preference -> Signal<(AutoNightThemePreferences, Void), NoError> in
-                        if preference.schedule != nil || preference.systemBased {
-                            return combineLatest(.single(preference), Signal<Void, NoError>.single(Void()) |> then( Signal<Void, NoError>.single(Void()) |> delay(60, queue: Queue.mainQueue()) |> restart))
+                        if let schedule = preference.schedule {
+                            return combineLatest(.single(preference), autoNightTicks(schedule))
                         } else {
                             return .single((preference, Void()))
                         }
@@ -1872,4 +1872,61 @@ private func updateDeviceModel(_ network: Network, _ deviceModel: String) {
         let updated = copy.withUpdatedLangPackCode(copy.langPackCode)
         return updated.deviceModel == deviceModel ? updated : nil
     }
+}
+
+private func autoNightBoundaries(_ schedule: AutoNightSchedule) -> [Int32] {
+    switch schedule {
+    case let .sunrise(latitude, longitude, _):
+        if latitude == 0 || longitude == 0 {
+            return []
+        }
+        guard let sunrise = EDSunriseSet(date: Date(), timezone: NSTimeZone.local, latitude: latitude, longitude: longitude) else {
+            return []
+        }
+        let from = Int32(sunrise.sunset.timeIntervalSince1970 - sunrise.sunset.startOfDay.timeIntervalSince1970)
+        let to = Int32(sunrise.sunrise.timeIntervalSince1970 - sunrise.sunrise.startOfDay.timeIntervalSince1970)
+        return [from, to + 1]
+    case let .timeSensitive(from, to):
+        return [from * 60 * 60, to * 60 * 60]
+    }
+}
+
+private func autoNightTicks(_ schedule: AutoNightSchedule) -> Signal<Void, NoError> {
+    return Signal { subscriber in
+        let timer = Atomic<SwiftSignalKit.Timer?>(value: nil)
+        var arm: (() -> Void)?
+        arm = {
+            subscriber.putNext(Void())
+            var now = time_t(Int32(CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970))
+            var timeinfoNow = tm()
+            localtime_r(&now, &timeinfoNow)
+            let secondsOfDay = timeinfoNow.tm_hour * 60 * 60 + timeinfoNow.tm_min * 60 + timeinfoNow.tm_sec
+            let next = SwiftSignalKit.Timer(timeout: AutoNightBoundarySchedule.nextCheck(secondsOfDay: secondsOfDay, boundaries: autoNightBoundaries(schedule)), repeat: false, completion: {
+                arm?()
+            }, queue: .mainQueue())
+            timer.swap(next)?.invalidate()
+            next.start()
+        }
+        let names: [Notification.Name] = [.NSSystemClockDidChange, .NSSystemTimeZoneDidChange, .NSCalendarDayChanged]
+        var observers = names.map { name in
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main, using: { _ in
+                arm?()
+            })
+        }
+        let wake = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main, using: { _ in
+            arm?()
+        })
+        arm?()
+        return ActionDisposable {
+            Queue.mainQueue().async {
+                for observer in observers {
+                    NotificationCenter.default.removeObserver(observer)
+                }
+                observers.removeAll()
+                NSWorkspace.shared.notificationCenter.removeObserver(wake)
+                timer.swap(nil)?.invalidate()
+                arm = nil
+            }
+        }
+    } |> runOn(.mainQueue())
 }

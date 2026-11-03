@@ -15,6 +15,7 @@ import TelegramTheme
 import TelegramUtils
 import InlineStickerLayer
 import InputView
+import NanogramRuntime
 
 private final class StickerPreviewView : View {
     private var preview: InlineStickerView?
@@ -95,6 +96,7 @@ private final class GiftAuctionPreviewView : View {
 
     private var timer: SwiftSignalKit.Timer?
     private var timeoutString: String?
+    private var updateTime: (() -> Bool)?
     
     required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -117,22 +119,25 @@ private final class GiftAuctionPreviewView : View {
     func update(context: any AccountContextProtocol, attr: TelegramMediaWebpageGiftAuctionAttribute) {
        
         
-        let updateTime:()->Void = { [weak self] in
+        let updateTime:()->Bool = { [weak self] in
             guard let self else {
-                return
+                return false
             }
             
             let string: String
+            let running: Bool
             if let auctionStartDate = attr.gift.generic?.auctionStartDate, auctionStartDate > context.timestamp {
                 string = strings().starGiftAuctionStartsIn(timerText(Int(auctionStartDate - context.timestamp)))
+                running = true
             } else {
-                string = attr.endDate > context.timestamp
+                running = attr.endDate > context.timestamp
+                string = running
                    ? timerText(Int(attr.endDate - context.timestamp))
                    : strings().chatLinkPreviewAuctionFinished
             }
             
             if self.timeoutString == string {
-                return
+                return running
             }
             self.timeoutString = string
             
@@ -144,6 +149,7 @@ private final class GiftAuctionPreviewView : View {
             self.timeoutView.layer?.cornerRadius = self.timeoutView.frame.height / 2
             self.timeoutView.backgroundColor = NSColor.blackTransparent
             self.needsLayout = true
+            return running
         }
         
         
@@ -189,10 +195,8 @@ private final class GiftAuctionPreviewView : View {
             self.preview = preview
         }
         
-        timer = SwiftSignalKit.Timer(timeout: 0.1, repeat: true, completion: updateTime, queue: .mainQueue())
-        timer?.start()
-        
-        updateTime()
+        self.updateTime = updateTime
+        self.tick()
         
         effectLayer.color = NSColor.white
         
@@ -200,6 +204,24 @@ private final class GiftAuctionPreviewView : View {
 
     }
     
+    private func tick() {
+        self.timer?.invalidate()
+        self.timer = nil
+        guard let updateTime = self.updateTime, updateTime(), self.window != nil else {
+            return
+        }
+        let timer = SwiftSignalKit.Timer(timeout: SecondTick.delayToNextSecond(now: Date().timeIntervalSince1970), repeat: false, completion: { [weak self] in
+            self?.tick()
+        }, queue: .mainQueue(), leeway: .precise)
+        self.timer = timer
+        timer.start()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        self.tick()
+    }
+
     override func layout() {
         super.layout()
         preview?.center()
