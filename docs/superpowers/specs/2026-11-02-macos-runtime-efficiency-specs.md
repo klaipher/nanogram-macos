@@ -1412,7 +1412,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 
 ### Large (L)
 
-### H28. Screen sharing uses the legacy CGDisplayStream/CGWindowListCreateImage capture (obsoleted at a macOS 15 deployment target) and scales and converts every full-resolution frame on the CPU; move to ScreenCaptureKit — `todo`
+### H28. Screen sharing uses the legacy CGDisplayStream/CGWindowListCreateImage capture (obsoleted at a macOS 15 deployment target) and scales and converts every full-resolution frame on the CPU; move to ScreenCaptureKit — `partial (9efe49a): SCStream capturer done; picker/thumbnails still legacy`
 
 - **Evidence**: `submodules/tgcalls/tgcalls/desktop_capturer/DesktopCaptureSourceManager.cpp:42-50` (webrtc `DesktopCapturer`).
   `submodules/tg_owt/src/modules/desktop_capture/mac/screen_capturer_mac.mm:440-494` (`CGDisplayStreamCreate`, full pixel size, BGRA).
