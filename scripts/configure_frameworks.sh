@@ -86,7 +86,7 @@ DIRECTORY_PAIRS=(
     "${SCRIPT_DIR}/../core-xprojects/openssl/build/openssl/include,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/OpenSSLEncryptionProvider/SharedHeaders/openssl/include"
     "${SCRIPT_DIR}/../submodules/telegram-ios/submodules/EncryptionProvider/PublicHeaders,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/OpenSSLEncryptionProvider/SharedHeaders/EncryptionProvider"
     "${SCRIPT_DIR}/../core-xprojects/Mozjpeg/build,${SCRIPT_DIR}/../submodules/Mozjpeg/SharedHeaders/libmozjpeg"
-    "${SCRIPT_DIR}/../submodules/telegram-ios/third-party/mozjpeg/mozjpeg,${SCRIPT_DIR}/../submodules/Mozjpeg/SharedHeaders/ios-mozjpeg"
+    "${SCRIPT_DIR}/../core-xprojects/Mozjpeg/build/libjpeg-turbo-3.2.1/src,${SCRIPT_DIR}/../submodules/Mozjpeg/SharedHeaders/ios-mozjpeg"
 )
 
 

@@ -20,9 +20,6 @@ framework_source_roots() {
         OpenSSL)
             echo "$1/submodules/telegram-ios/submodules/openssl"
             ;;
-        mozjpeg)
-            echo "$1/submodules/telegram-ios/third-party/mozjpeg/mozjpeg"
-            ;;
         dav1d)
             echo "$1/submodules/telegram-ios/third-party/dav1d/dav1d"
             ;;

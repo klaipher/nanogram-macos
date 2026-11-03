@@ -102,7 +102,6 @@ NSData * _Nullable compressJPEGData(CGImageRef _Nonnull sourceImage, int quality
     cinfo.image_height = (uint32_t)height;
     cinfo.input_components = 4;
     cinfo.in_color_space = JCS_EXT_BGRX;
-    jpeg_c_set_int_param(&cinfo, JINT_COMPRESS_PROFILE, JCP_FASTEST);
     jpeg_set_defaults(&cinfo);
     cinfo.arith_code = FALSE;
     cinfo.dct_method = JDCT_ISLOW;
@@ -188,7 +187,6 @@ NSData * _Nullable compressMiniThumbnail(CGImageRef _Nonnull image) {
     cinfo.image_height = (uint32_t)height;
     cinfo.input_components = 3;
     cinfo.in_color_space = JCS_RGB;
-    jpeg_c_set_int_param(&cinfo, JINT_COMPRESS_PROFILE, JCP_FASTEST);
     jpeg_set_defaults(&cinfo);
     cinfo.arith_code = FALSE;
     cinfo.dct_method = JDCT_ISLOW;

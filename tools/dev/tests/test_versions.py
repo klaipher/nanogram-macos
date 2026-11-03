@@ -103,6 +103,19 @@ class PinnedVersionsTests(unittest.TestCase):
         if cmake.is_file():
             self.assertRegex(read(cmake), r"project\(TDLib VERSION 1\.8\.69 ")
 
+    def test_libjpeg_turbo_replaces_mozjpeg(self):
+        script = read(CORE / "Mozjpeg" / "Mozjpeg" / "build.sh")
+        self.assertIn('SOURCE_NAME="libjpeg-turbo-3.2.1"', script)
+        self.assertIn("c27ad72a68da151177929aa969ae773a2da5ac2af9ce946079314fdac8cece7f", script)
+        self.assertIn("-DWITH_JPEG8=1", script)
+        self.assertTrue((CORE / "Mozjpeg" / "libjpeg-turbo-3.2.1.tar.gz").is_file())
+        project = read(CORE / "Mozjpeg" / "Mozjpeg.xcodeproj" / "project.pbxproj")
+        self.assertIn("libjpeg-turbo-3.2.1.tar.gz", project)
+        self.assertNotIn("third-party/mozjpeg", project)
+        self.assertNotIn("third-party/mozjpeg", read(ROOT / "scripts" / "framework-inputs.sh"))
+        self.assertNotIn("third-party/mozjpeg", read(ROOT / "scripts" / "configure_frameworks.sh"))
+        self.assertNotIn("jpeg_c_set_int_param", read(ROOT / "submodules" / "Mozjpeg" / "Sources" / "Mozjpeg.m"))
+
 
 if __name__ == "__main__":
     unittest.main()

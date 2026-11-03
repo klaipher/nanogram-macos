@@ -164,7 +164,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nif [ ! -d \"$PROJECT_DIR/build\" ]; then\n  sh $PROJECT_DIR/mozjpeg/build.sh ../../submodules/telegram-ios/third-party/mozjpeg/mozjpeg\nfi\n";
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nif [ ! -d \"$PROJECT_DIR/build\" ]; then\n  sh $PROJECT_DIR/Mozjpeg/build.sh $PROJECT_DIR/libjpeg-turbo-3.2.1.tar.gz\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -251,7 +251,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				HEADER_SEARCH_PATHS = (
 					$PROJECT_DIR/build,
-					"$PROJECT_DIR/../../submodules/telegram-ios/third-party/mozjpeg/mozjpeg",
+					"$PROJECT_DIR/build/libjpeg-turbo-3.2.1/src",
 				);
 				INFOPLIST_FILE = Mozjpeg/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
@@ -341,7 +341,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				HEADER_SEARCH_PATHS = (
 					$PROJECT_DIR/build,
-					"$PROJECT_DIR/../../submodules/telegram-ios/third-party/mozjpeg/mozjpeg",
+					"$PROJECT_DIR/build/libjpeg-turbo-3.2.1/src",
 				);
 				INFOPLIST_FILE = Mozjpeg/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
