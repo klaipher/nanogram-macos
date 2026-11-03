@@ -322,6 +322,20 @@ class DirectReleaseTests(unittest.TestCase):
             finally:
                 subprocess.run(["hdiutil", "detach", mount, "-quiet"], check=False)
 
+    def test_make_dmg_signs_the_image_when_given_an_identity(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            app = Path(tmp) / "Nanogram.app"
+            (app / "Contents" / "MacOS").mkdir(parents=True)
+            (app / "Contents" / "MacOS" / "Nanogram").write_text("#!/bin/sh\n")
+            dmg = release.make_dmg(app, Path(tmp) / "out" / "Nanogram.dmg", identity="-")
+            signed = subprocess.run(["codesign", "--verify", "--verbose", str(dmg)], capture_output=True, text=True)
+            self.assertEqual(signed.returncode, 0, signed.stderr)
+
+    def test_dmg_gatekeeper_check_uses_the_disk_image_context(self):
+        self.assertEqual(release.DMG_SPCTL_ARGS, ["-a", "-vv", "-t", "open", "--context",
+                                                  "context:primary-signature"])
+
     def test_notarize_submits_with_the_key_and_staples(self):
         with tempfile.TemporaryDirectory() as tmp:
             key = release.asc_key(fake_asc(Path(tmp) / "asc"))
@@ -340,6 +354,32 @@ class DirectReleaseTests(unittest.TestCase):
             for flag in (["--key", str(key.path)], ["--key-id", "ABC123DEF4"], ["--issuer", key.issuer]):
                 self.assertIn(flag, [calls[0][i:i + 2] for i in range(len(calls[0]) - 1)])
             self.assertIn("--wait", calls[0])
+            self.assertEqual(calls[-1], ["xcrun", "stapler", "staple", str(dmg)])
+
+    def test_notarize_waits_again_when_apple_times_out_after_receiving_the_upload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = release.asc_key(fake_asc(Path(tmp) / "asc"))
+            dmg = Path(tmp) / "Nanogram.dmg"
+            dmg.write_bytes(b"dmg")
+            submission = "292453bc-f680-4806-888c-e2899cbc754c"
+            calls = []
+
+            def run(args, **kwargs):
+                calls.append(args)
+                result = mock.Mock(returncode=0, stdout="", stderr="")
+                if "submit" in args:
+                    result.returncode = 1
+                    result.stderr = ("Error: HTTPError(statusCode: nil, error: The request timed out. "
+                                     f"NSErrorFailingURLKey=https://appstoreconnect.apple.com/notary/v2/submissions/"
+                                     f"{submission}?)")
+                elif "wait" in args:
+                    result.stdout = json.dumps({"id": submission, "status": "Accepted"})
+                return result
+            with mock.patch.object(release.subprocess, "run", side_effect=run):
+                release.notarize(dmg, key)
+            waits = [c for c in calls if c[:3] == ["xcrun", "notarytool", "wait"]]
+            self.assertEqual(len(waits), 1)
+            self.assertEqual(waits[0][3], submission)
             self.assertEqual(calls[-1], ["xcrun", "stapler", "staple", str(dmg)])
 
     def test_notarize_rejected_raises_with_log(self):

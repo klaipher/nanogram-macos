@@ -393,8 +393,12 @@ def source_archive(out: Path, prefix: str, root: Path = config.ROOT) -> Path:
     return out
 
 
-def make_dmg(app: Path, out: Path) -> Path:
-    """A compressed APFS disk image (ULFO) with the app and an Applications link."""
+DMG_SPCTL_ARGS = ["-a", "-vv", "-t", "open", "--context", "context:primary-signature"]
+
+
+def make_dmg(app: Path, out: Path, identity: str | None = None) -> Path:
+    """A compressed APFS disk image (ULFO) with the app and an Applications link, signed with `identity` if given:
+    Gatekeeper checks a disk image's own signature, so an unsigned one is rejected even when notarized."""
     app, out = Path(app), Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     staging = out.parent / f".{out.stem}.staging"
@@ -410,6 +414,8 @@ def make_dmg(app: Path, out: Path) -> Path:
                         "-fs", "APFS", "-format", "ULFO", str(out)], check=True)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
+    if identity:
+        subprocess.run(["codesign", "--force", "--timestamp", "--sign", identity, str(out)], check=True)
     return out
 
 
@@ -429,6 +435,19 @@ def notarize(path: Path, key: AscKey) -> None:
     except ValueError:
         response = {}
     status, submission = response.get("status", "unknown"), response.get("id", "")
+    if not submission:
+        found = re.search(r"submissions/([0-9a-f-]{36})", result.stdout + result.stderr)
+        submission = found.group(1) if found else ""
+    for _ in range(3):
+        if status in ("Accepted", "Invalid", "Rejected") or not submission:
+            break
+        print(f"==> Apple did not answer in time; waiting on submission {submission}", flush=True)
+        waited = subprocess.run(["xcrun", "notarytool", "wait", submission, *auth, "--timeout", "30m",
+                                 "--output-format", "json"], capture_output=True, text=True)
+        try:
+            status = json.loads(waited.stdout or "{}").get("status", "unknown")
+        except ValueError:
+            status = "unknown"
     if submit != path:
         submit.unlink(missing_ok=True)
     if status != "Accepted":
@@ -503,9 +522,9 @@ def release_direct(allow_dirty: bool = False) -> Path:
     _check(["codesign", "--verify", "--deep", "--strict", str(app)], "codesign --verify --deep --strict")
     notarize(app, key)
     name = f"Nanogram-{version}-{build}"
-    dmg = make_dmg(app, out_dir / f"{name}.dmg")
+    dmg = make_dmg(app, out_dir / f"{name}.dmg", identity=authority)
     notarize(dmg, key)
-    print(_check(["spctl", "-a", "-vv", "-t", "install", str(dmg)], "spctl (dmg)"), flush=True)
+    print(_check(["spctl", *DMG_SPCTL_ARGS, str(dmg)], "spctl (dmg)"), flush=True)
     print(_check(["spctl", "-a", "-vv", "-t", "exec", str(app)], "spctl (app)"), flush=True)
     signature = sparkle.sign(dmg)
     if not sparkle.verify(dmg, signature, sparkle.public_key()):
