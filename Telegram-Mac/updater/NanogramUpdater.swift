@@ -241,7 +241,7 @@ private final class NanogramUpdater {
                 try updater.start()
                 updater.automaticallyChecksForUpdates = true
                 updater.automaticallyDownloadsUpdates = false
-                updater.updateCheckInterval = 60 * 60
+                updater.updateCheckInterval = UpdateCheckSchedule.interval
                 started = true
             } catch {
                 statePromise.set(AppUpdateState(items: [], loadingState: .failed(error as NSError)))
@@ -261,6 +261,24 @@ private final class NanogramUpdater {
             if updater.canCheckForUpdates {
                 updater.checkForUpdatesInBackground()
             }
+        }
+    }
+
+    func checkInBackground() {
+        guard start() else {
+            return
+        }
+        if UpdateCheckSchedule.isBackgroundCheckDue(lastCheck: updater.lastUpdateCheckDate, now: Date()) {
+            check()
+        }
+    }
+
+    func checkOnOpeningUpdateScreen() {
+        switch driver.phase {
+        case .downloading, .extracting, .readyToInstall, .installing:
+            return
+        default:
+            checkByUser()
         }
     }
 
@@ -289,7 +307,7 @@ func setAppUpdaterBaseDomain(_ domain: String?) {}
 
 func updater_resetWithUpdaterSource(_ source: UpdaterSource, force: Bool = true) {
     if force {
-        onMain { NanogramUpdater.shared.check() }
+        onMain { NanogramUpdater.shared.checkInBackground() }
     }
 }
 
@@ -409,6 +427,7 @@ private func appUpdateEntries(state: AppUpdateState) -> [InputDataEntry] {
 }
 
 func AppUpdateViewController() -> InputDataController {
+    onMain { NanogramUpdater.shared.checkOnOpeningUpdateScreen() }
     let signal: Signal<InputDataSignalValue, NoError> = statePromise.get() |> deliverOnResourceQueue |> map { value in
         return InputDataSignalValue(entries: appUpdateEntries(state: value))
     }
