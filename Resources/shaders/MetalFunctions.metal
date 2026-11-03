@@ -21,59 +21,39 @@ vertex Varyings vertexPassthrough(constant Vertex *verticies[[buffer(0)]],
   return out;
 }
 
+typedef struct {
+    float4 column0;
+    float4 column1;
+    float4 column2;
+    float4 offset;
+    float4 scale;
+} YUVConversion;
+
+static inline float4 convertYUV(float3 yuv, constant YUVConversion &conversion) {
+    float3x3 matrix = float3x3(conversion.column0.xyz, conversion.column1.xyz, conversion.column2.xyz);
+    float3 rgb = matrix * ((yuv - conversion.offset.xyz) * conversion.scale.xyz);
+    return float4(saturate(rgb), 1.0);
+}
+
 fragment float4 fragmentColorConversion(
     Varyings in[[stage_in]],
-    sampler sourceSampler [[sampler(0)]],
     texture2d<float, access::sample> textureY[[texture(0)]],
     texture2d<float, access::sample> textureU[[texture(1)]],
-    texture2d<float, access::sample> textureV[[texture(2)]]) {
-//    float y;
-//    float u;
-//    float v;
-//    float r;
-//    float g;
-//    float b;
-//    // Conversion for YUV to rgb from http://www.fourcc.org/fccyvrgb.php
-//
-//    constexpr sampler quadSampler;
-//
-//    y = textureY.sample(quadSampler, in.texcoord).r;
-//    u = textureU.sample(quadSampler, in.texcoord).r;
-//    v = textureV.sample(quadSampler, in.texcoord).r;
-//
-//    y = y - 0.0625;
-//    u = u - 0.5;
-//    v = v - 0.5;
-//
-//    r = 1.164 * y + 1.596 * v;
-//    g = 1.164 * y - 0.392 * u - 0.813 * v;
-//    b = 1.164 * y + 2.17 * u;
-//
-//    float4 out = float4(r, g, b, 1.0);
-//
-//    return float4(out);
-        
-        constexpr sampler s(address::clamp_to_edge, filter::linear);
-        float y;
-        float u;
-        float v;
-        float r;
-        float g;
-        float b;
-        // Conversion for YUV to rgb from http://www.fourcc.org/fccyvrgb.php
-        y = textureY.sample(s, in.texcoord).r;
-        u = textureU.sample(s, in.texcoord).r;
-        v = textureV.sample(s, in.texcoord).r;
-        u = u - 0.5;
-        v = v - 0.5;
-        r = y + 1.403 * v;
-        g = y - 0.344 * u - 0.714 * v;
-        b = y + 1.770 * u;
+    texture2d<float, access::sample> textureV[[texture(2)]],
+    constant YUVConversion &conversion[[buffer(0)]]) {
+    constexpr sampler s(address::clamp_to_edge, filter::linear);
+    float3 yuv = float3(textureY.sample(s, in.texcoord).r, textureU.sample(s, in.texcoord).r, textureV.sample(s, in.texcoord).r);
+    return convertYUV(yuv, conversion);
+}
 
-        float4 out = float4(r, g, b, 1.0);
-
-        return out;
-
+fragment float4 fragmentColorConversionNV12(
+    Varyings in[[stage_in]],
+    texture2d<float, access::sample> textureY[[texture(0)]],
+    texture2d<float, access::sample> textureUV[[texture(1)]],
+    constant YUVConversion &conversion[[buffer(0)]]) {
+    constexpr sampler s(address::clamp_to_edge, filter::linear);
+    float3 yuv = float3(textureY.sample(s, in.texcoord).r, textureUV.sample(s, in.texcoord).rg);
+    return convertYUV(yuv, conversion);
 }
          
 
