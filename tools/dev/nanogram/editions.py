@@ -34,7 +34,7 @@ SPARKLE_SYMBOL = re.compile(r"_OBJC_CLASS_\$_(SU|SPU)[A-Z]\w*|Sparkle")
 APPS_DIR = config.BUILD_OUTPUT / "apps"
 
 __all__ = ["AppFacts", "inspect_app", "check_edition", "stash_app", "stashed_app", "main_executable",
-           "refresh_build_descriptions"]
+           "refresh_build_descriptions", "product_fingerprint", "fingerprint_file"]
 
 
 @dataclass
@@ -187,6 +187,35 @@ def stash_app(products: Path, configuration: str, edition: str) -> Path:
     return target
 
 
+CDHASH_RE = re.compile(r"^(?:CandidateCDHashFull sha256|CDHash)=([0-9a-f]+)$", re.M)
+
+
+def product_fingerprint(app: Path) -> str:
+    """The hash of the app's CodeDirectory, or "" for an unsigned app. It covers the main executable, Info.plist,
+    entitlements, runtime flags and, through CodeResources, every resource and nested code's own hash (debug dylib,
+    extension, Sparkle). Re-signing identical contents keeps it; the signing time and file times do not count."""
+    info = subprocess.run(["codesign", "-dvvv", str(app)], capture_output=True, text=True).stderr
+    hashes = CDHASH_RE.findall(info)
+    if not hashes:
+        return ""
+    return hashlib.sha256(f"nanogram-editions=1\n{hashes[0]}\n".encode()).hexdigest()
+
+
+def fingerprint_file(configuration: str, edition: str) -> Path:
+    return APPS_DIR / f"{configuration}-{edition}.fingerprint"
+
+
+def _unchanged_since_last_check(fingerprint: str, configuration: str, edition: str) -> bool:
+    stored = fingerprint_file(configuration, edition)
+    if not fingerprint or not stored.is_file() or stored.read_text().strip() != fingerprint:
+        return False
+    try:
+        stashed_app(configuration, edition)
+    except FileNotFoundError:
+        return False
+    return True
+
+
 def stashed_app(configuration: str, edition: str) -> Path:
     apps = sorted(_edition_dir(configuration, edition).glob("*.app"))
     if len(apps) != 1:
@@ -209,8 +238,17 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if not args.configuration:
         parser.error("--configuration is required")
-    app = stash_app(args.products, args.configuration, args.edition) if args.products else \
-        stashed_app(args.configuration, args.edition)
+    fingerprint = None
+    if args.products:
+        built = find_app(args.products)
+        fingerprint = product_fingerprint(built)
+        if _unchanged_since_last_check(fingerprint, args.configuration, args.edition):
+            print(f"editions: {args.edition} ok (unchanged since the last check)")
+            return 0
+        fingerprint_file(args.configuration, args.edition).unlink(missing_ok=True)
+        app = stash_app(args.products, args.configuration, args.edition)
+    else:
+        app = stashed_app(args.configuration, args.edition)
     problems = check_edition(inspect_app(app), args.edition)
     problems += branding.check_names(app)
     problems += [f"Telegram endpoint in the bundle: {hit}" for hit in branding.find_forbidden(app)]
@@ -218,6 +256,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"editions: {problem}", file=sys.stderr)
     if problems:
         return 1
+    if fingerprint:
+        fingerprint_file(args.configuration, args.edition).write_text(fingerprint + "\n")
     print(f"editions: {args.edition} ok ({app.relative_to(config.ROOT) if app.is_relative_to(config.ROOT) else app})")
     return 0
 

@@ -2,12 +2,14 @@
 import os
 import plistlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -130,6 +132,130 @@ class BuildDescriptionTests(unittest.TestCase):
         self.assertTrue(editions.refresh_build_descriptions(self.xcconfig, "mas", self.derived))
         self.cached()
         self.assertFalse(self.refresh())
+
+
+class ProductFingerprintTests(unittest.TestCase):
+    """The editions check (codesign, nm, a full-bundle endpoint scan: 4–9 s) is skipped when the built app's code
+    signature covers the same contents as the app it last passed. Xcode re-signs the app on every build (Sparkle's
+    always-run script phases re-embed it), so the fingerprint is the CodeDirectory hash, not file times."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.template = Path(cls.tmp.name) / "template" / "Nanogram.app"
+        cls.make_app(cls.template)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    @staticmethod
+    def compile(target, source):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        c_file = target.parent / f"{target.name}.c"
+        c_file.write_text(source)
+        subprocess.run(["xcrun", "clang", "-arch", "arm64", str(c_file), "-o", str(target)], check=True)
+        c_file.unlink()
+
+    @staticmethod
+    def write_plist(path, identifier, executable):
+        with path.open("wb") as handle:
+            plistlib.dump({"CFBundleExecutable": executable, "CFBundleIdentifier": identifier,
+                           "CFBundlePackageType": "APPL"}, handle)
+
+    @classmethod
+    def sign(cls, bundle, entitlements=None):
+        args = ["codesign", "--force", "-s", "-"]
+        if entitlements:
+            args += ["--entitlements", str(entitlements)]
+        subprocess.run(args + [str(bundle)], check=True, capture_output=True)
+
+    @classmethod
+    def make_app(cls, app):
+        appex = app / "Contents" / "PlugIns" / "Share.appex"
+        cls.compile(appex / "Contents" / "MacOS" / "Share", "int main(void) { return 0; }\n")
+        cls.write_plist(appex / "Contents" / "Info.plist", "org.example.App.Share", "Share")
+        cls.compile(app / "Contents" / "MacOS" / "Nanogram", "int main(void) { return 0; }\n")
+        cls.write_plist(app / "Contents" / "Info.plist", "org.example.App", "Nanogram")
+        cls.sign(appex)
+        cls.sign(app)
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp(dir=self.tmp.name))
+        self.products = self.dir / "Products"
+        self.products.mkdir()
+        self.app = self.products / "Nanogram.app"
+        subprocess.run(["cp", "-R", str(self.template), str(self.app)], check=True)
+        self.apps_dir = self.dir / "apps"
+        self.patches = [mock.patch.object(editions, "APPS_DIR", self.apps_dir),
+                        mock.patch.object(editions.branding, "check_names", return_value=[]),
+                        mock.patch.object(editions.branding, "find_forbidden", return_value=[])]
+        for patch in self.patches:
+            patch.start()
+
+    def tearDown(self):
+        for patch in self.patches:
+            patch.stop()
+
+    def check(self, edition="direct", problems=()):
+        with mock.patch.object(editions, "inspect_app", return_value=None) as inspect, \
+                mock.patch.object(editions, "check_edition", return_value=list(problems)):
+            status = editions.main(["--edition", edition, "--configuration", "Debug", "--products", str(self.products)])
+        return status, inspect.called
+
+    def test_unchanged_product_skips_check(self):
+        self.assertEqual(self.check(), (0, True))
+        with mock.patch.object(editions, "inspect_app", side_effect=AssertionError("inspected")), \
+                mock.patch.object(editions, "stash_app", side_effect=AssertionError("stashed")):
+            self.assertEqual(editions.main(["--edition", "direct", "--configuration", "Debug",
+                                            "--products", str(self.products)]), 0)
+
+    def test_resigned_unchanged_product_skips_check(self):
+        self.check()
+        self.sign(self.app)
+        self.assertEqual(self.check(), (0, False))
+
+    def test_relinked_binary_rechecks(self):
+        self.check()
+        self.compile(self.app / "Contents" / "MacOS" / "Nanogram", "int main(void) { return 1; }\n")
+        self.sign(self.app)
+        self.assertEqual(self.check(), (0, True))
+
+    def test_changed_extension_rechecks(self):
+        self.check()
+        appex = self.app / "Contents" / "PlugIns" / "Share.appex"
+        self.compile(appex / "Contents" / "MacOS" / "Share", "int main(void) { return 2; }\n")
+        self.sign(appex)
+        self.sign(self.app)
+        self.assertEqual(self.check(), (0, True))
+
+    def test_changed_entitlements_recheck(self):
+        self.check()
+        entitlements = self.dir / "e.plist"
+        with entitlements.open("wb") as handle:
+            plistlib.dump({"com.apple.security.app-sandbox": True}, handle)
+        self.sign(self.app, entitlements)
+        self.assertEqual(self.check(), (0, True))
+
+    def test_failed_check_does_not_write_fingerprint(self):
+        self.assertEqual(self.check(problems=["direct app is sandboxed"]), (1, True))
+        self.assertFalse(editions.fingerprint_file("Debug", "direct").exists())
+        self.assertEqual(self.check(problems=["direct app is sandboxed"]), (1, True))
+
+    def test_edition_switch_rechecks(self):
+        self.check("mas")
+        self.assertEqual(self.check("direct"), (0, True))
+
+    def test_missing_stash_rechecks(self):
+        self.check()
+        shutil.rmtree(self.apps_dir / "Debug-direct")
+        self.assertEqual(self.check(), (0, True))
+
+    def test_unsigned_app_always_checked(self):
+        subprocess.run(["codesign", "--remove-signature", str(self.app)], check=True)
+        self.assertEqual(editions.product_fingerprint(self.app), "")
+        self.check()
+        self.assertEqual(self.check(), (0, True))
 
 
 @unittest.skipUnless(BOTH_BUILT, NOT_BUILT)
