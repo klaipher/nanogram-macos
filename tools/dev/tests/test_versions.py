@@ -70,6 +70,17 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertTrue((CORE / "libwebp" / "libwebp-1.6.0.tar.gz").is_file())
         self.assertFalse((CORE / "libwebp" / "libwebp-master.zip").exists())
 
+    def test_openssl(self):
+        script = read(CORE / "openssl" / "OpenSSLEncryption" / "build.sh")
+        self.assertIn("-b openssl-3.5.9 ", script)
+        self.assertIn("45e844fa2a14ec92d146bd8f5778ac130b6625fb", script)
+        self.assertNotIn("OpenSSL_1_1_1", script)
+
+    def test_openssl_keeps_upstream_callers_free_of_3_0_deprecation_warnings(self):
+        script = read(CORE / "openssl" / "OpenSSLEncryption" / "build.sh")
+        self.assertIn("define OPENSSL_SUPPRESS_DEPRECATED", script)
+        self.assertIn("openssl/configuration.h", script)
+
     def test_ffmpeg(self):
         sources = TG_IOS / "submodules" / "ffmpeg" / "Sources" / "FFMpeg"
         self.assertEqual(read(sources / "ffmpeg-9.0.2" / "VERSION").strip(), "9.0.2")

@@ -16,12 +16,13 @@ mkdir build
 OUT_DIR="${BUILD_DIR}build"
 
 
-NAME="openssl-1.1.1s";
+NAME="openssl-3.5.9";
 
 CROSS_TOP_MAC="$(xcode-select -p)/Platforms/MacOSX.platform"
 CROSS_SDK_MAC="MacOSX.sdk"
 
-git clone -b OpenSSL_1_1_1-stable https://github.com/openssl/openssl build/${NAME}
+git clone -b openssl-3.5.9 --depth 1 https://github.com/openssl/openssl build/${NAME}
+[ "$(git -C build/${NAME} rev-parse HEAD)" = "45e844fa2a14ec92d146bd8f5778ac130b6625fb" ]
 
 
 SOURCE_DIR="$OUT_DIR/${NAME}"
@@ -188,6 +189,15 @@ mv $SOURCE_DIR/include ${BUILD_DIR}build/openssl/include
 mv "${BUILD_DIR}build/$ARCHS/libssl.a" "${BUILD_DIR}build/openssl/lib/libssl.a"
 mv "${BUILD_DIR}build/$ARCHS/libcrypto.a" "${BUILD_DIR}build/openssl/lib/libcrypto.a"
 fi
+
+# OpenSSL 3 marks the 1.1 APIs that upstream's callers use (tgcalls, EncryptionProvider, MtProtoKit) deprecated;
+# they still work in 3.5, and porting those callers is upstream's job, so keep their builds warning-free.
+cat >> "${BUILD_DIR}build/openssl/include/openssl/configuration.h" <<'EOF_SUPPRESS'
+
+#ifndef OPENSSL_SUPPRESS_DEPRECATED
+# define OPENSSL_SUPPRESS_DEPRECATED
+#endif
+EOF_SUPPRESS
 
 
 #cp -r "${TMP_DIR}/$ARCH/include" "${TMP_DIR}/"
