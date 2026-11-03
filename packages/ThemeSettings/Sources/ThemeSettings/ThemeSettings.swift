@@ -1001,7 +1001,7 @@ public struct ThemePaletteSettings: Codable, Equatable {
 
     
         self.bubbled = try container.decodeIfPresent(Bool.self, forKey: "bubbled") ?? false
-        self.fontSize = CGFloat(try container.decodeIfPresent(Double.self, forKey: "fontSize") ?? 13)
+        self.fontSize = CGFloat(try container.decodeIfPresent(Double.self, forKey: "fontSize") ?? Double(ThemePaletteSettings.defaultFontSize))
         
 
         self.defaultDark = try container.decode(DefaultTheme.self, forKey: "defaultDark_1")
@@ -1179,10 +1179,12 @@ public struct ThemePaletteSettings: Codable, Equatable {
         }
     }
     
+    public static let defaultFontSize: CGFloat = 15
+
     public static var defaultTheme: ThemePaletteSettings {
         let defDark = DefaultTheme(local: .nightAccent, cloud: nil)
         let defDay = DefaultTheme(local: .dayClassic, cloud: nil)
-        return ThemePaletteSettings(palette: dayClassicPalette, bubbled: false, fontSize: 13, wallpaper: ThemeWallpaper(), defaultDark: defDark, defaultDay: defDay, defaultIsDark: false, wallpapers: [LocalWallapper(name: .dayClassic, accentColor: dayClassicPalette.accent.argb, wallpaper: AssociatedWallpaper(cloud: nil, wallpaper: .builtin), associated: nil, cloud: nil)], accents: [], cloudTheme: nil, associated: [], legacyMenu: false)
+        return ThemePaletteSettings(palette: dayClassicPalette, bubbled: false, fontSize: ThemePaletteSettings.defaultFontSize, wallpaper: ThemeWallpaper(), defaultDark: defDark, defaultDay: defDay, defaultIsDark: false, wallpapers: [LocalWallapper(name: .dayClassic, accentColor: dayClassicPalette.accent.argb, wallpaper: AssociatedWallpaper(cloud: nil, wallpaper: .builtin), associated: nil, cloud: nil)], accents: [], cloudTheme: nil, associated: [], legacyMenu: false)
     }
 }
 

@@ -2260,7 +2260,7 @@ public func telegramUpdateTheme(_ theme: TelegramPresentationTheme, window: Wind
 }
 
 public func setDefaultTheme(for window: Window? = nil) {
-    telegramUpdateTheme(generateTheme(palette: dayClassicPalette, cloudTheme: nil, bubbled: false, fontSize: 13.0, wallpaper: ThemeWallpaper()), window: window, animated: false)
+    telegramUpdateTheme(generateTheme(palette: dayClassicPalette, cloudTheme: nil, bubbled: false, fontSize: ThemePaletteSettings.defaultFontSize, wallpaper: ThemeWallpaper()), window: window, animated: false)
 }
 
 
