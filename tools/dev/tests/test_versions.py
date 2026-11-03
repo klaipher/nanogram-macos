@@ -127,6 +127,15 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertNotIn("third-party/mozjpeg", read(ROOT / "scripts" / "configure_frameworks.sh"))
         self.assertNotIn("jpeg_c_set_int_param", read(ROOT / "submodules" / "Mozjpeg" / "Sources" / "Mozjpeg.m"))
 
+    def test_rust_toolchain(self):
+        pin = read(CORE / "rust-toolchain.toml")
+        self.assertIn('channel = "1.99.1"', pin)
+        for script in ("mtproto-engine/mtproto-engine/build.sh", "wallet-engine/wallet-engine/build.sh", "tlottie/build.sh"):
+            text = read(CORE / script)
+            self.assertIn("rust-toolchain.toml", text, script)
+            self.assertIn("export RUSTUP_TOOLCHAIN", text, script)
+            self.assertNotIn("third-party/mtproto-engine/rust-toolchain.toml", text, script)
+
     def test_tg_owt_has_desktop_app_master(self):
         owt = ROOT / "submodules" / "tg_owt"
         pin = gitlink(ROOT, "submodules/tg_owt")

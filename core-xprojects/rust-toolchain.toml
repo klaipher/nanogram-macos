@@ -1,0 +1,6 @@
+# Rust toolchain for every Rust library linked into Nanogram (mtproto-engine, wallet-engine, tlottie).
+# Their own rust-toolchain.toml files live in upstream submodules; the build scripts override them with
+# RUSTUP_TOOLCHAIN set from this file, so all three are built and linked with one compiler.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]

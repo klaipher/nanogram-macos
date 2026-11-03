@@ -69,7 +69,8 @@ framework_extra_fingerprint() {
                 CARGO_BIN="$HOME/.cargo/bin/cargo"
             fi
             if [ -n "$CARGO_BIN" ]; then
-                echo "rust=$("$CARGO_BIN" --version 2>/dev/null || echo unavailable)"
+                RUST_PIN="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$(dirname "${BASH_SOURCE[0]:-$0}")/../core-xprojects/rust-toolchain.toml")"
+                echo "rust=$(RUSTUP_TOOLCHAIN="$RUST_PIN" "$CARGO_BIN" --version 2>/dev/null || echo unavailable)"
             else
                 echo "rust=missing"
             fi

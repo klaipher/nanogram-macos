@@ -6,7 +6,7 @@ set -x
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/submodules/tlottie"
-ENGINE_TOOLCHAIN_FILE="$ROOT_DIR/submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml"
+ENGINE_TOOLCHAIN_FILE="$ROOT_DIR/core-xprojects/rust-toolchain.toml"
 BUILD_DIR="$SCRIPT_DIR/build"
 
 if [ ! -f "$SOURCE_DIR/Cargo.toml" ]; then
@@ -23,6 +23,8 @@ if [ ! -f "$ENGINE_TOOLCHAIN_FILE" ]; then
 fi
 
 TOOLCHAIN="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$ENGINE_TOOLCHAIN_FILE")"
+RUSTUP_TOOLCHAIN="$TOOLCHAIN"
+export RUSTUP_TOOLCHAIN
 
 if [ -n "${CARGO:-}" ]; then
     CARGO_BIN="$CARGO"

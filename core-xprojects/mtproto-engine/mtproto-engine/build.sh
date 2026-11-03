@@ -41,6 +41,18 @@ fi
 
 RUSTUP_BIN="$(dirname "$CARGO_BIN")/rustup"
 
+NANOGRAM_RUST_TOOLCHAIN_FILE="$(cd "$(dirname "$0")/../.." && pwd)/rust-toolchain.toml"
+RUSTUP_TOOLCHAIN="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$NANOGRAM_RUST_TOOLCHAIN_FILE")"
+if [ -z "$RUSTUP_TOOLCHAIN" ]; then
+    echo "no Rust channel in $NANOGRAM_RUST_TOOLCHAIN_FILE"
+    exit 1
+fi
+export RUSTUP_TOOLCHAIN
+
+if [ -x "$RUSTUP_BIN" ] && ! "$RUSTUP_BIN" run "$RUSTUP_TOOLCHAIN" rustc --version >/dev/null 2>&1; then
+    "$RUSTUP_BIN" toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal >/dev/null 2>&1
+fi
+
 mkdir -p "$BUILD_DIR"
 
 cd "$SOURCE_DIR"

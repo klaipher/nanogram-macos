@@ -46,10 +46,10 @@ cmd_setup() {
   git submodule update --init --recursive --jobs 8
   cmd_localfixes
   local toolchain
-  toolchain="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml)"
-  [ -n "$toolchain" ] || die "cannot read the Rust toolchain pinned in submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml"
+  toolchain="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' core-xprojects/rust-toolchain.toml)"
+  [ -n "$toolchain" ] || die "cannot read the Rust toolchain pinned in core-xprojects/rust-toolchain.toml"
   command -v rustup >/dev/null || die "rustup missing: brew install rustup"
-  say "Installing Rust $toolchain (pinned upstream)"
+  say "Installing Rust $toolchain (core-xprojects/rust-toolchain.toml)"
   rustup toolchain install "$toolchain" --profile minimal
   rustup target add --toolchain "$toolchain" aarch64-apple-darwin
   cmd_frameworks
