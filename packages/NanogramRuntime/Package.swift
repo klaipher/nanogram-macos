@@ -8,8 +8,11 @@ let package = Package(
     products: [
         .library(name: "NanogramRuntime", targets: ["NanogramRuntime"]),
     ],
+    dependencies: [
+        .package(name: "NanogramDebug", path: "../NanogramDebug"),
+    ],
     targets: [
-        .target(name: "NanogramRuntime", path: "Sources/NanogramRuntime", linkerSettings: [.linkedFramework("IOKit")]),
-        .testTarget(name: "NanogramRuntimeTests", dependencies: ["NanogramRuntime"], path: "Tests/NanogramRuntimeTests"),
+        .target(name: "NanogramRuntime", dependencies: [.product(name: "NanogramDebug", package: "NanogramDebug", condition: nil)], path: "Sources/NanogramRuntime", linkerSettings: [.linkedFramework("IOKit")]),
+        .testTarget(name: "NanogramRuntimeTests", dependencies: ["NanogramRuntime", .product(name: "NanogramDebug", package: "NanogramDebug", condition: nil)], path: "Tests/NanogramRuntimeTests"),
     ]
 )

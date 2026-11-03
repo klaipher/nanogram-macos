@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import TGUIKit
 import Postbox
 import SwiftSignalKit
@@ -25,7 +26,7 @@ import FoundationUtils
 import ObjcUtils
 import TelegramMediaResources
 
-public final class NativeMediaPlayer : View, UniversalVideoContentView {
+public final class NativeMediaPlayer : View, UniversalVideoContentView, SystemPictureInPictureSource {
     
     
     public var duration: Double {
@@ -33,6 +34,10 @@ public final class NativeMediaPlayer : View, UniversalVideoContentView {
     }
     
     private let mediaPlayerView: MediaPlayerView = MediaPlayerView()
+
+    public var pictureInPictureLayer: AVSampleBufferDisplayLayer? {
+        return self.mediaPlayerView.videoLayer
+    }
     private let mediaPlayer: MediaPlayer
     private let postbox: Postbox
     private let reference: FileMediaReference

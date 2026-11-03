@@ -9,13 +9,17 @@ import RangeSet
 import TelegramCore
 import InAppSettings
 
-public final class ChunkedNativeMediaPlayer : View, UniversalVideoContentView {
+public final class ChunkedNativeMediaPlayer : View, UniversalVideoContentView, SystemPictureInPictureSource {
 
     public var duration: Double {
         return reference.media.duration ?? 0
     }
 
     private let mediaPlayerView: MediaPlayerView
+
+    public var pictureInPictureLayer: AVSampleBufferDisplayLayer? {
+        return self.mediaPlayerView.videoLayer
+    }
     private let mediaPlayer: ChunkMediaPlayerV2
     private let postbox: Postbox
     private let reference: FileMediaReference
