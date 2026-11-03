@@ -3,7 +3,8 @@
   tg warnings [--update] [--log FILE]
 
 Counts unique `path:line:col: warning:` lines (xcodebuild repeats them) per package; our packages
-(NanogramKit, packages/Nanogram*) are left out because they build with warnings as errors.
+(NanogramKit, packages/Nanogram*) are left out because they build with warnings as errors. Deprecated and
+obsoleted API uses get their own per-package baseline, so a new one fails even when the package total stays.
 """
 from __future__ import annotations
 
@@ -16,8 +17,10 @@ from pathlib import Path
 from nanogram import config
 
 BASELINE = config.ROOT / "nanogram" / "warnings-baseline.json"
+DEPRECATIONS = config.ROOT / "nanogram" / "deprecations-baseline.json"
 
 WARNING_RE = re.compile(r"^(?P<path>[^\s:][^:\n]*):\d+:\d+: warning: ", re.M)
+DEPRECATION_RE = re.compile(r"\b(?:is|was) (?:deprecated|obsoleted)\b")
 
 # Most specific first: telegram-ios is itself under submodules/.
 PACKAGE_RES = (
@@ -42,7 +45,7 @@ def package_of(path: str, root: str) -> str:
     return "app"
 
 
-def count(log: str, root: str | None = None) -> dict[str, int]:
+def count(log: str, root: str | None = None, only=None) -> dict[str, int]:
     """Unique warning lines per package (`app` for app sources and paths outside the repo)."""
     root = str(config.ROOT) if root is None else root
     counts: dict[str, int] = {}
@@ -53,11 +56,18 @@ def count(log: str, root: str | None = None) -> dict[str, int]:
         if line in seen:
             continue
         seen.add(line)
+        if only is not None and not only.search(line):
+            continue
         package = package_of(match.group("path"), root)
         if is_ours(package):
             continue
         counts[package] = counts.get(package, 0) + 1
     return dict(sorted(counts.items()))
+
+
+def count_deprecations(log: str, root: str | None = None) -> dict[str, int]:
+    """Unique deprecated/obsoleted API warnings per package."""
+    return count(log, root=root, only=DEPRECATION_RE)
 
 
 def compare(baseline: dict, current: dict) -> list[str]:
@@ -73,6 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="tg warnings", description=__doc__.splitlines()[0])
     parser.add_argument("--log", type=Path, required=True, help="log of a clean debug build")
     parser.add_argument("--baseline", type=Path, default=BASELINE)
+    parser.add_argument("--deprecations", type=Path, default=DEPRECATIONS)
     parser.add_argument("--root", default=str(config.ROOT), help="checkout the log was built from")
     parser.add_argument("--update", action="store_true", help="write the counts as the new baseline")
     args = parser.parse_args(argv)
@@ -82,10 +93,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"warnings: {args.log} is not a successful build (no '** BUILD SUCCEEDED **')", file=sys.stderr)
         return 1
     current = count(log, root=args.root)
+    deprecations = count_deprecations(log, root=args.root)
     total = sum(current.values())
     if args.update:
         write_baseline(args.baseline, current)
-        print(f"warnings: baseline written to {args.baseline}: {total} warnings in {len(current)} packages")
+        write_baseline(args.deprecations, deprecations)
+        print(f"warnings: baseline written to {args.baseline}: {total} warnings in {len(current)} packages, "
+              f"{sum(deprecations.values())} of them deprecations")
         return 0
     if not args.baseline.is_file():
         print(f"warnings: no baseline at {args.baseline}; create it with: tools/dev/tg warnings --update",
@@ -100,9 +114,18 @@ def main(argv: list[str] | None = None) -> int:
     for package in increased:
         print(f"warnings: {package}: {baseline.get(package, 0)} -> {current[package]} (more than the baseline)",
               file=sys.stderr)
-    if increased:
-        print(f"warnings: {len(increased)} package(s) have more warnings than nanogram/warnings-baseline.json; "
-              "fix the new warnings (counts may only go down)", file=sys.stderr)
+    deprecations_increased: list[str] = []
+    if args.deprecations.is_file():
+        deprecation_baseline = json.loads(args.deprecations.read_text())
+        deprecations_increased = compare(deprecation_baseline, deprecations)
+        for package in deprecations_increased:
+            print(f"warnings: {package}: {deprecation_baseline.get(package, 0)} -> {deprecations[package]} deprecation "
+                  "warnings (more than the baseline)", file=sys.stderr)
+    else:
+        print(f"warnings: no deprecation baseline at {args.deprecations}; create it with: tools/dev/tg warnings --update")
+    if increased or deprecations_increased:
+        print(f"warnings: {len(set(increased) | set(deprecations_increased))} package(s) have more warnings than the "
+              "baseline; fix the new warnings (counts may only go down)", file=sys.stderr)
         return 1
     lower = sum(baseline.values()) - total
     hint = f"; {lower} fewer than the baseline, lock it in with: tools/dev/tg warnings --update" if lower > 0 else ""

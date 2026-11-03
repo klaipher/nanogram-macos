@@ -44,6 +44,18 @@ class CountTests(unittest.TestCase):
         self.assertEqual(warnings.count(line, root="/ROOT/"), {"Colors": 1})
 
 
+class DeprecationTests(unittest.TestCase):
+    def test_only_deprecation_warnings_counted_per_package(self):
+        log = ("/ROOT/packages/TGUIKit/Sources/A.swift:1:2: warning: 'foo()' was deprecated in macOS 15.0\n"
+               "/ROOT/packages/TGUIKit/Sources/A.swift:3:2: warning: 'bar' is deprecated: use baz\n"
+               "/ROOT/packages/TGUIKit/Sources/A.swift:3:2: warning: 'bar' is deprecated: use baz\n"
+               "/ROOT/packages/TGUIKit/Sources/B.swift:4:2: warning: 'qux' was obsoleted in macOS 15.0\n"
+               "/ROOT/packages/TGUIKit/Sources/B.swift:5:2: warning: variable 'x' was never mutated\n"
+               "/ROOT/packages/ChatUI/Sources/C.swift:6:2: warning: initialization of 'y' was never used\n"
+               "/ROOT/packages/NanogramKit/Sources/D.swift:7:2: warning: 'old' is deprecated\n")
+        self.assertEqual(warnings.count_deprecations(log, root="/ROOT"), {"TGUIKit": 3})
+
+
 class CompareTests(unittest.TestCase):
     def test_increase_reported(self):
         self.assertEqual(warnings.compare({"TGUIKit": 2, "app": 1}, {"TGUIKit": 3, "app": 1}), ["TGUIKit"])
@@ -61,11 +73,13 @@ class CommandTests(unittest.TestCase):
         self.log = self.dir / "build.log"
         self.log.write_text(fixture_log())
         self.baseline = self.dir / "warnings-baseline.json"
+        self.deprecations = self.dir / "deprecations-baseline.json"
 
     def run_main(self, *args):
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):
-            status = warnings.main(["--log", str(self.log), "--baseline", str(self.baseline), "--root", "/ROOT", *args])
+            status = warnings.main(["--log", str(self.log), "--baseline", str(self.baseline),
+                                    "--deprecations", str(self.deprecations), "--root", "/ROOT", *args])
         return status, out.getvalue(), err.getvalue()
 
     def test_update_writes_sorted_baseline(self):
@@ -88,6 +102,27 @@ class CommandTests(unittest.TestCase):
         status, out, _ = self.run_main()
         self.assertEqual(status, 0)
         self.assertIn("TGUIKit: 9 -> 2", out)
+
+    def test_update_writes_the_deprecation_baseline_too(self):
+        status, _, _ = self.run_main("--update")
+        self.assertEqual(status, 0)
+        self.assertEqual(json.loads(self.deprecations.read_text()), warnings.count_deprecations(fixture_log(), root="/ROOT"))
+
+    def test_a_new_deprecation_fails_even_when_the_total_stays(self):
+        self.deprecations.write_text(json.dumps({}))
+        self.log.write_text(fixture_log() + "/ROOT/packages/ChatUI/Sources/New.swift:1:1: warning: 'x' is deprecated\n")
+        self.baseline.write_text(json.dumps({"TGUIKit": 9, "TelegramCore": 1, "sqlcipher": 1, "rnnoise": 1,
+                                             "Sparkle": 1, "app": 2, "ChatUI": 5}))
+        status, _, err = self.run_main()
+        self.assertEqual(status, 1)
+        self.assertIn("ChatUI: 0 -> 1 deprecation", err)
+
+    def test_missing_deprecation_baseline_only_hints(self):
+        self.baseline.write_text(json.dumps({"TGUIKit": 9, "TelegramCore": 1, "sqlcipher": 1, "rnnoise": 1,
+                                             "Sparkle": 1, "app": 2}))
+        status, out, _ = self.run_main()
+        self.assertEqual(status, 0)
+        self.assertIn("--update", out)
 
     def test_missing_baseline_fails_with_hint(self):
         status, _, err = self.run_main()
