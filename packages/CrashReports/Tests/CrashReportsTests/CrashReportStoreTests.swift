@@ -108,4 +108,23 @@ final class CrashReportStoreTests: XCTestCase {
         let store = CrashReportStore(handledKey: key, directory: directory.appendingPathComponent("missing"), executablePath: executable, homeDirectory: home, defaults: defaults)
         XCTAssertTrue(store.scan().isEmpty)
     }
+    func testDefaultDirectoryIsInTheRealUserHome() {
+        let real = String(cString: getpwuid(getuid())!.pointee.pw_dir)
+        XCTAssertEqual(CrashReportStore.userHomeDirectory(), real)
+        XCTAssertEqual(CrashReportStore.defaultDirectory(home: "/Users/someone").path, "/Users/someone/Library/Logs/DiagnosticReports")
+        let store = CrashReportStore(handledKey: key, defaults: defaults)
+        XCTAssertEqual(store.directory.path, real + "/Library/Logs/DiagnosticReports")
+    }
+
+    func testTheSandboxedEditionHasNoCrashReports() throws {
+        let installed = Date(timeIntervalSince1970: 6_000_000)
+        try writeReport(name: "Telegram-1.ips", procPath: executable, date: installed.addingTimeInterval(10))
+        let sandboxed = CrashReportStore(handledKey: key, directory: directory, executablePath: executable, homeDirectory: home, defaults: defaults, now: installed, environment: ["APP_SANDBOX_CONTAINER_ID": "org.klaipher.Nanogram"])
+        XCTAssertFalse(sandboxed.isAvailable)
+        XCTAssertTrue(sandboxed.scan().isEmpty)
+        XCTAssertTrue(sandboxed.allReports().isEmpty)
+        let direct = CrashReportStore(handledKey: key, directory: directory, executablePath: executable, homeDirectory: home, defaults: defaults, now: installed, environment: [:])
+        XCTAssertTrue(direct.isAvailable)
+        XCTAssertEqual(direct.scan().count, 1)
+    }
 }

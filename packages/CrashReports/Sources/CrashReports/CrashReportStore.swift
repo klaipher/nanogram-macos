@@ -13,7 +13,8 @@ public final class CrashReportStore: @unchecked Sendable {
     private static let rescanDelays: [Double] = [0, 15, 45, 120, 300]
     private static let maxReports = 5
 
-    private let directory: URL
+    let directory: URL
+    public let isAvailable: Bool
     private let executablePath: String
     private let anonymizedExecutablePath: String
     private let processName: String
@@ -23,8 +24,24 @@ public final class CrashReportStore: @unchecked Sendable {
     private let reportsPromise = ValuePromise<[CrashReport]>([], ignoreRepeated: true)
     private var started = false
 
-    public init(handledKey: String, directory: URL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/DiagnosticReports"), executablePath: String = Bundle.main.executablePath ?? "", homeDirectory: String = NSHomeDirectory(), defaults: UserDefaults = .standard, now: Date = Date()) {
+    public static func userHomeDirectory() -> String {
+        if let entry = getpwuid(getuid()), let home = entry.pointee.pw_dir {
+            return String(cString: home)
+        }
+        return NSHomeDirectory()
+    }
+
+    public static func defaultDirectory(home: String = CrashReportStore.userHomeDirectory()) -> URL {
+        return URL(fileURLWithPath: home, isDirectory: true).appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)
+    }
+
+    public static func isSandboxed(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        return environment["APP_SANDBOX_CONTAINER_ID"] != nil
+    }
+
+    public init(handledKey: String, directory: URL = CrashReportStore.defaultDirectory(), executablePath: String = Bundle.main.executablePath ?? "", homeDirectory: String = CrashReportStore.userHomeDirectory(), defaults: UserDefaults = .standard, now: Date = Date(), environment: [String: String] = ProcessInfo.processInfo.environment) {
         self.directory = directory
+        self.isAvailable = !CrashReportStore.isSandboxed(environment: environment)
         self.executablePath = executablePath
         if !homeDirectory.isEmpty, executablePath.hasPrefix(homeDirectory + "/") {
             self.anonymizedExecutablePath = "/Users/USER" + executablePath.dropFirst(homeDirectory.count)
@@ -78,7 +95,7 @@ public final class CrashReportStore: @unchecked Sendable {
     }
 
     private func scan(handledUntil handled: Double, limit: Int) -> [CrashReport] {
-        guard let contents = try? FileManager.default.contentsOfDirectory(at: self.directory, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles]) else {
+        guard self.isAvailable, let contents = try? FileManager.default.contentsOfDirectory(at: self.directory, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles]) else {
             return []
         }
         var reports: [CrashReport] = []
