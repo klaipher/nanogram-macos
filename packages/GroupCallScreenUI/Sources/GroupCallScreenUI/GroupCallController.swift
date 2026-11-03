@@ -7,6 +7,7 @@ import ColorPalette
 import TelegramCore
 import HotKey
 import TgVoipWebrtc
+import CallVideoLayer
 import InAppSettings
 import ObjcUtils
 import InputView
@@ -1854,6 +1855,22 @@ public final class GroupCallUIController : ViewController {
                 }
                 if let item = member.requestedPresentationVideoChannel(minQuality: minScreencast, maxQuality: maxScreencast) {
                     items.append(item)
+                }
+            }
+            
+            if !state.isStream {
+                let candidates = items.map { item -> GroupVideoChannelCandidate in
+                    let owner = participants.first(where: { $0.videoEndpointId == item.endpointId || $0.presentationEndpointId == item.endpointId })
+                    return GroupVideoChannelCandidate(
+                        endpointId: item.endpointId,
+                        isDominant: dominant.permanent == item.endpointId || dominant.focused?.id == item.endpointId,
+                        isScreencast: owner?.presentationEndpointId == item.endpointId,
+                        isLocal: owner?.id == .peer(accountId)
+                    )
+                }
+                let allowed = GroupVideoChannelSelection.select(candidates)
+                if allowed.count < items.count {
+                    items = items.filter { allowed.contains($0.endpointId) }
                 }
             }
             

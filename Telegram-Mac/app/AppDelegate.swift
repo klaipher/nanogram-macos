@@ -1395,6 +1395,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         settings.register(OnDeviceTranslation.legacyDebugOption)
         settings.register(LocalAudioTranscription.debugOption)
         settings.register(SystemPictureInPicture.debugOption)
+        nanogramDebugObservations.append(contentsOf: installCallVideoDebugOptions(settings))
         NanogramDebugMenu.install(openDeveloperScreen: { [weak self] in
             guard let context = self?.contextValue?.context, !context.isSupport else {
                 return false

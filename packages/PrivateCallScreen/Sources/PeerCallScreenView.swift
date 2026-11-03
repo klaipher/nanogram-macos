@@ -282,6 +282,26 @@ final class PeerCallScreenView : Control {
         updateLayout(size: self.frame.size, transition: .immediate)
     }
     
+    private var isEnergySavingEnabled: Bool {
+        guard CallVideoDebugOptions.isBackgroundGradientIdleEnabled() else {
+            return false
+        }
+        if #available(macOS 12.0, *) {
+            return ProcessInfo.processInfo.isLowPowerModeEnabled
+        }
+        return false
+    }
+    
+    private func updateBackgroundActivity() {
+        guard let backgroundLayer else {
+            return
+        }
+        let isIdleOptimizationEnabled = CallVideoDebugOptions.isBackgroundGradientIdleEnabled()
+        backgroundLayer.isIdleOptimizationEnabled = isIdleOptimizationEnabled
+        backgroundLayer.isAnimationSuspended = self.videoLink_large != nil
+        backgroundLayer.isBlurPassNeeded = self.videoLink_large == nil
+    }
+    
     private var isWindowVisible: Bool = true
     
     private var animationsActive: Bool {
@@ -578,7 +598,7 @@ final class PeerCallScreenView : Control {
         self.statusView.updateState(state, arguments: arguments, transition: transition)
         
         
-        self.backgroundLayer?.update(stateIndex: state.stateIndex, isEnergySavingEnabled: false, transition: transition)
+        self.backgroundLayer?.update(stateIndex: state.stateIndex, isEnergySavingEnabled: self.isEnergySavingEnabled, transition: transition)
         
         self.backgroundLayer_fallback?.updateColors(colors: colorSets_fallback[state.stateIndex])
         
@@ -654,6 +674,8 @@ final class PeerCallScreenView : Control {
             self.videoLink_small = nil
         }
         
+        
+        self.updateBackgroundActivity()
         
         if videoLink_large != nil {
             let current: ShadowView

@@ -6,6 +6,8 @@ import SwiftSignalKit
 import TelegramCallsCore
 import TelegramMediaUtils
 import TgVoipWebrtc
+import NanogramDebug
+import CallVideoLayer
 
 func installCallsCoreUIHooks() {
     installCallsCoreHooks(.init(presentUpgradedConferenceCall: { sharedContext, conferenceCall, accountContext, window in
@@ -48,6 +50,10 @@ func installCallsCoreUIHooks() {
             }
         })
     }))
+}
+
+func installCallVideoDebugOptions(_ settings: NanogramDebugSettings) -> [NanogramDebugObservation] {
+    return CallVideoDebugOptions.install(in: settings)
 }
 
 extension AccountContextProtocol {

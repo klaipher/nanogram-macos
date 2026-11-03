@@ -34,6 +34,7 @@ let package = Package(
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
         .package(name: "MetalEngine", path: "../../submodules/telegram-ios/submodules/MetalEngine"),
         .package(name: "TGUIKit", path: "../TGUIKit"),
+        .package(name: "NanogramDebug", path: "../NanogramDebug"),
         .package(name: "TgVoipWebrtc", path: "../../submodules/tgcalls"),
         .package(name: "TelegramVoip", path: "../../submodules/telegram-ios/submodules/TelegramVoip"),
         .package(name: "YuvConversion", path: "../../submodules/telegram-ios/submodules/YuvConversion"),
@@ -47,13 +48,14 @@ let package = Package(
             dependencies: [.product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
                            .product(name: "MetalEngine", package: "MetalEngine", condition: nil),
                            .product(name: "TGUIKit", package: "TGUIKit", condition: nil),
+                           .product(name: "NanogramDebug", package: "NanogramDebug", condition: nil),
                            .product(name: "TgVoipWebrtc", package: "TgVoipWebrtc", condition: nil),
                            .product(name: "TelegramVoip", package: "TelegramVoip", condition: nil),
                            .product(name: "YuvConversion", package: "YuvConversion", condition: nil)],
             path: "Sources/"),
         .testTarget(
             name: "CallVideoLayerTests",
-            dependencies: ["CallVideoLayer", .product(name: "rnoise", package: "rnoise")],
+            dependencies: ["CallVideoLayer", .product(name: "NanogramDebug", package: "NanogramDebug", condition: nil), .product(name: "rnoise", package: "rnoise")],
             path: "Tests/CallVideoLayerTests",
             linkerSettings: [
                 .unsafeFlags(callVideoLayerTestLinkerFlags),

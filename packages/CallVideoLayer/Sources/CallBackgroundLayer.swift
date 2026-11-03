@@ -89,7 +89,7 @@ public final class CallBackgroundLayer: MetalEngineSubjectLayer, MetalEngineSubj
     
     private var phase: Float = 0.0
     
-    private var displayLinkSubscription: SharedDisplayLinkDriver.Link?
+    private var linkController: CallBackgroundLinkController!
     
     public var renderSpec: RenderLayerSpec? {
         didSet {
@@ -103,6 +103,28 @@ public final class CallBackgroundLayer: MetalEngineSubjectLayer, MetalEngineSubj
     private let colorTransition: AnimatedProperty<ColorSet>
     private var stateIndex: Int = 0
     private var isEnergySavingEnabled: Bool = false
+    
+    public var isIdleOptimizationEnabled: Bool = true {
+        didSet {
+            self.updateLinkPolicy()
+        }
+    }
+    
+    public var isAnimationSuspended: Bool = false {
+        didSet {
+            self.updateLinkPolicy()
+        }
+    }
+    
+    public var isBlurPassNeeded: Bool = true {
+        didSet {
+            if self.isBlurPassNeeded && !oldValue {
+                self.setNeedsUpdate()
+            }
+        }
+    }
+    
+    private var isLinkAllowedInHierarchy: Bool = false
     private let phaseAcceleration = AnimatedProperty<CGFloat>(0.0)
     
     public override init() {
@@ -141,30 +163,49 @@ public final class CallBackgroundLayer: MetalEngineSubjectLayer, MetalEngineSubj
         
         self.blurredLayer.cloneLayers.append(self.externalBlurredLayer)
         
+        self.linkController = CallBackgroundLinkController(policy: self.currentPolicy, makeLink: { tick in
+            return SharedDisplayLinkDriver.shared.add(framesPerSecond: .fps(30), { timeDelta in
+                tick(timeDelta)
+            })
+        }, tick: { [weak self] timeDelta in
+            guard let self else {
+                return
+            }
+            self.colorTransition.update()
+            self.phaseAcceleration.update()
+            
+            let stepCount = 8
+            var phaseStep: CGFloat = 0.5 * timeDelta
+            phaseStep += phaseStep * self.phaseAcceleration.value * 0.5
+            self.phase = (self.phase + Float(phaseStep)).truncatingRemainder(dividingBy: Float(stepCount))
+            
+            self.setNeedsUpdate()
+        })
+        
         self.didEnterHierarchy = { [weak self] in
             guard let self else {
                 return
             }
-            self.displayLinkSubscription = SharedDisplayLinkDriver.shared.add(framesPerSecond: .fps(30), { [weak self] timeDelta in
-                guard let self else {
-                    return
-                }
-                self.colorTransition.update()
-                self.phaseAcceleration.update()
-                
-                let stepCount = 8
-                var phaseStep: CGFloat = 0.5 * timeDelta
-                phaseStep += phaseStep * self.phaseAcceleration.value * 0.5
-                self.phase = (self.phase + Float(phaseStep)).truncatingRemainder(dividingBy: Float(stepCount))
-                
-                self.setNeedsUpdate()
-            })
+            self.isLinkAllowedInHierarchy = true
+            self.updateLinkPolicy()
         }
         self.didExitHierarchy = { [weak self] in
             guard let self else {
                 return
             }
-            self.displayLinkSubscription = nil
+            self.isLinkAllowedInHierarchy = false
+            self.updateLinkPolicy()
+        }
+    }
+    
+    private var currentPolicy: CallBackgroundAnimationPolicy {
+        return CallBackgroundAnimationPolicy(isInHierarchy: self.isLinkAllowedInHierarchy, isSuspended: self.isAnimationSuspended, isEnergySavingEnabled: self.isEnergySavingEnabled, isIdleOptimizationEnabled: self.isIdleOptimizationEnabled)
+    }
+    
+    private func updateLinkPolicy() {
+        self.linkController?.policy = self.currentPolicy
+        if !self.currentPolicy.shouldRunLink {
+            self.setNeedsUpdate()
         }
     }
     
@@ -182,11 +223,14 @@ public final class CallBackgroundLayer: MetalEngineSubjectLayer, MetalEngineSubj
     }
     
     public func update(stateIndex: Int, isEnergySavingEnabled: Bool, transition: ContainedViewLayoutTransition) {
-        self.isEnergySavingEnabled = isEnergySavingEnabled
+        if self.isEnergySavingEnabled != isEnergySavingEnabled {
+            self.isEnergySavingEnabled = isEnergySavingEnabled
+            self.updateLinkPolicy()
+        }
         
         if self.stateIndex != stateIndex {
             self.stateIndex = stateIndex
-            if transition.isAnimated {
+            if transition.isAnimated && self.linkController.hasLink {
                 self.phaseAcceleration.animate(from: 1.0, to: 0.0, duration: 2.0, curve: .easeInOut)
                 self.colorTransition.animate(to: self.colorSets[stateIndex % self.colorSets.count], duration: 0.3, curve: .easeInOut)
             } else {
@@ -205,6 +249,9 @@ public final class CallBackgroundLayer: MetalEngineSubjectLayer, MetalEngineSubj
         
         for i in 0 ..< 2 {
             let isBlur = i == 1
+            if isBlur && !self.isBlurPassNeeded && self.isIdleOptimizationEnabled {
+                continue
+            }
             context.renderToLayer(spec: renderSpec, state: RenderState.self, layer: i == 0 ? self : self.blurredLayer, commands: { encoder, placement in
                 var effectiveRect = placement.effectiveRect
                 effectiveRect = effectiveRect.insetBy(dx: -effectiveRect.width * 0.1, dy: -effectiveRect.height * 0.1)
