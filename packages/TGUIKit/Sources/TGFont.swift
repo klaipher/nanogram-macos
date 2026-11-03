@@ -169,18 +169,10 @@ public extension NSFont {
         if let font = caches[.init(type: .avatar, size: size)] {
             return font
         }
-        if #available(OSX 10.15, *) {
-            if let descriptor = NSFont.boldSystemFont(ofSize: size).fontDescriptor.withDesign(.rounded), let font = NSFont(descriptor: descriptor, size: size) {
-                return font
-            } else {
-                return .systemFont(ofSize: size, weight: .heavy)
-            }
+        if let descriptor = NSFont.boldSystemFont(ofSize: size).fontDescriptor.withDesign(.rounded), let font = NSFont(descriptor: descriptor, size: size) {
+            return font
         } else {
-           if let font = NSFont(name: ".SFCompactRounded-Semibold", size: size) {
-                return font
-            } else {
-                return .systemFont(ofSize: size, weight: .heavy)
-            }
+            return .systemFont(ofSize: size, weight: .heavy)
         }
     }
     
@@ -188,18 +180,10 @@ public extension NSFont {
         if let font = caches[.init(type: .roundTimer, size: size)] {
             return font
         }
-        if #available(OSX 10.15, *) {
-            if let descriptor = NSFont.systemFont(ofSize: size).fontDescriptor.withDesign(.rounded), let font = NSFont(descriptor: descriptor, size: size) {
-                return font
-            } else {
-                return .systemFont(ofSize: size, weight: .medium)
-            }
+        if let descriptor = NSFont.systemFont(ofSize: size).fontDescriptor.withDesign(.rounded), let font = NSFont(descriptor: descriptor, size: size) {
+            return font
         } else {
-           if let font = NSFont(name: ".SFCompactRounded-Semibold", size: size) {
-                return font
-            } else {
-                return .systemFont(ofSize: size, weight: .medium)
-            }
+            return .systemFont(ofSize: size, weight: .medium)
         }
     }
     
