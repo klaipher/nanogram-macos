@@ -131,4 +131,30 @@ final class LottieFrameSurfaceTrimTests: XCTestCase {
         XCTAssertNotNil(other)
         XCTAssertLessThan(pool.retainedCount, before + 1)
     }
+
+    func testIdleSurfacesAreDroppedByALowFrequencyTrimWhenNothingTakesNewOnes() {
+        var clock: Double = 2000
+        var scheduled: [(Double, () -> Void)] = []
+        let pool = LottieFrameSurfacePool.shared
+        pool.now = { clock }
+        pool.scheduleTrim = { delay, work in scheduled.append((delay, work)) }
+        defer {
+            pool.now = { CFAbsoluteTimeGetCurrent() }
+            pool.scheduleTrim = LottieFrameSurfacePool.defaultScheduleTrim
+        }
+        clock += 100
+        let bytes = [UInt8](repeating: 0x40, count: 48 * 4 * 48)
+        var leases = (0 ..< 3).map { _ in bytes.withUnsafeBytes { pool.surface(copying: $0.baseAddress!, width: 48, height: 48, bytesPerRow: 192, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) } }
+        XCTAssertEqual(leases.compactMap { $0 }.count, 3)
+        let before = pool.retainedCount
+        XCTAssertTrue(scheduled.isEmpty)
+        leases.removeAll()
+        XCTAssertEqual(scheduled.count, 1)
+        XCTAssertGreaterThanOrEqual(scheduled[0].0, LottieFrameSurfacePool.idleLifetime)
+        clock += 10
+        let trim = scheduled.removeFirst().1
+        trim()
+        XCTAssertLessThanOrEqual(pool.retainedCount, before - 3)
+        XCTAssertTrue(scheduled.isEmpty)
+    }
 }
