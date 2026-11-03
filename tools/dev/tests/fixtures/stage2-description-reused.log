@@ -1,0 +1,20 @@
+    Target 'PasscodeCore' in project 'PasscodeCore'
+        ➜ Explicit dependency on target 'SwiftSignalKit-product' in project 'SSignalKit'
+    Target 'SwiftSignalKit-product' in project 'SSignalKit'
+        ➜ Explicit dependency on target 'SwiftSignalKit' in project 'SSignalKit'
+    Target 'SwiftSignalKit' in project 'SSignalKit' (no dependencies)
+    Target 'RLottie' in project 'RLottie_Xcode' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.2.sdk /Users/klaipher/.cache/nanogram-macos/DerivedData-stage2/SDKStatCaches.noindex/macosx27.2-26B118-9aa026f88bf9ed31cff8761912ac5bd1a7ff82d74745d5ef33555b35c4238456.sdkstatcache
+    cd /Users/klaipher/Projects/nanogram-macos-stage2
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.2.sdk -o /Users/klaipher/.cache/nanogram-macos/DerivedData-stage2/SDKStatCaches.noindex/macosx27.2-26B118-9aa026f88bf9ed31cff8761912ac5bd1a7ff82d74745d5ef33555b35c4238456.sdkstatcache
+
+note: Run script build phase 'Run Script: Link Tools' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Sparkle' from project 'Sparkle')
+note: Run script build phase 'Run Script: Set Git Version Info' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Sparkle' from project 'Sparkle')
+note: Run script build phase 'Strip Framework' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Sparkle' from project 'Sparkle')
+MkDir /Users/klaipher/.cache/nanogram-macos/DerivedData-stage2/Build/Products/Debug/Sparkle.framework/Versions/B/XPCServices (in target 'Sparkle' from project 'Sparkle')
+    cd /Users/klaipher/Projects/nanogram-macos-stage2/submodules/Sparkle
