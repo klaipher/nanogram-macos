@@ -18,7 +18,9 @@ final class RecognitionFileCacheTests: XCTestCase {
     }
 
     private func detected(_ text: String) -> TextRecognizing.Result.Detected {
-        return .init(text: text, language: nil, _topLeft: .init(.zero), _topRight: .init(.zero), _bottomLeft: .init(.zero), _bottomRight: .init(.zero), _boundingBox: .init(.zero))
+        let point = "{\"_x\":\"0\",\"_y\":\"0\"}"
+        let json = "{\"text\":\"\(text)\",\"_topLeft\":\(point),\"_topRight\":\(point),\"_bottomLeft\":\(point),\"_bottomRight\":\(point),\"_boundingBox\":{\"origin\":\(point),\"size\":{\"_width\":\"0\",\"_height\":\"0\"}}}"
+        return try! JSONDecoder().decode(TextRecognizing.Result.Detected.self, from: Data(json.utf8))
     }
 
     func testEachPhotoIsStoredInItsOwnFile() throws {
