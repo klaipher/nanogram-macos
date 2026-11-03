@@ -82,9 +82,8 @@ protocol SharedDisplayLinkSource: AnyObject {
 func makeDefaultSharedDisplayLinkSource() -> SharedDisplayLinkSource? {
     if #available(macOS 14.0, *) {
         return ScreenDisplayLinkSource()
-    } else {
-        return LegacyDisplayLinkSource()
     }
+    return nil
 }
 
 @available(macOS 14.0, *)
@@ -151,96 +150,6 @@ final class ScreenDisplayLinkSource: SharedDisplayLinkSource {
         if self.plan != plan {
             self.plan = plan
             self.link?.preferredFrameRateRange = plan.frameRateRange
-        }
-    }
-}
-
-final class LegacyDisplayLinkSource: SharedDisplayLinkSource {
-    var onFrame: ((Double, Double) -> Void)?
-    private var link: DisplayLink?
-    private var displayID: CGDirectDisplayID = CGMainDisplayID()
-    private var plan: DisplayLinkRatePlan?
-
-    var isPaused: Bool = true {
-        didSet {
-            if self.isPaused != oldValue {
-                self.updateRunning()
-            }
-        }
-    }
-
-    private let measureRefreshRate: (CGDirectDisplayID) -> Int
-    private var refreshRates: [CGDirectDisplayID: Int] = [:]
-    private var screenParametersObserver: NSObjectProtocol?
-
-    init(measureRefreshRate: @escaping (CGDirectDisplayID) -> Int = LegacyDisplayLinkSource.nominalRefreshRate) {
-        self.measureRefreshRate = measureRefreshRate
-        self.screenParametersObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: nil, using: { [weak self] _ in
-            self?.refreshRates.removeAll()
-        })
-    }
-
-    deinit {
-        if let observer = self.screenParametersObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-    }
-
-    static func nominalRefreshRate(_ displayID: CGDirectDisplayID) -> Int {
-        var link: CVDisplayLink?
-        guard CVDisplayLinkCreateWithCGDisplay(displayID, &link) == kCVReturnSuccess, let link = link else {
-            return 60
-        }
-        let period = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link)
-        guard period.timeValue > 0 else {
-            return 60
-        }
-        return max(1, Int((Double(period.timeScale) / Double(period.timeValue)).rounded()))
-    }
-
-    var maximumFramesPerSecond: Int {
-        if let cached = self.refreshRates[self.displayID] {
-            return cached
-        }
-        let value = self.measureRefreshRate(self.displayID)
-        self.refreshRates[self.displayID] = value
-        return value
-    }
-
-    func setScreen(_ screen: NSScreen?) {
-        self.setDisplayID((screen ?? NSScreen.main)?.displayLinkDisplayID ?? CGMainDisplayID())
-    }
-
-    func setDisplayID(_ displayID: CGDirectDisplayID) {
-        self.displayID = displayID
-        self.link?.setDisplay(displayID)
-    }
-
-    func apply(_ plan: DisplayLinkRatePlan) {
-        self.plan = plan
-        self.link?.gate.setFramesUntilDue(max(1, self.maximumFramesPerSecond / max(1, plan.preferred)))
-    }
-
-    private func updateRunning() {
-        if self.isPaused {
-            if let link = self.link {
-                self.link = nil
-                link.cancel()
-            }
-        } else if self.link == nil, let link = DisplayLink() {
-            link.callback = { [weak self, weak link] _ in
-                guard let self = self, let link = link else {
-                    return
-                }
-                let timestamp = CACurrentMediaTime()
-                self.onFrame?(timestamp, timestamp + link.timestamp)
-            }
-            link.setDisplay(self.displayID)
-            self.link = link
-            if let plan = self.plan {
-                self.apply(plan)
-            }
-            link.start()
         }
     }
 }
