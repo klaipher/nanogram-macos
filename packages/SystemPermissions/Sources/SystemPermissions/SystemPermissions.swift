@@ -13,9 +13,6 @@ public func requestCameraPermission() -> Signal<Bool, NoError> {
 }
 public func screenCaptureAvailable() -> Bool {
     if #available(macOS 13.0, *) {
-        let stream = CGDisplayStream(dispatchQueueDisplay: CGMainDisplayID(), outputWidth: 1, outputHeight: 1, pixelFormat: Int32(kCVPixelFormatType_32BGRA), properties: nil, queue: DispatchQueue.main, handler: { _, _, _, _ in
-        })
-        _ = stream != nil
         return true
     } else {
         return false
