@@ -249,6 +249,7 @@ public class GalleryViewer: NSResponder {
     private var didSetReady = false
     private var presentationGeneration = 0
     private weak var keyWindowBeforePresentation: NSWindow?
+    private let closeSequence = OverlayCloseSequence()
     
     private let disposable = MetaDisposable()
     private let readyDispose = MetaDisposable()
@@ -1657,6 +1658,7 @@ public class GalleryViewer: NSResponder {
     
     fileprivate func show(_ animated: Bool = true, _ ignoreStableId:AnyHashable? = nil) -> Void {
         presentationGeneration += 1
+        closeSequence.finish()
         viewer = self
         NotificationCenter.default.removeObserver(self)
         NotificationCenter.default.addObserver(self, selector: #selector(windowDidBecomeKey), name: NSWindow.didBecomeKeyNotification, object: window)
@@ -1724,38 +1726,47 @@ public class GalleryViewer: NSResponder {
         readyDispose.set(nil)
         didSetReady = false
         NotificationCenter.default.removeObserver(self)
-        returnKeyWindow()
         if animated {
             let presentationGeneration = self.presentationGeneration
-            backgroundView._change(opacity: 0, animated: true)
-            controls.animateOut()
-            self.pager.animateOut(to: { [weak self] stableId in
-                if let firstStableId = self?.firstStableId, let innerIndex = stableId.base as? Int {
-                    guard let view = self?.delegate?.contentInteractionView(for: firstStableId, animateIn: false), view.subviews.indices.contains(innerIndex) else {
-                        return nil
+            closeSequence.close(startAnimation: {
+                backgroundView._change(opacity: 0, animated: true)
+                controls.animateOut()
+                self.pager.animateOut(to: { [weak self] stableId in
+                    if let firstStableId = self?.firstStableId, let innerIndex = stableId.base as? Int {
+                        guard let view = self?.delegate?.contentInteractionView(for: firstStableId, animateIn: false), view.subviews.indices.contains(innerIndex) else {
+                            return nil
+                        }
+                        return view.subviews[innerIndex]
                     }
-                    return view.subviews[innerIndex]
-                }
-                return self?.delegate?.contentInteractionView(for: stableId, animateIn: true)
-            }, completion: { [weak self] interactive, stableId in
-                guard let self, self.presentationGeneration == presentationGeneration, viewer === self else {
-                    return
-                }
-                if let stableId = stableId {
-                    self.delegate?.interactionControllerDidFinishAnimation(interactive: interactive, for: stableId)
-                }
-                self.removeCaptureExclusion()
-                self.window.orderOut(nil)
-                viewer = nil
-                playPipIfNeeded()
-            }, addAccesoryOnCopiedView: { [weak self] stableId, view in
-                if let stableId = stableId {
-                    self?.delegate?.addAccesoryOnCopiedView(for: stableId, view: view)
-                }
-            }, addVideoTimebase: { stableId, view  in
-                
+                    return self?.delegate?.contentInteractionView(for: stableId, animateIn: true)
+                }, completion: { [weak self] interactive, stableId in
+                    guard let self, self.presentationGeneration == presentationGeneration else {
+                        return
+                    }
+                    self.closeSequence.finish()
+                    guard viewer === self else {
+                        return
+                    }
+                    if let stableId = stableId {
+                        self.delegate?.interactionControllerDidFinishAnimation(interactive: interactive, for: stableId)
+                    }
+                    self.removeCaptureExclusion()
+                    self.window.orderOut(nil)
+                    viewer = nil
+                    playPipIfNeeded()
+                }, addAccesoryOnCopiedView: { [weak self] stableId, view in
+                    if let stableId = stableId {
+                        self?.delegate?.addAccesoryOnCopiedView(for: stableId, view: view)
+                    }
+                }, addVideoTimebase: { stableId, view  in
+                    
+                })
+            }, handOffKey: { [weak self] in
+                self?.returnKeyWindow()
             })
         } else {
+            closeSequence.finish()
+            returnKeyWindow()
             window.orderOut(nil)
             self.removeCaptureExclusion()
             if viewer === self {
