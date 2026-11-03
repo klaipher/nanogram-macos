@@ -113,7 +113,7 @@ direct, quit, open mas and see the same account and chats without logging in aga
 
 Local signing uses no provisioning profile, so local mas builds sign with
 `Nanogram-MAS-Development.entitlements`: the distribution set `Nanogram-MAS.entitlements` minus keys macOS
-honours only with a profile (Maps). `tg testflight` signs with the full set and the App Store profile.
+honours only with a profile (Maps, Communication Notifications for H24). `tg testflight` signs with the full set and the App Store profile.
 Shaders: Xcode 27 copies `.copy("*.metal")` package resources as source, and MetalEngine then traps at launch.
 CallVideoLayer, DustLayer and MetalEngine compile their shaders (XCODE27.md item 3), and `buildcheck` fails any
 app that ships a `.metal` file.
@@ -175,7 +175,7 @@ Xcode's automatic signing through the App Store Connect API key (`~/.config/tele
   Release (runtime spec M17); Debug builds and `swift test` keep them. `buildcheck --release` fails any Swift compile
   that still checks. When `Telegram-Mac/OrderFiles/Telegram.order` exists (written by the launch order file
   generator, runtime spec M31), `NANOGRAM_ORDER_FILE` points the app's Release link at it.
-- `tg testflight [--export-only]`: mas edition, signed with the distribution entitlements (Maps included) and the App
+- `tg testflight [--export-only]`: mas edition, signed with the distribution entitlements (Maps and Communication Notifications included) and the App
   Store profile, exported as a signed `.pkg`, uploaded with `xcrun altool` (xcodebuild's own upload refuses the API
   key). Before building, it checks (read-only) that the App Store Connect app has the macOS platform and stops with
   one line if not. `--export-only` signs and stops.

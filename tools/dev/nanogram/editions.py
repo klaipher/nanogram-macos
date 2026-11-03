@@ -28,7 +28,7 @@ GROUPS = "com.apple.security.application-groups"
 # Entitlements macOS honours only with a provisioning profile: in the distribution set
 # (Nanogram-MAS.entitlements, used when exporting with the App Store profile), left out of the
 # development set that profile-less local builds sign with.
-PROFILE_ONLY_KEYS = ("com.apple.developer.maps",)
+PROFILE_ONLY_KEYS = ("com.apple.developer.maps", "com.apple.developer.usernotifications.communication")
 SPARKLE_FEED_URL = sparkle.FEED_URL
 SPARKLE_SYMBOL = re.compile(r"_OBJC_CLASS_\$_(SU|SPU)[A-Z]\w*|Sparkle")
 APPS_DIR = config.BUILD_OUTPUT / "apps"
