@@ -359,7 +359,7 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
                 if notificationMessageId.peerId == peerId, notificationMessageId <= maxId {
                     return true
                 }
-                return timestamp == 0 || timestamp + 24 * 60 * 60 < now
+                return timestamp == 0 || Int64(timestamp) + 24 * 60 * 60 < Int64(now)
             })
         }
     }
