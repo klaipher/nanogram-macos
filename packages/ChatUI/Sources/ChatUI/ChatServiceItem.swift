@@ -4849,7 +4849,7 @@ public class ChatServiceRowView: TableRowView, RevealTableView {
         }
         
         func updateAnimatableContent() -> Void {
-            let accept = window != nil && window!.isKeyWindow && !NSIsEmptyRect(visibleRect) && !self.isDynamicContentLocked
+            let accept = self.isPlaybackVisible && !NSIsEmptyRect(visibleRect) && !self.isDynamicContentLocked
             
             if let photoVideoPlayer = photoVideoPlayer {
                 if accept {
@@ -6270,7 +6270,7 @@ public class ChatServiceRowView: TableRowView, RevealTableView {
     
     
     public func updatePlayerIfNeeded() {
-        let accept = window != nil && window!.isKeyWindow && !NSIsEmptyRect(visibleRect) && !self.isDynamicContentLocked
+        let accept = self.isPlaybackVisible && !NSIsEmptyRect(visibleRect) && !self.isDynamicContentLocked
         if let photoVideoPlayer = photoVideoPlayer {
             if accept {
                 photoVideoPlayer.play()

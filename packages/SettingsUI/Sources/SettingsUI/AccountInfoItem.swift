@@ -236,7 +236,7 @@ private class AccountInfoView : GeneralContainableRowView {
     }
         
     @objc func updatePlayerIfNeeded() {
-        let accept = window != nil && window!.isKeyWindow && !NSIsEmptyRect(visibleRect)
+        let accept = self.isPlaybackVisible && !NSIsEmptyRect(visibleRect)
         if accept {
             photoVideoPlayer?.play()
         } else {

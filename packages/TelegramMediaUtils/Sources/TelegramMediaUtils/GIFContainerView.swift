@@ -90,7 +90,7 @@ public class GIFContainerView: Control {
     
     
     public var accept: Bool {
-        let wAccept = window != nil && (window!.isKeyWindow || self.ignoreWindowKey)  && !NSIsEmptyRect(visibleRect)
+        let wAccept = self.isPlaybackVisible(ignoringKeyWindow: self.ignoreWindowKey) && !NSIsEmptyRect(visibleRect)
         var accept:Bool = wAccept
         if let context = self.context, context.isLite(.gif) && tableView != nil {
             accept = accept && mouseInside()
@@ -143,6 +143,7 @@ public class GIFContainerView: Control {
         if let window = window {
             NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerIfNeeded), name: NSWindow.didBecomeKeyNotification, object: window)
             NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerIfNeeded), name: NSWindow.didResignKeyNotification, object: window)
+            PlaybackVisibility.addObserver(self, selector: #selector(updatePlayerIfNeeded), window: window)
             NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerIfNeeded), name: NSView.boundsDidChangeNotification, object: tableView?.clipView)
             NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerIfNeeded), name: NSView.frameDidChangeNotification, object: tableView?.view)
         }

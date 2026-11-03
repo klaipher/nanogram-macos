@@ -312,7 +312,7 @@ public class ChatVideoMessageContentView: ChatMediaContentView, APDelegate {
     
     
     public var acceptVisibility:Bool {
-        return window != nil && window!.isKeyWindow && !NSIsEmptyRect(visibleRect) && !isDynamicContentLocked
+        return self.isPlaybackVisible && !NSIsEmptyRect(visibleRect) && !isDynamicContentLocked
     }
     
     public override func viewDidUpdatedDynamicContent() {
@@ -350,6 +350,7 @@ public class ChatVideoMessageContentView: ChatMediaContentView, APDelegate {
         if let window = window {
             NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerIfNeeded), name: NSWindow.didBecomeKeyNotification, object: window)
             NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerIfNeeded), name: NSWindow.didResignKeyNotification, object: window)
+            PlaybackVisibility.addObserver(self, selector: #selector(updatePlayerIfNeeded), window: window)
             NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerIfNeeded), name: NSView.boundsDidChangeNotification, object: table?.clipView)
             NotificationCenter.default.addObserver(self, selector: #selector(updatePlayerIfNeeded), name: NSView.frameDidChangeNotification, object: table?.view)
 
