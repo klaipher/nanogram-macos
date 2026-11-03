@@ -91,32 +91,47 @@ class BackgroundTests(unittest.TestCase):
     def test_background_holds_1x_and_2x_representations(self):
         info = subprocess.run(["tiffutil", "-info", str(dmg.BACKGROUND)], capture_output=True, text=True,
                               check=True).stdout
-        self.assertIn("Image Width: 640 Image Length: 400", info)
-        self.assertIn("Image Width: 1280 Image Length: 800", info)
+        width, height = dmg.BACKGROUND_SIZE
+        self.assertIn(f"Image Width: {width} Image Length: {height}", info)
+        self.assertIn(f"Image Width: {2 * width} Image Length: {2 * height}", info)
+
+    def background_pixels(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        bitmap = Path(tmp.name) / "background.bmp"
+        subprocess.run(["sips", "-s", "format", "bmp", str(dmg.BACKGROUND), "--out", str(bitmap)],
+                       capture_output=True, check=True)
+        data = bitmap.read_bytes()
+        offset, = struct.unpack_from("<I", data, 10)
+        width, height, _, bits = struct.unpack_from("<iiHH", data, 18)
+        self.assertEqual((width, abs(height)), dmg.BACKGROUND_SIZE)
+        stride = (width * bits // 8 + 3) // 4 * 4
+
+        def pixel(x: int, y: int) -> tuple[int, int, int]:
+            row = abs(height) - 1 - y if height > 0 else y
+            at = offset + row * stride + x * (bits // 8)
+            return data[at + 2], data[at + 1], data[at]
+        return pixel
+
+    def test_a_window_larger_than_the_layout_shows_the_backdrop_not_white(self):
+        pixel = self.background_pixels()
+        window_width, window_height = dmg.WINDOW_SIZE
+        width, height = dmg.BACKGROUND_SIZE
+        corner = pixel(window_width - 1, window_height - 1)
+        for x, y in ((window_width + 8, window_height // 2), (width - 1, 0), (width // 2, window_height),
+                     (window_width // 2, height - 1), (width - 1, height - 1)):
+            with self.subTest(x=x, y=y):
+                self.assertTrue(all(abs(a - b) <= 12 for a, b in zip(pixel(x, y), corner)), pixel(x, y))
 
     def test_icon_labels_are_readable_in_light_and_dark_appearance(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            bitmap = Path(tmp) / "background.bmp"
-            subprocess.run(["sips", "-s", "format", "bmp", str(dmg.BACKGROUND), "--out", str(bitmap)],
-                           capture_output=True, check=True)
-            data = bitmap.read_bytes()
-            offset, = struct.unpack_from("<I", data, 10)
-            width, height, _, bits = struct.unpack_from("<iiHH", data, 18)
-            self.assertEqual((width, abs(height)), dmg.WINDOW_SIZE)
-            stride = (width * bits // 8 + 3) // 4 * 4
-
-            def pixel(x: int, y: int) -> tuple[int, int, int]:
-                row = abs(height) - 1 - y if height > 0 else y
-                at = offset + row * stride + x * (bits // 8)
-                return data[at + 2], data[at + 1], data[at]
-
-            label_top = dmg.APP_POSITION[1] + dmg.ICON_SIZE // 2
-            for center, _ in (dmg.APP_POSITION, dmg.APPLICATIONS_POSITION):
-                samples = [relative_luminance(pixel(x, y)) for x in range(center - 60, center + 61, 3)
-                           for y in range(label_top, label_top + 32, 2)]
-                with self.subTest(icon_at=center):
-                    self.assertGreaterEqual(1.05 / (max(samples) + 0.05), 4.4, "white label (dark appearance)")
-                    self.assertGreaterEqual((min(samples) + 0.05) / 0.05, 4.4, "black label (light appearance)")
+        pixel = self.background_pixels()
+        label_top = dmg.APP_POSITION[1] + dmg.ICON_SIZE // 2
+        for center, _ in (dmg.APP_POSITION, dmg.APPLICATIONS_POSITION):
+            samples = [relative_luminance(pixel(x, y)) for x in range(center - 60, center + 61, 3)
+                       for y in range(label_top, label_top + 32, 2)]
+            with self.subTest(icon_at=center):
+                self.assertGreaterEqual(1.05 / (max(samples) + 0.05), 4.4, "white label (dark appearance)")
+                self.assertGreaterEqual((min(samples) + 0.05) / 0.05, 4.4, "black label (light appearance)")
 
 
 class InstallerImageTests(unittest.TestCase):
@@ -168,6 +183,12 @@ class InstallerImageTests(unittest.TestCase):
                 target_cnid, = struct.unpack_from(">I", alias, 114)
                 self.assertEqual(target_cnid, os.stat(mount / ".background" / "background.tiff").st_ino)
                 self.assertEqual(records[(".", "vstl")], "icnv")
+                self.assertNotIn((".", "pBBk"), records)
+                layout = (mount / ".DS_Store").read_bytes()
+                for private in ("/Users/", str(Path.home()), str(Path(tmp).resolve()), str(Path(tmp))):
+                    for encoding in ("utf-8", "utf-16-be"):
+                        with self.subTest(path=private, encoding=encoding):
+                            self.assertNotIn(private.encode(encoding), layout)
             finally:
                 subprocess.run(["hdiutil", "detach", str(mount), "-quiet"], check=False)
 

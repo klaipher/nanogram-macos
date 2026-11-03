@@ -3,7 +3,6 @@ right, the background from tools/dev/dmg (render-background.swift) and the app i
 written as a .DS_Store on a mounted read-write image, without Finder or AppleScript, then the image is compressed."""
 from __future__ import annotations
 
-import base64
 import os
 import plistlib
 import shutil
@@ -13,12 +12,13 @@ from pathlib import Path
 
 from nanogram import config, dsstore
 
-__all__ = ["VOLUME_NAME", "WINDOW_SIZE", "ICON_SIZE", "APP_POSITION", "APPLICATIONS_POSITION", "BACKGROUND",
+__all__ = ["VOLUME_NAME", "WINDOW_SIZE", "BACKGROUND_SIZE", "ICON_SIZE", "APP_POSITION", "APPLICATIONS_POSITION", "BACKGROUND",
            "app_icon", "layout_records", "build"]
 
 VOLUME_NAME = "Nanogram"
 WINDOW_ORIGIN = (200, 260)
 WINDOW_SIZE = (640, 400)
+BACKGROUND_SIZE = (2560, 1600)
 TITLE_BAR_HEIGHT = 28
 ICON_SIZE = 128
 APP_POSITION = (160, 190)
@@ -29,9 +29,6 @@ VOLUME_ICON = ".VolumeIcon.icns"
 FALLBACK_ICON = config.ROOT / "TelegramShare" / "icon.icns"
 CUSTOM_ICON_FINDER_INFO = "00" * 8 + "0400" + "00" * 22
 SIZE_MARGIN = 32 * 1024 * 1024
-BOOKMARK_SCRIPT = ('ObjC.import("Foundation"); function run(argv) { const url = $.NSURL.fileURLWithPath(argv[0]); '
-                   'const data = url.bookmarkDataWithOptionsIncludingResourceValuesForKeysRelativeToURLError('
-                   '0, $(), $(), $()); return data.base64EncodedStringWithOptions(0).js; }')
 
 
 def app_icon(app: Path) -> Path:
@@ -47,16 +44,7 @@ def app_icon(app: Path) -> Path:
     return FALLBACK_ICON
 
 
-def _bookmark(path: Path) -> bytes | None:
-    result = subprocess.run(["osascript", "-l", "JavaScript", "-e", BOOKMARK_SCRIPT, str(path)],
-                            capture_output=True, text=True)
-    if result.returncode != 0 or not result.stdout.strip():
-        return None
-    return base64.b64decode(result.stdout.strip())
-
-
-def layout_records(app_name: str, background_alias: bytes, background_bookmark: bytes | None = None
-                   ) -> list[dsstore.Record]:
+def layout_records(app_name: str, background_alias: bytes) -> list[dsstore.Record]:
     (x, y), (width, height) = WINDOW_ORIGIN, WINDOW_SIZE
     window = {
         "WindowBounds": f"{{{{{x}, {y}}}, {{{width}, {height + TITLE_BAR_HEIGHT}}}}}",
@@ -79,8 +67,6 @@ def layout_records(app_name: str, background_alias: bytes, background_bookmark: 
         dsstore.Record(app_name, "Iloc", "blob", dsstore.iloc(*APP_POSITION)),
         dsstore.Record("Applications", "Iloc", "blob", dsstore.iloc(*APPLICATIONS_POSITION)),
     ]
-    if background_bookmark:
-        records.append(dsstore.Record(".", "pBBk", "blob", background_bookmark))
     return records
 
 
@@ -114,10 +100,7 @@ def _stage(app: Path, staging: Path) -> None:
 def _lay_out(mount: Path, app_name: str) -> None:
     background = mount / BACKGROUND_PATH
     background_alias = dsstore.alias(background, mount, VOLUME_NAME)
-    try:
-        dsstore.write(mount / ".DS_Store", layout_records(app_name, background_alias, _bookmark(background)))
-    except dsstore.NodeOverflow:
-        dsstore.write(mount / ".DS_Store", layout_records(app_name, background_alias))
+    dsstore.write(mount / ".DS_Store", layout_records(app_name, background_alias))
     subprocess.run(["xattr", "-wx", "com.apple.FinderInfo", CUSTOM_ICON_FINDER_INFO, str(mount)], check=True)
     subprocess.run(["chflags", "hidden", str(mount / BACKGROUND_PATH.parent), str(mount / VOLUME_ICON)],
                    check=True)

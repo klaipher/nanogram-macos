@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 
 let width: CGFloat = 640
 let height: CGFloat = 400
+let canvasWidth: CGFloat = 2560
+let canvasHeight: CGFloat = 1600
 let appCenter = CGPoint(x: 160, y: 190)
 let applicationsCenter = CGPoint(x: 480, y: 190)
 let hintCenterY: CGFloat = 336
@@ -24,13 +26,14 @@ func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
 }
 
 func flipped(_ point: CGPoint) -> CGPoint {
-    CGPoint(x: point.x, y: height - point.y)
+    CGPoint(x: point.x, y: canvasHeight - point.y)
 }
 
 func drawBase(_ context: CGContext, space: CGColorSpace) {
     let base = required(CGGradient(colorsSpace: space, colors: [color(0x6E7C94), color(0x67758D)] as CFArray,
                                    locations: [0, 1]), "base gradient")
-    context.drawLinearGradient(base, start: CGPoint(x: 0, y: height), end: CGPoint(x: 0, y: 0), options: [])
+    context.drawLinearGradient(base, start: flipped(.zero), end: flipped(CGPoint(x: 0, y: height)),
+                               options: [.drawsAfterEndLocation])
 }
 
 func drawComet(_ context: CGContext, space: CGColorSpace) {
@@ -105,7 +108,7 @@ func drawHint(_ context: CGContext) {
 
 func render(scale: Int) -> CGImage {
     let space = required(CGColorSpace(name: CGColorSpace.sRGB), "sRGB color space")
-    let context = required(CGContext(data: nil, width: Int(width) * scale, height: Int(height) * scale,
+    let context = required(CGContext(data: nil, width: Int(canvasWidth) * scale, height: Int(canvasHeight) * scale,
                                      bitsPerComponent: 8, bytesPerRow: 0, space: space,
                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue), "bitmap context")
     context.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
