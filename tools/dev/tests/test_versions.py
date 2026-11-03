@@ -81,6 +81,17 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn('AS="$CC"', script)
         self.assertNotIn("GASPP_FIX_XCODE5", script)
 
+    def test_dav1d(self):
+        self.assertEqual(gitlink(TG_IOS, "third-party/dav1d/dav1d"), "54706fc6bc0cdecab7e9593974a4039cc038fca7")
+        meson = TG_IOS / "third-party" / "dav1d" / "dav1d" / "meson.build"
+        if meson.is_file():
+            self.assertRegex(read(meson), r"version\s*:\s*'1\.5\.4'")
+
+    def test_dav1d_cross_file_enables_dotprod_and_i8mm(self):
+        cross = read(CORE / "dav1d" / "dav1d-arm64.meson")
+        self.assertIn("cpu_family = 'aarch64'", cross)
+        self.assertIn("cpu = 'aarch64'", cross)
+
 
 if __name__ == "__main__":
     unittest.main()
