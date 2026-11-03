@@ -159,9 +159,39 @@ compiled objects stay, so the build is still incremental.
 
 ## Native libraries
 
-`tg frameworks` runs upstream's `scripts/configure_frameworks.sh` with our xcconfig (`XCODE_XCCONFIG_FILE`) and
-`CMAKE_POLICY_VERSION_MINIMUM=3.5`, then checks that every required output exists and is arm64 only.
-`tg frameworks --verify-only` runs just the check. Per-library times go to `build-output/frameworks-timing.tsv`.
+`tg frameworks` brings the 12 native libraries plus tlottie up to date, then checks that every required output
+exists and is arm64 only. `tg frameworks --verify-only` runs just the check. Per-library build times go to
+`build-output/frameworks-timing.tsv`, the full log to `build-output/frameworks.log`.
+
+Each library is one of:
+
+- **current**: its stamp in the checkout equals the stamp of today's inputs and its outputs are present; nothing runs.
+- **restored** from the shared cache `~/.cache/nanogram-macos/frameworks/<key>/` (every clone and worktree uses
+  the same cache): the files are APFS clones (`cp -c`), so a restore costs no extra disk; tg then writes the
+  checkout's own stamp, so upstream's script sees the library as up to date.
+- **built** by upstream's `scripts/configure_frameworks.sh` with our xcconfig (`XCODE_XCCONFIG_FILE`) and
+  `CMAKE_POLICY_VERSION_MINIMUM=3.5`. It runs only when at least one library is neither current nor cached (it then
+  also syncs headers and rebuilds tlottie); otherwise tg syncs the headers itself and builds tlottie only if needed.
+  Every library that ends up current and is not in the cache yet is stored, so the first run in any checkout seeds it.
+
+The cache key is the sha256 of upstream's stamp (Xcode build, `deployment=`, `archs=`, the git tree of each input
+plus a hash of uncommitted changes, the stamps of the libraries it depends on) with the `rust=` line replaced by
+the pinned toolchain's `rustc -V` (`rust-toolchain.toml` of mtproto-engine), not whatever `cargo` is first on
+`PATH`. tlottie gets the same kind of stamp (`core-xprojects/tlottie/build/.nanogram-stamp`). An entry holds only
+what the app build and dependent library builds read: the required outputs, their `include/` trees, the headers
+`sync-headers.sh` copies, and the two Rust xcframeworks (about 190 MB for all 13; the build directories are 1.7 GB).
+The cache keeps the most recently used entries up to 3 GB (`NANOGRAM_FRAMEWORK_CACHE_MAX_GB`).
+
+`tg frameworks --no-cache` (or `NANOGRAM_FRAMEWORK_CACHE=0`) neither reads nor writes the cache. To rebuild one
+library from source, delete its `core-xprojects/<lib>/build` and run `tg frameworks --no-cache`. Upstream's script
+gets `TMPDIR=~/.cache/nanogram-macos/tmp/frameworks-<pid>`, so the per-library DerivedData it creates there is
+removed by `tg prune` even after an interrupted run.
+
+Measured 2026-11-03 on the shared Mac (load average 160–230 on 10 cores from other workflows, so wall times are
+upper bounds): seeding the cache from an up-to-date checkout 34 s (tlottie had no stamp yet); a run with
+everything current 6 s wall, 3.6 CPU s (before: ≥ 54 s, because upstream's script always rebuilt tlottie);
+restoring all 13 into a checkout with no `core-xprojects/*/build`, xcframeworks or `SharedHeaders` 20 s wall,
+8 CPU s, after which `git status` was unchanged and `tg build` linked the app (buildcheck and editions ok).
 
 What we changed in the build scripts:
 

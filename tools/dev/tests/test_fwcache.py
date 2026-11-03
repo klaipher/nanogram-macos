@@ -216,7 +216,8 @@ class CacheKeyTests(unittest.TestCase):
 class StampTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.stamps = fwcache.local_stamps(config.ROOT, fwcache.stamp_environment(), rust=RUST)
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(config, "CACHE_DIR", Path(tmp)):
+            cls.stamps = fwcache.local_stamps(config.ROOT, fwcache.stamp_environment(), rust=RUST)
 
     def test_stamps_have_no_absolute_paths(self):
         stamps = self.stamps

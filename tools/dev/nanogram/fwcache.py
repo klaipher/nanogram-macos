@@ -37,7 +37,8 @@ META_SCHEMA = 1
 PARTIAL_MAX_AGE = 3600
 COPY_CHUNK = 400
 DEFAULT_MAX_GB = 3
-PAIR_SOURCE = re.compile(r'^\s*"\$\{SCRIPT_DIR\}/\.\./([^,"]+),', re.MULTILINE)
+PAIR = re.compile(r'^\s*"\$\{SCRIPT_DIR\}/\.\./([^,"]+),\$\{SCRIPT_DIR\}/\.\./([^,"]+)"', re.MULTILINE)
+TD_PAIR = ("submodules/telegram-ios/third-party/td/td", "submodules/telegram-ios/third-party/td/TdBinding/SharedHeaders/td")
 
 STAMPS_SCRIPT = r"""
 set -e
@@ -142,13 +143,19 @@ def build_dir(root: Path, unit: str) -> Path:
     return projects / unit / "build"
 
 
-def header_sources(root: Path) -> list[Path]:
+def header_pairs(root: Path) -> list[tuple[Path, Path]]:
     text = (frameworks.SCRIPTS / "configure_frameworks.sh").read_text()
+    pairs = [(Path(root) / source, Path(root) / dest) for source, dest in PAIR.findall(text)]
+    if not pairs or TD_PAIR[1] not in text:
+        raise config.ConfigError("scripts/configure_frameworks.sh changed its header sync: update fwcache.py")
+    return pairs + [(Path(root) / TD_PAIR[0], Path(root) / TD_PAIR[1])]
+
+
+def header_sources(root: Path) -> list[Path]:
     sources: list[Path] = []
-    for rel in PAIR_SOURCE.findall(text):
-        path = Path(root) / rel
-        if path not in sources:
-            sources.append(path)
+    for source, _ in header_pairs(root):
+        if source not in sources:
+            sources.append(source)
     return sources
 
 
