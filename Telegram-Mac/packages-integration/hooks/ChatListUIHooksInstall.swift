@@ -4,8 +4,7 @@ import Postbox
 import TelegramCore
 import SwiftSignalKit
 import ChatListUI
-import CrashReports
-import ApiCredentials
+import NanogramLogExport
 
 extension FWDNavigationAction: @retroactive ChatListForwardAction {
 
@@ -19,42 +18,9 @@ extension ChatController: @retroactive ChatListChatController {
 
 }
 
-private let crashReportStore = CrashReportStore(handledKey: "crashReports.handledUntil." + ApiEnvironment.prefix)
-
-private var crashReportSource: String {
-    #if APP_STORE
-    return "appstore"
-    #elseif STABLE
-    return "stable"
-    #elseif BETA
-    return "beta"
-    #elseif ALPHA
-    return "alpha"
-    #elseif GITHUB
-    return "github"
-    #else
-    return "debug"
-    #endif
-}
-
 private func crashReportIcon() -> CGImage? {
     var rect = NSMakeRect(0, 0, 60, 60)
     return NSApp.applicationIconImage?.cgImage(forProposedRect: &rect, context: nil, hints: nil)
-}
-
-private func sendCrashReports(_ reports: [CrashReport], context: AccountContext) {
-    _ = (context.engine.peers.resolvePeerByName(name: crashReportsBotUsername, referrer: nil) |> filter { $0 != .progress } |> take(1) |> deliverOnMainQueue).start(next: { result in
-        guard let peer = result.result else {
-            showModalText(for: context.window, text: strings().crashReportCouldNotOpenBot(crashReportsBotUsername))
-            return
-        }
-        navigateToChat(navigation: context.bindings.rootNavigation(), context: context, chatLocation: .peer(peer.id), callback: { controller in
-            let newest = reports.first
-            let caption = NSAttributedString(string: strings().crashReportCaption(newest?.appVersion ?? "", newest?.buildVersion ?? "", crashReportSource))
-            let preview = PreviewSenderController(urls: reports.map { $0.url }, chatInteraction: controller.chatInteraction, asMedia: false, attributedString: caption)
-            showModal(with: preview, for: context.window)
-        })
-    })
 }
 
 private func mapChatListInAppLink(_ link: inAppLink) -> ChatListInAppLink {
@@ -155,17 +121,19 @@ func installChatListUIHooks() {
     }, formatPhoneNumber: { context, number in
         return formatPhoneNumber(context: context.concrete, number: number)
     }, crashReportCard: { context in
-        return crashReportStore.reports |> deliverOnMainQueue |> map { reports -> ChatListCrashReportCard? in
-            guard let newest = reports.first, !crashReportsBotUsername.isEmpty else {
+        return nanogramCrashReportStore.reports |> deliverOnMainQueue |> map { reports -> ChatListCrashReportCard? in
+            guard let newest = reports.first else {
                 return nil
             }
             let title = reports.count == 1 ? strings().crashReportCardTitle : strings().crashReportCardTitleTimesOther(reports.count)
             let info = strings().crashReportCardInfo
+            let urls = reports.map { $0.url }
             return ChatListCrashReportCard(id: newest.incidentId, title: title, info: info, icon: crashReportIcon(), action: {
-                crashReportStore.markHandled(reports)
-                sendCrashReports(reports, context: context.concrete)
+                NanogramLogExport.present(kind: .crashReports, window: context.concrete.window, collect: { urls }, onDestinationChosen: {
+                    nanogramCrashReportStore.markHandled(reports)
+                })
             }, dismiss: {
-                crashReportStore.markHandled(reports)
+                nanogramCrashReportStore.markHandled(reports)
             })
         }
     })

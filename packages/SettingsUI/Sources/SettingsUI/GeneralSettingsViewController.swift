@@ -567,7 +567,10 @@ open class GeneralSettingsViewController<Context: AccountContextProtocol>: Table
     
     
     public func sendLogs() {
-        
+        guard DeveloperHooks.isInstalled else {
+            return
+        }
+        DeveloperHooks.shared.sendLogs?(self.window)
     }
     
     deinit {

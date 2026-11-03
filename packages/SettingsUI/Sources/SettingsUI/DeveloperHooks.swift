@@ -1,16 +1,32 @@
 import Cocoa
 
+public struct DeveloperLogExport {
+    public let id: String
+    public let title: String
+    public let send: (NSWindow?) -> Void
+
+    public init(id: String, title: String, send: @escaping (NSWindow?) -> Void) {
+        self.id = id
+        self.title = title
+        self.send = send
+    }
+}
+
 public struct DeveloperHooks {
     public let updateGraphicContext: () -> Void
     public let forceRLottieBackend: () -> Bool
     public let toggleForceRLottieBackend: () -> Void
     public let openNanogramSwitches: (() -> Void)?
+    public let logExports: [DeveloperLogExport]
+    public let sendLogs: ((NSWindow?) -> Void)?
 
-    public init(updateGraphicContext: @escaping () -> Void, forceRLottieBackend: @escaping () -> Bool, toggleForceRLottieBackend: @escaping () -> Void, openNanogramSwitches: (() -> Void)? = nil) {
+    public init(updateGraphicContext: @escaping () -> Void, forceRLottieBackend: @escaping () -> Bool, toggleForceRLottieBackend: @escaping () -> Void, openNanogramSwitches: (() -> Void)? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
         self.updateGraphicContext = updateGraphicContext
         self.forceRLottieBackend = forceRLottieBackend
         self.toggleForceRLottieBackend = toggleForceRLottieBackend
         self.openNanogramSwitches = openNanogramSwitches
+        self.logExports = logExports
+        self.sendLogs = sendLogs
     }
 
     private static var _shared: DeveloperHooks?

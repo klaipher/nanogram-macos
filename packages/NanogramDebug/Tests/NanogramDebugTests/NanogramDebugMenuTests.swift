@@ -2,6 +2,7 @@ import AppKit
 import XCTest
 @testable import NanogramDebug
 @testable import NanogramDebugUI
+import NanogramLogExport
 
 final class NanogramDebugMenuTests: XCTestCase {
     private func makeMainMenu() -> NSMenu {
@@ -69,6 +70,17 @@ final class NanogramDebugMenuTests: XCTestCase {
         XCTAssertEqual(settings.choice("display.cap"), "60")
         settings.set("display.cap", choice: "off")
         XCTAssertEqual(popup?.indexOfSelectedItem, 0)
+        controller.close()
+    }
+
+    func testWindowListsEveryLogExport() {
+        let controller = NanogramDebugWindowController(settings: makeSettings().0)
+        XCTAssertEqual(NanogramLogExportKind.allCases.compactMap { controller.logButton(for: $0)?.title }, ["Send App Logs…", "Send Call Logs…", "Send Crash Reports…", "Send MetricKit Reports…"])
+        let gate = NanogramLogExportGate.shared
+        XCTAssertTrue(gate.begin())
+        XCTAssertFalse(controller.logButton(for: .appLogs)?.isEnabled ?? true)
+        gate.end()
+        XCTAssertTrue(controller.logButton(for: .appLogs)?.isEnabled ?? false)
         controller.close()
     }
 }

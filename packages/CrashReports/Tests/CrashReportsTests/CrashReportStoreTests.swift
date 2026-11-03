@@ -93,6 +93,17 @@ final class CrashReportStoreTests: XCTestCase {
         XCTAssertEqual(store.scan().map { $0.url.lastPathComponent }, ["Telegram-7.ips", "Telegram-6.ips", "Telegram-5.ips", "Telegram-4.ips", "Telegram-3.ips"])
     }
 
+    func testAllReportsIncludeHandledAndOlderOnes() throws {
+        let installed = Date(timeIntervalSince1970: 5_000_000)
+        let store = store(now: installed)
+        try writeReport(name: "Telegram-before.ips", procPath: executable, date: installed.addingTimeInterval(-60))
+        try writeReport(name: "Telegram-after.ips", procPath: executable, date: installed.addingTimeInterval(60))
+        try writeReport(name: "Telegram-hang.ips", procPath: executable, bugType: "288", date: installed.addingTimeInterval(70))
+        store.markHandled(store.scan())
+        XCTAssertEqual(store.allReports().map { $0.url.lastPathComponent }, ["Telegram-after.ips", "Telegram-before.ips"])
+        XCTAssertEqual(store.allReports(limit: 1).map { $0.url.lastPathComponent }, ["Telegram-after.ips"])
+    }
+
     func testAMissingDirectoryGivesNoReports() {
         let store = CrashReportStore(handledKey: key, directory: directory.appendingPathComponent("missing"), executablePath: executable, homeDirectory: home, defaults: defaults)
         XCTAssertTrue(store.scan().isEmpty)

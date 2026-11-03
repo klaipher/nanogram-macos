@@ -1,11 +1,15 @@
 import AppKit
 import NanogramDebug
+import NanogramLogExport
 
 public final class NanogramDebugWindowController: NSWindowController {
     private let settings: NanogramDebugSettings
     private var controls: [String: NSControl] = [:]
     private var observation: NanogramDebugObservation?
     private let stack = NSStackView()
+    private var logButtons: [NanogramLogExportKind: NSButton] = [:]
+    private let logProgress = NSProgressIndicator()
+    private var gateObserver: NSObjectProtocol?
 
     public init(settings: NanogramDebugSettings = .shared) {
         self.settings = settings
@@ -24,7 +28,16 @@ public final class NanogramDebugWindowController: NSWindowController {
                 }
             }
         }
+        self.gateObserver = NotificationCenter.default.addObserver(forName: NanogramLogExportGate.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.refreshLogControls()
+        }
         window.center()
+    }
+
+    deinit {
+        if let gateObserver = self.gateObserver {
+            NotificationCenter.default.removeObserver(gateObserver)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -33,6 +46,10 @@ public final class NanogramDebugWindowController: NSWindowController {
 
     func control(for id: String) -> NSControl? {
         return self.controls[id]
+    }
+
+    func logButton(for kind: NanogramLogExportKind) -> NSButton? {
+        return self.logButtons[kind]
     }
 
     private func buildContent() {
@@ -69,6 +86,9 @@ public final class NanogramDebugWindowController: NSWindowController {
         self.stack.setCustomSpacing(18, after: self.stack.arrangedSubviews.last!)
         self.stack.addArrangedSubview(reset)
 
+        self.stack.setCustomSpacing(18, after: reset)
+        self.buildLogsSection()
+
         let document = FlippedView()
         document.translatesAutoresizingMaskIntoConstraints = false
         document.addSubview(self.stack)
@@ -86,6 +106,43 @@ public final class NanogramDebugWindowController: NSWindowController {
             document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
         ])
         self.refreshValues()
+    }
+
+    private func buildLogsSection() {
+        let header = NSTextField(labelWithString: "Logs")
+        header.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
+        self.stack.addArrangedSubview(header)
+        self.stack.addArrangedSubview(self.secondaryLabel("Each export asks where to send it: a Nanogram chat, an email, another app, or a folder."))
+        for kind in NanogramLogExportKind.allCases {
+            let button = NSButton(title: NanogramLogExportSpec.current(kind).menuTitle + "…", target: self, action: #selector(sendLogs(_:)))
+            button.identifier = NSUserInterfaceItemIdentifier("logs." + kind.rawValue)
+            self.logButtons[kind] = button
+            self.stack.addArrangedSubview(button)
+        }
+        self.logProgress.style = .spinning
+        self.logProgress.controlSize = .small
+        self.logProgress.isDisplayedWhenStopped = false
+        self.stack.addArrangedSubview(self.logProgress)
+        self.refreshLogControls()
+    }
+
+    private func refreshLogControls() {
+        let running = NanogramLogExport.isRunning
+        for button in self.logButtons.values {
+            button.isEnabled = !running
+        }
+        if running {
+            self.logProgress.startAnimation(nil)
+        } else {
+            self.logProgress.stopAnimation(nil)
+        }
+    }
+
+    @objc private func sendLogs(_ sender: NSButton) {
+        guard let kind = self.logButtons.first(where: { $0.value === sender })?.key else {
+            return
+        }
+        NanogramLogExport.present(kind: kind, window: self.window, anchor: sender)
     }
 
     private func secondaryLabel(_ text: String) -> NSTextField {

@@ -7420,21 +7420,13 @@ public final class L10n {
   public static var crashRecoveryWebsiteDetail: String  { return L10n.tr("Localizable", "CrashRecovery.WebsiteDetail") }
   /// Download from macos.telegram.org
   public static var crashRecoveryWebsiteLink: String  { return L10n.tr("Localizable", "CrashRecovery.WebsiteLink") }
-  /// Crash report from Telegram %1$@ (%2$@, %3$@)
-  public static func crashReportCaption(_ p1: String, _ p2: String, _ p3: String) -> String {
-    return L10n.tr("Localizable", "CrashReport.Caption", p1, p2, p3)
-  }
-  /// Send the report to help us fix it.
+  /// Choose where to send the report to help fix it.
   public static var crashReportCardInfo: String  { return L10n.tr("Localizable", "CrashReport.CardInfo") }
-  /// Telegram quit unexpectedly
+  /// Nanogram quit unexpectedly
   public static var crashReportCardTitle: String  { return L10n.tr("Localizable", "CrashReport.CardTitle") }
-  /// Telegram quit unexpectedly %1$d times
+  /// Nanogram quit unexpectedly %1$d times
   public static func crashReportCardTitleTimesOther(_ p1: Int) -> String {
     return L10n.tr("Localizable", "CrashReport.CardTitleTimes_other", p1)
-  }
-  /// Couldn’t open @%1$@
-  public static func crashReportCouldNotOpenBot(_ p1: String) -> String {
-    return L10n.tr("Localizable", "CrashReport.CouldNotOpenBot", p1)
   }
   /// Sorry, you are a member of too many groups and channels. Please leave some before creating a new one.
   public static var createChannelsTooMuch: String  { return L10n.tr("Localizable", "Create.ChannelsTooMuch") }

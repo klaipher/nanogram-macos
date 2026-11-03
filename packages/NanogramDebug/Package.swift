@@ -14,12 +14,16 @@ let package = Package(
     platforms: [.macOS(.v10_13)],
     products: [
         .library(name: "NanogramDebug", targets: ["NanogramDebug"]),
-        .library(name: "NanogramDebugUI", targets: ["NanogramDebugUI"]),
+        .library(name: "NanogramDebugUI", targets: ["NanogramDebugUI", "NanogramLogExport"]),
+    ],
+    dependencies: [
+        .package(name: "Zip", path: "../../submodules/Zip"),
     ],
     targets: [
         .target(name: "NanogramDebug", path: "Sources/NanogramDebug", swiftSettings: nanogramSwiftSettings),
-        .target(name: "NanogramDebugUI", dependencies: ["NanogramDebug"], path: "Sources/NanogramDebugUI", swiftSettings: appKitSwiftSettings),
-        .testTarget(name: "NanogramDebugTests", dependencies: ["NanogramDebug", "NanogramDebugUI"], path: "Tests/NanogramDebugTests", swiftSettings: appKitSwiftSettings),
+        .target(name: "NanogramLogExport", dependencies: [.product(name: "Zip", package: "Zip")], path: "Sources/NanogramLogExport", swiftSettings: appKitSwiftSettings),
+        .target(name: "NanogramDebugUI", dependencies: ["NanogramDebug", "NanogramLogExport"], path: "Sources/NanogramDebugUI", swiftSettings: appKitSwiftSettings),
+        .testTarget(name: "NanogramDebugTests", dependencies: ["NanogramDebug", "NanogramDebugUI", "NanogramLogExport"], path: "Tests/NanogramDebugTests", swiftSettings: appKitSwiftSettings),
     ],
     swiftLanguageModes: [.v6]
 )

@@ -159,8 +159,16 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     })))
     index += 1
 
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_open_logs, data: InputDataGeneralData(name: "Open Logs", color: theme.colors.text, type: .next, viewType: .lastItem, action: arguments.navigateToLogs)))
+    let logExports = DeveloperHooks.isInstalled ? DeveloperHooks.shared.logExports : []
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_open_logs, data: InputDataGeneralData(name: "Open Logs", color: theme.colors.text, type: .next, viewType: logExports.isEmpty ? .lastItem : .innerItem, action: arguments.navigateToLogs)))
     index += 1
+
+    for (offset, export) in logExports.enumerated() {
+        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: InputDataIdentifier("_id_send_logs_\(export.id)"), data: InputDataGeneralData(name: export.title, color: theme.colors.accent, type: .none, viewType: offset == logExports.count - 1 ? .lastItem : .innerItem, action: {
+            export.send(arguments.context.window)
+        })))
+        index += 1
+    }
 
     entries.append(.sectionId(sectionId, type: .normal))
     sectionId += 1

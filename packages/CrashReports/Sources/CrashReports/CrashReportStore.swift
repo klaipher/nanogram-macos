@@ -1,12 +1,6 @@
 import Foundation
 import SwiftSignalKit
 
-#if NANOGRAM
-public let crashReportsBotUsername = ""
-#else
-public let crashReportsBotUsername = "macos_stable_updater_bot"
-#endif
-
 public struct CrashReport: Equatable {
     public let url: URL
     public let date: Date
@@ -76,7 +70,14 @@ public final class CrashReportStore {
     }
 
     public func scan() -> [CrashReport] {
-        let handled = self.defaults.double(forKey: self.handledKey)
+        return self.scan(handledUntil: self.defaults.double(forKey: self.handledKey), limit: CrashReportStore.maxReports)
+    }
+
+    public func allReports(limit: Int = 20) -> [CrashReport] {
+        return self.scan(handledUntil: 0, limit: limit)
+    }
+
+    private func scan(handledUntil handled: Double, limit: Int) -> [CrashReport] {
         guard let contents = try? FileManager.default.contentsOfDirectory(at: self.directory, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles]) else {
             return []
         }
@@ -90,7 +91,7 @@ public final class CrashReportStore {
             }
         }
         reports.sort(by: { $0.date > $1.date })
-        return Array(reports.prefix(CrashReportStore.maxReports))
+        return Array(reports.prefix(limit))
     }
 
     private func parse(url: URL, date: Date) -> CrashReport? {

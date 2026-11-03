@@ -1,6 +1,7 @@
 import Cocoa
 import ChatHistoryModel
 import ColorPalette
+import NanogramKit
 import Postbox
 import QrStudioUI
 import SettingsUI
@@ -356,7 +357,7 @@ func installSettingsUIHooks() {
         if let state = state as? AppUpdateState {
             switch state.loadingState {
             case let .loading(_, current, total):
-                text = "\(Int(Float(current) / Float(total) * 100))%"
+                text = UpdateProgress.percentText(current: current, total: total)
             case let .readyToInstall(item), let .unarchiving(item):
                 #if NANOGRAM
                 text = "\(item.displayVersionString).\(item.versionString)"
