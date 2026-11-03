@@ -40,6 +40,69 @@ tools/dev/tg xcode          # direct edition; `tg xcode mas` for the App Store e
 It opens the workspace with `XCODE_XCCONFIG_FILE` pointing at the edition xcconfig, which Xcode applies like
 `-xcconfig`. Quit Xcode first: an Xcode that is already running keeps its old environment.
 
+## Day-to-day build speed
+
+Most of a small incremental build is planning, not compiling: before it runs a single task, Xcode resolves the
+package graph (~190 local packages), computes the target graph and loads its *build description*, the cached plan
+of every task. Reusing the description costs under a second; recreating it costs 20–31 s and ~40 CPU s, and the
+first build from a new environment cost 542 CPU s (2026-11-03 baseline).
+
+**Fixed arguments and environment.** Xcode reuses a description only for the same build request in the same
+environment. `tg build` therefore runs xcodebuild through `tools/dev/nanogram/xcbuild.py`, always with the same
+arguments and only `HOME`, `USER`, `LOGNAME`, `TMPDIR`, `LANG`, `DEVELOPER_DIR` and a fixed `PATH`; session
+variables (an agent's `AI_AGENT`, `PYTHONPATH`, `SHLVL`, …) no longer reach it. After each build it prints
+
+- `build description: reused`: the normal case;
+- `build description: recreated (…)`: expected after an xcconfig or edition change, an Xcode update, a package
+  graph change, extra `-- SETTING=value` arguments, or switching between `tg build`, Xcode's UI and a raw
+  `xcodebuild`. Each of those keeps its own description; alternating between them recreates it every time.
+
+Packages are not re-resolved on ordinary builds (`-disableAutomaticPackageResolution`, plus
+`-skipPackagePluginValidation -skipMacroValidation`): builds stay offline and deterministic. `tg build --clean`
+resolves, and so does `tg build --resolve-packages` without cleaning. A failure about `Package.resolved` prints
+`hint: run tg build --clean to re-resolve packages`.
+
+**Post-build checks.** `buildcheck` runs after every build (1–2 s). The editions check (codesign, `nm`, a full-bundle
+endpoint scan: 4–9 s) runs only when the app changed: its fingerprint is the hash of the app's code signature
+(CodeDirectory), which covers the executables, Info.plist, entitlements and, through CodeResources, every resource and
+nested binary. File times cannot be used, because Xcode re-embeds Sparkle and re-signs the app on every build
+(Sparkle's always-run script phases). A no-change build prints `editions: direct ok (unchanged since the last check)`.
+
+**Debug settings** (`nanogram/Nanogram.xcconfig`, all `[config=Debug]`; Release keeps `-O`, whole-module, `-O3`,
+ThinLTO and dead-code stripping):
+
+| Setting | Why |
+|---|---|
+| `ENABLE_MODULE_VERIFIER = NO` | `VerifyModule` of Sparkle and CodeSyntax ran on every build, 2.2–8.4 s |
+| `LM_SKIP_METADATA_EXTRACTION = YES` | 170 `ExtractAppIntentsMetadata` tasks, 49 s in a clean build; the app has no App Intents. Swift Build skips every App Intents metadata task for it (`AppIntentsMetadataTaskProducer`) |
+| `DEBUG_INFORMATION_FORMAT = dwarf`, `SWIFT_COMPILATION_MODE = singlefile`, `GCC_OPTIMIZATION_LEVEL = 0` | Today's values, pinned against upstream drift |
+
+`buildcheck` fails a Debug build whose log has a `VerifyModule`, `GenerateDSYMFile` or `ExtractAppIntentsMetadata` task.
+
+**Compilation caching** (`COMPILATION_CACHE_ENABLE_CACHING`, a CAS shared by all checkouts): not adopted. The
+experiment needs two clean builds and up to 10 GB of CAS with at least 30 GB free; on 2026-11-03 the disk had 15–24 GB
+free, so it was not run.
+
+**Considered and not done:** run-script phases with declared outputs (6 phases cost 1.2–1.4 s per build; it means
+editing upstream's and Sparkle's projects), mergeable libraries and eager linking (the ~170 package modules already
+link statically into one binary), changing `-jobs` (the Mac is shared; fewer jobs only slow us), `ONLY_ACTIVE_ARCH`,
+explicit modules, index-while-building and dSYMs (already optimal: arm64 only, explicit modules on, index store off,
+no dSYM in Debug).
+
+Measured on 2026-11-03 (M-series, 10 cores, Xcode 27.2; the Mac was shared with other builds, load in brackets, so
+compare CPU seconds):
+
+| Build | Before stage 2 | Stage 2 |
+|---|---|---|
+| No-change `tg build`, description reused | 29–44 s, 36–39 CPU s (load 55–100) | 45 s, 41 CPU s for all of `tg build` (load 250→139) |
+| No-change `tg build`, description recreated | 147–251 s, 77 CPU s | 137 s, 71 CPU s (load 274→250), only after a setting, environment or package change |
+| First build in a different environment | 269 s, 542 CPU s | does not happen: the environment is fixed |
+| Editions check on a no-change build | 4.4–8.6 s | skipped (not yet measured on a real build) |
+| VerifyModule on every Debug build | 2.2–8.4 s | none (not yet measured on a real build) |
+
+Not yet measured, because free disk stayed below the 30 GB a clean build needs: a clean Debug build with the new
+settings, the ChatUI edit builds, a Release build and the compilation-cache experiment.
+
 ## Strictness, lint and `tg check`
 
 Our packages (`packages/Nanogram*`) build in Swift 6 mode with warnings as errors. Upstream code gets the same
