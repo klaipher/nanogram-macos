@@ -65,19 +65,24 @@ made modern and strict, quick to build, and then measurably faster and lighter t
   a submodule (pinned to release-13.1.1; Nanogram iOS is on 13.1.2).
 - Machine: Apple Silicon, 10 cores, 32 GB, Xcode 27.2.
 
-## Baseline (upstream as-is, measured 2026-11-02)
+## Baseline (upstream as-is, measured 2026-11-02) and stage 2 (measured 2026-11-03)
 
-| What | Result |
-|---|---|
-| Clone with submodules | 2.8 GB, ~12 min (fails without workarounds, see below) |
-| Native libraries, universal | ~22 min, ~2.3 GB; OpenSSL 334 s, WebRTC 301 s, ffmpeg 158 s, OpenH264 101 s |
-| App, clean debug build | 401 s (6.7 min), 6.1 GB DerivedData; Swift compile 1,644 s CPU across 1,072 tasks, 169 modules, C/ObjC 252 s CPU; ~2,500 warning lines (478 deprecated APIs, 52 ImplicitStrongCapture) |
-| App, no-change rebuild | 34 s (nothing compiled: planning, package checks, script phases) |
-| App, body edit in a screen package (ChatUI) | 35 s (3 files compiled — almost all overhead) |
-| App, public API added to the hub TGUIKit | 222 s (2,845 Swift files recompiled) |
-| App, clean release build (universal) | 1,057 s (17.6 min); Swift compile 3,883 s CPU, C/ObjC 619 s CPU; 11 GB DerivedData |
-| Release app size | 610 MB universal (main binary 423 MB, share extension 166 MB), not stripped (plain build, not an archive) |
-| Total on disk for one checkout | ~24 GB: sources 2.8 GB, native libraries 2.3 GB, debug 6.1 GB, release 11 GB |
+Stage 2 column: `nanogram/stage2` with both packages, arm64 only, via `tg` under `buildlock`. The Mac was shared with
+other workflows; load average (10 cores) in brackets, so compare CPU seconds. Details: `docs/local-development.md`,
+"Stage 2 results".
+
+| What | Upstream (2026-11-02) | Stage 2 (2026-11-03) |
+|---|---|---|
+| Clone with submodules | 2.8 GB, ~12 min (fails without workarounds, see below) | not re-measured (worktree of the main clone: sources 2.5 GB, git objects shared) |
+| Native libraries | universal: ~22 min, ~2.3 GB; OpenSSL 334 s, WebRTC 301 s, ffmpeg 158 s, OpenH264 101 s | arm64, empty build dirs and empty cache: 958 s, 1,973 CPU s (load 73→47, loaded), 1.65 GB build dirs + 192 MB cache; fresh worktree with a warm cache: 7.6 s (13 restored as APFS clones); all current: 2.4 s |
+| App, clean debug build | 401 s (6.7 min), 6.1 GB DerivedData; Swift compile 1,644 s CPU across 1,072 tasks, 169 modules, C/ObjC 252 s CPU; ~2,500 warning lines (478 deprecated APIs, 52 ImplicitStrongCapture) | 388 s (load 6→38, loaded at the end), 2,260 CPU s; Swift compile 1,936 s across 1,077 tasks, C/ObjC 311 s; 5.7 GB DerivedData; no VerifyModule, App Intents extraction or dSYM tasks |
+| App, clean debug build with a warm compilation cache (Debug only, adopted) | — | 148 s, 434 CPU s (load 53→49, loaded); compile tasks 53 s instead of 4,007 s with an empty CAS (566 s, 2,348 CPU s, loaded); CAS 4.0 GB, capped at 10 GB |
+| App, no-change rebuild | 34 s (nothing compiled: planning, package checks, script phases) | 22 s, 20 CPU s, build description reused, editions check skipped (load 16→13); the first two builds after a clean build 35 s and 29 s (description recreated) |
+| App, body edit in a screen package (ChatUI) | 35 s (3 files compiled — almost all overhead) | 32 s, 34 CPU s (load 13→10): 1 Swift task, relink, re-sign, editions check; repeated at load 26–179 (loaded): 34–56 s, 32–43 CPU s with the description reused |
+| App, public API added to the hub TGUIKit | 222 s (2,845 Swift files recompiled) | 265 s, 900 CPU s (load 14→12); the same 819 Swift compile tasks as upstream |
+| App, clean release build | universal: 1,057 s (17.6 min); Swift compile 3,883 s CPU, C/ObjC 619 s CPU; 11 GB DerivedData | arm64: 1,507 s (load 20→128, loaded), 2,998 CPU s; Swift compile 3,871 s in 170 whole-module tasks, C/ObjC 326 s; Build 3.4 GB + 1.5 GB module cache; `buildcheck` fails: the 170 links of Swift-only targets have no `-flto=thin` (ThinLTO reaches C code only; see local-development) |
+| Release app size | 610 MB universal (main binary 423 MB, share extension 166 MB), not stripped (plain build, not an archive) | 308 MB arm64 (main binary 215 MB, share extension 83 MB), plain build |
+| Total on disk for one checkout | ~24 GB: sources 2.8 GB, native libraries 2.3 GB, debug 6.1 GB, release 11 GB | ~10 GB: sources 2.5 GB, native libraries 0.19 GB (shared cache; the checkout's copies are clones), debug + release DerivedData 7.3 GB (debug alone 5.7 GB); plus 1.1 GB of logs in `build-output` |
 
 Upstream build defects found while measuring (fix in the fork, offer upstream):
 

@@ -1,12 +1,14 @@
+import os
 import re
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nanogram import config, frameworks  # noqa: E402
+from nanogram import config, frameworks, fwcache  # noqa: E402
 
 
 def populate(root):
@@ -56,7 +58,8 @@ class VerifyOutputsTests(unittest.TestCase):
 
 class BuildEnvironmentTests(unittest.TestCase):
     def test_build_env_comes_from_our_xcconfig(self):
-        env = frameworks.build_environment(Path("/tmp/timing.tsv"), base={})
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(config, "CACHE_DIR", Path(tmp)):
+            env = frameworks.build_environment(Path("/tmp/timing.tsv"), base={})
         self.assertEqual(env["XCODE_XCCONFIG_FILE"], str(config.ROOT / "nanogram" / "Nanogram.xcconfig"))
         self.assertEqual(env["MACOSX_DEPLOYMENT_TARGET"], "15.0")
         self.assertEqual(env["ARCHS"], "arm64")
@@ -84,6 +87,153 @@ class RustScriptTests(unittest.TestCase):
                 self.assertIn("env -u MACOSX_DEPLOYMENT_TARGET", line, f"{script}: {line.strip()}")
             self.assertNotIn("DEPLOYMENT_TARGET=", text, script)
             self.assertNotIn("x86_64", text, script)
+
+
+class FakeRunner:
+    def __init__(self, current=(), cached=(), stamps=None):
+        self.stamps_by_unit = stamps or {unit: f"stamp of {unit}\n" for unit in fwcache.UNITS}
+        self.current = set(current)
+        self.broken = set()
+        self.cached = {fwcache.cache_key(self.stamps_by_unit[u], "rustc 1") for u in cached}
+        self.calls = []
+
+    def prepare(self):
+        self.calls.append(("prepare",))
+
+    def stamps(self):
+        return dict(self.stamps_by_unit)
+
+    def rust(self):
+        return "rustc 1"
+
+    def is_current(self, unit, stamp):
+        return unit in self.current
+
+    def find(self, key):
+        if key in self.cached:
+            return fwcache.Entry(key, "?", Path("/cache") / key, 1, 0.0)
+        return None
+
+    def restore(self, unit, entry, stamp):
+        self.calls.append(("restore", unit))
+        if unit not in self.broken:
+            self.current.add(unit)
+
+    def configure(self):
+        self.calls.append(("configure",))
+        self.current.update(fwcache.UNITS)
+
+    def headers_synced(self):
+        return True
+
+    def sync_headers(self):
+        self.calls.append(("sync_headers",))
+
+    def build_tlottie(self, stamp):
+        self.calls.append(("build_tlottie",))
+        self.current.add("tlottie")
+
+    def write_stamp(self, unit, stamp):
+        self.calls.append(("write_stamp", unit))
+        self.current.add(unit)
+
+    def store(self, unit, key, stamp):
+        self.calls.append(("store", unit))
+        self.cached.add(key)
+
+    def prune(self, keep):
+        self.calls.append(("prune",))
+
+    def cache_size(self):
+        return 0
+
+    def names(self):
+        return [c[0] for c in self.calls]
+
+
+ALL = fwcache.UNITS
+
+
+class CacheRunTests(unittest.TestCase):
+    def test_all_current_skips_configure(self):
+        runner = FakeRunner(current=ALL, cached=ALL)
+        summary = frameworks.run(Path("/root"), True, runner)
+        for name in ("configure", "sync_headers", "build_tlottie", "restore", "store"):
+            self.assertNotIn(name, runner.names())
+        self.assertEqual((summary.current, summary.restored, summary.built), (len(ALL), 0, 0))
+
+    def test_hits_restore_and_skip_configure(self):
+        runner = FakeRunner(current=(), cached=ALL)
+        summary = frameworks.run(Path("/root"), True, runner)
+        self.assertEqual([c[1] for c in runner.calls if c[0] == "restore"], list(ALL))
+        self.assertIn("sync_headers", runner.names())
+        self.assertNotIn("configure", runner.names())
+        self.assertNotIn("build_tlottie", runner.names())
+        self.assertEqual((summary.current, summary.restored, summary.built), (0, len(ALL), 0))
+        self.assertLess(runner.names().index("restore"), runner.names().index("sync_headers"))
+
+    def test_miss_runs_configure_then_stores(self):
+        hits = [u for u in ALL if u != "webrtc"]
+        runner = FakeRunner(current=(), cached=hits)
+        summary = frameworks.run(Path("/root"), True, runner)
+        self.assertEqual(runner.names().count("configure"), 1)
+        self.assertEqual([c[1] for c in runner.calls if c[0] == "store"], ["webrtc"])
+        self.assertLess(runner.names().index("configure"), runner.names().index("store"))
+        self.assertNotIn("build_tlottie", runner.names())
+        self.assertEqual(summary.built, 1)
+
+    def test_restore_that_is_not_current_gets_built(self):
+        runner = FakeRunner(current=(), cached=ALL)
+        runner.broken = {"wallet-engine"}
+        summary = frameworks.run(Path("/root"), True, runner)
+        self.assertEqual(runner.names().count("configure"), 1)
+        self.assertEqual((summary.restored, summary.built), (len(ALL) - 1, 1))
+
+    def test_configure_builds_tlottie_once(self):
+        runner = FakeRunner(current=(), cached=())
+        frameworks.run(Path("/root"), True, runner)
+        self.assertEqual(runner.names().count("configure"), 1)
+        self.assertNotIn("build_tlottie", runner.names())
+
+    def test_tlottie_miss_alone_builds_only_tlottie(self):
+        runner = FakeRunner(current=[u for u in ALL if u != "tlottie"], cached=())
+        frameworks.run(Path("/root"), True, runner)
+        self.assertIn("build_tlottie", runner.names())
+        self.assertNotIn("configure", runner.names())
+
+    def test_current_units_seed_the_cache(self):
+        runner = FakeRunner(current=ALL, cached=[u for u in ALL if u != "OpenSSL"])
+        frameworks.run(Path("/root"), True, runner)
+        self.assertEqual([c[1] for c in runner.calls if c[0] == "store"], ["OpenSSL"])
+
+    def test_no_cache_builds_even_with_hit(self):
+        runner = FakeRunner(current=(), cached=ALL)
+        statuses = frameworks.plan(runner.stamps(), runner.is_current, runner.find, "rustc 1", use_cache=False)
+        self.assertEqual(set(statuses.values()), {"build"})
+        frameworks.run(Path("/root"), False, runner)
+        self.assertNotIn("restore", runner.names())
+        self.assertNotIn("store", runner.names())
+        self.assertIn("configure", runner.names())
+
+    def test_plan_statuses(self):
+        runner = FakeRunner(current=["OpenSSL"], cached=["libopus"])
+        statuses = frameworks.plan(runner.stamps(), runner.is_current, runner.find, "rustc 1", use_cache=True)
+        self.assertEqual(statuses["OpenSSL"], "current")
+        self.assertEqual(statuses["libopus"], "restore")
+        self.assertEqual(statuses["webrtc"], "build")
+
+    def test_tmpdir_points_into_cache(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(config, "CACHE_DIR", Path(tmp)):
+            env = frameworks.build_environment(Path("/tmp/timing.tsv"), base={})
+            self.assertTrue(env["TMPDIR"].startswith(str(Path(tmp) / "tmp")))
+            self.assertTrue(Path(env["TMPDIR"]).is_dir())
+
+    def test_no_cache_flag_from_environment(self):
+        with mock.patch.dict(os.environ, {"NANOGRAM_FRAMEWORK_CACHE": "0"}):
+            self.assertFalse(frameworks.cache_enabled([]))
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(frameworks.cache_enabled([]))
+            self.assertFalse(frameworks.cache_enabled(["--no-cache"]))
 
 
 if __name__ == "__main__":

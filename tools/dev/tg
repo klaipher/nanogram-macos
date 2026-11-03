@@ -28,6 +28,12 @@ cmd_doctor() { py doctor; }
 
 cmd_frameworks() { py frameworks "$@"; }
 
+# tg clean [--all]: this checkout's DerivedData/Build (all of its DerivedData with --all) and build-output/apps.
+cmd_clean() { py disk clean "$@"; }
+
+# tg prune [--dry-run] [--max-gb N]: lists everything under ~/.cache/nanogram-macos, removes stale build caches.
+cmd_prune() { py disk prune "$@"; }
+
 # Writes the gitignored NanogramSecrets.swift (api_id/api_hash); prints only the path, never the values.
 cmd_credentials() { py credentials || die "cannot generate API credentials"; }
 
@@ -61,14 +67,17 @@ edition_xcconfig() {
   echo "$file"
 }
 
-# tg build [--release] [--clean] [--edition mas|direct] [-- extra xcodebuild args]
+# tg build [--release] [--clean] [--resolve-packages] [--edition mas|direct] [-- extra xcodebuild args]
 # --clean deletes DerivedData/Build first, so every file compiles and every warning is in the log.
+# xcodebuild runs through tools/dev/nanogram/xcbuild.py with fixed arguments and environment, so Xcode keeps
+# its cached build description; packages resolve only with --clean or --resolve-packages.
 cmd_build() {
-  local release=0 clean=0 edition=direct extra=()
+  local release=0 clean=0 resolve=0 edition=direct extra=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --release) release=1 ;;
       --clean) clean=1 ;;
+      --resolve-packages) resolve=1 ;;
       --edition) [ $# -ge 2 ] || die "--edition needs mas or direct"; edition="$2"; shift ;;
       --) shift; extra=("$@"); break ;;
       *) die "unknown build option: $1" ;;
@@ -97,13 +106,12 @@ cmd_build() {
 
   say "Building $configuration ($edition edition), log: build-output/last-build.log"
   local start=$SECONDS status=0
-  xcodebuild build \
-    -workspace Telegram-Mac.xcworkspace -scheme "$scheme" -configuration "$configuration" \
-    -destination 'platform=macOS,arch=arm64' -derivedDataPath "$derived" \
-    -xcconfig "$xcconfig" \
-    "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$conditions" \
-    COMPILER_INDEX_STORE_ENABLE=NO ${settings[@]+"${settings[@]}"} \
-    -showBuildTimingSummary ${extra[@]+"${extra[@]}"} > "$log" 2>&1 || status=$?
+  local run_args=(--configuration "$configuration" --scheme "$scheme" --derived "$derived" --xcconfig "$xcconfig"
+    --conditions "$conditions" --log "$log")
+  [ "$clean" = 1 ] && run_args+=(--clean)
+  [ "$resolve" = 1 ] && run_args+=(--resolve-packages)
+  for setting in ${settings[@]+"${settings[@]}"}; do run_args+=(--setting "$setting"); done
+  py xcbuild run "${run_args[@]}" -- ${extra[@]+"${extra[@]}"} || status=$?
   local elapsed=$((SECONDS - start))
   if [ "$status" != 0 ]; then
     grep -E '(error|fatal error):' "$log" | sort -u | head -30 >&2 || true
@@ -261,9 +269,9 @@ usage: tools/dev/tg <command> [options]
 
   setup            submodules, Rust toolchain, native libraries
   doctor           check prerequisites
-  frameworks       build the native libraries (arm64) [--verify-only]
+  frameworks       native libraries (arm64): current, restored from the shared cache, or built [--no-cache] [--verify-only]
   credentials      generate NanogramSecrets.swift from ~/.config/telegram-ios/api-credentials.json
-  build            build the app [--release] [--clean] [--edition mas|direct]
+  build            build the app [--release] [--clean] [--resolve-packages] [--edition mas|direct]
   xcode [edition]  open the workspace in Xcode with our settings (quit Xcode first)
   sparkle-key      create the Sparkle EdDSA key once, print its public key [sign <archive>]
   run              build and launch the app
@@ -274,6 +282,8 @@ usage: tools/dev/tg <command> [options]
   sync-upstream    fast-forward upstream, merge it, rebuild, update the warning baseline [--no-build] [--after-merge]
   testflight       archive and upload the mas edition [--export-only]
   release-direct   notarized dmg + appcast for the direct edition (local)
+  clean            remove this checkout's build products [--all]
+  prune            list caches and build files, remove stale ones [--dry-run] [--max-gb N]
 USAGE
 }
 
@@ -284,6 +294,8 @@ main() {
     doctor) cmd_doctor "$@" ;;
     setup) cmd_setup "$@" ;;
     frameworks) cmd_frameworks "$@" ;;
+    clean) cmd_clean "$@" ;;
+    prune) cmd_prune "$@" ;;
     credentials) cmd_credentials ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;

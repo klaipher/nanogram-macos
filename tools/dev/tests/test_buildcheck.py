@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nanogram import buildcheck  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+XCCONFIG = Path(__file__).resolve().parents[3] / "nanogram" / "Nanogram.xcconfig"
 CLANG = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
 
 
@@ -96,6 +98,64 @@ class LogTests(unittest.TestCase):
         self.assertEqual(buildcheck.check_log(fixed, release=True), [])
         self.assertEqual(buildcheck.check_log(base + swift("Postbox", "").replace(" -O ", " -Onone "),
                                               release=False), [])
+
+    def test_debug_log_with_verify_module_rejected(self):
+        log = ("VerifyModule /DD/Build/Products/Debug/Sparkle.framework (in target 'Sparkle' from project 'Sparkle')\n"
+               "    cd /src\n    builtin-verifyModule /DD/Sparkle.framework\n\n"
+               + compile_line("arm64-apple-macos15.0") + "Build Timing Summary\n\nVerifyModule (1 task) | 2.201 seconds\n")
+        problems = buildcheck.check_log(log)
+        self.assertEqual(problems, ["VerifyModule ran in a Debug build"])
+
+    def test_debug_log_with_app_intents_extraction_rejected(self):
+        log = (compile_line("arm64-apple-macos15.0")
+               + "ExtractAppIntentsMetadata (in target 'ChatUI' from project 'ChatUI')\n    cd /src\n\n"
+               + "GenerateDSYMFile /DD/X.dSYM /DD/X (in target 'X' from project 'P')\n    cd /src\n")
+        problems = buildcheck.check_log(log)
+        self.assertIn("ExtractAppIntentsMetadata ran in a Debug build", problems)
+        self.assertIn("GenerateDSYMFile ran in a Debug build", problems)
+
+    def test_release_log_may_verify_modules(self):
+        log = ("VerifyModule /DD/Sparkle.framework (in target 'Sparkle' from project 'Sparkle')\n    cd /src\n\n"
+               + compile_line("arm64-apple-macos15.0", "-O3 -flto=thin") + link_line("-flto=thin"))
+        self.assertEqual(buildcheck.check_log(log, release=True), [])
+
+    def test_task_name_inside_a_path_is_not_a_task(self):
+        log = compile_line("arm64-apple-macos15.0", "-I/src/VerifyModule/include")
+        self.assertEqual(buildcheck.check_log(log), [])
+
+
+class XcconfigTests(unittest.TestCase):
+    """Fast Debug settings must never reach Release, the mas edition or an archive."""
+
+    STAGE2_KEYS = ("DEBUG_INFORMATION_FORMAT", "SWIFT_COMPILATION_MODE", "GCC_OPTIMIZATION_LEVEL",
+                   "ENABLE_MODULE_VERIFIER", "LM_SKIP_METADATA_EXTRACTION", "COMPILATION_CACHE_ENABLE_CACHING",
+                   "COMPILATION_CACHE_CAS_PATH", "COMPILATION_CACHE_LIMIT_SIZE")
+    RELEASE_LINES = ("SWIFT_OPTIMIZATION_LEVEL[config=Release] = -O",
+                     "SWIFT_COMPILATION_MODE[config=Release] = wholemodule",
+                     "GCC_OPTIMIZATION_LEVEL[config=Release] = 3",
+                     "LLVM_LTO[config=Release] = YES_THIN",
+                     "DEAD_CODE_STRIPPING[config=Release] = YES")
+
+    def settings(self, path):
+        lines = [line.split("//")[0].strip() for line in path.read_text().splitlines()]
+        return [line for line in lines if "=" in line and not line.startswith("#")]
+
+    def test_stage2_settings_are_debug_only(self):
+        files = [XCCONFIG] + sorted((XCCONFIG.parent / "editions").glob("*.xcconfig"))
+        for path in files:
+            for line in self.settings(path):
+                key = re.match(r"^([A-Za-z0-9_]+(?:\[[^\]]*\])*)\s*=", line).group(1)
+                name = key.split("[")[0]
+                if name in self.STAGE2_KEYS and line not in self.RELEASE_LINES:
+                    self.assertTrue(key.endswith("[config=Debug]"), f"{path.name}: {line}")
+        debug_keys = {line.split("[")[0] for line in self.settings(XCCONFIG) if "[config=Debug]" in line}
+        for name in self.STAGE2_KEYS:
+            self.assertIn(name, debug_keys)
+
+    def test_release_lines_unchanged(self):
+        settings = self.settings(XCCONFIG)
+        for line in self.RELEASE_LINES:
+            self.assertIn(line, settings)
 
 
 def build_binary(directory, archs, minos):
