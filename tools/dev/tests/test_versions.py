@@ -127,6 +127,12 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertNotIn("third-party/mozjpeg", read(ROOT / "scripts" / "configure_frameworks.sh"))
         self.assertNotIn("jpeg_c_set_int_param", read(ROOT / "submodules" / "Mozjpeg" / "Sources" / "Mozjpeg.m"))
 
+    def test_tg_owt_has_desktop_app_master(self):
+        owt = ROOT / "submodules" / "tg_owt"
+        pin = gitlink(ROOT, "submodules/tg_owt")
+        for commit in ("020feec5c040fdae2cf752c2c2be62ddde7c236d", "557e0e3d7d72f80278938f01e4d31bfd036278ba"):
+            self.assertTrue(is_ancestor(owt, commit, pin), f"tg_owt {pin} does not contain {commit}")
+
 
 if __name__ == "__main__":
     unittest.main()
