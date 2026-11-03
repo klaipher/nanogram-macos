@@ -268,6 +268,8 @@ public final class EditVideoController: ModalViewController {
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private let thumbnailsDisposable = MetaDisposable()
+    private let stillDisposable = MetaDisposable()
+    private var isLoadingStill = false
     private var thumbnailsCount: Int = 0
     private var thumbnailsSize: NSSize = .zero
     private var thumbnailsGeneration = UUID()
@@ -309,6 +311,7 @@ public final class EditVideoController: ModalViewController {
             NotificationCenter.default.removeObserver(endObserver)
         }
         thumbnailsDisposable.dispose()
+        stillDisposable.dispose()
     }
 
     public override var containerBackground: NSColor {
@@ -377,13 +380,24 @@ public final class EditVideoController: ModalViewController {
         player.seek(to: time(seconds), toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
-    private func still(at seconds: Double) -> CGImage? {
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.requestedTimeToleranceBefore = .zero
-        generator.requestedTimeToleranceAfter = .zero
-        generator.maximumSize = CGSize(width: 1920, height: 1920)
-        return try? generator.copyCGImage(at: time(seconds), actualTime: nil)
+    private func withStill(_ open: @escaping (Window, CGImage) -> Void) {
+        guard let window = self.window, !isLoadingStill else {
+            return
+        }
+        isLoadingStill = true
+        let signal = showModalProgress(signal: EditVideoStill.generate(asset: asset, at: time(currentTime), maximumSide: 1920), for: window, timeout: 0.1)
+        stillDisposable.set((signal |> deliverOnMainQueue).start(next: { [weak self] still in
+            guard let self = self else {
+                return
+            }
+            self.isLoadingStill = false
+            guard let still = still, let window = self.window, !self.isClosing else {
+                return
+            }
+            open(window, still)
+        }, completed: { [weak self] in
+            self?.isLoadingStill = false
+        }))
     }
 
     private func renderOverlay() {
@@ -494,43 +508,49 @@ public final class EditVideoController: ModalViewController {
     }
 
     private func openCrop() {
-        guard let window = self.window, let still = still(at: currentTime) else {
-            return
+        withStill { [weak self] window, still in
+            guard let self = self else {
+                return
+            }
+            self.pause()
+            let editor = EditVideoCropController(still: still, orientation: self.data.orientation, crop: self.data.crop, completion: { [weak self] orientation, crop in
+                self?.data.orientation = orientation
+                self?.data.crop = crop
+                self?.refreshPreview()
+            })
+            showModal(with: editor, for: window, animated: false, animationType: .alpha)
         }
-        pause()
-        let editor = EditVideoCropController(still: still, orientation: data.orientation, crop: data.crop, completion: { [weak self] orientation, crop in
-            self?.data.orientation = orientation
-            self?.data.crop = crop
-            self?.refreshPreview()
-        })
-        showModal(with: editor, for: window, animated: false, animationType: .alpha)
     }
 
     private func openPaint() {
-        guard let window = self.window, let still = still(at: currentTime) else {
-            return
+        withStill { [weak self] window, still in
+            guard let self = self else {
+                return
+            }
+            self.pause()
+            let editor = EditImageCanvasController(image: still, actions: self.data.paintings, entities: self.data.entities, context: self.context, updatedImage: { [weak self] paintings, entities in
+                self?.data.paintings = paintings
+                self?.data.entities = entities
+                self?.renderOverlay()
+                self?.refreshPreview()
+            }, closeHandler: {}, alone: true)
+            showModal(with: editor, for: window, animated: false, animationType: .alpha)
         }
-        pause()
-        let editor = EditImageCanvasController(image: still, actions: data.paintings, entities: data.entities, context: context, updatedImage: { [weak self] paintings, entities in
-            self?.data.paintings = paintings
-            self?.data.entities = entities
-            self?.renderOverlay()
-            self?.refreshPreview()
-        }, closeHandler: {}, alone: true)
-        showModal(with: editor, for: window, animated: false, animationType: .alpha)
     }
 
     private func openTools() {
-        guard let window = self.window, let still = still(at: currentTime) else {
-            return
+        withStill { [weak self] window, still in
+            guard let self = self else {
+                return
+            }
+            self.pause()
+            let editor = EditVideoToolsController(still: still, spec: self.spec(includeQuality: false), completion: { [weak self] tools, tint in
+                self?.data.tools = tools
+                self?.data.tint = tint
+                self?.refreshPreview()
+            })
+            showModal(with: editor, for: window, animated: false, animationType: .alpha)
         }
-        pause()
-        let editor = EditVideoToolsController(still: still, spec: spec(includeQuality: false), completion: { [weak self] tools, tint in
-            self?.data.tools = tools
-            self?.data.tint = tint
-            self?.refreshPreview()
-        })
-        showModal(with: editor, for: window, animated: false, animationType: .alpha)
     }
 
     private func updateThumbnailsIfNeeded() {

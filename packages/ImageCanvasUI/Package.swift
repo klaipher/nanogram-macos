@@ -2,6 +2,25 @@
 
 import PackageDescription
 
+let imageCanvasTestLibraries: [(path: String, name: String)] = [
+    ("webrtc/build/webrtc", "mac_framework_objc_static"),
+    ("openssl/build/openssl/lib", "ssl"),
+    ("openssl/build/openssl/lib", "crypto"),
+    ("ffmpeg/build/ffmpeg/lib", "avformat"),
+    ("ffmpeg/build/ffmpeg/lib", "avcodec"),
+    ("ffmpeg/build/ffmpeg/lib", "swresample"),
+    ("ffmpeg/build/ffmpeg/lib", "avutil"),
+    ("OpenH264/build/output/lib", "openh264"),
+    ("libvpx/build/libvpx/lib", "vpx"),
+    ("dav1d/build/dav1d/lib", "dav1d"),
+    ("libopus/build/libopus/lib", "opus"),
+    ("Mozjpeg/build", "jpeg"),
+    ("libwebp/build/libwebp/lib", "webp"),
+    ("libwebp/build/libwebp/lib", "webpdemux"),
+    ("libwebp/build/libwebp/lib", "sharpyuv"),
+]
+let imageCanvasTestLinkerFlags: [String] = imageCanvasTestLibraries.flatMap { ["-L", "../../core-xprojects/" + $0.path, "-l" + $0.name] }
+
 let package = Package(
     name: "ImageCanvasUI",
     platforms: [.macOS(.v10_13)],
@@ -44,6 +63,19 @@ let package = Package(
                 "ImageCanvasUI",
                 .product(name: "rnoise", package: "rnoise", condition: nil),
             ],
-            path: "Tests/ImageCanvasUITests"),
+            path: "Tests/ImageCanvasUITests",
+            linkerSettings: [
+                .unsafeFlags(imageCanvasTestLinkerFlags),
+                .linkedFramework("VideoToolbox"),
+                .linkedFramework("CoreMedia"),
+                .linkedFramework("AudioToolbox"),
+                .linkedFramework("CoreAudio"),
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("ScreenCaptureKit"),
+                .linkedLibrary("z"),
+                .linkedLibrary("bz2"),
+                .linkedLibrary("iconv"),
+                .linkedLibrary("c++"),
+            ]),
     ]
 )
