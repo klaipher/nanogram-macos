@@ -604,7 +604,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   microbenchmark 5k chats with a folder predicate.
 - **iOS cross-ref**: `718f4692`; ports as is.
 
-### M25. Streamed (HLS) video leaves two temp copies of every segment until relaunch, and moves segments through JS as base64 — `partial (cb8d0f1): a-c done; d (ArrayBuffer bridge) not done`, verified
+### M25. Streamed (HLS) video leaves two temp copies of every segment until relaunch, and moves segments through JS as base64 — `done (cb8d0f1, 43bfbab): a-c + d (ArrayBuffer bridge)`, verified
 
 - **Evidence**: `packages/TelegramMedia/Sources/HLSVideoJSNativeContentView.swift:170` (a `partialFile` per request,
   never disposed: the `ActionDisposable` at `:297-305` disposes only `completeFile` and `metaFile`); `:920-935`
@@ -1879,7 +1879,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | M22 | done | 47580f4 |
 | M23 | done | 6bbcf5e |
 | M24 | done | core 5751188 |
-| M25 | partial | cb8d0f1 |
+| M25 | done | cb8d0f1, 43bfbab |
 | M26 | done | f4e1837, core 19875d3 |
 | M27 | done | 25b7f7a, core d6c3ef8 (FFmpeg rebuild pending for the VT patch) |
 | M28 | done | core 0ff4315 |
