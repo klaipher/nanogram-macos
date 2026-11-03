@@ -430,7 +430,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   TableLayoutLab/TextLayoutLab with and without `-Xswiftc -enforce-exclusivity=unchecked`.
 - **iOS cross-ref**: the iOS fork has not done this either.
 
-### M18. Group-call screen sharing logs every WebRTC INFO line into an in-memory stream that is never read, and to stderr — `todo`, verified
+### M18. Group-call screen sharing logs every WebRTC INFO line into an in-memory stream that is never read, and to stderr — `done (1becb21)`, verified
 
 - **Evidence**: `packages/TelegramCallsCore/Sources/TelegramCallsCore/PresentationGroupCall.swift:3037-3050` (the
   screencast context gets `logPath: ""`); `submodules/tgcalls/macos/Sources/OngoingCallThreadLocalContext.mm:1477`
@@ -604,7 +604,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   microbenchmark 5k chats with a folder predicate.
 - **iOS cross-ref**: `718f4692`; ports as is.
 
-### M25. Streamed (HLS) video leaves two temp copies of every segment until relaunch, and moves segments through JS as base64 — `todo`, verified
+### M25. Streamed (HLS) video leaves two temp copies of every segment until relaunch, and moves segments through JS as base64 — `partial (cb8d0f1): a-c done; d (ArrayBuffer bridge) not done`, verified
 
 - **Evidence**: `packages/TelegramMedia/Sources/HLSVideoJSNativeContentView.swift:170` (a `partialFile` per request,
   never disposed: the `ActionDisposable` at `:297-305` disposes only `completeFile` and `metaFile`); `:920-935`
@@ -649,7 +649,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   unrelated transaction with 0 vs 30 views; a manager logic test for release and recreation.
 - **iOS cross-ref**: R21 (`todo` on iOS); nothing to port.
 
-### M27. Hardware GIF frames are tagged by FFmpeg, then stripped and re-wrapped by the Mac path; the iOS VideoToolbox fixes are missing — `todo`, verified
+### M27. Hardware GIF frames are tagged by FFmpeg, then stripped and re-wrapped by the Mac path; the iOS VideoToolbox fixes are missing — `done (25b7f7a; FFmpeg rebuild pending for the VT patch)`, verified
 
 - **Evidence**: FFmpeg 8.1.2 in `submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg` has none of the iOS
   "Local patch (Nanogram)"; `libavcodec/videotoolbox.c:135` (`av_vt_pixbuf_set_attachments` per frame), `:763-764`
@@ -731,7 +731,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   counting process wake-ups and main deliveries, old vs new.
 - **iOS cross-ref**: R14 (`3cd4aadf`, shared link at the highest requested rate), R5's timer tolerance.
 
-### M31. No launch order file for the Mac binary — `todo` (low confidence, low priority)
+### M31. No launch order file for the Mac binary — `done (311fe98): generator script only; Release ORDER_FILE for stage 1` (low confidence, low priority)
 
 - **Evidence**: `Telegram.xcodeproj/project.pbxproj`: no `ORDER_FILE`/`-order_file` (Release `OTHER_LDFLAGS` is
   `-ObjC`, `:4914`); packages are static, so ~150 packages plus TelegramCore and Postbox link into one executable.
@@ -992,7 +992,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   and run DecodeBench `decode --mode hw|sw` per clip size. With the account, `run.sh gif-panel hw|sw`.
 - **Confidence**: medium (iOS-measured on this host's chip family; the Mac tile mix is unmeasured).
 
-### H6. HLS never picks AV1 renditions, even on M3+ where AV1 decodes in hardware — `todo`
+### H6. HLS never picks AV1 renditions, even on M3+ where AV1 decodes in hardware — `done (9c174f7)`
 
 - **Evidence**: `packages/TelegramMedia/Sources/HLSVideoJSNativeContentView.swift:320-322`: `isNativeVideoCodecSupported` accepts only
   h264/h265/avc/hevc, so the AV1 tie-break at `:351-368` is dead code. `ChunkMediaPlayerV2.swift:11-14` already has
@@ -1268,7 +1268,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   action calls the local engine when the switch is on.
 - **Confidence**: high.
 
-### H20. Media playback audio is forced to 44.1 kHz 16-bit stereo through an AUGraph with an always-on time-pitch unit; render at the source rate with AVSampleBufferAudioRenderer — `todo`
+### H20. Media playback audio is forced to 44.1 kHz 16-bit stereo through an AUGraph with an always-on time-pitch unit; render at the source rate with AVSampleBufferAudioRenderer — `partial: measured, no code change — see ledger`
 
 - **Evidence**: `MediaPlayer/Sources/FFMpegAudioFrameDecoder.swift:17,21` (default 44100 Hz, 2 channels, S16 via swresample), used by
   `FFMpegMediaFrameSourceContext.swift:549`. In `packages/TelegramMedia/Sources/MediaPlayerAudioRenderer.swift:397-468`, AUGraph runs AUConverter →
@@ -1290,7 +1290,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   with `sysmon.py`/`powermetrics` for app and `coreaudiod` CPU. A DecodeBench micro-benchmark of swresample 48→44.1 stereo vs passthrough.
 - **Confidence**: medium (whether `AUiPodTimeOther` self-bypasses at 1.0 was not checked).
 
-### H21. The round-video recorder composites through deprecated OpenGL with a CPU texture upload per frame; use Metal and `CVMetalTextureCache` — `todo`
+### H21. The round-video recorder composites through deprecated OpenGL with a CPU texture upload per frame; use Metal and `CVMetalTextureCache` — `todo — not started in the runtime run, see ledger ruling`
 
 - **Evidence**: `packages/TGVideoCameraMovie/Sources/TGVideoCameraGLRenderer.m:85-113` (a CGL context with 4× MSAA). At `:355-364` it locks the camera
   `CVPixelBuffer`, `glTexImage2D` copies it, and `glGenerateMipmap` runs every frame. `:331`: `CVOpenGLTextureCache` is used only for the destination.
@@ -1307,7 +1307,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   comparing with `compare_rgba.py` and measuring CPU per frame. Optionally encode with `TGVideoCameraMovieRecorder` and read back with AVAssetReader. No camera needed.
 - **Confidence**: medium.
 
-### H22. Software-decoded video (VP9, AV1 on M1/M2, any fallback) reaches AVSampleBufferDisplayLayer untagged and always video-range, and 10-bit frames are dropped — `todo`
+### H22. Software-decoded video (VP9, AV1 on M1/M2, any fallback) reaches AVSampleBufferDisplayLayer untagged and always video-range, and 10-bit frames are dropped — `done (9ad344d)`
 
 - **Evidence**: `MediaPlayer/Sources/FFMpegMediaVideoFrameDecoder.swift:532-541`: always `420YpCbCr8BiPlanarVideoRange` or `…8A_TriPlanar`, whatever
   `colorRange` is. There is no `CVBufferSetAttachment`/`kCVImageBufferYCbCrMatrix` anywhere in `MediaPlayer/Sources`, while the hardware path at `:472-480`
@@ -1384,7 +1384,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   CPU, wake-ups and wsCores, and window captures compared with `compare_rgba.py`.
 - **Confidence**: low.
 
-### H26. Picture-in-picture is a custom floating panel plus an off-screen helper window; use system PiP with an AVSampleBufferDisplayLayer content source — `todo` (product decision)
+### H26. Picture-in-picture is a custom floating panel plus an off-screen helper window; use system PiP with an AVSampleBufferDisplayLayer content source — `todo — product decision, not started in the runtime run, see ledger ruling` (product decision)
 
 - **Evidence**: `packages/GalleryUI/Sources/GalleryUI/PIPVideoWindow.swift:96-170` (a `.nonactivatingPanel` with `.canJoinAllSpaces/.fullScreenAuxiliary`, a second
   `Window` parked at (3000,3000) at `:109-110`, hand-written snapping and an event monitor). No `AVPictureInPictureController` anywhere. Playback is already
@@ -1512,7 +1512,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 
 ### Quick (S)
 
-### Q1. Streamed, chunked and inline videos play their soundtrack in mono; decode to stereo (upstream 13.1.2) — `todo`
+### Q1. Streamed, chunked and inline videos play their soundtrack in mono; decode to stereo (upstream 13.1.2) — `done (2955fe5 core)`
 
 - **Evidence**: `submodules/telegram-ios/submodules/MediaPlayer/Sources/FFMpegFileReader.swift:381` builds every playback audio decoder with
   `FFMpegAudioFrameDecoder(codecContext:, sampleRate: 48000, channelCount: 1)`. `FFMpegAudioFrameDecoder.swift:21` resamples down to that channel count,
@@ -1535,7 +1535,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `0650eac5` (upstream 13.1.2).
 - **Confidence**: high.
 
-### Q2. Pausing and resuming a voice note breaks the Ogg stream (second BOS page, page numbers restart), which clicks at the join and makes trim fail — `todo`
+### Q2. Pausing and resuming a voice note breaks the Ogg stream (second BOS page, page numbers restart), which clicks at the join and makes trim fail — `partial: OpusBinding stream continuity (b23b004 core); recorder resume waits for H16`
 
 - **Evidence**: `packages/TelegramMedia/Sources/AudioRecorder.swift:595` (`pause()` stores `oggWriter.pause()`) and `:608-613` (`resume()` calls
   `oggWriter.resume(with:encoderState:)` on the same live writer). In `OpusBinding/Sources/opusenc/opusenc.m:647-655,712-765`, `restoreState` calls `[self cleanup]`, creates a new
@@ -1558,7 +1558,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `ManagedAudioRecorder.swift:478` (flush-only pause). iOS `63094959` (trim on resume via `beginAppend`) needs the same OpusBinding fix.
 - **Confidence**: high (libogg and opusfile behaviour read in the bundled sources).
 
-### Q3. Every video the Mac encodes is written without colour tags, so iPhones and FFmpeg players decode small videos as BT.601 and reds shift — `todo`
+### Q3. Every video the Mac encodes is written without colour tags, so iPhones and FFmpeg players decode small videos as BT.601 and reds shift — `done (0879d4e)`
 
 - **Evidence**: `packages/TGVideoCameraMovie/Sources/TGVideoCameraMovieRecorder.m:60-90` (`videoSettingsForPreset:` has no `AVVideoColorPropertiesKey`);
   `TGVideoCameraGLRenderer.m:613-630` (BGRA pool without `kCVBufferPropagatedAttachmentsKey`); `ImageCanvasUI/EditVideoExport.swift:605-614` (re-encode writer,
@@ -1576,7 +1576,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `58bda613`, `7d600b48`, `9876c249`.
 - **Confidence**: high.
 
-### Q4. Paused round videos keep the microphone and camera running, so AirPods stay in HFP and the paused preview plays narrowband; the audio track is fixed at 44.1 kHz — `todo`
+### Q4. Paused round videos keep the microphone and camera running, so AirPods stay in HFP and the paused preview plays narrowband; the audio track is fixed at 44.1 kHz — `done (0ee33a3)`
 
 - **Evidence**: `packages/MediaRecorderUI/Sources/MediaRecorderUI/VideoRecorderPipeline.swift:407-417` (`pause()` only finishes the segment writer; `stopRunning` is only in
   `stopCapture`, `:636`). `VideoRecorderModalView.swift:186-202` plays the paused clip through an unmuted `AVPlayer`. `TGVideoCameraMovieRecorder.m:42-57`
@@ -1594,7 +1594,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: CameraNeo `VideoRecorder.swift:774-781` (AAC at the source rate and channel count).
 - **Confidence**: medium (pause behaviour verified in code; HFP timing needs hardware).
 
-### Q5. Screen shares are converted to limited-range YUV but every Telegram Apple renderer decodes full range, so blacks are grey; fixes H28's `'420v'` too — `todo`
+### Q5. Screen shares are converted to limited-range YUV but every Telegram Apple renderer decodes full range, so blacks are grey; fixes H28's `'420v'` too — `partial: not changed, owner decision on tdesktop/Android range (see ledger ruling)`
 
 - **Evidence**: `submodules/tgcalls/tgcalls/desktop_capturer/DesktopCaptureSourceHelper.cpp:207-217` (`libyuv::ConvertToI420(..., FOURCC_ARGB)`, BT.601 limited range:
   `tg_owt/.../libyuv/source/row_common.cc:562`, `(66R+129G+25B+0x1080)>>8`). The receivers decode as full-range BT.601 with no 16/219 expansion:
@@ -1613,7 +1613,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: the iOS call shaders are the same (TelegramCallsUI `CallScreenShaders.metal`/`I420VideoShaders.metal`); land it once in tgcalls (iOS `e871519b`).
 - **Confidence**: medium (sender and receiver maths verified; other clients' conventions unverified).
 
-### Q6. Call video encoders run with `RealTime = false` and without low-latency rate control; use Apple's conferencing configuration with a fallback — `todo` (measure first)
+### Q6. Call video encoders run with `RealTime = false` and without low-latency rate control; use Apple's conferencing configuration with a fallback — `done (tgcalls 9ab1773, c66b2ea)`
 
 - **Evidence**: `submodules/tgcalls/tgcalls/platform/darwin/TGRTCVideoEncoderH264.mm:643-662` (encoder spec only enables hardware) and `:697-717`
   (`RealTime = false`, "TODO: colorspace matrices"). `TGRTCVideoEncoderH265.mm:408-419,455-475` is the same. Upstream WebRTC sets `RealTime = true`
@@ -1632,7 +1632,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: shared tgcalls; land it in the klaipher/tgcalls fork (iOS `e871519b`).
 - **Confidence**: medium (configuration verified; the network-behaviour gain is inferred).
 
-### Q7. Gallery scrub previews and cached sticker previews are BT.709 pixels labelled Display P3; M3+ AV1 is forced to 8-bit (extends H22) — `todo`
+### Q7. Gallery scrub previews and cached sticker previews are BT.709 pixels labelled Display P3; M3+ AV1 is forced to 8-bit (extends H22) — `done (0a053b6 core)`
 
 - **Evidence**: `MediaPlayer/Sources/FFMpegMediaVideoFrameDecoder.swift:16-27` (the macOS `deviceColorSpace` is Display P3), `:414` (YCbCr→RGB with the ITU-R 709 matrix) and `:443`
   (that BT.709-primaries RGB wrapped in a P3-tagged `CGImage`). `render(frame:)` is used by `UniversalSoftwareVideoSource.swift:306` (scrub previews) and
@@ -1647,7 +1647,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: iOS has the same P3 tag, so the fix can be shared back.
 - **Confidence**: medium.
 
-### Q8. Photo sends are flattened to DeviceRGB with no ICC profile, so Display P3 photos and screenshots lose their wide-gamut colours — `todo` (behind a switch)
+### Q8. Photo sends are flattened to DeviceRGB with no ICC profile, so Display P3 photos and screenshots lose their wide-gamut colours — `partial: JPEG ICC path behind setJPEGPreservesWideGamut, off (dab5e38); Debug Settings toggle pending NanogramDebug`
 
 - **Evidence**: `submodules/Mozjpeg/Sources/Mozjpeg.m:76-87` draws the source into `CGColorSpaceCreateDeviceRGB()` and writes no ICC marker. Every non-GIF/WebP send goes through it
   (`ChatHistoryModel/SenderController.swift:373-392`, `TelegramMediaUtils/MediaUtils.swift:1850-1858`). `jpeg_write_icc_profile` is in the bundled `jpeglib.h:1030`.
@@ -1664,7 +1664,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 
 ### Medium (M)
 
-### Q9. AirPods and Bluetooth headsets: notes, circles and calls always open the headset mic, dropping the AirPods to HFP; honour the chosen mic and offer the Mac's built-in mic — `todo`
+### Q9. AirPods and Bluetooth headsets: notes, circles and calls always open the headset mic, dropping the AirPods to HFP; honour the chosen mic and offer the Mac's built-in mic — `partial: policy, setting, calls and circles (85d4081); voice notes wait for H16`
 
 - **Evidence**: there is no macOS opt-in (see the intro). The voice recorder always binds the system default input (`packages/TelegramMedia/Sources/AudioRecorder.swift:457-466`), and it has an
   upsampler written for the 16/24 kHz HFP rates (`:720-741`, covered by H16). Round video uses `AVCaptureDevice.default(for: .audio)`
@@ -1693,7 +1693,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `63094959` (voice), `a4f2a32b` (circles), `de29c10d` (story-reply circles). These are the iOS 26 opt-in and cannot be ported; this is the Mac equivalent.
 - **Confidence**: high for the code paths and the missing API; the user-facing default is a product call.
 
-### Q10. Round videos are encoded at 300×300 after two hidden resamples (server diameter 384, iOS 400/480); encode at the server diameter with one controlled downscale — `todo`
+### Q10. Round videos are encoded at 300×300 after two hidden resamples (server diameter 384, iOS 400/480); encode at the server diameter with one controlled downscale — `done (ddfa750)`
 
 - **Evidence**: `packages/TGVideoCameraMovie/Sources/TGVideoCameraMovieRecorder.m:26-30,176-183` (the size is `vmSide`, NSUserDefaults `videoMessageSide`, default 300, never set).
   `MediaRecorderUI/VideoMessageConfig.swift:13,33` parses `round_video_encoding.diameter` (default 384), and nothing reads it. `VideoRecorderPipeline.swift:176-180`
@@ -1715,7 +1715,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `918a6467` (supersampling when the camera is more than 2× the output), CameraNeo `RoundVideoLanczosScaler`, `93c4de0e`. Do it with or after H21.
 - **Confidence**: high.
 
-### Q11. Edited or compressed video sends: HDR (HLG/Dolby Vision) clips come out flat and washed out, and the downscale is plain bilinear — `todo`
+### Q11. Edited or compressed video sends: HDR (HLG/Dolby Vision) clips come out flat and washed out, and the downscale is plain bilinear — `done (2be3958)`
 
 - **Evidence**: `packages/ImageCanvasUI/Sources/ImageCanvasUI/EditVideoExport.swift:312` (a `CIContext` with NSNull working and output colour spaces). `:428-437`
   (`AVMutableVideoComposition(applyingCIFiltersWithHandler:)` with `colorPrimaries`/`colorTransferFunction`/`colorYCbCrMatrix` left nil, so the source's are propagated).
@@ -1732,7 +1732,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `7d600b48` (export tags).
 - **Confidence**: medium (code verified; the tone-map behaviour of the CI-handler composition is to be confirmed by the harness).
 
-### Q12. The voice recorder never reacts to device or rate changes and fails silently, so an AirPods switch mid-note can give an empty, cut or wrong-pitch note (extends H16) — `todo`
+### Q12. The voice recorder never reacts to device or rate changes and fails silently, so an AirPods switch mid-note can give an empty, cut or wrong-pitch note (extends H16) — `partial: circles (fa42c17); voice recorder waits for H16`
 
 - **Evidence**: `packages/TelegramMedia/Sources/AudioRecorder.swift:429` publishes `.recording` before any audio setup. `:466-468,493-495` return without disposing the unit or changing the state,
   and `:435-449,461-464,499-528` also return silently. `:470-498` picks the rate before `AudioOutputUnitStart` (`:541`), and Bluetooth headsets change rate when input IO starts.
@@ -1751,7 +1751,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `4c229c73` (the queue-side drain design to reuse when rebuilding).
 - **Confidence**: medium (the silent failures are verified; the wrong-rate symptom is inferred).
 
-### Q13. Hand-built passthrough format descriptions force video range and carry no colour or HDR metadata (old player: non-HLS H.264/HEVC, gallery GIFs, live photos) — `todo` (measure first)
+### Q13. Hand-built passthrough format descriptions force video range and carry no colour or HDR metadata (old player: non-HLS H.264/HEVC, gallery GIFs, live photos) — `done (3afe194 core)`
 
 - **Evidence**: `MediaPlayer/Sources/FFMpegMediaFrameSourceContextHelpers.swift:11-35` (avcC) and `:67-91` (hvcC) hard-code `FullRangeVideo = 0` (twice), chroma "left" and depth 24, with no
   primaries, transfer, matrix, mastering-display or content-light extensions. `FFMpegMediaFrameSourceContext.swift:503-514` uses the passthrough decoder for H.264/HEVC whenever hardware is allowed.
@@ -1768,7 +1768,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: the same idea as `58bda613`/`d5d3b440`/`7d600b48` (tags must describe the pixels), applied to decode. The iOS code is identical.
 - **Confidence**: medium (code verified; the visible effect depends on VT, which the harness measures).
 
-### Q14. Call-video renderers ignore the frame's YCbCr matrix and range and always use full-range BT.601 — `todo` (after Q5)
+### Q14. Call-video renderers ignore the frame's YCbCr matrix and range and always use full-range BT.601 — `partial: CallVideoLayer renderers (221326e); tgcalls I420 renderer not changed`
 
 - **Evidence**: `packages/CallVideoLayer/Sources/CallScreenShaders.metal:353-356,475-482` and `Resources/shaders/MetalFunctions.metal:56-71` use fixed full-range BT.601 coefficients.
   `CallVideoLayer/Sources/MetalVideoRenderView.swift:9-10,76,107` copies I420 into `420f` without range conversion. `tgcalls/platform/darwin/macOS/TGRTCMTLI420Renderer.mm:59` sends every frame, hardware
@@ -1784,7 +1784,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 
 ### Large (L)
 
-### Q15. Calls use WebRTC's plain AUHAL device module with software AEC3/NS, not Apple voice processing, so Voice Isolation, Wide Spectrum and the system echo canceller never apply — `todo`
+### Q15. Calls use WebRTC's plain AUHAL device module with software AEC3/NS, not Apple voice processing, so Voice Isolation, Wide Spectrum and the system echo canceller never apply — `dropped: needs a VPIO ADM in tgcalls verified by an ERLE harness on real hardware (ledger ruling)`
 
 - **Evidence**: `submodules/tgcalls/tgcalls/v2/InstanceV2Impl.cpp:2150-2175` (on macOS `webrtc::AudioDeviceModule::Create(kPlatformDefaultAudio)`; only `WEBRTC_IOS` gets
   `AudioDeviceModuleIOS`), and `:1123-1124,150-153` (default AudioProcessing with AEC3 and NS on). Group calls: `group/GroupInstanceCustomImpl.cpp:4339-4398` (the same ADM) and `:2311-2320` (RNNoise).
