@@ -179,7 +179,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: R22 (`9bc6231a`, `2398d68d`); the core ports as is, the trigger is Mac code.
 - **Perflab**: PostboxCacheLab already measures exactly this cache.
 
-### M6. Empty chat transitions never short-circuit, so the full merge and `applyTransition` tail run for no-op updates — `done (a84a3c8)`, verified
+### M6. Empty chat transitions never short-circuit, so the full merge and `applyTransition` tail run for no-op updates — `done (a84a3c8); part 2: done, no test (ChatController's pipeline needs an AccountContext)`, verified
 
 - **Evidence**: `packages/TGUIKit/Sources/TableView.swift:290-296` (`case none(TableAnimationInterface?)` in a
   synthesized `Equatable`); `TableAnimationInterface.swift:3` (`NSObject`, no `isEqual`, so identity);
@@ -319,7 +319,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **Perflab**: upstream #29 and #31e, listed, not fixed. `PowerLabs/Emitter/offscreen.swift` shows what lite gating
   saves per emitter.
 
-### M12. The chat list table does not skip AppKit's needs-display walk while scrolling — `done (28b6e26)`, verified (A/B with the account not measured)
+### M12. The chat list table does not skip AppKit's needs-display walk while scrolling — `done (28b6e26, test 065c497)`, verified (A/B with the account not measured)
 
 - **Evidence**: `packages/TGUIKit/Sources/TGClipView.swift:24-47,264-268` (`skipsDisplayOnScroll`); only
   `ChatController.swift:483` and `PeerMediaPhotosController.swift:424` set it; the chat list's table
@@ -487,7 +487,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 
 ## Medium changes (M)
 
-### M21. SwiftSignalKit timers have zero leeway, so no timer, `delay` or `timeout` can be coalesced — `done (770513f, core 1140dbe)`, verified
+### M21. SwiftSignalKit timers have zero leeway, so no timer, `delay` or `timeout` can be coalesced — `done (770513f, core 1140dbe); re-measured 2026-11-03 at load 46-110: precise 22.7-23.0 vs automatic 17.9-18.8 wake-ups/s (idle not reachable while other agents build)`, verified
 
 - **Evidence**: `submodules/telegram-ios/submodules/SSignalKit/SwiftSignalKit2/Source/Timer.swift:52-58`
   (`schedule(deadline:repeating:)`/`schedule(deadline:)`, no leeway); `Signal_Timing.swift` (`delay`, `timeout` built
@@ -520,7 +520,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   repo; the Mac submodule pin does not have it).
 - **Perflab**: not fixed upstream (#1 only covered `suspendAwareDelay`). IdleWakeupTests is the harness upstream used.
 
-### M22. Chat history and the chat list are rebuilt and merged on main while the window is hidden, minimized, closed to the Dock or occluded — `done (47580f4)`, verified
+### M22. Chat history and the chat list are rebuilt and merged on main while the window is hidden, minimized, closed to the Dock or occluded — `done (47580f4); controller wiring: done, no test (ChatController/ChatListController need an AccountContext; the gate is tested)`, verified
 
 - **Evidence**: `packages/ChatUI/Sources/ChatUI/ChatController.swift:4087-4101` (15-input `combineLatest`, no
   visibility input), `:4235-4247` (prepare off main, then `applyTransition` on main: merge, floating photos, scroll
@@ -554,7 +554,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: the idea of R21 ("pause views of invisible screens", `todo` on iOS) and R12; new Mac code.
 - **Perflab**: upstream power-audit #8, listed, not fixed. ChatMergeProbe and ChatListStoriesLab can host it.
 
-### M23. The 5 s presence heartbeat re-sets 4 promises per account forever and undoes the display-sleep network pause — `done (6bbcf5e)`, verified
+### M23. The 5 s presence heartbeat re-sets 4 promises per account forever and undoes the display-sleep network pause — `done (6bbcf5e); AppDelegate wiring: done, no test (app target has no test bundle)`, verified
 
 - **Evidence**: `Telegram-Mac/app/AppDelegate.swift:1309-1312` (repeating 5 s main-queue timer, no gating);
   `:1328-1335` (each tick `presentAccountStatus.set(.single(isOnline) |> then(… delay(50) …) |> restart)`, replacing
@@ -713,7 +713,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: `9d908ce1` (cache format 8, LZBITMAP writer). Note iOS kept LZFSE for XOR-delta video-sticker
   caches; this cache has no deltas.
 
-### M30. Animation clocks are free-running dispatch timers per frame rate, not tied to vsync — `done (b78cfaf); real-display wake-up comparison pending (display asleep)`, verified (low confidence)
+### M30. Animation clocks are free-running dispatch timers per frame rate, not tied to vsync — `done (b78cfaf); display-link clocks kept: awake 60 vs 75-82 process wake-ups/s for the old timers`, verified
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottiePlayer.swift:230-288` (one `RenderFpsLoop` per (duration,
   queue)), `:316-322` (repeating zero-leeway `SwiftSignalKit.Timer`); rates: inline emoji 24-30 Hz (`:1499`), webm
@@ -1204,7 +1204,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   duration. A harness that records on the default mic and asserts that `kAudioDevicePropertyNominalSampleRate` is unchanged afterwards. Port the iOS `VoiceRecorderInputTests`.
 - **Confidence**: high (code paths verified; the 44.1 kHz symptom is inferred).
 
-### H17. The shared display link is a CVDisplayLink (deprecated in the macOS 15 SDK) that wakes on every vsync; drive it from `CADisplayLink` with a frame-rate range (extends M30) — `done (12d814a); real-display rate tests skip while the display sleeps, rerun awake`
+### H17. The shared display link is a CVDisplayLink (deprecated in the macOS 15 SDK) that wakes on every vsync; drive it from `CADisplayLink` with a frame-rate range (extends M30) — `done (12d814a, fdbdce8, 5a1bb3f); real-display rate tests pass with the display awake (120 Hz)`
 
 - **Evidence**: `packages/TGUIKit/Sources/DisplayLinkAnimator.swift:31-110` (`CVDisplayLinkCreateWithCGDisplay` at `:47`; the callback at `:57-66` takes a lock and
   `gate.tick()` on every vsync; only the main hop is throttled). `:186-215` follows the screen by hand, and `:233-260` creates and destroys the link as links
@@ -1398,7 +1398,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 - **How to verify**: in the VideoPlayerLab/MediaPlaybackLab host with a local file, check `isPictureInPicturePossible`, start and stop, and confirm that delegate play, pause and seek reach the player.
 - **Confidence**: medium.
 
-### H27. No App Intents, Shortcuts or Focus filter — `done (02d4e35)` (integration, no efficiency gain)
+### H27. No App Intents, Shortcuts or Focus filter — `done (02d4e35); app-target hooks: done, no test (app target has no test bundle)` (integration, no efficiency gain)
 
 - **Evidence**: no `AppIntents`, `AppShortcutsProvider`, `SetFocusFilterIntent` or INIntent handling in `Telegram-Mac/` or `packages/`, and no `NSUserActivityTypes`.
   The only system entry point is the CoreSpotlight continuation (`AppDelegate.swift:1756-1766`).
@@ -1535,7 +1535,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `0650eac5` (upstream 13.1.2).
 - **Confidence**: high.
 
-### Q2. Pausing and resuming a voice note breaks the Ogg stream (second BOS page, page numbers restart), which clicks at the join and makes trim fail — `done (b23b004 core, 36315cc)`
+### Q2. Pausing and resuming a voice note breaks the Ogg stream (second BOS page, page numbers restart), which clicks at the join and makes trim fail — `done (b23b004 core, 36315cc); part 1 (36315cc, ManagedAudioRecorder.resume): done, no test (needs a live VoiceRecorderAudioEngine; TelegramMedia has no test target; the strategy is pinned by OggOpusWriterLiveEncoderTests)`
 
 - **Evidence**: `packages/TelegramMedia/Sources/AudioRecorder.swift:595` (`pause()` stores `oggWriter.pause()`) and `:608-613` (`resume()` calls
   `oggWriter.resume(with:encoderState:)` on the same live writer). In `OpusBinding/Sources/opusenc/opusenc.m:647-655,712-765`, `restoreState` calls `[self cleanup]`, creates a new
@@ -1664,7 +1664,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 
 ### Medium (M)
 
-### Q9. AirPods and Bluetooth headsets: notes, circles and calls always open the headset mic, dropping the AirPods to HFP; honour the chosen mic and offer the Mac's built-in mic — `done (85d4081, b78de4d, e79807e; option off by default)`
+### Q9. AirPods and Bluetooth headsets: notes, circles and calls always open the headset mic, dropping the AirPods to HFP; honour the chosen mic and offer the Mac's built-in mic — `done (85d4081, b78de4d, e79807e; option off by default); part 2 (b78de4d): done, no test (hook pass-through in MediaRecorderUI, no test target; needs a mic)`
 
 - **Evidence**: there is no macOS opt-in (see the intro). The voice recorder always binds the system default input (`packages/TelegramMedia/Sources/AudioRecorder.swift:457-466`), and it has an
   upsampler written for the 16/24 kHz HFP rates (`:720-741`, covered by H16). Round video uses `AVCaptureDevice.default(for: .audio)`
@@ -1732,7 +1732,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `7d600b48` (export tags).
 - **Confidence**: medium (code verified; the tone-map behaviour of the CI-handler composition is to be confirmed by the harness).
 
-### Q12. The voice recorder never reacts to device or rate changes and fails silently, so an AirPods switch mid-note can give an empty, cut or wrong-pitch note (extends H16) — `done (fa42c17, 107ee55)`
+### Q12. The voice recorder never reacts to device or rate changes and fails silently, so an AirPods switch mid-note can give an empty, cut or wrong-pitch note (extends H16) — `done (fa42c17, 107ee55); part 1 (fa42c17, circles): done, no test (VideoRecorderPipeline needs capture hardware; MediaRecorderUI has no test target)`
 
 - **Evidence**: `packages/TelegramMedia/Sources/AudioRecorder.swift:429` publishes `.recording` before any audio setup. `:466-468,493-495` return without disposing the unit or changing the state,
   and `:435-449,461-464,499-528` also return silently. `:470-498` picks the rate before `AudioOutputUnitStart` (`:541`), and Bluetooth headsets change rate when input IO starts.
@@ -1860,13 +1860,13 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | M3 | done | 795c4f8, e605e56; core 3ec2f14, 3a11ddd |
 | M4 | done | 1ac6562 |
 | M5 | done | 934ac65, core d985e78 |
-| M6 | done | a84a3c8 |
+| M6 | done (part 2: no test) | a84a3c8 |
 | M7 | done | b93d09d |
 | M8 | done | 9734759, 0e20f68; core 867d5c5 |
 | M9 | done | core 0319e83 |
 | M10 | done | core 10e47fe |
 | M11 | done | e48de99 |
-| M12 | done | 28b6e26 |
+| M12 | done | 28b6e26, 065c497 (test) |
 | M13 | done | cdb8e5f |
 | M14 | done | f20014e |
 | M15 | stage 1 | — |
@@ -1876,8 +1876,8 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | M19 | stage 1 | — |
 | M20 | dropped | 2184207 (lab) |
 | M21 | done | 770513f, core 1140dbe |
-| M22 | done | 47580f4 |
-| M23 | done | 6bbcf5e |
+| M22 | done (controller wiring: no test) | 47580f4 |
+| M23 | done (AppDelegate wiring: no test) | 6bbcf5e |
 | M24 | done | core 5751188 |
 | M25 | done | cb8d0f1, 43bfbab |
 | M26 | done | f4e1837, core 19875d3 |
@@ -1903,7 +1903,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H14 | partial | 091fa70 |
 | H15 | stage 1 | — |
 | H16 | done | c18caa9 |
-| H17 | done | 12d814a |
+| H17 | done | 12d814a, fdbdce8, 5a1bb3f |
 | H18 | partial | d0a7c3e |
 | H19 | partial | 0f80540 |
 | H20 | partial | 9a9b5c4, core 0b40f53 |
@@ -1913,20 +1913,20 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H24 | partial | 0eb0950 |
 | H25 | partial | b0fbff2 |
 | H26 | not done (ruling) | — |
-| H27 | done | 02d4e35 |
+| H27 | done (app hooks: no test) | 02d4e35 |
 | H28 | done | 9efe49a, f292f45 (tgcalls e7b02f1, df6280d) |
 | Q1 | done | 2955fe5 core |
-| Q2 | done | b23b004 core, 36315cc |
+| Q2 | done (part 1 recorder: no test) | b23b004 core, 36315cc |
 | Q3 | done | 0879d4e |
 | Q4 | done | 0ee33a3 |
 | Q5 | done | 512d9ed (tgcalls e9a1405) |
 | Q6 | done | tgcalls 9ab1773, c66b2ea |
 | Q7 | done | 0a053b6 core |
 | Q8 | done | dab5e38, f51c974; Debug Settings switch, off |
-| Q9 | done | 85d4081, b78de4d, e79807e; option off by default |
+| Q9 | done (part 2: no test) | 85d4081, b78de4d, e79807e; option off by default |
 | Q10 | done | ddfa750 |
 | Q11 | done | 2be3958, cc4584b |
-| Q12 | done | fa42c17, 107ee55 |
+| Q12 | done (part 1: no test) | fa42c17, 107ee55 |
 | Q13 | done | 3afe194 core |
 | Q14 | done | 221326e, 5f53c41 (tgcalls 6f098d2) |
 | Q15 | not done | — (ledger ruling) |
