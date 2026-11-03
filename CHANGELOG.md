@@ -2,6 +2,67 @@
 
 Nanogram for macOS releases, newest first.
 
+## 13.1.1 (202611032053) — 2026-11-03
+
+Source: `nanogram/integration` @ 2468ea83 · core `klaipher/nanogram` `mac/core` @ d3e0d01029 (was a1f42cdb0d) · tgcalls `klaipher/tgcalls` `nanogram-mac` @ a598e27 · tg_owt c31956f2 (all unchanged except the core).
+Artifacts: `Nanogram-13.1.1-202611032053.dmg` (Developer ID, notarized, stapled; Sparkle EdDSA-signed), `appcast.xml`, `Nanogram-13.1.1-202611032053-source.tar.gz`. App Store edition: pending (re-export after freeing disk space); the archive step ran out of disk, nothing was uploaded to TestFlight.
+Changes since 13.1.0 (ae0e6b0a, changelog 0b897ed5) and the 13.1.0 App Store build 202611031753 (46ec34af): `git log 0b897ed5..2468ea83`, core `git log a1f42cdb0d..d3e0d01029`. Published: core `mac/core` a1f42cdb0d..d3e0d01029 to `klaipher/nanogram`; tag `v13.1.1-202611032053` on 2468ea83.
+
+### Crash fixes
+- Update row/Settings no longer trap while an update downloads: Sparkle 2 can report an expected size of 0, and the percentage divided by it and converted NaN/∞ to Int; `UpdateProgress.percentText` shows nothing until the size is known and clamps to 0…100 (3015a1e3).
+- Video calls, the gift craft screen and the image/video editor no longer trap on missing images: PrivateCallScreen, CubeUI and ImageCanvasUI declared `Assets.xcassets` with `.copy`, so no `Assets.car` shipped and `NSImage(resource:)` failed; now `.process`; `tools/dev/tests/test_package_resources.py` guards it (01eca811).
+
+### Updater and distribution
+- Marketing version 13.1.1 (pbxproj `MARKETING_VERSION`, app and share extension), so Sparkle shows a real version change over 13.1.0 (cc479993).
+- Installer DMG: laid-out Finder window (640×400, app left, Applications right) with a Nanogram background, written as a `.DS_Store` by `tools/dev/nanogram/dsstore.py` without Finder/AppleScript (98bc3dd6); no machine paths (no `pBBk` bookmark) in the `.DS_Store`, background extends to 2560×1600 pt so a larger window has no white strip (b26c3f28).
+- App Store edition: code-free SwiftPM resource bundles ship unsigned (fixes ITMS-90284 on 202611031654), every nested code item must be signed by the edition's distribution identity (`check_exported_app`), and the embedded SF Compact Rounded font is gone (ITMS-91182) (26273e70, port of 46ec34af, already in TestFlight 202611031753; new for the direct edition).
+
+### Branding
+- Login QR centre and phone-number logo show the Nanogram comet (`Icon_NanogramComet`) instead of Telegram's plane (79034b46); the login screen re-themes its navigation backdrop on theme change, so no white text on a light backdrop (f5e488e1).
+- Strings name the app Nanogram in every language: `installLocalizationTransform` in Localization, applied to server language packs and the bundled English fallback; NanogramKit `BrandingStrings` rewrites the 63 app-identity keys and leaves Telegram's services (Premium, Stars, Passport, telegram.org, t.me…) alone (a5c5a57e). Branding lint in `branding.check_sources` (1f93b3c6).
+- App icons: the iOS app's 14 Nanogram icons replace Telegram's in the picker (new `NanogramAppIcons` package; channel no longer requested; stored Telegram icon names reset to Comet; menu bar and share-extension glyphs are the comet) (f17ac14c); icons carry 16–1024 px, sharp in Finder's large views (02307901).
+- Round video messages: no Telegram plane or corner watermark (`roundVideoDecorationIsEnabled = false`, as on iOS) (46bfca1e).
+
+### Logs and crash reports
+- Every log export asks where to send it (`NanogramLogExport.present`: chat, Email, Other Apps, Save to…), none goes to a fixed bot; files prepared off main, one export at a time (e5497b36; first part landed inside 3015a1e3).
+- Review fixes: each export is a `NanogramLogExportRun` owning its directory and lock until delivery ends; "Sent" only when every message has left; MetricKit reports zipped; crash reports hidden in the sandboxed App Store edition (9a6cbd7d); a chat picker dropped without an answer ends the export (f56163d7).
+- `CrashReportStore` reads the real home's `DiagnosticReports` (`getpwuid`), reports `isAvailable = false` when sandboxed (8bde7d50); it is `Sendable` with its state on its queue (9824318c).
+
+### Network, stories and chat list
+- Core: Network.framework TCP keepalive 30 s idle / 10 s / 3 probes instead of 5/5/2 (core cfda147943, port of iOS 7abc778f); MtProtoKit downloads use FetchV2's adaptive window (16 master / 32 CDN parts in flight) and growing part sizes instead of a fixed 6 parts (core bf81a9434e, port of iOS 0799a724; the Rust engine, the Mac default, already had it, so this speeds up the MtProtoKit fallback) (0404d80a).
+- Core: faster uploads: 128 KB parts for small files, six parts in flight under 512 KB, growing uploads over 10 MB restart as big files (core d3e0d01029, port of iOS 0799a724) (04efaaea).
+- Stories flood: the peer-stories sync starts each queued peer once instead of restarting all `stories.getPeerStories` requests on every view update (core ed7706cd21; was 50–130 requests/min and FLOOD_WAIT after login); the chat's 60 s story poll runs only while the chat is visible (c8b14ace); view-stories sync sends each queued `stories.readStories` once (core c3b0f01f5f, 3e9457cd).
+- Chat list paging like iOS: preload when less than max(2 viewports, 1400 pt) remains, folders start with 50 chats, appended rows keep scroll position and momentum (5787f76a); page only in the scrolled direction, cap preload below the window size, record the window applied on main, no request while one is pending or during programmatic scrolls; fixes an endless request loop and a list that could not scroll past ~115 rows on tall windows (3598c1ee). The paging helpers read table geometry on the main actor through one function and share the existing visible-range listener, so no new concurrency warnings (2468ea83).
+- Gallery close: key status goes back to the chat window right after the close animation starts (one run-loop turn later), plain keys are swallowed while closing, so a second Esc no longer reaches the chat (69506b39, 2e9f308b).
+
+### Settings
+- Default text size 15 pt (stored sizes kept) (98f9d91c).
+- Debug Settings: dead switches removed (native graphic context, animate emoji to input, duplicate peer-id switch, Crash App); Downloads v2 shows the core's real default (on) (c8580e56).
+
+### Verification
+- Debug direct build (incremental and clean) with buildcheck and the direct edition checks: ok, no compile errors; `tools/dev/tests/run.sh`: 345 tests OK (2 skipped); `tg lint --commits ae0e6b0a..HEAD`: 0 blocking; `tg warnings` (clean Debug): none above the baseline after 2468ea83 (ChatListUI 727 ≤ 728, Localization 3 ≤ 3).
+- Release direct build 202611032053 (`tg release-direct`, clean tree at 2468ea83): app and dmg notarized and stapled (`stapler validate` ok); `spctl` accepts both (Notarized Developer ID); `codesign --verify --deep --strict` passes; `check_exported_app` ok (every nested code item Developer ID, the 12 code-free resource bundles unsigned, no Apple system fonts; the only font is SwiftMath's `latinmodern-math.otf`).
+- Appcast: 13.1.1 / 202611032053, `minimumSystemVersion` 15.0, enclosure `…/releases/download/v13.1.1-202611032053/Nanogram-13.1.1-202611032053.dmg`, length 80502658 = dmg size, `edSignature` verifies against `SUPublicEDKey`; key and feed URL match the shipped 13.1.0, and 202611032053 > 202611031630, so 13.1.0 offers it. No release notes are embedded in the appcast.
+- SHA-256: dmg 7ba4c451c37ce205058bbf3db344702af9dfbad7acc3134a7d2835329618ac28, source archive ad7e05ffe4b0f8743ce0dba4557a0cab8a4a250d34f0c68127a484cd76c90953, appcast.xml 071bf1977bf75686fbfae65c1ea5c35b4a23ccdb1afd4b76a4f5636ab1923afc.
+- Secrets check on the source archive: no api_hash, api_id, Sparkle private key or owner email; only upstream public test material (fake-codesigning profiles, boringssl test `.p12`, parser test keys), same as 13.1.0. api_hash appears in no build log.
+
+### Known open items
+- App Store edition 13.1.1: pending (re-export after freeing disk space): `tg testflight --export-only` from this commit, then `altool --validate-app`, upload, What to Test notes.
+- In-app update test (13.1.0 → 13.1.1 through Sparkle against the live feed) runs after the public release.
+- ChatListUI paging `swift test` did not run (package resolution held the build lock for 20 minutes); covered by the Debug build and manual paging only.
+- Local `archive.log` and Debug build logs contain the Apple Development signing identity name (owner email): never publish them.
+- `submodules/tg_owt` still pinned to c31956f2, which exists on no remote; the source archive includes it.
+
+## 13.1.0 (202611031753) — 2026-11-03 — App Store edition (TestFlight)
+
+Source: `release/13.1.0-mas-fix` @ 46ec34af (on top of 0b897ed5 / the 13.1.0 direct release) · core `mac/core` @ a1f42cdb0d · tgcalls `nanogram-mac` @ a598e27.
+Artifact: `Nanogram.pkg` (Apple Distribution), uploaded to TestFlight, processing state VALID. Replaces TestFlight build 202611031654, which Apple rejected.
+- ITMS-90284 fix: the 11 SwiftPM resource bundles in `Contents/Resources` (QrStudioUI, PrivateCallScreen, CallVideoLayer, SwiftMath, ImageCanvasUI, DustLayer, MetalEngine, CubeUI, DataUsageUI, SceneEffects, WalletUI) were archived with an Apple Development signature that the app-store-connect export does not re-sign. `release.py` `unsign_resource_bundles()` strips `_CodeSignature` from Mach-O-free resource bundles after archiving, so the app signature covers them. `check_exported_app()` now fails the build on any nested code not signed Apple Distribution / Developer ID (YGTMYL879P) or any bundled Apple system font. 7 tests in `tools/dev/tests/test_release.py`.
+- ITMS-91182 fix: `SFCompactRounded-Semibold.otf` removed from the app and share extension, with its Xcode build entries and the `ATSApplicationFontsPath`/`UIAppFonts` keys. The pre-10.15 fallback branches that used it (`TGFont.avatar`, `roundTimer`, QrStudio username font) are gone; the macOS 15+ paths were already in use, so nothing looks different.
+- Verification: `altool --validate-app` passes, the only signed code is `Nanogram.app` and `TelegramShare.appex` (Apple Distribution), `codesign --verify --deep --strict` passes, and no SF fonts are bundled.
+- Ported to `nanogram/integration` as 26273e70.
+- What to Test: "First Mac TestFlight build of Nanogram 13.1.0: lighter on battery and memory, faster video/GIFs/stickers, smoother chat list, tidier storage, lighter calls, on-device voice transcription; fixes from the 13.1.0 direct release."
+
 ## 13.1.0 (202611031630) — 2026-11-03
 
 Source: `nanogram/integration` @ ae0e6b0a · core `klaipher/nanogram` `mac/core` @ a1f42cdb0d · tgcalls `klaipher/tgcalls` `nanogram-mac` @ a598e27 · tg_owt c31956f2.
