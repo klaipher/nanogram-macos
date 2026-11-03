@@ -140,6 +140,9 @@ class PinnedVersionsTests(unittest.TestCase):
             self.assertTrue(is_ancestor(rlottie, commit, pin), f"rlottie {pin} does not contain {commit}")
         self.assertIn("url = https://github.com/klaipher/rlottie", read(ROOT / ".gitmodules"))
 
+    def test_libprisma(self):
+        self.assertEqual(gitlink(ROOT, "submodules/libprisma"), "086296336c69723f58ca6aa603434ef8cf682c39")
+
 
 if __name__ == "__main__":
     unittest.main()
