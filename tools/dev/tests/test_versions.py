@@ -143,6 +143,9 @@ class PinnedVersionsTests(unittest.TestCase):
     def test_libprisma(self):
         self.assertEqual(gitlink(ROOT, "submodules/libprisma"), "086296336c69723f58ca6aa603434ef8cf682c39")
 
+    def test_boost_regex(self):
+        self.assertEqual(gitlink(ROOT, "submodules/regex"), "7760ef2a61d643c1770026f0392b440bdfb5687d")
+
 
 if __name__ == "__main__":
     unittest.main()
