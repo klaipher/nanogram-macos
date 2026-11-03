@@ -50,6 +50,7 @@ import PerfLab
 import SettingsUI
 import NanogramDebug
 import NanogramDebugUI
+import Mozjpeg
 
 //#if BETA || DEBUG
 //import Firebase
@@ -1386,6 +1387,14 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         applyFrameRateCap()
         nanogramDebugObservations.append(settings.observe("display.maxFrameRate") { _ in
             applyFrameRateCap()
+        })
+        settings.register(.toggle(id: "media.jpegWideGamut", section: "Media", title: "Keep wide-gamut colour in sent photos", detail: "Display P3 photos are sent with their ICC profile instead of being flattened to sRGB.", defaultValue: false))
+        let applyJPEGWideGamut = {
+            setJPEGPreservesWideGamut(settings.bool("media.jpegWideGamut"))
+        }
+        applyJPEGWideGamut()
+        nanogramDebugObservations.append(settings.observe("media.jpegWideGamut") { _ in
+            applyJPEGWideGamut()
         })
         NanogramDebugMenu.install(openDeveloperScreen: { [weak self] in
             guard let context = self?.contextValue?.context, !context.isSupport else {
