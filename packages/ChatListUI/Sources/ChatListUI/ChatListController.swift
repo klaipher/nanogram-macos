@@ -733,26 +733,53 @@ public struct FilterData : Equatable {
 }
 
 
+struct ChatListPageKey: Equatable {
+    let filter: ChatListFilter
+    let request: ChatListIndexRequest
+
+    init(_ filterData: FilterData) {
+        self.filter = filterData.filter
+        self.request = filterData.request
+    }
+}
+
 public class ChatListController<Context: AccountContextProtocol> : PeersListController<Context>, ChatListControllerKind {
     
     private let folderUpdatesDisposable = MetaDisposable()
 
-    private func requestChatListPageIfNeeded() {
-        guard let view = previousChatList.with({ $0 }) else {
+    private func chatListPageApplied(window: ChatListPageWindow<EngineChatList.Item.Index>, key: ChatListPageKey) {
+        chatListPager.didApply(window: window, key: key)
+        requestChatListPageIfNeeded()
+    }
+    
+    private func chatListDidScroll(_ position: ScrollPosition) {
+        guard !genericView.tableView.clipView.isAnimateScrolling else {
             return
         }
+        switch position.direction {
+        case .top:
+            chatListPager.didScroll(towards: .later)
+        case .bottom:
+            chatListPager.didScroll(towards: .earlier)
+        case .none:
+            break
+        }
+        requestChatListPageIfNeeded()
+    }
+    
+    private func requestChatListPageIfNeeded() {
         let tableView = genericView.tableView
         let viewport = tableView.frame.height
-        guard viewport > 0 else {
+        guard viewport > 0, tableView.count > 0 else {
             return
         }
         let offset = tableView.documentOffset.y
-        let remainingBelow = tableView.documentSize.height - offset - viewport
-        let next = ChatListPaging.nextPageRequest(remainingAbove: offset, remainingBelow: remainingBelow, viewport: viewport, hasLater: view.hasLater, hasEarlier: view.hasEarlier, firstAnchor: view.items.first?.index, lastAnchor: view.items.last?.index, lastRequested: lastRequestedPageAnchor)
-        guard let next else {
+        let documentHeight = tableView.documentSize.height
+        let geometry = ChatListPageGeometry(remainingAbove: offset, remainingBelow: documentHeight - offset - viewport, viewport: viewport, rowHeight: documentHeight / CGFloat(tableView.count))
+        let currentKey = ChatListPageKey(stateValue.with { $0.filterData })
+        guard let next = chatListPager.nextRequest(currentKey: currentKey, geometry: geometry, isAnimatingScroll: tableView.clipView.isAnimateScrolling) else {
             return
         }
-        lastRequestedPageAnchor = next.anchor
         _ = animated.swap(false)
         updateFilter {
             $0.withUpdatedRequest(.Index(next.anchor, nil), removeAnimation: true)
@@ -786,7 +813,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }
         
         if case .Initial = stateValue.with({ $0.filterData.request }) {
-            self.lastRequestedPageAnchor = nil
+            self.chatListPager.restart()
         }
         
         if changedFolder {
@@ -800,7 +827,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     }
     
     private let previousChatList:Atomic<EngineChatList?> = Atomic(value: nil)
-    private var lastRequestedPageAnchor: EngineChatList.Item.Index?
+    private var chatListPager = ChatListPager<EngineChatList.Item.Index, ChatListPageKey>()
     private let first = Atomic(value:true)
     private let chatListVisibility = ValuePromise<Bool>(true, ignoreRepeated: true)
     private lazy var chatListVisibilityObserver = WindowVisibilityObserver(onChange: { [weak self] visible in
@@ -1055,7 +1082,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         |> map { _ in Void() }
         let projectedState: Signal<ChatListStateProjection, NoError> = combineLatest(stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, activityTicks)
         |> map { state, _ in state }
-        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, projectedState, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<TableUpdateTransition, NoError> in
+        let list:Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey), NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, projectedState, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey), NoError> in
             if !HistoryVisibilityGate.shouldApply(visible: isVisible, isPlainGenericUpdate: !value.2 && !scrollUp.with { $0 }, hasScrollPosition: scroll != nil, appliedOnce: chatListAppliedOnce.with { $0 }) {
                 _ = chatListSkippedWhileHidden.swap(true)
                 return .complete()
@@ -1258,15 +1285,17 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             }
             
             
-            return prepareEntries(from: previousEntries.swap(entries), to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode)
+            let pageWindow = ChatListPageWindow(hasLater: update.list.hasLater, hasEarlier: update.list.hasEarlier, firstAnchor: update.list.items.first?.index, lastAnchor: update.list.items.last?.index)
+            let pageKey = ChatListPageKey(filterData)
+            return prepareEntries(from: previousEntries.swap(entries), to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode) |> map { ($0, pageWindow, pageKey) }
         }
         
         
         
-        let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition -> Signal<Void, NoError> in
+        let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition, pageWindow, pageKey -> Signal<Void, NoError> in
             self?.enqueueTransition(transition)
             _ = chatListAppliedOnce.swap(true)
-            self?.requestChatListPageIfNeeded()
+            self?.chatListPageApplied(window: pageWindow, key: pageKey)
             return .complete()
         }
         
@@ -1300,8 +1329,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }))
         
         
-        genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] _ in
-            self?.requestChatListPageIfNeeded()
+        genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] position in
+            self?.chatListDidScroll(position)
         }))
         
         genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] scroll in

@@ -70,4 +70,16 @@ final class TableAppendKeepsScrollTests: XCTestCase {
         let anchor = try XCTUnwrap(table.item(stableId: anchorId))
         XCTAssertEqual(table.clipView.bounds.minY - table.rectOf(item: anchor).minY, offsetInRow, accuracy: 0.5)
     }
+
+    func testRemovingTheLastRowsAtTheBottomKeepsThePositionInsideTheContent() throws {
+        let window = makeWindow()
+        defer { window.close() }
+        let table = try makeTable(window: window, rows: 60)
+        let maxOffset = table.documentSize.height - table.clipView.bounds.height
+        table.clipView.scroll(to: NSMakePoint(0, maxOffset))
+        let transition = TableUpdateTransition(deleted: Array((55 ..< 60).reversed()), inserted: [], updated: [], animated: false, state: .saveVisible(.lower, false))
+        table.merge(with: transition)
+        let newMaxOffset = table.documentSize.height - table.clipView.bounds.height
+        XCTAssertLessThanOrEqual(table.clipView.bounds.minY, newMaxOffset + 0.5)
+    }
 }

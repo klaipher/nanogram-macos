@@ -3646,7 +3646,7 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
                     } else {
                         y = nrect.minY - visible.1
                     }
-                    if abs(y - self.clipView.documentOffset.y) > 0.5 || self.clipView.isAnimateScrolling {
+                    if abs(y - self.clipView.documentOffset.y) > 0.5 {
                         self.clipView.updateBounds(to: NSMakePoint(0, y), cancel: true)
                     }
                     break
