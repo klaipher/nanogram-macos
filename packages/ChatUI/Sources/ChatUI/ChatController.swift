@@ -2228,6 +2228,7 @@ private final class ChatAdData {
     var nextPendingDynamicMessageId: Int32 = 1
     private var seenMessageIds = Set<MessageId>()
     private var height: CGFloat = 0
+    let visibility = ValuePromise<Bool>(true, ignoreRepeated: true)
 
 
     private let disposable = MetaDisposable()
@@ -2282,7 +2283,7 @@ private final class ChatAdData {
                         let preload = Signal<Void, NoError> { _ in
                             return context.account.addAdditionalPreloadHistoryPeerId(peerId: adPeerId)
                         }
-                        combinedDisposable.add(whileVisible(combineLatest(context.account.viewTracker.polledChannel(peerId: adPeerId), preload), visible: self.historyVisibility.get()).start())
+                        combinedDisposable.add(whileVisible(combineLatest(context.account.viewTracker.polledChannel(peerId: adPeerId), preload), visible: self.visibility.get()).start())
                     } else {
                         self.preloadAdPeerDisposable.set(nil)
                     }
@@ -2679,6 +2680,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     private let historyVisibility = ValuePromise<Bool>(true, ignoreRepeated: true)
     private lazy var historyVisibilityObserver = WindowVisibilityObserver(onChange: { [weak self] visible in
         self?.historyVisibility.set(visible)
+        self?.adMessages?.visibility.set(visible)
     })
     private let historyAppliedOnce = Atomic<Bool>(value: false)
     private let historySkippedWhileHidden = Atomic<Bool>(value: false)
