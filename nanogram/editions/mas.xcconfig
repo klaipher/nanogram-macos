@@ -4,8 +4,9 @@
 #include "../Nanogram.xcconfig"
 
 // Local builds sign without a provisioning profile, so they use the development set (the distribution set
-// minus profile-only keys such as Maps); tg testflight passes
-// NANOGRAM_MAS_ENTITLEMENTS=nanogram/entitlements/Nanogram-MAS.entitlements with the App Store profile.
+// minus profile-only keys such as Maps). tg testflight re-signs the archived app with Nanogram-MAS.entitlements
+// before the export, which signs it with the App Store profile. (A setting this file defines cannot be overridden
+// on xcodebuild's command line: the -xcconfig file wins.)
 NANOGRAM_MAS_ENTITLEMENTS = nanogram/entitlements/Nanogram-MAS-Development.entitlements
 NANOGRAM_ENTITLEMENTS_Telegram = $(NANOGRAM_MAS_ENTITLEMENTS)
 NANOGRAM_ENTITLEMENTS_TelegramShare = nanogram/entitlements/NanogramShare.entitlements

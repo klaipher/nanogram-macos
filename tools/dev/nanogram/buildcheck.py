@@ -27,6 +27,7 @@ MACHO_MAGICS = {
 TARGET_RE = re.compile(r"\(in target '([^']+)' from project '([^']+)'\)")
 TRIPLE_RE = re.compile(r"^([a-z0-9_]+)-apple-macos([0-9.]+)$")
 X86_RE = re.compile(r"\bx86_64\b")
+EXCLUSIVITY_RE = re.compile(r"^-enforce-exclusivity=(\w+)$")
 
 
 class _Problems:
@@ -87,6 +88,11 @@ def _optimization(args: list[str]) -> str | None:
     return levels[-1] if levels else None
 
 
+def _exclusivity(args: list[str]) -> str:
+    modes = [m.group(1) for m in map(EXCLUSIVITY_RE.match, args) if m]
+    return modes[-1] if modes else "checked"
+
+
 def _blocks(log: str):
     action, label = None, "?"
     for raw in log.splitlines():
@@ -136,8 +142,11 @@ def check_log(log: str, release: bool = False, min_os: str = MIN_OS) -> list[str
             level = _optimization(args)
             if level != "-O3":
                 problems.add(f"C compile at {level or 'unknown optimization'} (want -O3)", label)
-        if release and action == "Ld" and "-flto=thin" not in args:
-            problems.add("link without -flto=thin", label)
+            if "-flto=thin" not in args:
+                problems.add("C compile without -flto=thin (no ThinLTO bitcode for the link)", label)
+        if release and action == "SwiftDriver" and _exclusivity(args) != "unchecked":
+            problems.add("Swift compile keeps runtime exclusivity checks "
+                         "(want SWIFT_ENFORCE_EXCLUSIVE_ACCESS=off in Release, M17)", label)
     if seen == 0:
         # A no-change rebuild compiles nothing; accept it only when the log is recognisably xcodebuild's own.
         if _is_successful_xcodebuild_log(log):

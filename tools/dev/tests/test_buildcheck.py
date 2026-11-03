@@ -60,16 +60,42 @@ class LogTests(unittest.TestCase):
             log = compile_line("arm64-apple-macos15.0", f"@{resp}") + link_line("-flto=thin")
             problems = buildcheck.check_log(log, release=True)
             self.assertTrue(any("-Os" in p for p in problems), problems)
-            resp.write_text("-fmessage-length=0 -O3 -fobjc-arc\n")
+            resp.write_text("-fmessage-length=0 -O3 -flto=thin -fobjc-arc\n")
             self.assertEqual(buildcheck.check_log(log, release=True), [])
 
-    def test_release_requires_thin_lto_at_link(self):
+    def test_release_requires_thin_lto_compiles(self):
+        # Xcode 27 passes no -flto=thin at the link (seen in the first real release archive): ThinLTO shows as
+        # bitcode compiles, which the linker optimizes; relocatable package merges (ld -r) carry no LTO flag.
         log = compile_line("arm64-apple-macos15.0", "-O3") + link_line()
         problems = buildcheck.check_log(log, release=True)
-        self.assertTrue(any("flto=thin" in p for p in problems), problems)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("-flto=thin", problems[0])
+        self.assertIn("C compile", problems[0])
+        good = compile_line("arm64-apple-macos15.0", "-O3 -flto=thin") + link_line() + link_line("-r")
+        self.assertEqual(buildcheck.check_log(good, release=True), [])
 
     def test_debug_does_not_require_release_flags(self):
         self.assertEqual(buildcheck.check_log(compile_line("arm64-apple-macos15.0", "-O0") + link_line()), [])
+
+    def test_release_swift_without_unchecked_exclusivity_rejected(self):
+        # M17: Release passes SWIFT_ENFORCE_EXCLUSIVE_ACCESS=off on the command line so it reaches the packages,
+        # not only the app target (whose pbxproj already has it off). The log escapes '=' as '\='.
+        def swift(target, extra):
+            return (f"SwiftDriver {target} normal arm64 com.apple.xcode.tools.swift.compiler "
+                    f"(in target '{target}' from project 'P')\n    cd /src\n    builtin-SwiftDriver -- "
+                    f"/usr/bin/swiftc -module-name {target} -O {extra} -target arm64-apple-macos15.0\n")
+        base = compile_line("arm64-apple-macos15.0", "-O3 -flto=thin") + link_line("-flto=thin")
+        log = base + swift("Telegram", "-enforce-exclusivity\\=unchecked") + swift("Postbox", "")
+        problems = buildcheck.check_log(log, release=True)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("exclusivity", problems[0])
+        self.assertIn("'Postbox'", problems[0])
+        self.assertNotIn("'Telegram'", problems[0])
+        fixed = base + swift("Telegram", "-enforce-exclusivity\\=unchecked") + \
+            swift("Postbox", "-enforce-exclusivity\\=unchecked")
+        self.assertEqual(buildcheck.check_log(fixed, release=True), [])
+        self.assertEqual(buildcheck.check_log(base + swift("Postbox", "").replace(" -O ", " -Onone "),
+                                              release=False), [])
 
 
 def build_binary(directory, archs, minos):

@@ -80,6 +80,10 @@ cmd_build() {
   if [ "$release" = 1 ]; then scheme=Release configuration=Release; else scheme=Telegram configuration=Debug; fi
   conditions='$(inherited) NANOGRAM STABLE'
   [ "$edition" = mas ] && conditions="$conditions NANOGRAM_MAS"
+  local settings=() setting
+  if [ "$release" = 1 ]; then
+    while IFS= read -r setting; do settings+=("$setting"); done < <(py release settings)
+  fi
   derived="$(config_value DERIVED_DATA)"
   mkdir -p "$ROOT/build-output"
   log="$ROOT/build-output/last-build.log"
@@ -98,7 +102,7 @@ cmd_build() {
     -destination 'platform=macOS,arch=arm64' -derivedDataPath "$derived" \
     -xcconfig "$xcconfig" \
     "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$conditions" \
-    COMPILER_INDEX_STORE_ENABLE=NO \
+    COMPILER_INDEX_STORE_ENABLE=NO ${settings[@]+"${settings[@]}"} \
     -showBuildTimingSummary ${extra[@]+"${extra[@]}"} > "$log" 2>&1 || status=$?
   local elapsed=$((SECONDS - start))
   if [ "$status" != 0 ]; then
@@ -167,6 +171,14 @@ cmd_sync_upstream() {
   "$ROOT/tools/dev/tg" check
   say "Synced. Commit nanogram/warnings-baseline.json if it changed."
 }
+
+# tg testflight [--export-only]: Release archive of the mas edition (build number TG_BUILD_NUMBER or the time),
+# buildcheck, App Store export with automatic signing (App Store Connect API key), altool upload.
+cmd_testflight() { py release testflight "$@"; }
+
+# tg release-direct: Release archive of the direct edition, Developer ID export, notarized and stapled dmg,
+# Sparkle appcast and source archive in build-output/direct/<build>/. Uploads nothing.
+cmd_release_direct() { py release release-direct "$@"; }
 
 cmd_xcode() {
   local edition="${1:-direct}" xcconfig
@@ -260,7 +272,7 @@ usage: tools/dev/tg <command> [options]
   warnings         clean debug build, compare upstream warnings with the baseline [--update] [--log FILE]
   check            tests, lint, clean build + warnings, package tests (pre-push gate) [--base REV]
   sync-upstream    fast-forward upstream, merge it, rebuild, update the warning baseline [--no-build] [--after-merge]
-  testflight       archive and upload the mas edition
+  testflight       archive and upload the mas edition [--export-only]
   release-direct   notarized dmg + appcast for the direct edition (local)
 USAGE
 }
@@ -281,7 +293,9 @@ main() {
     lint) cmd_lint "$@" ;;
     test) cmd_test "$@" ;;
     check) cmd_check "$@" ;;
-    run|testflight|release-direct) not_yet "$cmd" ;;
+    testflight) cmd_testflight "$@" ;;
+    release-direct) cmd_release_direct "$@" ;;
+    run) not_yet "$cmd" ;;
     help|-h|--help) usage ;;
     *) usage >&2; die "unknown command: $cmd" ;;
   esac

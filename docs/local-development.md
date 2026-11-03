@@ -29,7 +29,8 @@ and passes the compilation conditions (`NANOGRAM`, `STABLE`, `NANOGRAM_MAS`) as 
 Every `tg build` ends with `buildcheck` (`tools/dev/nanogram/buildcheck.py`), which reads the build log and the built
 app and fails the build when any compile or link was not `arm64-apple-macos15.0`, any Mach-O in the bundle has
 a non-arm64 slice, or the main binary's `minos` is not 15.0. Release builds must also show `-O3` for every C
-compile (read from Xcode's response files) and `-flto=thin` at every link.
+compile (read from Xcode's response files) with `-flto=thin` (Xcode 27 links ThinLTO bitcode without a link flag),
+and no Swift compile with runtime exclusivity checks (M17).
 
 ### Building from Xcode
 
@@ -156,6 +157,34 @@ Xcode can reuse a cached build description without re-reading an edition xcconfi
 `direct.xcconfig`, build direct → the new setting missing from Info.plist). `tg build` therefore drops the cached
 `XCBuildData/*.xcbuilddata` descriptions when the edition's xcconfig files changed since that edition's last build;
 compiled objects stay, so the build is still incremental.
+
+## Release builds: `tg testflight` and `tg release-direct`
+
+Both archive the `Release` scheme with the edition xcconfig (`tools/dev/nanogram/release.py`), stamp the build
+number, run `buildcheck` in release mode and the edition and branding checks on the archived app, and export with
+Xcode's automatic signing through the App Store Connect API key (`~/.config/telegram-ios/asc/asc.json` +
+`AuthKey_<id>.p8`, team key with the Admin role). Xcode creates the distribution certificates and profiles it needs
+(`-allowProvisioningUpdates`). Output: `build-output/testflight/<build>/` and `build-output/direct/<build>/`.
+
+- Version = upstream's `MARKETING_VERSION`; build number = `TG_BUILD_NUMBER` or `date +%Y%m%d%H%M`. Upstream's
+  Info.plists carry a literal `CFBundleVersion` that upstream bumps by hand, so the build number is stamped into the
+  archived app and share extension (re-signed with the same identity; export signs them again) instead of editing
+  those files.
+- Release-only command-line settings (`python3 -m nanogram.release settings`, also used by `tg build --release`):
+  `SWIFT_ENFORCE_EXCLUSIVE_ACCESS=off`, so the packages, not only the app target, drop runtime exclusivity checks in
+  Release (runtime spec M17); Debug builds and `swift test` keep them. `buildcheck --release` fails any Swift compile
+  that still checks. When `Telegram-Mac/OrderFiles/Telegram.order` exists (written by the launch order file
+  generator, runtime spec M31), `NANOGRAM_ORDER_FILE` points the app's Release link at it.
+- `tg testflight [--export-only]`: mas edition, signed with the distribution entitlements (Maps included) and the App
+  Store profile, exported as a signed `.pkg`, uploaded with `xcrun altool` (xcodebuild's own upload refuses the API
+  key). Before building, it checks (read-only) that the App Store Connect app has the macOS platform and stops with
+  one line if not. `--export-only` signs and stops.
+- `tg release-direct [--allow-dirty]`: direct edition, exported with Developer ID, notarized (`notarytool`) and
+  stapled, put in an APFS ULFO `.dmg` that is notarized and stapled too, signed for Sparkle (`appcast.xml`, one item,
+  enclosure `…/releases/download/v<version>-<build>/Nanogram-<version>-<build>.dmg`), plus
+  `Nanogram-<version>-<build>-source.tar.gz` (`git archive` of the superproject and every submodule). It refuses
+  uncommitted tracked changes, so the source archive matches the binary. Nothing is uploaded: the owner creates
+  the GitHub release in `klaipher/nanogram-releases` with the dmg, `appcast.xml` and the source archive.
 
 ## Native libraries
 

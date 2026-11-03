@@ -51,3 +51,9 @@ DSA_PEM_FILE =
 // new concurrency warnings into errors (Swift has no umbrella group for -Wwarning); there the baseline is the gate.
 NANOGRAM_SWIFT_FLAGS_TelegramCore = -no-warnings-as-errors
 OTHER_SWIFT_FLAGS = $(inherited) -strict-concurrency=complete $(NANOGRAM_SWIFT_FLAGS_$(TARGET_NAME))
+
+// Launch order file (M31) for the app's Release link only. tools/dev/nanogram/release.py passes
+// NANOGRAM_ORDER_FILE on the command line when Telegram-Mac/OrderFiles/Telegram.order exists, so a checkout
+// without one still links. M17 (no runtime exclusivity checks in Release) is a command-line setting there too.
+NANOGRAM_ORDER_FILE_Telegram = $(NANOGRAM_ORDER_FILE)
+ORDER_FILE[config=Release] = $(NANOGRAM_ORDER_FILE_$(TARGET_NAME):default=$(inherited))
