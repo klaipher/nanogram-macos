@@ -59,9 +59,24 @@ private func dictFromLocalization(_ value: Localization) -> [String: String] {
     return dict
 }
 
+public typealias LocalizationTransform = ([String: String], String) -> [String: String]
+
+private let _localizationTransform: Atomic<LocalizationTransform?> = Atomic(value: nil)
+
+public func installLocalizationTransform(_ transform: @escaping LocalizationTransform) {
+    _ = _localizationTransform.swap(transform)
+}
+
+private func transformed(_ strings: [String: String], languageCode: String) -> [String: String] {
+    guard let transform = _localizationTransform.with({ $0 }) else {
+        return strings
+    }
+    return transform(strings, languageCode)
+}
+
 public func applyUILocalization(_ settings: LocalizationSettings) {
-    let primaryLanguage = Language(languageCode: settings.primaryComponent.languageCode, customPluralizationCode: settings.primaryComponent.customPluralizationCode, strings: dictFromLocalization(settings.primaryComponent.localization))
-    let secondaryLanguage = settings.secondaryComponent != nil ? Language.init(languageCode: settings.secondaryComponent!.languageCode, customPluralizationCode: settings.secondaryComponent!.customPluralizationCode, strings: dictFromLocalization(settings.secondaryComponent!.localization)) : nil
+    let primaryLanguage = Language(languageCode: settings.primaryComponent.languageCode, customPluralizationCode: settings.primaryComponent.customPluralizationCode, strings: transformed(dictFromLocalization(settings.primaryComponent.localization), languageCode: settings.primaryComponent.languageCode))
+    let secondaryLanguage = settings.secondaryComponent.map { Language(languageCode: $0.languageCode, customPluralizationCode: $0.customPluralizationCode, strings: transformed(dictFromLocalization($0.localization), languageCode: $0.languageCode)) }
     
     let language = TelegramLocalization(primaryLanguage: primaryLanguage, secondaryLanguage: secondaryLanguage, localizedName: settings.primaryComponent.localizedName)
     _ = _appCurrentLanguage.swap(language)
@@ -245,6 +260,20 @@ private let _englishFallbackBundle: Bundle? = {
     return Bundle(path: path)
 }()
 
+private let _bundledOverrides: [String: String] = {
+    guard let url = _englishFallbackBundle?.url(forResource: "Localizable", withExtension: "strings"), let bundled = NSDictionary(contentsOf: url) as? [String: String] else {
+        return [:]
+    }
+    return transformed(bundled, languageCode: "en").filter { bundled[$0.key] != $0.value }
+}()
+
+private func bundledString(_ key: String, bundle: Bundle) -> String {
+    if let value = _bundledOverrides[key] {
+        return value
+    }
+    return NSLocalizedString(key, bundle: bundle, comment: "")
+}
+
 /// Single combined lookup used by `translate`. Returning `String?` lets the
 /// caller skip a second exist+fetch round-trip when a key is missing.
 /// When `returnNilIfMissing` is false, mirrors `_NSLocalizedString` and
@@ -258,7 +287,7 @@ internal func _LocalizedStringFor(_ key: String, primary: Language, secondary: L
         return value
     }
     if let bundle = _englishFallbackBundle {
-        let resolved = NSLocalizedString(key, bundle: bundle, comment: "")
+        let resolved = bundledString(key, bundle: bundle)
         if returnNilIfMissing && resolved == key {
             return nil
         }
@@ -278,7 +307,7 @@ public func _NSLocalizedString(_ key: String) -> String {
 
 public func NativeLocalization(_ key: String) -> String {
     if let bundle = _englishFallbackBundle {
-        return NSLocalizedString(key, bundle: bundle, comment: "")
+        return bundledString(key, bundle: bundle)
     }
     return NSLocalizedString(key, comment: "")
 }

@@ -1,9 +1,12 @@
 import Cocoa
 import ApiCredentials
 import CrashRecoveryUI
+import Localization
 import NanogramKit
 
 guard SingleInstance.ensure() else { exit(0) }
+
+installLocalizationTransform(BrandingStrings.brand)
 
 @_silgen_name("OPENSSL_init_crypto")
 private func OPENSSL_init_crypto(_ opts: UInt64, _ settings: OpaquePointer?) -> Int32

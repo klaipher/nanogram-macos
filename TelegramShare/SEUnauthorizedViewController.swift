@@ -17,7 +17,9 @@ class SEUnauthorizedView : View {
         cancel.set(color: theme.colors.accent, for: .Normal)
         cancel.set(text: L10n.shareExtensionUnauthorizedOK, for: .Normal)
         
-        let layout = TextViewLayout(.initialize(string: L10n.shareExtensionUnauthorizedDescription, color: theme.colors.text, font: .normal(.text)), alignment: .center)
+        let displayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Telegram"
+        let description = L10n.shareExtensionUnauthorizedDescription.replacingOccurrences(of: "Telegram", with: displayName)
+        let layout = TextViewLayout(.initialize(string: description, color: theme.colors.text, font: .normal(.text)), alignment: .center)
         textView.backgroundColor = theme.colors.background
         textView.update(layout)
         
