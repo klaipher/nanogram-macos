@@ -173,7 +173,7 @@ enum NanogramLogExportFlow {
     private static func deliver(_ files: [URL], spec: NanogramLogExportSpec, destination: NanogramLogExportDestination, window: NSWindow?, anchor: NSView?, run: NanogramLogExportRun) {
         switch destination {
         case .nanogram:
-            NanogramLogExportHooks.shared.sendToChat(files, window, { result in
+            let reply = NanogramLogChatSendReply { result in
                 guard !run.isFinished else {
                     return
                 }
@@ -188,6 +188,9 @@ enum NanogramLogExportFlow {
                     run.finish(delivered: false)
                     showMessage(window, "Could not send \(spec.what.lowercased()).") //TODOLANG
                 }
+            }
+            NanogramLogExportHooks.shared.sendToChat(files, window, { result in
+                reply.receive(result)
             })
         case .email:
             let hasMailApp = URL(string: "mailto:").flatMap { NSWorkspace.shared.urlForApplication(toOpen: $0) } != nil

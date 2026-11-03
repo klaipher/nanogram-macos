@@ -36,6 +36,31 @@ public func nanogramLogEmailFailureOffersPicker(_ error: Error) -> Bool {
     return !(error.domain == NSCocoaErrorDomain && error.code == NSUserCancelledError)
 }
 
+final class NanogramLogChatSendReply: @unchecked Sendable {
+    private var handler: NanogramLogChatSendCompletion?
+
+    init(_ handler: @escaping NanogramLogChatSendCompletion) {
+        self.handler = handler
+    }
+
+    @MainActor
+    func receive(_ result: NanogramLogChatSendResult) {
+        let handler = self.handler
+        self.handler = nil
+        handler?(result)
+    }
+
+    deinit {
+        if let handler = self.handler {
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    handler(.cancelled)
+                }
+            }
+        }
+    }
+}
+
 @MainActor
 final class NanogramLogExportRun {
     private let gate: NanogramLogExportGate

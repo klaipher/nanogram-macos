@@ -108,6 +108,23 @@ final class NanogramLogExportDeliveryTests: XCTestCase {
     }
 
     @MainActor
+    func testAChatPickerClosedWithoutAnAnswerReleasesTheLockAndTheFiles() throws {
+        let recorder = DeliveryRecorder()
+        self.install(recorder)
+        let file = try self.startChatSend(recorder)
+        XCTAssertTrue(NanogramLogExportGate.shared.isRunning)
+
+        recorder.chatCompletion = nil
+        let released = self.expectation(for: NSPredicate { _, _ in
+            return MainActor.assumeIsolated { !NanogramLogExportGate.shared.isRunning }
+        }, evaluatedWith: nil)
+        self.wait(for: [released], timeout: 5)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.deletingLastPathComponent().path))
+        XCTAssertEqual(recorder.messages, [])
+        XCTAssertEqual(recorder.delivered, 0)
+    }
+
+    @MainActor
     func testAFailedUploadRemovesTheFilesAndSaysSo() throws {
         let recorder = DeliveryRecorder()
         self.install(recorder)
