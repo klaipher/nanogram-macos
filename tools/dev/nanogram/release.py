@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nanogram import branding, buildcheck, config, editions
+from nanogram import dmg as disk_image
 
 TEAM = "YGTMYL879P"
 APP_STORE_APP_ID = "6829268176"
@@ -397,23 +398,10 @@ DMG_SPCTL_ARGS = ["-a", "-vv", "-t", "open", "--context", "context:primary-signa
 
 
 def make_dmg(app: Path, out: Path, identity: str | None = None) -> Path:
-    """A compressed APFS disk image (ULFO) with the app and an Applications link, signed with `identity` if given:
-    Gatekeeper checks a disk image's own signature, so an unsigned one is rejected even when notarized."""
-    app, out = Path(app), Path(out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    staging = out.parent / f".{out.stem}.staging"
-    if staging.exists():
-        shutil.rmtree(staging)
-    staging.mkdir()
-    try:
-        subprocess.run(["ditto", str(app), str(staging / app.name)], check=True)
-        (staging / "Applications").symlink_to("/Applications")
-        if out.exists():
-            out.unlink()
-        subprocess.run(["hdiutil", "create", "-quiet", "-volname", app.stem, "-srcfolder", str(staging),
-                        "-fs", "APFS", "-format", "ULFO", str(out)], check=True)
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
+    """The installer disk image (nanogram/dmg.py: a compressed APFS image with the app, an Applications link and the
+    Finder window layout), signed with `identity` if given: Gatekeeper checks a disk image's own signature, so an
+    unsigned one is rejected even when notarized."""
+    out = disk_image.build(Path(app), Path(out))
     if identity:
         subprocess.run(["codesign", "--force", "--timestamp", "--sign", identity, str(out)], check=True)
     return out
