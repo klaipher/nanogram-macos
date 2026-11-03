@@ -29,6 +29,7 @@ let package = Package(
         .package(name: "TelegramMediaResources", path: "../TelegramMediaResources"),
         .package(name: "TelegramMediaPlayer", path: "../../submodules/telegram-ios/submodules/MediaPlayer"),
         .package(name: "VoiceRecorderInput", path: "../VoiceRecorderInput"),
+        .package(name: "NanogramRuntime", path: "../NanogramRuntime"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -49,6 +50,7 @@ let package = Package(
                            .product(name: "OpusBinding", package: "OpusBinding", condition: nil),
                            .product(name: "TelegramVoip", package: "TelegramVoip", condition: nil),
                            .product(name: "VoiceRecorderInput", package: "VoiceRecorderInput", condition: nil),
+                           .product(name: "NanogramRuntime", package: "NanogramRuntime", condition: nil),
                           ],
             path: "Sources"),
     ]

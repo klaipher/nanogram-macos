@@ -5,6 +5,7 @@ import Postbox
 import SwiftSignalKit
 import TGUIKit
 import ApiCredentials
+import NanogramRuntime
 
 private let enableDifference = false
 
@@ -180,7 +181,7 @@ final class TRLotData {
             self.isDirty = false
             let data = try? PropertyListEncoder().encode(self.map)
             if let data = data {
-                _ = NSKeyedArchiver.archiveRootObject(data, toFile: self.mapPath)
+                PlistCacheFile.write(data, toPath: self.mapPath)
             }
         }
     }
@@ -302,27 +303,12 @@ final class TRLotData {
             return
         }
         
-        guard let data = NSKeyedUnarchiver.unarchiveObject(withFile: self.mapPath) as? Data else {
-            self.map = .init(dest: [:], fps: 0, startFrame: 0, endFrame: 0)
-            self.bufferSize = bufferSize
-            deferr(self)
-            return
-        }
-        if let map = decodeDstData(data) {
-            self.map = map
-            self.bufferSize = bufferSize
-            deferr(self)
-        } else {
-            do {
-                self.map = try PropertyListDecoder().decode(DstData.self, from: data)
-                self.bufferSize = bufferSize
-                deferr(self)
-            } catch {
-                self.map = .init(dest: [:], fps: 0, startFrame: 0, endFrame: 0)
-                self.bufferSize = bufferSize
-                deferr(self)
-            }
-        }
+        let stored = PlistCacheFile.read(atPath: self.mapPath, decode: { data in
+            return decodeDstData(data) ?? (try? PropertyListDecoder().decode(DstData.self, from: data))
+        })
+        self.map = stored ?? .init(dest: [:], fps: 0, startFrame: 0, endFrame: 0)
+        self.bufferSize = bufferSize
+        deferr(self)
         
         if !self.map.dest.isEmpty, self.map.dest.filter ({ $0.value.finished }).count == self.map.dest.count {
             self.isFinished = true
