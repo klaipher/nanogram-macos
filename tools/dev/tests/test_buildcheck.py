@@ -102,7 +102,8 @@ class XcconfigTests(unittest.TestCase):
     """Fast Debug settings must never reach Release, the mas edition or an archive."""
 
     STAGE2_KEYS = ("DEBUG_INFORMATION_FORMAT", "SWIFT_COMPILATION_MODE", "GCC_OPTIMIZATION_LEVEL",
-                   "ENABLE_MODULE_VERIFIER", "LM_SKIP_METADATA_EXTRACTION")
+                   "ENABLE_MODULE_VERIFIER", "LM_SKIP_METADATA_EXTRACTION", "COMPILATION_CACHE_ENABLE_CACHING",
+                   "COMPILATION_CACHE_CAS_PATH", "COMPILATION_CACHE_LIMIT_SIZE")
     RELEASE_LINES = ("SWIFT_OPTIMIZATION_LEVEL[config=Release] = -O",
                      "SWIFT_COMPILATION_MODE[config=Release] = wholemodule",
                      "GCC_OPTIMIZATION_LEVEL[config=Release] = 3",
