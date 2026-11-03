@@ -1273,27 +1273,7 @@ NSArray<NSString *> *cut_long_message(NSString *message, int max_length) {
 
 
 int64_t SystemIdleTime(void) {
-    int64_t idlesecs = -1;
-    io_iterator_t iter = 0;
-    if (IOServiceGetMatchingServices(kIOMasterPortDefault, IOServiceMatching("IOHIDSystem"), &iter) == KERN_SUCCESS) {
-        io_registry_entry_t entry = IOIteratorNext(iter);
-        if (entry) {
-            CFTypeRef obj = IORegistryEntryCreateCFProperty(entry, CFSTR("HIDIdleTime"), kCFAllocatorDefault, 0);
-            if (obj) {
-                if (CFGetTypeID(obj) == CFNumberGetTypeID()) {
-                    int64_t nanoseconds = 0;
-                    if (CFNumberGetValue((CFNumberRef)obj, kCFNumberSInt64Type, &nanoseconds)) {
-                        idlesecs = (nanoseconds >> 30);
-                    }
-                }
-                CFRelease(obj);
-            }
-            IOObjectRelease(entry);
-        }
-        IOObjectRelease(iter);
-    }
-    
-    return idlesecs;
+    return (int64_t)CGEventSourceSecondsSinceLastEventType(kCGEventSourceStateCombinedSessionState, kCGAnyInputEventType);
 }
 
 NSDictionary<NSString *, NSString *> *audioTags(AVURLAsset *asset) {

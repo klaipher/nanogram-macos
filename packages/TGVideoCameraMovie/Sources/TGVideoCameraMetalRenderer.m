@@ -65,6 +65,8 @@ static NSString *const TGVideoMessageMetalSource = @
 "    return mix(color, background, (s1 + s2 + s3 + s4) * 0.25);\n"
 "}\n";
 
+static NSInteger TGVideoMessagePipelineCompileCount = 0;
+
 static id<MTLRenderPipelineState> TGVideoMessagePipeline(id<MTLDevice> device)
 {
     static NSMutableDictionary<NSNumber *, id<MTLRenderPipelineState>> *pipelines;
@@ -78,6 +80,7 @@ static id<MTLRenderPipelineState> TGVideoMessagePipeline(id<MTLDevice> device)
         if (pipeline != nil)
             return pipeline;
         NSError *error = nil;
+        TGVideoMessagePipelineCompileCount += 1;
         id<MTLLibrary> library = [device newLibraryWithSource:TGVideoMessageMetalSource options:nil error:&error];
         if (library == nil)
             return nil;
@@ -118,6 +121,26 @@ static id<MTLRenderPipelineState> TGVideoMessagePipeline(id<MTLDevice> device)
 @end
 
 @implementation TGVideoCameraMetalRenderer
+
++ (void)prewarm
+{
+    [self prewarmWithCompletion:nil];
+}
+
++ (void)prewarmWithCompletion:(void (^)(BOOL))completion
+{
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        BOOL ready = device != nil && TGVideoMessagePipeline(device) != nil;
+        if (completion != nil)
+            completion(ready);
+    });
+}
+
++ (NSInteger)pipelineCompileCount
+{
+    return TGVideoMessagePipelineCompileCount;
+}
 
 @synthesize orientation = _orientation;
 @synthesize mirror = _mirror;

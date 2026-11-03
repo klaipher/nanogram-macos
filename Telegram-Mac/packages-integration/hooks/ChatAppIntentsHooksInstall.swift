@@ -180,25 +180,31 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
 final class AppChatFocusFolders {
     static let shared = AppChatFocusFolders()
 
-    private(set) var membership: ChatFocusFolderMembership!
-    private let disposables = DisposableDict<Int64>()
+    private let feeds: ChatFocusFolderFeeds
+
+    var membership: ChatFocusFolderMembership {
+        return self.feeds.membership
+    }
 
     private init() {
-        self.membership = ChatFocusFolderMembership(store: ChatFocusFilterStore.shared, requestFolders: { accountId in
-            DispatchQueue.main.async {
-                AppChatFocusFolders.shared.subscribe(accountId)
+        self.feeds = ChatFocusFolderFeeds(store: ChatFocusFilterStore.shared, schedule: { DispatchQueue.main.async(execute: $0) }, observeFolders: { accountId, update in
+            guard let account = AppChatFocusFolders.loggedInAccount(accountId) else {
+                return nil
+            }
+            let disposable = TelegramEngine(account: account).peers.updatedChatListFilters().start(next: { filters in
+                update(filters.compactMap(AppChatFocusFolders.rules))
+            })
+            return {
+                disposable.dispose()
             }
         })
     }
 
-    private func subscribe(_ accountId: Int64) {
-        guard let context = accountContext(accountId) else {
-            self.membership.clearFolders(accountId: accountId)
-            return
+    private static func loggedInAccount(_ accountId: Int64) -> Account? {
+        if let account = appDelegate?.sharedApplicationContextValue?.notificationManager.activeAccounts.accounts.first(where: { $0.0.int64 == accountId })?.1 {
+            return account
         }
-        self.disposables.set(context.engine.peers.updatedChatListFilters().start(next: { [weak self] filters in
-            self?.membership.setFolders(filters.compactMap(AppChatFocusFolders.rules), accountId: accountId)
-        }), forKey: accountId)
+        return accountContext(accountId)?.account
     }
 
     private static func rules(_ filter: ChatListFilter) -> ChatFocusFolderRules? {
@@ -229,10 +235,9 @@ final class AppChatFocusFolders {
     }
 
     static func chat(transaction: Transaction, peerId: PeerId, isMuted: Bool, hasUnseenMention: Bool) -> ChatFocusChat {
-        var peerIds: [Int64] = [peerId.toInt64()]
+        let peerIds: [Int64] = [peerId.toInt64()]
         var peer = transaction.getPeer(peerId)
         if let secretChat = peer as? TelegramSecretChat {
-            peerIds.append(secretChat.regularPeerId.toInt64())
             peer = transaction.getPeer(secretChat.regularPeerId)
         }
         let kind: ChatFocusChat.Kind

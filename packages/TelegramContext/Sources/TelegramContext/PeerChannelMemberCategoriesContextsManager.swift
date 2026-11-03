@@ -287,10 +287,10 @@ public final class PeerChannelMemberCategoriesContextsManager {
                             var count: Int32 = 0
                             let timestamp = CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970
                             if let presences = (view.views[key] as? PeerPresencesView)?.presences {
+                                let globalTime = account.network.globalTime
+                                let networkTime = globalTime > 0 ? globalTime - timestamp : 0
                                 for (_, presence) in presences {
                                     if let presence = presence as? TelegramUserPresence {
-                                        let networkTime = account.network.globalTime > 0 ? account.network.globalTime - timestamp : 0
-                                        
                                         let relativeStatus = relativeUserPresenceStatus(presence, timeDifference: networkTime, relativeTo: Int32(timestamp))
                                         sw: switch relativeStatus {
                                         case let .online(at: until):

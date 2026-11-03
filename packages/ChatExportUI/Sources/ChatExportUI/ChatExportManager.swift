@@ -86,7 +86,9 @@ public func exportChatToHtml(context: any AccountContextProtocol, peerId: PeerId
             let run = ChatExportRun(context: context, peerId: peerId, peerTitle: peerTitle, settings: settings, cancelled: cancelled, emit: { update in
                 subscriber.putNext(update)
             })
-            run.run()
+            ProcessInfo.processInfo.performActivity(options: .userInitiated, reason: "Exporting chat") {
+                run.run()
+            }
             subscriber.putCompletion()
         }
         return ActionDisposable {
@@ -1050,7 +1052,9 @@ public func exportAllChatsToHtml(context: any AccountContextProtocol, settings: 
             let run = FullExportRun(context: context, settings: settings, cancelled: cancelled, sessionsSignal: sessionsSignal, webSessionsSignal: webSessionsSignal, emit: { update in
                 subscriber.putNext(update)
             })
-            run.run()
+            ProcessInfo.processInfo.performActivity(options: .userInitiated, reason: "Exporting chat") {
+                run.run()
+            }
             subscriber.putCompletion()
         }
         return ActionDisposable {

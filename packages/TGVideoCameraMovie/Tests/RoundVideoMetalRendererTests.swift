@@ -234,6 +234,21 @@ final class RoundVideoMetalRendererTests: XCTestCase {
         XCTAssertTrue(pixel(a, x: 192, y: 192) == pixel(b, x: 192, y: 192), "inside the circle")
     }
 
+    func testPrewarmCompilesTheShaderOffTheMainThreadSoTheRecorderDoesNot() throws {
+        let warmed = expectation(description: "prewarm")
+        var compiledOnMain = true
+        TGVideoCameraMetalRenderer.prewarm(completion: { ready in
+            compiledOnMain = Thread.isMainThread
+            XCTAssertTrue(ready)
+            warmed.fulfill()
+        })
+        wait(for: [warmed], timeout: 20)
+        XCTAssertFalse(compiledOnMain)
+        let before = TGVideoCameraMetalRenderer.pipelineCompileCount()
+        _ = try XCTUnwrap(TGVideoCameraMetalRenderer())
+        XCTAssertEqual(TGVideoCameraMetalRenderer.pipelineCompileCount(), before)
+    }
+
     func testFourKFramesStillRenderAtTheOutputSide() throws {
         let frame = makeCameraFrame(.skin, width: 3840, height: 2160)
         let metal = try XCTUnwrap(TGVideoCameraMetalRenderer())

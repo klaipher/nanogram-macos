@@ -7,6 +7,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (nullable instancetype)init;
 
++ (void)prewarm;
++ (void)prewarmWithCompletion:(nullable void (^)(BOOL ready))completion;
++ (NSInteger)pipelineCompileCount;
+
 @end
 
 NS_ASSUME_NONNULL_END

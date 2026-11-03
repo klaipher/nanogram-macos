@@ -48,9 +48,10 @@ class UNUserNotifications : NSObject {
     }
     
     static func recurrentAuthorizationStatus(_ context: AccountContext) -> Signal<AuthorizationStatus, NoError> {
-        return context.window.keyWindowUpdater |> mapToSignal { _ in
-            return (authorizationStatus |> then(.complete() |> suspendAwareDelay(1 * 60.0, queue: Queue.concurrentDefaultQueue()))) |> restart
-        } |> distinctUntilChanged
+        let requery = context.window.keyWindowUpdater |> mapToSignal { isKey -> Signal<AuthorizationStatus, NoError> in
+            return isKey ? authorizationStatus : .complete()
+        }
+        return (authorizationStatus |> then(requery)) |> distinctUntilChanged
     }
     
     static var authorizationStatus: Signal<AuthorizationStatus, NoError> {

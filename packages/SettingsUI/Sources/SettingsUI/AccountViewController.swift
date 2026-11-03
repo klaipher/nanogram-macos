@@ -820,6 +820,7 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
     
     
     private let disposable = MetaDisposable()
+    private let isShown = ValuePromise<Bool>(false, ignoreRepeated: true)
     
     let actionsDisposable = DisposableSet()
     
@@ -1193,7 +1194,14 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
             walletBalance = .single(nil)
         }
 
-        let apply = combineLatest(queue: prepareQueue, context.account.viewTracker.peerView(context.account.peerId), context.sharedContext.activeAccountsWithInfo, appearanceSignal, settings.get(), appUpdateState, hasFilters.get(), sessionsCount, SettingsHooks.shared.authorizationStatus(context), twoStep, storyStats, acceptBots.get(), context.starsContext.state, context.tonContext.state, walletBalance) |> map { peerView, accounts, appearance, settings, appUpdateState, hasFilters, sessionsCount, unAuthStatus, twoStepConfiguration, storyStats, attachMenuBots, stars, ton, walletBalance -> TableUpdateTransition in
+        let inputs = combineLatest(queue: prepareQueue, context.account.viewTracker.peerView(context.account.peerId), context.sharedContext.activeAccountsWithInfo, appearanceSignal, settings.get(), appUpdateState, hasFilters.get(), sessionsCount, SettingsHooks.shared.authorizationStatus(context), twoStep, storyStats, acceptBots.get(), context.starsContext.state, context.tonContext.state, walletBalance)
+        let appliedOnce = Atomic<Bool>(value: false)
+        let apply = combineLatest(queue: prepareQueue, inputs, self.isShown.get())
+        |> filter { _, isShown in
+            return isShown || !appliedOnce.swap(true)
+        }
+        |> map { values, _ -> TableUpdateTransition in
+            let (peerView, accounts, appearance, settings, appUpdateState, hasFilters, sessionsCount, unAuthStatus, twoStepConfiguration, storyStats, attachMenuBots, stars, ton, walletBalance) = values
             let entries = accountInfoEntries(peerView: peerView, context: context, accounts: accounts.accounts, language: appearance.language, privacySettings: settings.0, webSessions: settings.1, proxySettings: settings.2, passportVisible: settings.3.0, appUpdateState: appUpdateState, hasFilters: hasFilters, sessionsCount: sessionsCount, unAuthStatus: unAuthStatus, has2fa: settings.3.1, twoStepConfiguration: twoStepConfiguration, storyStats: storyStats, attachMenuBots: attachMenuBots, stars: stars, ton: ton, walletBalance: walletBalance).map {AppearanceWrapperEntry(entry: $0, appearance: appearance)}
             var size = atomicSize.modify {$0}
             size.width = max(size.width, 280)
@@ -1336,8 +1344,14 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
         window?.removeAllHandlers(for: self)
     }
     
+    open override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        self.isShown.set(false)
+    }
+
     open override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        self.isShown.set(true)
         SettingsNavigationHooks.shared.prefetchQrStudio(context)
         guard hasAppeared else {
             hasAppeared = true

@@ -84,12 +84,37 @@ final class ChatFocusFolderMembershipTests: XCTestCase {
         XCTAssertFalse(ChatFocusFolderMatcher.contains(self.rules(1, categories: [.bots]), self.chat([5], .community([.groups, .channels]))))
     }
 
-    func testSecretChatsMatchThroughTheirUser() {
+    func testSecretChatsMatchIncludeAndExcludeListsByTheirOwnIdAndCategoriesThroughTheirUser() {
         let secret = self.chat([900, 42], .user(isContact: true))
-        XCTAssertTrue(ChatFocusFolderMatcher.contains(self.rules(1, include: [42]), secret))
+        XCTAssertFalse(ChatFocusFolderMatcher.contains(self.rules(1, include: [42]), secret))
         XCTAssertTrue(ChatFocusFolderMatcher.contains(self.rules(1, include: [900]), secret))
         XCTAssertTrue(ChatFocusFolderMatcher.contains(self.rules(1, categories: [.contacts]), secret))
         XCTAssertFalse(ChatFocusFolderMatcher.contains(self.rules(1, categories: [.nonContacts]), secret))
-        XCTAssertFalse(ChatFocusFolderMatcher.contains(self.rules(1, exclude: [42], categories: [.contacts]), secret))
+        XCTAssertTrue(ChatFocusFolderMatcher.contains(self.rules(1, exclude: [42], categories: [.contacts]), secret))
+        XCTAssertFalse(ChatFocusFolderMatcher.contains(self.rules(1, exclude: [900], categories: [.contacts]), secret))
+    }
+
+    func testFoldersLoadForEveryLoggedInAccountNotOnlyTheActiveOne() {
+        let store = self.store()
+        var observed: [Int64] = []
+        var updates: [Int64: ([ChatFocusFolderRules]) -> Void] = [:]
+        var cancelled: [Int64] = []
+        let loggedIn: Set<Int64> = [1, 2]
+        let feeds = ChatFocusFolderFeeds(store: store, schedule: { $0() }, observeFolders: { accountId, update in
+            guard loggedIn.contains(accountId) else {
+                return nil
+            }
+            observed.append(accountId)
+            updates[accountId] = update
+            return { cancelled.append(accountId) }
+        })
+        store.update(ChatFocusFilter(accountIds: [], folders: [.init(accountId: 2, folderId: 4), .init(accountId: 3, folderId: 5)]))
+        XCTAssertEqual(observed, [2])
+        updates[2]?([self.rules(4, include: [11])])
+        XCTAssertTrue(feeds.membership.isLoaded(accountId: 2))
+        XCTAssertFalse(feeds.membership.allows(accountId: 2, chat: self.chat([10], .group)))
+        XCTAssertTrue(feeds.membership.allows(accountId: 2, chat: self.chat([11], .group)))
+        XCTAssertFalse(feeds.membership.isLoaded(accountId: 3))
+        XCTAssertTrue(cancelled.isEmpty)
     }
 }

@@ -62,11 +62,13 @@ public struct ChatFocusChat: Equatable {
 
 public enum ChatFocusFolderMatcher {
     public static func contains(_ rules: ChatFocusFolderRules, _ chat: ChatFocusChat) -> Bool {
-        if chat.peerIds.contains(where: { rules.excludePeerIds.contains($0) }) {
-            return false
-        }
-        if chat.peerIds.contains(where: { rules.includePeerIds.contains($0) }) {
-            return true
+        if let chatPeerId = chat.peerIds.first {
+            if rules.excludePeerIds.contains(chatPeerId) {
+                return false
+            }
+            if rules.includePeerIds.contains(chatPeerId) {
+                return true
+            }
         }
         if rules.excludeArchived && chat.isArchived {
             return false
@@ -174,5 +176,43 @@ public final class ChatFocusFolderMembership {
         }
         let folderIds = Set(folders.filter { ChatFocusFolderMatcher.contains($0, chat) }.map { $0.id })
         return self.store.allows(accountId: accountId, peerId: chat.peerIds.first ?? 0, folderIds: folderIds)
+    }
+}
+
+public final class ChatFocusFolderFeeds {
+    public private(set) var membership: ChatFocusFolderMembership!
+    private let lock = NSLock()
+    private var cancels: [Int64: () -> Void] = [:]
+    private let observeFolders: (Int64, @escaping ([ChatFocusFolderRules]) -> Void) -> (() -> Void)?
+
+    public init(store: ChatFocusFilterStore, schedule: @escaping (@escaping () -> Void) -> Void, observeFolders: @escaping (_ accountId: Int64, _ update: @escaping ([ChatFocusFolderRules]) -> Void) -> (() -> Void)?) {
+        self.observeFolders = observeFolders
+        self.membership = ChatFocusFolderMembership(store: store, requestFolders: { [weak self] accountId in
+            schedule {
+                self?.subscribe(accountId)
+            }
+        })
+    }
+
+    deinit {
+        for cancel in self.cancels.values {
+            cancel()
+        }
+    }
+
+    private func subscribe(_ accountId: Int64) {
+        let cancel = self.observeFolders(accountId, { [weak self] folders in
+            self?.membership.setFolders(folders, accountId: accountId)
+        })
+        self.lock.lock()
+        let previous = self.cancels.removeValue(forKey: accountId)
+        if let cancel = cancel {
+            self.cancels[accountId] = cancel
+        }
+        self.lock.unlock()
+        previous?()
+        if cancel == nil {
+            self.membership.clearFolders(accountId: accountId)
+        }
     }
 }
