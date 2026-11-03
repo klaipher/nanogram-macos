@@ -1290,7 +1290,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   with `sysmon.py`/`powermetrics` for app and `coreaudiod` CPU. A DecodeBench micro-benchmark of swresample 48→44.1 stereo vs passthrough.
 - **Confidence**: medium (whether `AUiPodTimeOther` self-bypasses at 1.0 was not checked).
 
-### H21. The round-video recorder composites through deprecated OpenGL with a CPU texture upload per frame; use Metal and `CVMetalTextureCache` — `todo — not started in the runtime run, see ledger ruling`
+### H21. The round-video recorder composites through deprecated OpenGL with a CPU texture upload per frame; use Metal and `CVMetalTextureCache` — `done (cff6487): Metal + CVMetalTextureCache, bit-identical to the GL renderer; GL kept as fallback; capture capped at 720p`
 
 - **Evidence**: `packages/TGVideoCameraMovie/Sources/TGVideoCameraGLRenderer.m:85-113` (a CGL context with 4× MSAA). At `:355-364` it locks the camera
   `CVPixelBuffer`, `glTexImage2D` copies it, and `glGenerateMipmap` runs every frame. `:331`: `CVOpenGLTextureCache` is used only for the destination.
@@ -1907,7 +1907,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H18 | partial | d0a7c3e |
 | H19 | partial | 0f80540 |
 | H20 | measured, no change (ruling) | — |
-| H21 | not done (ruling) | — |
+| H21 | done | cff6487 |
 | H22 | done | 9ad344d |
 | H23 | partial | 9d62367 |
 | H24 | partial | 0eb0950 |
