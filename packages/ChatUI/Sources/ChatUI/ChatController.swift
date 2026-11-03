@@ -2279,8 +2279,10 @@ private final class ChatAdData {
                     if let adPeerId = adPeerId {
                         let combinedDisposable = DisposableSet()
                         self.preloadAdPeerDisposable.set(combinedDisposable)
-                        combinedDisposable.add(context.account.viewTracker.polledChannel(peerId: adPeerId).start())
-                        combinedDisposable.add(context.account.addAdditionalPreloadHistoryPeerId(peerId: adPeerId))
+                        let preload = Signal<Void, NoError> { _ in
+                            return context.account.addAdditionalPreloadHistoryPeerId(peerId: adPeerId)
+                        }
+                        combinedDisposable.add(whileVisible(combineLatest(context.account.viewTracker.polledChannel(peerId: adPeerId), preload), visible: self.historyVisibility.get()).start())
                     } else {
                         self.preloadAdPeerDisposable.set(nil)
                     }
@@ -3902,6 +3904,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             return (cachedData.participantsSummary.memberCount ?? 0) > 200 ? 2 : 1
         } |> distinctUntilChanged
         
+        let countersVisibility = self.historyVisibility.get()
         let counters: Signal<ChatTitleCounters, NoError> = combineLatest(onlineCounterMode, self.chatLocationValue) |> mapToSignal { onlineCounterMode, chatLocation in
             let threadId = chatLocation.threadId
             
@@ -3963,9 +3966,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             
             switch onlineCounterMode {
             case 2:
-                onlineMemberCount = context.peerChannelMemberCategoriesContextsManager.recentOnline(peerId: peerId)  |> map(Optional.init) |> deliverOnMainQueue
+                onlineMemberCount = whileVisible(context.peerChannelMemberCategoriesContextsManager.recentOnline(peerId: peerId), visible: countersVisibility)  |> map(Optional.init) |> deliverOnMainQueue
             case 1:
-                onlineMemberCount = context.peerChannelMemberCategoriesContextsManager.recentOnlineSmall(peerId: peerId)  |> map(Optional.init) |> deliverOnMainQueue
+                onlineMemberCount = whileVisible(context.peerChannelMemberCategoriesContextsManager.recentOnlineSmall(peerId: peerId), visible: countersVisibility)  |> map(Optional.init) |> deliverOnMainQueue
             default:
                 onlineMemberCount = .single(nil)
             }
@@ -9437,7 +9440,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
        
         
         
-        pollChannelDiscussionDisposable.set(discussion.start())
+        pollChannelDiscussionDisposable.set(whileVisible(discussion, visible: historyVisibility.get()).start())
         
         
         let personalChannelSignal: Signal<Void, NoError>
@@ -9460,7 +9463,10 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         preloadPersonalChannel.set(personalChannelSignal.start())
         
-        self.premiumOrStarsRequiredDisposable.set(((self.context.engine.peers.isPremiumRequiredToContact([peerId]) |> then(.complete() |> suspendAwareDelay(60.0, queue: Queue.concurrentDefaultQueue()))) |> restart).startStandalone())
+        if peerId.namespace == Namespaces.Peer.CloudUser {
+            let premiumRequiredPoll = (self.context.engine.peers.isPremiumRequiredToContact([peerId]) |> then(.complete() |> suspendAwareDelay(60.0, queue: Queue.concurrentDefaultQueue()))) |> restart
+            self.premiumOrStarsRequiredDisposable.set(whileVisible(premiumRequiredPoll, visible: historyVisibility.get()).startStandalone())
+        }
         
         
         let count = 50

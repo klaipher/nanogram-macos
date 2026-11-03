@@ -247,7 +247,7 @@ public final class ChatAvatarView : Control {
     }
     
     @objc public func updatePlayerIfNeeded() {
-        let accept = window != nil && window!.isKeyWindow && !NSIsEmptyRect(visibleRect)
+        let accept = self.isPlaybackVisible && !NSIsEmptyRect(visibleRect)
         if let photoVideoPlayer = photoVideoPlayer {
             if accept {
                 photoVideoPlayer.play()

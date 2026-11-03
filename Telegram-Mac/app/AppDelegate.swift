@@ -1293,13 +1293,18 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 
                 self.window.contentView?.wantsLayer = true
                 
+                let updatePlaybackVisibility = {
+                    PlaybackVisibility.setScreenAvailable(!sharedWakeupManager.isSleeping && !sharedNotificationManager._lockedValue.screenLock)
+                }
                 sharedWakeupManager.onSleepValueUpdated = { value in
                     self.updatePeerPresence()
+                    updatePlaybackVisibility()
                 }
                 sharedContext.updateStatusBarLock(sharedNotificationManager.isLocked)
                 sharedContext.updateSpotlightLock(sharedNotificationManager._lockedValue.passcodeLock)
                 sharedNotificationManager.didUpdateLocked = { value in
                     self.updatePeerPresence()
+                    updatePlaybackVisibility()
                     sharedContext.updateStatusBarLock(value.isLocked)
                     sharedContext.updateSpotlightLock(value.passcodeLock)
                 }

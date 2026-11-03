@@ -61,12 +61,12 @@ CONFIGURE_FLAGS="--enable-cross-compile --disable-programs \
                  --enable-audiotoolbox \
                  --enable-bsf=aac_adtstoasc,vp9_superframe,h264_mp4toannexb \
                  --enable-decoder=h264,libvpx_vp9,hevc,libopus,mp3,aac,flac,alac_at,pcm_s16le,pcm_s24le,pcm_f32le,gsm_ms_at,vorbis,libdav1d \
-                 --enable-encoder=libvpx_vp9,aac_at \
-                 --enable-demuxer=aac,mov,m4v,mp3,ogg,libopus,flac,wav,aiff,matroska,mpegts \
-                 --enable-parser=aac,h264,mp3,libopus \
+                 --enable-demuxer=aac,mov,m4v,mp3,ogg,flac,wav,aiff,matroska,mpegts \
+                 --enable-parser=aac,h264,mp3 \
                  --enable-protocol=file \
-                 --enable-muxer=mp4,matroska,mpegts \
                  --enable-hwaccel=h264_videotoolbox,hevc_videotoolbox,av1_videotoolbox \
+                 --disable-network --disable-securetransport --disable-bzlib --disable-iconv \
+                 --disable-appkit --disable-avfoundation --disable-coreimage --disable-metal --disable-sdl2 \
                  "
 
 EXTRA_CFLAGS="-DCONFIG_SAFE_BITSTREAM_READER=1"

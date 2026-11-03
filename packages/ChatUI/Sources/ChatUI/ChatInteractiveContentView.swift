@@ -591,7 +591,7 @@ public class ChatInteractiveContentView: ChatMediaContentView {
             return
         }
         
-        var accept = window != nil && window!.isKeyWindow && !NSIsEmptyRect(visibleRect) && !self.isDynamicContentLocked
+        var accept = self.isPlaybackVisible && !NSIsEmptyRect(visibleRect) && !self.isDynamicContentLocked
         
         if lite {
             accept = accept && mouseInside()

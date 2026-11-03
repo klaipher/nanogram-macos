@@ -45,10 +45,23 @@ public final class LottieFrameSurfacePool {
         return CFAbsoluteTimeGetCurrent()
     }
 
+    static let defaultScheduleTrim: (Double, @escaping () -> Void) -> Void = { delay, work in
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    var scheduleTrim: (Double, @escaping () -> Void) -> Void = LottieFrameSurfacePool.defaultScheduleTrim {
+        didSet {
+            self.lock.lock()
+            self.trimPending = false
+            self.lock.unlock()
+        }
+    }
+
     private let lock = NSLock()
     private var slots: [Size: [Slot]] = [:]
     private var _createdCount: Int = 0
     private var lastTrim: Double = 0
+    private var trimPending = false
 
     var retainedCount: Int {
         self.lock.lock()
@@ -94,13 +107,7 @@ public final class LottieFrameSurfacePool {
             self.lock.unlock()
         }
         if now - self.lastTrim > 1.0 {
-            self.lastTrim = now
-            for (key, value) in self.slots {
-                let kept = value.filter { slot in
-                    return !(slot.leases == 0 && now - slot.releasedAt > LottieFrameSurfacePool.idleLifetime && !slot.surface.isInUse)
-                }
-                self.slots[key] = kept.isEmpty ? nil : kept
-            }
+            self.trimIdleLocked(now: now)
         }
         var list = self.slots[size] ?? []
         var candidate: Slot?
@@ -134,14 +141,56 @@ public final class LottieFrameSurfacePool {
         return LottieFrameSurface(slot: slot, pool: self)
     }
 
+    private func trimIdleLocked(now: Double) {
+        self.lastTrim = now
+        for (key, value) in self.slots {
+            let kept = value.filter { slot in
+                return !(slot.leases == 0 && now - slot.releasedAt > LottieFrameSurfacePool.idleLifetime && !slot.surface.isInUse)
+            }
+            self.slots[key] = kept.isEmpty ? nil : kept
+        }
+    }
+
+    private func scheduleIdleTrimLocked() -> Bool {
+        if self.trimPending {
+            return false
+        }
+        self.trimPending = true
+        return true
+    }
+
+    private func runScheduledTrim() {
+        let now = self.now()
+        self.lock.lock()
+        self.trimPending = false
+        self.trimIdleLocked(now: now)
+        let hasIdle = self.slots.values.contains(where: { $0.contains(where: { $0.leases == 0 }) })
+        let schedule = hasIdle && self.scheduleIdleTrimLocked()
+        self.lock.unlock()
+        if schedule {
+            self.armTrim()
+        }
+    }
+
+    private func armTrim() {
+        self.scheduleTrim(LottieFrameSurfacePool.idleLifetime + 1.0, { [weak self] in
+            self?.runScheduledTrim()
+        })
+    }
+
     fileprivate func release(_ slot: Slot) {
         let now = self.now()
         self.lock.lock()
         slot.leases -= 1
+        var schedule = false
         if slot.leases == 0 {
             slot.releasedAt = now
+            schedule = self.scheduleIdleTrimLocked()
         }
         self.lock.unlock()
+        if schedule {
+            self.armTrim()
+        }
     }
 }
 

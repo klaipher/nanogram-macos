@@ -148,7 +148,11 @@ function build_for ()
     "no-tests" \
   )
 
-  ./Configure $PLATFORM -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET no-shared no-tests --prefix="${ABS_TMP_DIR}/${ARCH}" || exit 1
+  ./Configure $PLATFORM -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET no-shared no-tests \
+    no-quic no-engine no-dso no-autoload-config no-legacy no-sm2 no-sm3 no-sm4 no-aria no-camellia no-seed \
+    no-idea no-bf no-cast no-rc2 no-rc4 no-rc5 no-mdc2 no-whirlpool no-srp no-gost no-ct no-cms no-ts no-ssl3 \
+    no-comp no-docs no-ml-dsa no-slh-dsa \
+    --prefix="${ABS_TMP_DIR}/${ARCH}" || exit 1
   
   make build_libs || exit 2
   unset CROSS_TOP

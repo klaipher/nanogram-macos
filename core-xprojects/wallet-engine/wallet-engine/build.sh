@@ -63,8 +63,10 @@ for RUST_TARGET in aarch64-apple-darwin; do
     if [ -x "$RUSTUP_BIN" ]; then
         "$RUSTUP_BIN" target add "$RUST_TARGET" >/dev/null 2>&1 || true
     fi
-    env -u MACOSX_DEPLOYMENT_TARGET CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" build \
+    env -u MACOSX_DEPLOYMENT_TARGET CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" rustc \
         --package wallet-engine \
+        --lib \
+        --crate-type staticlib \
         --release \
         --locked \
         --target "$RUST_TARGET"

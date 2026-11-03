@@ -69,6 +69,10 @@ public final class AnimatableContentObserver {
         }
         add(NSWindow.didBecomeKeyNotification, window)
         add(NSWindow.didResignKeyNotification, window)
+        add(NSWindow.didChangeOcclusionStateNotification, window)
+        center.addObserver(notificationTarget, selector: #selector(AnimatableContentNotificationTarget.forwardNotification(_:)), name: NSApplication.didHideNotification, object: nil)
+        center.addObserver(notificationTarget, selector: #selector(AnimatableContentNotificationTarget.forwardNotification(_:)), name: NSApplication.didUnhideNotification, object: nil)
+        center.addObserver(notificationTarget, selector: #selector(AnimatableContentNotificationTarget.forwardNotification(_:)), name: PlaybackVisibility.didChangeNotification, object: nil)
         if options.contains(.contentBounds), let contentView {
             add(NSView.boundsDidChangeNotification, contentView)
         }
@@ -150,6 +154,10 @@ public final class AnimatableContentTokenObserver {
         let center = NotificationCenter.default
         tokens.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main, using: callback))
         tokens.append(center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main, using: callback))
+        tokens.append(center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main, using: callback))
+        tokens.append(center.addObserver(forName: NSApplication.didHideNotification, object: nil, queue: .main, using: callback))
+        tokens.append(center.addObserver(forName: NSApplication.didUnhideNotification, object: nil, queue: .main, using: callback))
+        tokens.append(center.addObserver(forName: PlaybackVisibility.didChangeNotification, object: nil, queue: .main, using: callback))
         if let contentView {
             tokens.append(center.addObserver(forName: NSView.boundsDidChangeNotification, object: contentView, queue: .main, using: callback))
         }
