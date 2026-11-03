@@ -38,7 +38,7 @@ APPLE_FONT_PREFIXES = ("SF", ".SF", "NewYork")
 FONT_SUFFIXES = (".otf", ".ttf", ".ttc")
 WORKSPACE = "Telegram-Mac.xcworkspace"
 PBXPROJ = config.ROOT / "Telegram.xcodeproj" / "project.pbxproj"
-# Written by the launch order file generator (M31, tools/dev/orderfile.py on the runtime branch). The Release
+# Written by the launch order file generator (M31, tools/dev/orderfile.py). The Release
 # link of the app uses it when it exists; a symbol the linker cannot find is ignored.
 ORDER_FILE = config.ROOT / "Telegram-Mac" / "OrderFiles" / "Telegram.order"
 # Profile-only entitlements (Maps) cannot be in a profile-less local signature, and an -xcconfig setting cannot be

@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <trace-query-result>
 <node xpath='//trace-toc[1]/run[1]/data[1]/table[2]'>
-<row><sample-time id="1" fmt="00:00.002">2000000</sample-time><backtrace id="2"><frame id="3" name="AppDelegate.applicationDidFinishLaunching(_:)"><binary id="4" name="Telegram"/></frame><frame id="5" name="main"><binary ref="4"/></frame><frame id="6" name="start"><binary id="7" name="dyld"/></frame></backtrace></row>
-<row><sample-time id="8" fmt="00:00.001">1000000</sample-time><backtrace id="9"><frame id="10" name="Postbox.init()"><binary ref="4"/></frame><frame ref="5"/><frame ref="6"/></backtrace></row>
-<row><sample-time id="11" fmt="00:00.003">3000000</sample-time><backtrace id="12"><frame id="13" name="objc_msgSend"><binary id="14" name="libobjc.A.dylib"/></frame><frame ref="3"/><frame ref="5"/></backtrace></row>
+<row><sample-time id="1" fmt="00:00.012">12000000</sample-time><tagged-backtrace id="2"><frame id="3" name="AppDelegate.applicationDidFinishLaunching(_:)" addr="0x104000201"><binary id="4" name="NanogramLaunchTrace" UUID="AAAA0000-0000-0000-0000-000000000001" arch="arm64" load-addr="0x104000000"/></frame><frame id="5" name="main" addr="0x104000101"><binary ref="4"/></frame><frame id="6" name="start" addr="0x19fd04d7b"><binary id="7" name="dyld" UUID="DDDD0000-0000-0000-0000-000000000002" load-addr="0x19fcd3000"/></frame></tagged-backtrace></row>
+<row><sample-time id="8" fmt="00:00.010">10000000</sample-time><tagged-backtrace id="9"><frame id="10" name="Postbox.init()" addr="0x104000181"><binary ref="4"/></frame><frame ref="5"/><frame ref="6"/></tagged-backtrace></row>
+<row><event-time id="11" fmt="00:00.015">15000000</event-time><tagged-backtrace id="12"><frame id="13" name="objc_msgSend" addr="0x18000001"><binary id="14" name="libobjc.A.dylib" UUID="EEEE0000-0000-0000-0000-000000000003" load-addr="0x18000000"/></frame><frame ref="3"/><frame ref="5"/></tagged-backtrace></row>
+<row><sample-time id="15" fmt="00:00.005">5000000</sample-time><tagged-backtrace id="16"><frame ref="6"/></tagged-backtrace></row>
 </node>
 </trace-query-result>
