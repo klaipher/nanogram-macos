@@ -206,7 +206,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: none (Mac TableView).
 - **Perflab**: ChatMergeProbe (DEBUG) already wraps the merge.
 
-### M7. Tinted custom emoji are never frame-cached and run rlottie every frame — `todo`, verified (key claim corrected)
+### M7. Tinted custom emoji are never frame-cached and run rlottie every frame — `done (b93d09d)`, verified (key claim corrected)
 
 - **Evidence**: `packages/InlineStickerLayer/Sources/InlineStickerLayer/InlineStickerItemLayer.swift:790-795`
   (`cache = .temporaryLZ4(.effect); if !colors.isEmpty { cache = .none }`); colours are fixed at creation
@@ -235,7 +235,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: iOS `f1b056ef` (tinted template emoji on the cached YUVA path); the idea ports, the code does not.
 - **Perflab**: InlineEmojiLayerLab / InlinePlaybackLab hosts drive real tinted animations without an account.
 
-### M8. Cached video emoji and stickers still open FFmpeg, probe the stream and allocate a VP9 decoder each time they start — `todo`, verified
+### M8. Cached video emoji and stickers still open FFmpeg, probe the stream and allocate a VP9 decoder each time they start — `partial (9734759): lazy decoder on a finished cache done; iOS 019e8379 probe skip not ported (SoftwareVideoSource is the media group's)`, verified
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottiePlayer.swift:1800-1812` (`.webm` always builds
   `SoftwareVideoSource`, while the `.lottie` branch at `:1778` skips its bridge when `fileSupplyment.isFinished`);
@@ -466,7 +466,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   (PowerLabs/Audio pattern).
 - **iOS cross-ref**: `64fc8c95`.
 
-### M20. Pattern wallpapers put a `softLightBlendMode` compositing filter on every tile layer — `todo`, verified (low confidence: measure before changing)
+### M20. Pattern wallpapers put a `softLightBlendMode` compositing filter on every tile layer — `dropped: measured in WallpaperBlendLab (2184207): rasterizing saves 0.14 ms/frame (-15%) offscreen at 2x but differs by up to 2/255 and needs gradient-animation and scale handling; gain too small for the medium UX risk`, verified (low confidence: measure before changing)
 
 - **Evidence**: `packages/TGUIKit/Sources/ViewController.swift:313-320` (light themes with ≥2 colours:
   `compositingFilter = "softLightBlendMode"`); `:180-210` (TileControl creates N tile layers and copies the filter to
@@ -691,7 +691,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   recovery, torn-map rejection, direct readers see unflushed chunks); the 2,000-write benchmark.
 - **iOS cross-ref**: `41e7cd8d`, `13bb846e`; iOS CLAUDE.md "Media I/O invariants".
 
-### M29. The Lottie frame cache stores whole frames with LZFSE, and chat-sticker caches expire after 1 hour — `todo`, verified
+### M29. The Lottie frame cache stores whole frames with LZFSE, and chat-sticker caches expire after 1 hour — `partial (ee9a00f): LZ4 writer + v71 done; the 1 h chat lifetime is unchanged (needs a byte budget)`, verified
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottieBufferCompressor.swift:9` (`enableDifference = false`),
   `:459-466` (LZFSE encode of each full frame), `:507-511` (LZFSE decode per displayed frame), `:41` (`version = 70`);
@@ -713,7 +713,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: `9d908ce1` (cache format 8, LZBITMAP writer). Note iOS kept LZFSE for XOR-delta video-sticker
   caches; this cache has no deltas.
 
-### M30. Animation clocks are free-running dispatch timers per frame rate, not tied to vsync — `todo`, verified (low confidence)
+### M30. Animation clocks are free-running dispatch timers per frame rate, not tied to vsync — `done (b78cfaf); real-display wake-up comparison pending (display asleep)`, verified (low confidence)
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottiePlayer.swift:230-288` (one `RenderFpsLoop` per (duration,
   queue)), `:316-322` (repeating zero-leeway `SwiftSignalKit.Timer`); rates: inline emoji 24-30 Hz (`:1499`), webm
@@ -747,7 +747,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 
 ## Design changes (L)
 
-### M32. Every animated frame is a freshly allocated, copied `CGImage`; use pooled IOSurfaces — `todo`, verified (medium confidence)
+### M32. Every animated frame is a freshly allocated, copied `CGImage`; use pooled IOSurfaces — `partial: deferred, nothing changed — the IOSurface ring needs the onscreen PowerLabs harness (sysmon WindowServer CPU, VM Tracker, P3 captures) on an awake display; the dead metalSupport path is left for the same change`, verified (medium confidence)
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottiePlayer.swift:1584` (rlottie renders into a new
   `Data(count:)` per frame; cache hits decode into a fresh buffer, `LottieBufferCompressor.swift:507-520`);
@@ -896,7 +896,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 
 ### Quick (S)
 
-### H1. Decorative endless Core Animation loops run at 120 Hz on ProMotion; give them a 30-60 Hz frame-rate range — `todo`
+### H1. Decorative endless Core Animation loops run at 120 Hz on ProMotion; give them a 30-60 Hz frame-rate range — `done (da40434); app build check pending, ProMotion sysmon/Quartz Debug comparison needs an awake display`
 
 - **Evidence**: `packages/TGUIKit/Sources/CAAnimationUtils.swift:76-133` is the shared `makeAnimation`/`animate` path and never
   sets `preferredFrameRateRange`. There is no `preferredFrameRateRange` or `maximumFramesPerSecond` anywhere in `packages/` or
@@ -958,7 +958,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   monitor. On the Debug app's login screen, run `sysmon.py` for idle wake-ups, and toggle Wi-Fi to see the availability-changed log line.
 - **Confidence**: high.
 
-### H4. Static-sticker thumbnails decode the same WebP twice at full size; decode once, at the target size — `todo`
+### H4. Static-sticker thumbnails decode the same WebP twice at full size; decode once, at the target size — `done (2a53b7c); AJpeg path unchanged`
 
 - **Evidence**: `packages/TelegramMediaUtils/Sources/TelegramMediaUtils/FetchCachedRepresentations.swift:416`
   (`convertFromWebP`, a full libwebp decode through `decodeForDisplay`, which redraws into a second bitmap, `submodules/libwebp/Sources/libwebp.m:8-17`).
@@ -976,7 +976,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 - **How to verify**: a unit test on bundled `.webp` stickers comparing old and new output with `compare_rgba.py`, plus a micro-benchmark of time and peak allocation.
 - **Confidence**: high.
 
-### H5. Every GIF opens its own VideoToolbox session; use software below 320 px and a 16-session budget (iOS `c2c22996`, extends M27) — `todo`
+### H5. Every GIF opens its own VideoToolbox session; use software below 320 px and a 16-session budget (iOS `c2c22996`, extends M27) — `partial (28d0503): budget + 320 px threshold done; software skip_loop_filter not wired (SoftwareVideoSource is being changed by the media group for M27)`
 
 - **Evidence**: `packages/TelegramMedia/Sources/SoftwareVideoLayerFrameManager.swift:16` (`usesHardwareDecoding = true`) and `:95`
   (hardware for every non-WebM GIF, with no size check and no cap). iOS `c2c22996` measured CPU per frame on the Mac host, software → VideoToolbox:
@@ -1101,7 +1101,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 
 ### Medium (M)
 
-### H13. `ThreadPool` uses legacy `threadPriority`: the Lottie and avatar pools run at priority 62 with no QoS, above the main thread, and every enqueue wakes every worker — `todo`
+### H13. `ThreadPool` uses legacy `threadPriority`: the Lottie and avatar pools run at priority 62 with no QoS, above the main thread, and every enqueue wakes every worker — `done (52ffa2d, core df65bdef)`
 
 - **Evidence**: `submodules/telegram-ios/submodules/SSignalKit/SwiftSignalKit2/Source/ThreadPool.swift:117-131` (`thread.threadPriority = …`
   before `start()`; `qualityOfService` is never set) and `:151` (`pthread_cond_broadcast` for every `workOnQueue`). The pools are
@@ -1132,7 +1132,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   (E and P residency) with an offscreen emoji-heavy LottiePlayer in PowerLabs.
 - **Confidence**: high (the mechanism was measured on this Mac; the energy gain is an estimate).
 
-### H14. Video stickers and video emoji decode VP9 on the CPU with libvpx, then convert and scale at full size; decode on VideoToolbox (iOS `632f1d87`/`06d7091f`) — `todo`
+### H14. Video stickers and video emoji decode VP9 on the CPU with libvpx, then convert and scale at full size; decode on VideoToolbox (iOS `632f1d87`/`06d7091f`) — `partial (091fa70): VP9Hardware port + hardware sticker reader in WebmRenderer done; VT-side scaling, fused conversion and the hardware cache builder not ported`
 
 - **Evidence**: `core-xprojects/ffmpeg/ffmpeg/build.sh:63,69`: the only VP9 decoder is `libvpx_vp9`, and the hwaccels are h264/hevc/av1.
   `SoftwareVideoLayerFrameManager.swift:42,95` (`&& !hintVP9`). `LottiePlayer.swift:1800-1812` (`WebmRenderer` over `SoftwareVideoSource(hintVP9: true)`) and
@@ -1204,7 +1204,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   duration. A harness that records on the default mic and asserts that `kAudioDevicePropertyNominalSampleRate` is unchanged afterwards. Port the iOS `VoiceRecorderInputTests`.
 - **Confidence**: high (code paths verified; the 44.1 kHz symptom is inferred).
 
-### H17. The shared display link is a CVDisplayLink (deprecated in the macOS 15 SDK) that wakes on every vsync; drive it from `CADisplayLink` with a frame-rate range (extends M30) — `todo`
+### H17. The shared display link is a CVDisplayLink (deprecated in the macOS 15 SDK) that wakes on every vsync; drive it from `CADisplayLink` with a frame-rate range (extends M30) — `done (12d814a); real-display rate tests skip while the display sleeps, rerun awake`
 
 - **Evidence**: `packages/TGUIKit/Sources/DisplayLinkAnimator.swift:31-110` (`CVDisplayLinkCreateWithCGDisplay` at `:47`; the callback at `:57-66` takes a lock and
   `gate.tick()` on every vsync; only the main hop is throttled). `:186-215` follows the screen by hand, and `:233-260` creates and destroys the link as links
@@ -1368,7 +1368,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   `log stream --predicate 'subsystem == "com.apple.UserNotifications"'` shows the result.
 - **Confidence**: medium (whether macOS renders the avatar for this app needs a run).
 
-### H25. GIF tiles each own an AVSampleBufferDisplayLayer fed a new CMSampleBuffer per frame plus two queue hops; try IOSurface `layer.contents` — `todo` (measure first, after M27 and H5)
+### H25. GIF tiles each own an AVSampleBufferDisplayLayer fed a new CMSampleBuffer per frame plus two queue hops; try IOSurface `layer.contents` — `partial (b0fbff2): the unused layer pool now reuses tile layers; the IOSurface contents path is unmeasured (onscreen harness, display asleep)` (measure first, after M27 and H5)
 
 - **Evidence**: `packages/TelegramMedia/Sources/SampleBufferPool.swift:36-53`: the `pool` is never read, and `takeSampleBufferLayer()` always creates a new
   `SampleBufferLayerImpl`. `SoftwareVideoLayerFrameManager.swift:100-130`: each tick hops to `applyQueue`, calls `enqueue(frame.sampleBuffer)`, then
