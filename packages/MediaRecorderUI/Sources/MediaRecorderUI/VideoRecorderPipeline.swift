@@ -120,7 +120,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         } |> distinctUntilChanged
     }
     
-    private let renderer:TGVideoCameraGLRenderer = TGVideoCameraGLRenderer()
+    private let renderer: TGVideoCameraRenderer = (TGVideoCameraMetalRenderer() as TGVideoCameraRenderer?) ?? TGVideoCameraGLRenderer()
     private var renderingEnabled: Bool = false
 
     private var recorder: TGVideoCameraMovieRecorder!
@@ -216,7 +216,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         
         videoOutput.alwaysDiscardsLateVideoFrames = false
 
-        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferIOSurfacePropertiesKey as String: [:]]
+        videoOutput.videoSettings = captureVideoSettings()
         
         videoOutput.setSampleBufferDelegate(self, queue: VideoRecorderPipeline.queue.queue)
         session.addOutput(videoOutput)
@@ -288,6 +288,24 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             self.videoDeviceInput = videoDeviceInput
         }
         session.commitConfiguration()
+        videoOutput.videoSettings = captureVideoSettings()
+    }
+    
+    private func captureVideoSettings() -> [String: Any] {
+        var settings: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+            kCVPixelBufferMetalCompatibilityKey as String: true
+        ]
+        if let device = videoDevice {
+            let source = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+            let capped = TGVideoCameraCaptureDimensions(source)
+            if capped.width != source.width || capped.height != source.height {
+                settings[kCVPixelBufferWidthKey as String] = Int(capped.width)
+                settings[kCVPixelBufferHeightKey as String] = Int(capped.height)
+            }
+        }
+        return settings
     }
   
     

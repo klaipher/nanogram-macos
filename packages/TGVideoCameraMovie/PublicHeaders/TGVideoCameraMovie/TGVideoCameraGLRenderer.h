@@ -1,8 +1,9 @@
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 #import <AVFoundation/AVFoundation.h>
+#import "TGVideoCameraRenderer.h"
 
-@interface TGVideoCameraGLRenderer : NSObject
+@interface TGVideoCameraGLRenderer : NSObject <TGVideoCameraRenderer>
 
 @property (nonatomic, readonly) __attribute__((NSObject)) CMFormatDescriptionRef outputFormatDescription;
 @property (nonatomic, assign) AVCaptureVideoOrientation orientation;
