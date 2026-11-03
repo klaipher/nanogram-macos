@@ -10,6 +10,7 @@ import Accelerate
 import QuartzCore
 import TelegramMediaPlayer
 import CoreMedia
+import VP9Hardware
 
 public protocol R_LottieBridge: NSObject {
     func renderFrame(with index: Int32, into buffer: UnsafeMutablePointer<UInt8>, width: Int32, height: Int32, bytesPerRow: Int32)
@@ -1343,6 +1344,9 @@ final class WebmRenderer : RenderContainer {
     private let animation: LottieAnimation
     private var decoder: SoftwareVideoSource?
     private var makeDecoder: (() -> SoftwareVideoSource)?
+    private var hardwareReader: VP9HardwareStickerReader?
+    private var makeHardwareReader: (() -> VP9HardwareStickerReader?)?
+    private var hardwareFramesRead: Int = 0
     private let framerate: Int
     
     
@@ -1351,10 +1355,15 @@ final class WebmRenderer : RenderContainer {
     private let fileSupplyment: TRLotFileSupplyment?
     private let detectedEndFrame: Atomic<Int32?>
 
-    init(animation: LottieAnimation, makeDecoder: @escaping () -> SoftwareVideoSource, fileSupplyment: TRLotFileSupplyment?) {
+    init(animation: LottieAnimation, makeDecoder: @escaping () -> SoftwareVideoSource, makeHardwareReader: (() -> VP9HardwareStickerReader?)? = nil, fileSupplyment: TRLotFileSupplyment?) {
         self.animation = animation
         if let fileSupplyment = fileSupplyment, fileSupplyment.isFinished, fileSupplyment.fps > 0 {
             self.framerate = Int(fileSupplyment.fps)
+            self.makeDecoder = makeDecoder
+            self.makeHardwareReader = makeHardwareReader
+        } else if let hardwareReader = makeHardwareReader?() {
+            self.hardwareReader = hardwareReader
+            self.framerate = hardwareReader.frameRate
             self.makeDecoder = makeDecoder
         } else {
             let decoder = makeDecoder()
@@ -1396,6 +1405,34 @@ final class WebmRenderer : RenderContainer {
             }
         }
 
+        if self.decoder == nil, self.hardwareReader == nil, let makeHardwareReader = self.makeHardwareReader {
+            self.makeHardwareReader = nil
+            self.hardwareReader = makeHardwareReader()
+        }
+        if let hardwareReader = self.hardwareReader {
+            if !hardwareReader.hasMoreFrames {
+                self.reachedEnd(at: frameIndex)
+                return nil
+            }
+            var data: Data?
+            let decoded = hardwareReader.readFrame { pointer, width, height, bytesPerRow in
+                data = scaleWebmFrame(pointer, width: width, height: height, bytesPerRow: bytesPerRow, to: s)
+            }
+            if decoded, let data = data {
+                self.hardwareFramesRead += 1
+                self.index += 1
+                return RenderedWebmFrame(key: animation.key, frame: frameIndex, fps: self.fps, size: animation.size, data: data, backingScale: animation.backingScale)
+            }
+            self.hardwareReader = nil
+            if let makeDecoder = self.makeDecoder {
+                self.makeDecoder = nil
+                let decoder = makeDecoder()
+                for _ in 0 ..< self.hardwareFramesRead {
+                    _ = decoder.readFrame(maxPts: nil)
+                }
+                self.decoder = decoder
+            }
+        }
         if self.decoder == nil, let makeDecoder = self.makeDecoder {
             self.makeDecoder = nil
             self.decoder = makeDecoder()
@@ -1465,6 +1502,8 @@ final class WebmRenderer : RenderContainer {
             fileSupplyment.markFinished()
             self.decoder = nil
             self.makeDecoder = nil
+            self.hardwareReader = nil
+            self.makeHardwareReader = nil
         }
     }
     func setColor(_ color: NSColor, keyPath: String) {
@@ -1823,6 +1862,8 @@ public final class LottieAnimation : Equatable {
                 let reusePixelBuffers = fileSupplyment == nil
                 return WebmRenderer(animation: self, makeDecoder: {
                     return SoftwareVideoSource(path: path, hintVP9: true, unpremultiplyAlpha: premultiply, reusePixelBuffers: reusePixelBuffers)
+                }, makeHardwareReader: {
+                    return VP9HardwareStickerReader(path: path, unpremultiplyAlpha: premultiply)
                 }, fileSupplyment: fileSupplyment)
             }
         }
