@@ -7,8 +7,6 @@ build holds (its checkout's buildlock) and nothing of the current checkout is re
 from __future__ import annotations
 
 import argparse
-import errno
-import fcntl
 import os
 import plistlib
 import shutil
@@ -19,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from . import config, fwcache
+from . import checkoutlock, config, fwcache
 
 Kind = Literal["derived-data", "swiftpm-scratch", "frameworks", "compilation-cache", "tmp", "other"]
 DAY = 86400
@@ -28,6 +26,7 @@ RECENT = 2 * 3600
 DEFAULT_MAX_GB = 40
 EVICTION_ORDER: tuple[Kind, ...] = ("swiftpm-scratch", "derived-data", "compilation-cache")
 STALE_KINDS: tuple[Kind, ...] = ("derived-data", "swiftpm-scratch")
+PROTECTED_NAMES = ("sparkle-ed25519", "sparkle_ed25519", "launch-home")
 
 
 @dataclass(frozen=True)
@@ -44,7 +43,7 @@ class Item:
 
 def kind_of(path: Path) -> Kind:
     name = path.name
-    if not path.is_dir() or path.is_symlink():
+    if not path.is_dir() or path.is_symlink() or name in PROTECTED_NAMES:
         return "other"
     if name.startswith("DerivedData"):
         return "derived-data"
@@ -84,24 +83,8 @@ def last_used(path: Path) -> float:
     return newest
 
 
-def lock_file(cache_dir: Path, checkout: Path) -> Path:
-    return Path(cache_dir) / f"build-{checkout.name}.lock"
-
-
-def is_locked(lock: Path) -> bool:
-    try:
-        fd = os.open(lock, os.O_RDONLY)
-    except OSError:
-        return False
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError as error:
-        return error.errno in (errno.EWOULDBLOCK, errno.EAGAIN)
-    else:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        return False
-    finally:
-        os.close(fd)
+lock_file = checkoutlock.lock_file
+is_locked = checkoutlock.is_locked
 
 
 def workspace_owner(derived: Path) -> Path | None:
@@ -211,6 +194,9 @@ def prune(items: list[Item], max_total: int, stale_days: int = 7, dry_run: bool 
     outside = [str(i.path) for i in targets if not _inside_cache(i.path)]
     if outside:
         raise config.ConfigError(f"refusing to remove paths outside {config.CACHE_DIR}: {', '.join(outside)}")
+    protected = [str(i.path) for i in targets if i.path.name in PROTECTED_NAMES]
+    if protected:
+        raise config.ConfigError(f"refusing to remove protected paths: {', '.join(protected)}")
     if dry_run:
         return targets
     for item in targets:
@@ -220,11 +206,23 @@ def prune(items: list[Item], max_total: int, stale_days: int = 7, dry_run: bool 
     return targets
 
 
+def owned_derived_data(derived: Path, cache_dir: Path) -> bool:
+    if derived.is_symlink() or not derived.name.startswith("DerivedData"):
+        return False
+    return derived.resolve().parent == Path(cache_dir).resolve()
+
+
+def require_owned_derived_data() -> Path:
+    derived = Path(config.DERIVED_DATA)
+    if not owned_derived_data(derived, Path(config.CACHE_DIR)):
+        raise config.ConfigError(f"{derived} is not a DerivedData* directory directly in {config.CACHE_DIR}; "
+                                 "tg clean removes nothing outside it")
+    return derived
+
+
 def clean(root: Path, everything: bool) -> int:
     root = Path(root)
-    if is_locked(lock_file(Path(config.CACHE_DIR), root)):
-        raise config.ConfigError(f"a build of {root.name} is running (buildlock held); try again when it is done")
-    derived = Path(config.DERIVED_DATA)
+    derived = require_owned_derived_data()
     targets = [derived if everything else derived / "Build", root / "build-output" / "apps"]
     freed = 0
     for target in targets:
@@ -271,9 +269,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     try:
         if args.command == "clean":
+            require_owned_derived_data()
             before = disk_usage(Path(config.DERIVED_DATA)) if Path(config.DERIVED_DATA).exists() else 0
             print(f"==> {config.DERIVED_DATA}: {gigabytes(before)}")
-            freed = clean(config.ROOT, everything=args.all)
+            with checkoutlock.hold(checkoutlock.lock_path(), exclusive=True):
+                freed = clean(config.ROOT, everything=args.all)
             after = disk_usage(Path(config.DERIVED_DATA)) if Path(config.DERIVED_DATA).exists() else 0
             print(f"==> freed {gigabytes(freed)}; {config.DERIVED_DATA}: {gigabytes(after)}")
             return 0

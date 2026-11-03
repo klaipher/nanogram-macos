@@ -265,6 +265,16 @@ class CacheRunTests(unittest.TestCase):
             self.assertTrue(env["TMPDIR"].startswith(str(Path(tmp) / "tmp")))
             self.assertTrue(Path(env["TMPDIR"]).is_dir())
 
+    def test_main_holds_the_lock_exclusively_except_verify_only(self):
+        with mock.patch.object(frameworks, "checkoutlock") as lock, \
+                mock.patch.object(frameworks, "_build", return_value=0) as build:
+            self.assertEqual(frameworks.main(["--no-cache"]), 0)
+            self.assertTrue(lock.hold.call_args.kwargs["exclusive"])
+            build.assert_called_once_with(["--no-cache"])
+            lock.reset_mock()
+            self.assertEqual(frameworks.main(["--verify-only"]), 0)
+            self.assertFalse(lock.hold.call_args.kwargs["exclusive"])
+
     def test_no_cache_flag_from_environment(self):
         with mock.patch.dict(os.environ, {"NANOGRAM_FRAMEWORK_CACHE": "0"}):
             self.assertFalse(frameworks.cache_enabled([]))

@@ -385,14 +385,24 @@ use and what `tg prune` would do; `tg doctor` warns when the root is over its ca
 | `tmp/frameworks-<pid>/` | upstream's `configure_frameworks.sh` (per-library DerivedData, deleted when the script exits normally) | — | `tg prune` after 6 hours |
 | `spm-*/`, `swiftpm/` | `swift build --scratch-path` runs outside the checkout | whole root | `tg prune` (unused 7 days, or over the cap) |
 | `CompilationCache/` | Debug compilation caching, if enabled | whole root | `tg prune`, only when over the cap, last |
-| everything else (`bin/`, `build-*.lock`, keys, tools, logs) | tools and workflows | — | never removed |
+| everything else (`bin/`, `build-*.lock`, `sparkle-ed25519/` (the signing helper binary), `launch-home`, tools, logs) | tools and workflows | — | never removed; `tg prune` refuses `sparkle-ed25519`, `sparkle_ed25519` and `launch-home` by name |
 
 `tg prune` keeps the whole root under 40 GB (`NANOGRAM_CACHE_MAX_GB`, or `--max-gb N`): first it removes DerivedData
 whose checkout no longer exists and build caches unused for 7 days, then, while still over the cap, the least
 recently used SwiftPM scratch directories, then DerivedData, then the compilation cache. It never removes the current
 checkout's DerivedData, anything whose checkout holds its build lock (`build-<checkout>.lock`, taken by `buildlock`),
-anything used in the last 2 hours, or anything outside the cache root. `tg clean` refuses to run while this
-checkout's build lock is held, so do not run it under `buildlock`.
+anything used in the last 2 hours, or anything outside the cache root. `tg clean` removes only a `DerivedData*`
+directory directly in the cache root (it refuses a `NANOGRAM_DERIVED_DATA` elsewhere, or a symlink).
+
+**The checkout lock.** `tg build` holds this checkout's `build-<checkout>.lock` shared, `tg frameworks` and `tg clean`
+hold it exclusively (`tools/dev/nanogram/checkoutlock.py`; `tg frameworks --verify-only` shared), so native libraries
+and DerivedData never change under a running build; a waiting command prints `…: a build of this checkout is
+running; waiting`. Under `buildlock`, which holds the same file exclusively, they do not wait: buildlock exports
+`NANOGRAM_BUILDLOCK` and writes its pid into the file, and either one tells tg the lock is its parent's.
+
+The Sparkle private key is not in the cache root: it lives in `~/.config/nanogram-macos/sparkle_ed25519`
+(see "Sparkle"); `~/.cache/nanogram-macos/sparkle-ed25519/` holds only the helper binary that signs with it, which
+tg rebuilds when it is missing.
 
 The checkout itself holds only the native libraries' outputs (`core-xprojects/*/build`, the two Rust xcframeworks,
 the generated `SharedHeaders`); after a restore from the cache they are APFS clones of the cache entries.

@@ -71,7 +71,13 @@ edition_xcconfig() {
 # --clean deletes DerivedData/Build first, so every file compiles and every warning is in the log.
 # xcodebuild runs through tools/dev/nanogram/xcbuild.py with fixed arguments and environment, so Xcode keeps
 # its cached build description; packages resolve only with --clean or --resolve-packages.
+# It holds this checkout's build lock shared (tg frameworks and tg clean hold it exclusively); under buildlock it
+# does not wait for it.
 cmd_build() {
+  if [ -z "${NANOGRAM_TG_LOCKED:-}" ]; then
+    NANOGRAM_TG_LOCKED=1 py checkoutlock --shared -- "$ROOT/tools/dev/tg" build "$@"
+    return
+  fi
   local release=0 clean=0 resolve=0 edition=direct extra=()
   while [ $# -gt 0 ]; do
     case "$1" in

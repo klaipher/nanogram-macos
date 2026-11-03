@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Callable, Literal, Protocol
 if TYPE_CHECKING:
     from .fwcache import Entry
 
-from . import config
+from . import checkoutlock, config
 
 XCCONFIG = config.ROOT / "nanogram" / "Nanogram.xcconfig"
 SCRIPTS = config.ROOT / "scripts"
@@ -272,6 +272,11 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         print(f"error: unknown frameworks option: {' '.join(unknown)}", file=sys.stderr)
         return 2
+    with checkoutlock.hold(checkoutlock.lock_path(), exclusive="--verify-only" not in argv):
+        return _build(argv)
+
+
+def _build(argv: list[str]) -> int:
     timing_log = config.BUILD_OUTPUT / "frameworks-timing.tsv"
     log = config.BUILD_OUTPUT / "frameworks.log"
     if "--verify-only" not in argv:

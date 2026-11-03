@@ -1,3 +1,5 @@
+import contextlib
+import io
 import os
 import plistlib
 import subprocess
@@ -191,6 +193,26 @@ class PruneTests(DiskTestCase):
         self.assertNotIn(other, [i.path for i in removed])
         self.assertTrue(other.exists())
 
+    def test_sparkle_helper_is_never_listed_for_removal(self):
+        helper = self.scratch("sparkle-ed25519", size=50_000)
+        age(helper, 90 * DAY)
+        self.assertEqual(disk.plan_prune(self.items(), max_total=0)[helper], "keep: not a build cache")
+        disk.prune(self.items(), max_total=0)
+        self.assertTrue(helper.exists())
+
+    def test_prune_refuses_protected_names_whatever_their_kind(self):
+        protected = self.cache / "sparkle-ed25519"
+        protected.mkdir()
+        item = disk.Item(protected, "swiftpm-scratch", None, 10, 0.0, False, False, False)
+        with self.assertRaises(config.ConfigError):
+            disk.prune([item], max_total=0)
+        self.assertTrue(protected.exists())
+
+    def test_sparkle_private_key_lives_outside_the_cache(self):
+        from nanogram import sparkle
+        self.assertNotIn(Path(config.CACHE_DIR).resolve(), sparkle.KEY_FILE.resolve().parents)
+        self.assertNotIn(Path.home() / ".cache", sparkle.KEY_FILE.parents)
+
     def test_dry_run_removes_nothing(self):
         stale = self.scratch("spm-old")
         age(stale, 8 * DAY)
@@ -245,16 +267,42 @@ class CleanTests(DiskTestCase):
         self.assertFalse(self.current.exists())
         self.assertFalse((self.root / "build-output" / "apps").exists())
 
-    def test_clean_refuses_while_locked(self):
-        child = hold_lock(self.cache / "build-nanogram-macos-stage2.lock")
-        try:
-            with self.assertRaises(config.ConfigError):
-                disk.clean(self.root, everything=True)
-        finally:
-            child.kill()
-            child.wait()
-            child.stdout.close()
-        self.assertTrue((self.current / "Build").exists())
+    def test_clean_refuses_derived_data_outside_the_cache(self):
+        outside = Path(self.tmp.name) / "elsewhere" / "DerivedData"
+        (outside / "Build").mkdir(parents=True)
+        for target in (outside, self.cache / "Projects", self.cache, self.cache / ".." / "DerivedData-x"):
+            target.mkdir(parents=True, exist_ok=True)
+            with self.subTest(target=target), mock.patch.object(config, "DERIVED_DATA", target):
+                for everything in (True, False):
+                    with self.assertRaises(config.ConfigError):
+                        disk.clean(self.root, everything=everything)
+                self.assertTrue(target.exists())
+        self.assertTrue((outside / "Build").exists())
+        self.assertTrue((self.root / "build-output" / "apps").exists())
+
+    def test_clean_main_refuses_before_measuring(self):
+        outside = Path(self.tmp.name) / "elsewhere"
+        outside.mkdir()
+        with mock.patch.object(config, "DERIVED_DATA", outside), mock.patch.object(config, "ROOT", self.root), \
+                mock.patch.object(disk, "disk_usage") as usage, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(disk.main(["clean", "--all"]), 1)
+        usage.assert_not_called()
+
+    def test_clean_refuses_a_symlink_out_of_the_cache(self):
+        outside = Path(self.tmp.name) / "elsewhere"
+        (outside / "Build").mkdir(parents=True)
+        link = self.cache / "DerivedData-link"
+        link.symlink_to(outside)
+        with mock.patch.object(config, "DERIVED_DATA", link), self.assertRaises(config.ConfigError):
+            disk.clean(self.root, everything=True)
+        self.assertTrue((outside / "Build").exists())
+
+    def test_clean_main_holds_the_lock_exclusively(self):
+        with mock.patch.object(config, "ROOT", self.root), mock.patch.object(disk.checkoutlock, "hold") as hold, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(disk.main(["clean"]), 0)
+        self.assertFalse((self.current / "Build").exists())
+        self.assertTrue(hold.call_args.kwargs["exclusive"])
 
 
 if __name__ == "__main__":
