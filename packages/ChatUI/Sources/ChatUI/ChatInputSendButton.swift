@@ -13,9 +13,14 @@ import InAppSettings
 import Localization
 import ColorPalette
 import MessageUtils
+import TGVideoCameraMovie
 import FoundationUtils
 import ChatHistoryModel
 import MessageTextUtils
+
+private let prewarmVideoMessageRenderer: Void = {
+    TGVideoCameraMetalRenderer.prewarm()
+}()
 
 /// Standalone 40×40 glass-pill view that shows a centered `ProgressIndicator`.
 /// Used as the action-button while inline bot context loads — mirrors the
@@ -248,6 +253,9 @@ public final class ChatInputSendButton: View {
     }
 
     private func updateVoiceIcon(animated: Bool) {
+        if FastSettings.recordingState == .video {
+            _ = prewarmVideoMessageRenderer
+        }
         voice.removeImage(for: .Normal)
         voiceIcon.isHidden = false
         voiceIcon.update(state: FastSettings.recordingState, color: theme.colors.text, animated: animated)
