@@ -1268,7 +1268,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   action calls the local engine when the switch is on.
 - **Confidence**: high.
 
-### H20. Media playback audio is forced to 44.1 kHz 16-bit stereo through an AUGraph with an always-on time-pitch unit; render at the source rate with AVSampleBufferAudioRenderer — `partial: measured, no code change — see ledger`
+### H20. Media playback audio is forced to 44.1 kHz 16-bit stereo through an AUGraph with an always-on time-pitch unit; render at the source rate with AVSampleBufferAudioRenderer — `partial (9a9b5c4; core 0b40f53): decoder and AUGraph renderer run at 48 kHz (one SRC for 48 kHz media); AVSampleBufferAudioRenderer port and per-stream rate not done — see ledger`
 
 - **Evidence**: `MediaPlayer/Sources/FFMpegAudioFrameDecoder.swift:17,21` (default 44100 Hz, 2 channels, S16 via swresample), used by
   `FFMpegMediaFrameSourceContext.swift:549`. In `packages/TelegramMedia/Sources/MediaPlayerAudioRenderer.swift:397-468`, AUGraph runs AUConverter →
@@ -1906,7 +1906,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H17 | done | 12d814a |
 | H18 | partial | d0a7c3e |
 | H19 | partial | 0f80540 |
-| H20 | measured, no change (ruling) | — |
+| H20 | partial | 9a9b5c4, core 0b40f53 |
 | H21 | done | cff6487 |
 | H22 | done | 9ad344d |
 | H23 | partial | 9d62367 |
