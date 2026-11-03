@@ -1333,7 +1333,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     private func schedulePeerPresenceCheck(idleTime: Double) {
         self.timer?.invalidate()
         self.timer = nil
-        guard let timeout = PresenceIdleSchedule.nextCheck(isActive: NSApp.isActive && !NSApp.isHidden, idleTime: idleTime) else {
+        let isSleeping = self.sharedApplicationContextValue?.sharedWakeupManager.isSleeping ?? false
+        let isScreenLocked = self.sharedApplicationContextValue?.notificationManager._lockedValue.screenLock ?? false
+        guard let timeout = PresenceIdleSchedule.nextCheck(isActive: NSApp.isActive && !NSApp.isHidden, isSleeping: isSleeping, isScreenLocked: isScreenLocked, idleTime: idleTime) else {
             return
         }
         self.timer = SwiftSignalKit.Timer(timeout: timeout, repeat: false, completion: { [weak self] in

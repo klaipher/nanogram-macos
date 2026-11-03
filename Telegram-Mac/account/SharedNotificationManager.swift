@@ -163,7 +163,6 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
     private let disposableDict: DisposableDict<AccountRecordId> = DisposableDict()
     private let storyDisposableDict: DisposableDict<AccountRecordId> = DisposableDict()
     private let inAppSettingsDisposable = MetaDisposable()
-    private let lockTimeoutDisposable = MetaDisposable()
     let accountManager: AccountManager<TelegramAccountManagerTypes>
     var resignTimestamp:Int32? = nil
     
@@ -271,42 +270,7 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
         })
         
         
-        let cachedLockTimeout = Atomic<Int32??>(value: nil)
-        lockTimeoutDisposable.set(combineLatest(accountManager.accessChallengeData(), passcodeSettingsView(accountManager)).start(next: { challenge, settings in
-            let _ = cachedLockTimeout.swap(.some(challenge.data.isLockable ? settings.timeout : nil))
-        }))
-        
-        let passlock = Signal<Void, NoError>.single(Void()) |> delay(10, queue: Queue.concurrentDefaultQueue()) |> restart |> mapToSignal { () -> Signal<Int32?, NoError> in
-            if let timeout = cachedLockTimeout.with({ $0 }) {
-                return .single(timeout)
-            }
-            return accountManager.transaction { transaction -> Int32? in
-                if transaction.getAccessChallengeData().isLockable {
-                    return passcodeSettings(transaction).timeout
-                } else {
-                    return nil
-                }
-            }
-            } |> map { [weak self] timeout -> Bool in
-                if let timeout = timeout {
-                    if let resignTimestamp = self?.resignTimestamp  {
-                        let current = Int32(Date().timeIntervalSince1970)
-                        if current - resignTimestamp > timeout {
-                            return true
-                        }
-                    }
-                    return Int64(timeout) < SystemIdleTime()
-                } else  {
-                    return false
-                }
-            }
-            |> filter { _ in
-                return !self._lockedValue.passcodeLock
-            }
-            |> deliverOnMainQueue
-        
-
-        _passlock.set(passlock)
+        _passlock.set(self.idlePasslock)
         
     }
     
@@ -314,7 +278,49 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
         guard !_lockedValue.passcodeLock else {
             return
         }
-        _passlock.set(signal)
+        _passlock.set(signal |> then(self.idlePasslock))
+    }
+
+    private var idlePasslock: Signal<Bool, NoError> {
+        let lockTimeout: Signal<Int32?, NoError> = combineLatest(accountManager.accessChallengeData(), passcodeSettingsView(accountManager))
+        |> map { challenge, settings -> Int32? in
+            return challenge.data.isLockable ? settings.timeout : nil
+        }
+        |> distinctUntilChanged
+        return combineLatest(lockTimeout, self.isPasscodeLocked)
+        |> mapToSignal { [weak self] timeout, isLocked -> Signal<Bool, NoError> in
+            if isLocked {
+                return .never()
+            }
+            guard let timeout = timeout else {
+                return .single(false)
+            }
+            return Signal { subscriber in
+                let timer = Atomic<SwiftSignalKit.Timer?>(value: nil)
+                var check: (() -> Void)?
+                check = {
+                    let now = Int32(Date().timeIntervalSince1970)
+                    let idle = Double(SystemIdleTime())
+                    let resignedAt = self?.resignTimestamp
+                    if PasslockSchedule.shouldLock(timeout: timeout, idle: idle, resignedAt: resignedAt, now: now) {
+                        subscriber.putNext(true)
+                        return
+                    }
+                    let next = SwiftSignalKit.Timer(timeout: PasslockSchedule.nextCheck(timeout: timeout, idle: idle, resignedAt: resignedAt, now: now), repeat: false, completion: {
+                        check?()
+                    }, queue: .mainQueue())
+                    timer.swap(next)?.invalidate()
+                    next.start()
+                }
+                subscriber.putNext(false)
+                check?()
+                return ActionDisposable {
+                    timer.swap(nil)?.invalidate()
+                    check = nil
+                }
+            } |> runOn(.mainQueue())
+        }
+        |> deliverOnMainQueue
     }
     
     func find(_ id: AccountRecordId?) -> AccountContext? {
@@ -351,7 +357,7 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                 default:
                     return true
                 }
-            })
+            } |> then(self.idlePasslock))
         }
         
         updateLocked { (previous) -> LockNotificationsData in

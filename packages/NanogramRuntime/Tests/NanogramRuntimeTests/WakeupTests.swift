@@ -78,4 +78,37 @@ final class PresenceIdleScheduleTests: XCTestCase {
     func testIdleActiveAppPollsForReturn() {
         XCTAssertEqual(PresenceIdleSchedule.nextCheck(isActive: true, idleTime: 45), 5)
     }
+
+    func testNoPollWhileTheDisplaySleepsOrTheScreenIsLocked() {
+        XCTAssertNil(PresenceIdleSchedule.nextCheck(isActive: true, isSleeping: true, isScreenLocked: false, idleTime: 45))
+        XCTAssertNil(PresenceIdleSchedule.nextCheck(isActive: true, isSleeping: false, isScreenLocked: true, idleTime: 45))
+        XCTAssertNil(PresenceIdleSchedule.nextCheck(isActive: true, isSleeping: true, isScreenLocked: false, idleTime: 0))
+        XCTAssertEqual(PresenceIdleSchedule.nextCheck(isActive: true, isSleeping: false, isScreenLocked: false, idleTime: 45), 5)
+    }
+}
+
+final class PasslockScheduleTests: XCTestCase {
+    func testLocksOnceIdleLongerThanTheTimeout() {
+        XCTAssertFalse(PasslockSchedule.shouldLock(timeout: 60, idle: 59, resignedAt: nil, now: 1000))
+        XCTAssertFalse(PasslockSchedule.shouldLock(timeout: 60, idle: 60, resignedAt: nil, now: 1000))
+        XCTAssertTrue(PasslockSchedule.shouldLock(timeout: 60, idle: 61, resignedAt: nil, now: 1000))
+    }
+
+    func testLocksOnceResignedLongerThanTheTimeout() {
+        XCTAssertFalse(PasslockSchedule.shouldLock(timeout: 60, idle: 0, resignedAt: 950, now: 1000))
+        XCTAssertTrue(PasslockSchedule.shouldLock(timeout: 60, idle: 0, resignedAt: 900, now: 1000))
+    }
+
+    func testTheNextCheckIsTheEarliestDeadlineNotATenSecondPoll() {
+        XCTAssertEqual(PasslockSchedule.nextCheck(timeout: 300, idle: 0, resignedAt: nil, now: 1000), 301)
+        XCTAssertEqual(PasslockSchedule.nextCheck(timeout: 300, idle: 120, resignedAt: nil, now: 1000), 181)
+        XCTAssertEqual(PasslockSchedule.nextCheck(timeout: 300, idle: 0, resignedAt: 900, now: 1000), 201)
+        XCTAssertEqual(PasslockSchedule.nextCheck(timeout: 300, idle: 299.5, resignedAt: nil, now: 1000), 1.5)
+    }
+
+    func testAnIdleTimeThatWasResetByInputRearmsFromTheNewIdleTime() {
+        let first = PasslockSchedule.nextCheck(timeout: 60, idle: 0, resignedAt: nil, now: 0)
+        XCTAssertFalse(PasslockSchedule.shouldLock(timeout: 60, idle: 10, resignedAt: nil, now: Int32(first)))
+        XCTAssertEqual(PasslockSchedule.nextCheck(timeout: 60, idle: 10, resignedAt: nil, now: Int32(first)), 51)
+    }
 }

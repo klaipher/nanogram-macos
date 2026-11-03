@@ -103,13 +103,30 @@ public enum PresenceIdleSchedule {
     public static let idleThreshold: Double = 30
     public static let returnPollInterval: Double = 5
 
-    public static func nextCheck(isActive: Bool, idleTime: Double) -> Double? {
-        guard isActive else {
+    public static func nextCheck(isActive: Bool, isSleeping: Bool = false, isScreenLocked: Bool = false, idleTime: Double) -> Double? {
+        guard isActive, !isSleeping, !isScreenLocked else {
             return nil
         }
         if idleTime >= idleThreshold {
             return returnPollInterval
         }
         return max(1, (idleThreshold - idleTime).rounded(.up))
+    }
+}
+
+public enum PasslockSchedule {
+    public static func shouldLock(timeout: Int32, idle: Double, resignedAt: Int32?, now: Int32) -> Bool {
+        if let resignedAt = resignedAt, Int64(now) - Int64(resignedAt) > Int64(timeout) {
+            return true
+        }
+        return idle > Double(timeout)
+    }
+
+    public static func nextCheck(timeout: Int32, idle: Double, resignedAt: Int32?, now: Int32) -> Double {
+        var result = Double(timeout) - idle + 1
+        if let resignedAt = resignedAt {
+            result = min(result, Double(Int64(resignedAt) + Int64(timeout) - Int64(now) + 1))
+        }
+        return max(1, result)
     }
 }
