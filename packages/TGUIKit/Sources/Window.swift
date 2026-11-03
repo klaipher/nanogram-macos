@@ -1063,14 +1063,6 @@ open class Window: NSWindow {
         NotificationCenter.default.removeObserver(self)
     }
     
-    public func windowImageShot() -> CGImage? {
-        if windowNumber >= 0 {
-            return windowListCreateImage(CGRect.null, [.optionIncludingWindow], CGWindowID(windowNumber), [.boundsIgnoreFraming])
-        } else {
-            return nil
-        }
-    }
-
 
 
     @objc open func windowDidBecomeKey() {

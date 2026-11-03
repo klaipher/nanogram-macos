@@ -2234,33 +2234,18 @@ public func updateTheme(with settings: ThemePaletteSettings, for window: Window?
     return theme
 }
 
-private let appearanceDisposable = MetaDisposable()
 
 public func telegramUpdateTheme(_ theme: TelegramPresentationTheme, window: Window? = nil, animated: Bool) {
     assertOnMainThread()
     updateTheme(theme)
     if let window = window {
         
-        if animated, let contentView = window.contentView, window.isVisible, window.occlusionState.contains(.visible), window.windowNumber > 0 {
-
-            let image = window.windowImageShot()
-            let imageView = ImageView()
-            imageView.isAccessibilityDecorative = true
-            imageView.image = image
-            imageView.frame = window.bounds
-            contentView.addSubview(imageView)
-
-            
-            let signal = Signal<Void, NoError>.single(Void()) |> delay(0.05, queue: Queue.mainQueue()) |> afterDisposed { [weak imageView] in
-                if let imageView = imageView {
-                    imageView.change(opacity: 0, animated: true, removeOnCompletion: false, duration: 0.2, completion: { [weak imageView] completed in
-                        imageView?.removeFromSuperview()
-                    })
-                }
-            }
-            
-            appearanceDisposable.set(signal.start())
-            
+        if animated, let layer = window.contentView?.layer, window.isVisible, window.occlusionState.contains(.visible) {
+            let transition = CATransition()
+            transition.type = .fade
+            transition.duration = 0.25
+            transition.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            layer.add(transition, forKey: "themeTransition")
         }
         window.contentView?.background = theme.colors.background
         window.contentView?.subviews.first?.background = theme.colors.background
