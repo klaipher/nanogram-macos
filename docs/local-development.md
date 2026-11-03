@@ -79,9 +79,23 @@ ThinLTO and dead-code stripping):
 
 `buildcheck` fails a Debug build whose log has a `VerifyModule`, `GenerateDSYMFile` or `ExtractAppIntentsMetadata` task.
 
-**Compilation caching** (`COMPILATION_CACHE_ENABLE_CACHING`, a CAS shared by all checkouts): not adopted. The
-experiment needs two clean builds and up to 10 GB of CAS with at least 30 GB free; on 2026-11-03 the disk had 15–24 GB
-free, so it was not run.
+**Compilation caching** (Debug only): `COMPILATION_CACHE_ENABLE_CACHING = YES` with one CAS for every checkout,
+`~/.cache/nanogram-macos/CompilationCache`, capped by Xcode at 10 GB (`COMPILATION_CACHE_LIMIT_SIZE`). Adopted on
+the numbers below (`build-output/stage2/task10/`, 2026-11-03, the three settings on the command line, otherwise the
+same `tg build --clean`; loaded Mac, so compare CPU seconds):
+
+| Build | Without the cache | With the cache |
+|---|---|---|
+| Clean Debug, empty CAS (cold) | 388 s, 2,260 CPU s (load 6→38) | 566 s, 2,348 CPU s (load 19→53, loaded): 4 % more CPU to fill the CAS |
+| Clean Debug, warm CAS (`tg clean`, then the same build) | as above | 148 s, 434 CPU s (load 53→49, loaded); SwiftCompile + CompileC + SwiftEmitModule 53 s instead of 4,007 s cold; buildcheck and editions ok |
+| No-change build after it (description recreated in both) | 35 s, 35.3 CPU s | 33 s, 35.5 CPU s |
+| CAS size | — | 3.9 GB after the cold build, 4.0 GB after the warm and no-change builds |
+
+The adoption rule was: warm compile CPU ≤ 50 % of cold (it is 1.3 %), a no-change build ≤ 3 CPU s more (+0.2 s) and
+the CAS ≤ 10 GB. What it buys: a new worktree, `tg clean`, `tg warnings` or `tg check` (both start from a clean
+build) and any build after an xcconfig change compile mostly from the CAS. The warm run used the same checkout path;
+reuse of the CAS by a checkout at a different path was not measured. The 10 GB cap was never reached, so Xcode's
+eviction was not observed; `tg prune` removes the CAS last, only when the cache root is over its cap.
 
 **Considered and not done:** run-script phases with declared outputs (6 phases cost 1.2–1.4 s per build; it means
 editing upstream's and Sparkle's projects), mergeable libraries and eager linking (the ~170 package modules already
@@ -101,7 +115,7 @@ compare CPU seconds):
 | VerifyModule on every Debug build | 2.2–8.4 s | none: 0 `VerifyModule`, `ExtractAppIntentsMetadata` or `GenerateDSYMFile` tasks in a clean Debug build (Stage 2 results) |
 
 The clean Debug, ChatUI, TGUIKit and Release builds were measured after both packages landed: see "Stage 2
-results". The compilation-cache experiment was not run.
+results".
 
 ## Strictness, lint and `tg check`
 
@@ -346,19 +360,35 @@ command) are the comparable number. Free disk 16–73 GB during the runs.
 
 | What | Upstream (2026-11-02) | Stage 2 |
 |---|---|---|
-| Native libraries, empty `core-xprojects/*/build`, no Rust xcframeworks, empty cache | ~22 min universal, 2.3 GB (stage 1 arm64: 777 s on an idle Mac) | 958 s, 1,583 user + 390 sys CPU s (load 73→47); OpenSSL 269, webrtc 220, ffmpeg 93, libopus 73, OpenH264 65, libvpx 62, tde2e 57, wallet-engine 42, libwebp 23, mtproto-engine 13, mozjpeg 9, tlottie 9, dav1d 7 s; build dirs + xcframeworks 1.65 GB, cache 192 MB |
-| Native libraries, fresh worktree: no build dirs or xcframeworks, warm cache | same as above | 7.6 s, 4.8 CPU s (load 46): 13 restored |
+| Native libraries, empty `core-xprojects/*/build`, no Rust xcframeworks, empty cache | ~22 min universal, 2.3 GB (stage 1 arm64: 777 s on an idle Mac) | 958 s, 1,583 user + 390 sys CPU s (load 73→47, loaded); OpenSSL 269, webrtc 220, ffmpeg 93, libopus 73, OpenH264 65, libvpx 62, tde2e 57, wallet-engine 42, libwebp 23, mtproto-engine 13, mozjpeg 9, tlottie 9, dav1d 7 s; build dirs + xcframeworks 1.65 GB, cache 192 MB |
+| Native libraries, fresh worktree: no build dirs or xcframeworks, warm cache | same as above | 7.6 s, 4.8 CPU s (load 46, loaded): 13 restored |
 | Native libraries, everything current | upstream's script always rebuilt tlottie (≥ 54 s) | 2.4 s, 2.4 CPU s |
-| Clean Debug `tg build --clean` from an empty DerivedData | 401 s, 6.1 GB | 388 s, 1,956 + 304 CPU s (load 6→38); SwiftCompile 1,936 s (1,077 tasks), CompileC 311 s (514), SwiftDriver 300 s, SwiftEmitModule 216 s; 0 VerifyModule / ExtractAppIntentsMetadata / GenerateDSYMFile; DerivedData 5.7 GB (Build 3.7, ModuleCache 1.5) |
+| Clean Debug `tg build --clean` from an empty DerivedData | 401 s, 6.1 GB | 388 s, 1,956 + 304 CPU s (load 6→38, loaded at the end); SwiftCompile 1,936 s (1,077 tasks), CompileC 311 s (514), SwiftDriver 300 s, SwiftEmitModule 216 s; 0 VerifyModule / ExtractAppIntentsMetadata / GenerateDSYMFile; DerivedData 5.7 GB (Build 3.7, ModuleCache 1.5) |
 | No-change `tg build` | 34 s | 22 s, 17 + 3 CPU s (load 16→13), description reused, editions check skipped. The first two builds after `--clean` recreated the description: 35 s / 29 s, 35 / 32 CPU s |
 | ChatUI body edit (`BigEmojiMessage.swift`, a string literal in a function) | 35 s | 32 s, 29 + 5 CPU s (load 13→10): 1 Swift task, 4 links, re-sign, editions check; reverting it 33 s |
-| TGUIKit public API added (`public func` in `AnimationStyle.swift`) | 222 s | 265 s, 765 + 136 CPU s (load 14→12): 819 Swift compile tasks, the same count as upstream's log; reverting it 428 s, 820 + 143 CPU s (load 15→54) |
-| Clean Release `tg build --release --clean` | 1,057 s universal, 11 GB | 1,507 s, 2,757 + 241 CPU s (load 20→128, 200 at the end); SwiftCompile 3,871 s (170 whole-module tasks), CompileC 326 s, GenerateDSYMFile 73 s; Build 3.4 GB, the module cache grew 1.5 → 3.0 GB (Debug and Release); **`buildcheck` failed**, see below |
+| TGUIKit public API added (`public func` in `AnimationStyle.swift`) | 222 s | 265 s, 765 + 136 CPU s (load 14→12): 819 Swift compile tasks, the same count as upstream's log; reverting it 428 s, 820 + 143 CPU s (load 15→54, loaded) |
+| Clean Release `tg build --release --clean` | 1,057 s universal, 11 GB | 1,507 s, 2,757 + 241 CPU s (load 20→128, 200 at the end: loaded); SwiftCompile 3,871 s (170 whole-module tasks), CompileC 326 s, GenerateDSYMFile 73 s; Build 3.4 GB, the module cache grew 1.5 → 3.0 GB (Debug and Release); **`buildcheck` failed**, see below |
 | Release app | 610 MB universal (main 423 MB, share extension 166 MB) | 308 MB arm64 (main 215 MB, share extension 83 MB, Sparkle 1.3 MB, resources 19 MB) |
 | Disk for one checkout | ~24 GB | ~10 GB: sources 2.5 GB (git objects live in the main clone), native libraries 192 MB in the shared cache (the checkout's 188 MB are clones of it), DerivedData 7.3 GB with Debug and Release (5.7 GB Debug only); `build-output` logs and app copies 1.1 GB on top |
 
 `tools/dev/tests/run.sh` (244 tests, 9 skipped) and `tg check` (732 s, including a clean Debug build from an empty
 DerivedData) passed before the measurements.
+
+The ChatUI edits were measured again by comment and by string literal (`build-output/stage2/after/`, 12:27–12:46).
+These runs are **loaded** (load 26–179 on 10 cores; the clean Debug run of that series waited 40 min for the build
+lock and was replaced by a 740 s rebuild at load 119→180), so they only confirm the counts, not the times:
+
+| Edit (`BigEmojiMessage.swift`) | Wall, CPU s (load) | Description | Work |
+|---|---|---|---|
+| Trailing comment, first run | 128 s, 72 CPU s (179→143, loaded) | recreated | 1 Swift task; binary unchanged, editions check skipped |
+| Reverting it | 76 s, 61 CPU s (143→103, loaded) | recreated | 1 Swift task |
+| Trailing comment, second run | 56 s, 43 CPU s (103→100, loaded) | reused | 1 Swift task, editions check skipped |
+| Reverting it | 35 s, 32 CPU s (93→58, loaded) | reused | 1 Swift task |
+| String literal | 43 s, 41 CPU s (58→39, loaded) | reused | 1 Swift task, link, re-sign, editions check |
+| Reverting it | 34 s, 36 CPU s (37→26, loaded) | reused | 1 Swift task, link, re-sign, editions check |
+
+A comment-only edit leaves the binary and its code signature unchanged, so the editions check is skipped; a string
+literal changes the binary and the check runs. The unloaded number is the one above: 32 s, 34 CPU s.
 
 **Release `buildcheck` fails.** 170 of the 225 links in the Release log have no `-flto=thin`: the app, the share
 extension and the Swift-only package targets. Xcode adds `-flto=thin` (plus `-cache_path_lto`) to a link only through
