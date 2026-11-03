@@ -109,22 +109,17 @@ public class TabBarController: ViewController, TabViewDelegate {
     }
     
     public func didChange(selected item: TabItem, index: Int) {
-        
-        let animated = current != nil
-        
         if current != item.controller {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            defer {
+                CATransaction.commit()
+            }
             if let current = current {
                 _ = current.window?.makeFirstResponder(nil)
                 current.viewWillDisappear(false)
-                if animated {
-                    current.view.layer?.animateAlpha(from: 1, to: 0, duration: 0.15, removeOnCompletion: false, completion: { [weak self, weak current] _ in
-                        if self?.current !== current {
-                            current?.view.removeFromSuperview()
-                        }
-                    })
-                } else {
-                    current.view.removeFromSuperview()
-                }
+                current.view.layer?.removeAnimation(forKey: "opacity")
+                current.view.removeFromSuperview()
                 current.viewDidDisappear(false)
             }
             item.controller._frameRect = bounds
@@ -133,9 +128,6 @@ public class TabBarController: ViewController, TabViewDelegate {
             item.controller.updateContainerContentInsets(contentInsetsForTabs, transition: .immediate)
             item.controller.viewWillAppear(false)
             genericView.addContentView(item.controller.view)
-            if animated {
-                item.controller.view.layer?.animateAlpha(from: 0, to: 1, duration: 0.15)
-            }
             item.controller.viewDidAppear(false)
             current = item.controller
             didChangedIndex(index)
