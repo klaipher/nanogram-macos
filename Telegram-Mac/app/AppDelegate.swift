@@ -1308,9 +1308,11 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                     self.updatePeerPresence()
                 }
                 sharedContext.updateStatusBarLock(sharedNotificationManager.isLocked)
+                sharedContext.updateSpotlightLock(sharedNotificationManager._lockedValue.passcodeLock)
                 sharedNotificationManager.didUpdateLocked = { value in
                     self.updatePeerPresence()
                     sharedContext.updateStatusBarLock(value.isLocked)
+                    sharedContext.updateSpotlightLock(value.passcodeLock)
                 }
                 
                 self.updatePeerPresence()

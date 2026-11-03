@@ -136,6 +136,17 @@ class SharedAccountContext {
 
     private var statusItem: NSStatusItem?
     private var isLocked = false
+    #if !SHARE
+    private var spotlights: [AccountRecordId: SpotlightContext] = [:]
+    private var spotlightLocked = false
+
+    func updateSpotlightLock(_ isLocked: Bool) {
+        self.spotlightLocked = isLocked
+        for spotlight in self.spotlights.values {
+            spotlight.setLocked(isLocked)
+        }
+    }
+    #endif
 
     
     func updateStatusBarImage(_ image: NSImage?) -> Void {
@@ -561,7 +572,7 @@ class SharedAccountContext {
         } |> deliverOnMainQueue
         
         #if !SHARE
-        var spotlights:[AccountRecordId : SpotlightContext] = [:]
+        SpotlightPeerIndex.removeItemsFromEarlierLaunches()
         
         _ = signal.start(next: { (primary, accounts, photos) in
             self.activeAccountsInfoValue = (primary, accounts)
@@ -571,11 +582,12 @@ class SharedAccountContext {
             
             #if !SHARE
             let activeAccountIds = Set(accounts.map { $0.account.id })
-            for accountId in Array(spotlights.keys) where !activeAccountIds.contains(accountId) {
-                spotlights.removeValue(forKey: accountId)
+            for accountId in Array(self.spotlights.keys) where !activeAccountIds.contains(accountId) {
+                self.spotlights.removeValue(forKey: accountId)?.removeFromIndex()
             }
-            for info in accounts where spotlights[info.account.id]?.engine.account !== info.account {
-                spotlights[info.account.id] = SpotlightContext(engine: TelegramEngine(account: info.account))
+            for info in accounts where self.spotlights[info.account.id]?.engine.account !== info.account {
+                self.spotlights[info.account.id]?.removeFromIndex()
+                self.spotlights[info.account.id] = SpotlightContext(engine: TelegramEngine(account: info.account), isLocked: self.spotlightLocked)
             }
             #endif
         })
