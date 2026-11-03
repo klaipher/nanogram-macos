@@ -310,6 +310,12 @@ public enum EditVideoRenderer {
     private static let kernel: CIColorKernel? = CIColorKernel(source: source)
 
     public static let context = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, .outputColorSpace: CGColorSpace(name: CGColorSpace.itur_709)!])
+
+    private static let stillColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+
+    public static func stillImage(_ image: CIImage, from rect: CGRect) -> CGImage? {
+        return context.createCGImage(image, from: rect, format: .RGBA8, colorSpace: stillColorSpace)
+    }
     
     static let highQualityDownsampleThreshold: CGFloat = 0.75
 
@@ -535,7 +541,7 @@ public enum EditVideoExport {
         let scale = min(1.0, maxSide / max(size.width, size.height))
         let target = CGSize(width: max(1, floor(size.width * scale)), height: max(1, floor(size.height * scale)))
         image = image.transformed(by: CGAffineTransform(scaleX: target.width / size.width, y: target.height / size.height))
-        return EditVideoRenderer.context.createCGImage(image, from: CGRect(origin: .zero, size: target))
+        return EditVideoRenderer.stillImage(image, from: CGRect(origin: .zero, size: target))
     }
 
     public static func export(_ spec: EditVideoRenderSpec, to url: URL) -> Signal<Bool, NoError> {

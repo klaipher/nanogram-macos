@@ -402,7 +402,7 @@ public final class EditVideoToolsController: ModalViewController {
         }
         let scale = maxSide / side
         let scaled = CIImage(cgImage: image).transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        return EditVideoRenderer.context.createCGImage(scaled, from: scaled.extent) ?? image
+        return EditVideoRenderer.stillImage(scaled, from: scaled.extent) ?? image
     }
 
     public override var containerBackground: NSColor {
@@ -446,7 +446,7 @@ public final class EditVideoToolsController: ModalViewController {
             current.tint = EditVideoTint()
         }
         let output = EditVideoRenderer.render(CIImage(cgImage: still), spec: current, enhance: enhance, outputSize: nil)
-        if let image = EditVideoRenderer.context.createCGImage(output, from: output.extent) {
+        if let image = EditVideoRenderer.stillImage(output, from: output.extent) {
             genericView.imageSize = image.size
             genericView.preview.image = image
             genericView.needsLayout = true

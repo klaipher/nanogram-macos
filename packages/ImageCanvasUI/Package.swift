@@ -19,6 +19,7 @@ let package = Package(
         .package(name: "TelegramContext", path: "../TelegramContext"),
         .package(name: "TextRecognizing", path: "../TextRecognizing"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
+        .package(name: "rnoise", path: "../../submodules/telegram-ios/third-party/rnnoise"),
     ],
     targets: [
         .target(
@@ -37,5 +38,12 @@ let package = Package(
             ],
             path: "Sources/ImageCanvasUI",
             resources: [.copy("Resources/Assets.xcassets")]),
+        .testTarget(
+            name: "ImageCanvasUITests",
+            dependencies: [
+                "ImageCanvasUI",
+                .product(name: "rnoise", package: "rnoise", condition: nil),
+            ],
+            path: "Tests/ImageCanvasUITests"),
     ]
 )
