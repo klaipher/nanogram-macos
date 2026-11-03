@@ -50,6 +50,14 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertRegex(script, r"CFLAGS=\"[^\"]*-O2 -DNDEBUG")
         self.assertNotIn("-Os", script)
 
+    def test_libvpx(self):
+        self.assertTrue(read(CORE / "libvpx" / "source" / "CHANGELOG").startswith("2026-08-07 v1.17.0"))
+
+    def test_libvpx_detects_arm_extensions_at_runtime(self):
+        script = read(CORE / "libvpx" / "libvpx" / "build.sh")
+        self.assertIn("--enable-runtime-cpu-detect", script)
+        self.assertIn('target="arm64-darwin24-gcc"', script)
+
 
 if __name__ == "__main__":
     unittest.main()

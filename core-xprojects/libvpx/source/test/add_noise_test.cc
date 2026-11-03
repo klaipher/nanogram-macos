@@ -10,12 +10,13 @@
 #include <math.h>
 #include <tuple>
 
+#include "gtest/gtest.h"
 #include "test/clear_system_state.h"
 #include "test/register_state_check.h"
 #include "test/util.h"
-#include "third_party/googletest/src/include/gtest/gtest.h"
 #include "./vpx_dsp_rtcd.h"
 #include "vpx/vpx_integer.h"
+#include "vpx_config.h"
 #include "vpx_dsp/postproc.h"
 #include "vpx_mem/vpx_mem.h"
 
@@ -23,18 +24,17 @@ namespace {
 
 static const int kNoiseSize = 3072;
 
-// TODO(jimbankoski): make width and height integers not unsigned.
-typedef void (*AddNoiseFunc)(uint8_t *start, const int8_t *noise,
-                             int blackclamp, int whiteclamp, int width,
-                             int height, int pitch);
+using AddNoiseFunc = void (*)(uint8_t *start, const int8_t *noise,
+                              int blackclamp, int whiteclamp, int width,
+                              int height, int pitch);
 
-typedef std::tuple<double, AddNoiseFunc> AddNoiseTestFPParam;
+using AddNoiseTestFPParam = std::tuple<double, AddNoiseFunc>;
 
 class AddNoiseTest : public ::testing::Test,
                      public ::testing::WithParamInterface<AddNoiseTestFPParam> {
  public:
-  virtual void TearDown() { libvpx_test::ClearSystemState(); }
-  virtual ~AddNoiseTest() {}
+  void TearDown() override { libvpx_test::ClearSystemState(); }
+  ~AddNoiseTest() override = default;
 };
 
 double stddev6(char a, char b, char c, char d, char e, char f) {
@@ -134,7 +134,7 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(make_tuple(3.25, vpx_plane_add_noise_c),
                       make_tuple(4.4, vpx_plane_add_noise_c)));
 
-#if HAVE_SSE2
+#if HAVE_SSE2 && HAVE_X86_ASM
 INSTANTIATE_TEST_SUITE_P(
     SSE2, AddNoiseTest,
     ::testing::Values(make_tuple(3.25, vpx_plane_add_noise_sse2),

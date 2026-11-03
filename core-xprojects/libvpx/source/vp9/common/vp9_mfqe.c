@@ -215,8 +215,9 @@ static void mfqe_partition(VP9_COMMON *cm, MODE_INFO *mi, BLOCK_SIZE bs,
   const BLOCK_SIZE cur_bs = mi->sb_type;
   const int qdiff = cm->base_qindex - cm->postproc_state.last_base_qindex;
   const int bsl = b_width_log2_lookup[bs];
-  PARTITION_TYPE partition = partition_lookup[bsl][cur_bs];
-  const BLOCK_SIZE subsize = get_subsize(bs, partition);
+  PARTITION_TYPE partition;
+  BLOCK_SIZE subsize;
+  BLOCK_SIZE mfqe_bs, bs_tmp;
 
   if (cur_bs < BLOCK_8X8) {
     // If there are blocks smaller than 8x8, it must be on the boundary.
@@ -225,7 +226,10 @@ static void mfqe_partition(VP9_COMMON *cm, MODE_INFO *mi, BLOCK_SIZE bs,
   // No MFQE on blocks smaller than 16x16
   if (bs == BLOCK_16X16) {
     partition = PARTITION_NONE;
+  } else {
+    partition = partition_lookup[bsl][cur_bs];
   }
+  subsize = get_subsize(bs, partition);
   if (bs == BLOCK_64X64) {
     mi_offset = 4;
     y_offset = 32;
@@ -236,7 +240,6 @@ static void mfqe_partition(VP9_COMMON *cm, MODE_INFO *mi, BLOCK_SIZE bs,
     uv_offset = 8;
   }
   switch (partition) {
-    BLOCK_SIZE mfqe_bs, bs_tmp;
     case PARTITION_HORZ:
       if (bs == BLOCK_64X64) {
         mfqe_bs = BLOCK_64X32;

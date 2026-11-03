@@ -8,25 +8,32 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#include <assert.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "./vpx_config.h"
 #include "./vp8_rtcd.h"
 #include "./vpx_dsp_rtcd.h"
 #include "./vpx_scale_rtcd.h"
-#include "vpx/vpx_codec.h"
+#include "vpx/vpx_encoder.h"
 #include "vpx/internal/vpx_codec_internal.h"
 #include "vpx_version.h"
 #include "vpx_mem/vpx_mem.h"
 #include "vpx_ports/static_assert.h"
 #include "vpx_ports/system_state.h"
-#include "vpx_ports/vpx_once.h"
 #include "vpx_util/vpx_timestamp.h"
+#if CONFIG_MULTITHREAD
+#include "vp8/encoder/ethreading.h"
+#endif
 #include "vp8/encoder/onyx_int.h"
+#include "vp8/encoder/block.h"
 #include "vpx/vp8cx.h"
 #include "vp8/encoder/firstpass.h"
 #include "vp8/common/onyx.h"
 #include "vp8/common/common.h"
-#include <stdlib.h>
-#include <string.h>
 
 struct vp8_extracfg {
   struct vpx_codec_pkt_list *pkt_list;
@@ -52,7 +59,7 @@ static struct vp8_extracfg default_extracfg = {
 #if !(CONFIG_REALTIME_ONLY)
   0, /* cpu_used      */
 #else
-  4,                      /* cpu_used      */
+  4, /* cpu_used      */
 #endif
   0, /* enable_auto_alt_ref */
   0, /* noise_sensitivity */
@@ -93,13 +100,17 @@ struct vpx_codec_alg_priv {
   vpx_enc_frame_flags_t control_frame_flags;
 };
 
+// Called by update_extracfg(), vp8e_set_config() and vp8e_encode() only. Must
+// not be called by vp8e_init() because the `error` paramerer
+// (cpi->common.error) will be destroyed by vpx_codec_enc_init_ver() after
+// vp8e_init() returns an error.
+// See the "IMPORTANT" comment in vpx_codec_enc_init_ver().
 static vpx_codec_err_t update_error_state(
     vpx_codec_alg_priv_t *ctx, const struct vpx_internal_error_info *error) {
-  vpx_codec_err_t res;
+  const vpx_codec_err_t res = error->error_code;
 
-  if ((res = error->error_code)) {
+  if (res != VPX_CODEC_OK)
     ctx->base.err_detail = error->has_detail ? error->detail : NULL;
-  }
 
   return res;
 }
@@ -190,6 +201,9 @@ static vpx_codec_err_t validate_config(vpx_codec_alg_priv_t *ctx,
   RANGE_CHECK_BOOL(vp8_cfg, enable_auto_alt_ref);
   RANGE_CHECK(vp8_cfg, cpu_used, -16, 16);
 
+  /* Prevent (static_thresh >> 7) from exceeding MAX_ERROR_BINS (1024) */
+  RANGE_CHECK_HI(vp8_cfg, static_thresh, (MAX_ERROR_BINS << 7) - 1);
+
 #if CONFIG_REALTIME_ONLY && !CONFIG_TEMPORAL_DENOISING
   RANGE_CHECK(vp8_cfg, noise_sensitivity, 0, 0);
 #else
@@ -235,7 +249,7 @@ static vpx_codec_err_t validate_config(vpx_codec_alg_priv_t *ctx,
 
   if (cfg->ts_number_layers > 1) {
     unsigned int i;
-    RANGE_CHECK_HI(cfg, ts_periodicity, 16);
+    RANGE_CHECK(cfg, ts_periodicity, 1, 16);
 
     for (i = 1; i < cfg->ts_number_layers; ++i) {
       if (cfg->ts_target_bitrate[i] <= cfg->ts_target_bitrate[i - 1] &&
@@ -249,7 +263,9 @@ static vpx_codec_err_t validate_config(vpx_codec_alg_priv_t *ctx,
         ERROR("ts_rate_decimator factors are not powers of 2");
     }
 
-    RANGE_CHECK_HI(cfg, ts_layer_id[i], cfg->ts_number_layers - 1);
+    for (i = 0; i < cfg->ts_periodicity; ++i) {
+      RANGE_CHECK_HI(cfg, ts_layer_id[i], cfg->ts_number_layers - 1);
+    }
   }
 
 #if (CONFIG_REALTIME_ONLY & CONFIG_ONTHEFLY_BITPACKING)
@@ -291,6 +307,9 @@ static vpx_codec_err_t validate_img(vpx_codec_alg_priv_t *ctx,
 
   if ((img->d_w != ctx->cfg.g_w) || (img->d_h != ctx->cfg.g_h))
     ERROR("Image size must match encoder init configuration size");
+  assert(img->fmt & VPX_IMG_FMT_PLANAR);
+  if (img->stride[VPX_PLANE_U] != img->stride[VPX_PLANE_V])
+    ERROR("Image U/V strides must match");
 
   return VPX_CODEC_OK;
 }
@@ -339,7 +358,9 @@ static vpx_codec_err_t set_vp8e_config(VP8_CONFIG *oxcf,
     oxcf->end_usage = USAGE_CONSTANT_QUALITY;
   }
 
-  oxcf->target_bandwidth = cfg.rc_target_bitrate;
+  // Cap the target rate to 1000 Mbps to avoid some integer overflows in
+  // target bandwidth calculations.
+  oxcf->target_bandwidth = VPXMIN(cfg.rc_target_bitrate, 1000000);
   oxcf->rc_max_intra_bitrate_pct = vp8_cfg.rc_max_intra_bitrate_pct;
   oxcf->gf_cbr_boost_pct = vp8_cfg.gf_cbr_boost_pct;
 
@@ -386,8 +407,7 @@ static vpx_codec_err_t set_vp8e_config(VP8_CONFIG *oxcf,
   if (mr_cfg) {
     oxcf->mr_total_resolutions = mr_cfg->mr_total_resolutions;
     oxcf->mr_encoder_id = mr_cfg->mr_encoder_id;
-    oxcf->mr_down_sampling_factor.num = mr_cfg->mr_down_sampling_factor.num;
-    oxcf->mr_down_sampling_factor.den = mr_cfg->mr_down_sampling_factor.den;
+    oxcf->mr_down_sampling_factor = mr_cfg->mr_down_sampling_factor;
     oxcf->mr_low_res_mode_info = mr_cfg->mr_low_res_mode_info;
   }
 #else
@@ -472,14 +492,29 @@ static vpx_codec_err_t vp8e_set_config(vpx_codec_alg_priv_t *ctx,
     ERROR("Cannot increase lag_in_frames");
 
   res = validate_config(ctx, cfg, &ctx->vp8_cfg, 0);
+  if (res != VPX_CODEC_OK) return res;
 
-  if (!res) {
-    ctx->cfg = *cfg;
-    set_vp8e_config(&ctx->oxcf, ctx->cfg, ctx->vp8_cfg, NULL);
-    vp8_change_config(ctx->cpi, &ctx->oxcf);
+  if (setjmp(ctx->cpi->common.error.jmp)) {
+    const vpx_codec_err_t codec_err =
+        update_error_state(ctx, &ctx->cpi->common.error);
+    ctx->cpi->common.error.setjmp = 0;
+    vpx_clear_system_state();
+    assert(codec_err != VPX_CODEC_OK);
+    return codec_err;
   }
 
-  return res;
+  ctx->cpi->common.error.setjmp = 1;
+  ctx->cfg = *cfg;
+  set_vp8e_config(&ctx->oxcf, ctx->cfg, ctx->vp8_cfg, NULL);
+  vp8_change_config(ctx->cpi, &ctx->oxcf);
+#if CONFIG_MULTITHREAD
+  if (vp8cx_create_encoder_threads(ctx->cpi)) {
+    ctx->cpi->common.error.setjmp = 0;
+    return VPX_CODEC_ERROR;
+  }
+#endif
+  ctx->cpi->common.error.setjmp = 0;
+  return VPX_CODEC_OK;
 }
 
 static vpx_codec_err_t get_quantizer(vpx_codec_alg_priv_t *ctx, va_list args) {
@@ -500,12 +535,22 @@ static vpx_codec_err_t get_quantizer64(vpx_codec_alg_priv_t *ctx,
 static vpx_codec_err_t update_extracfg(vpx_codec_alg_priv_t *ctx,
                                        const struct vp8_extracfg *extra_cfg) {
   const vpx_codec_err_t res = validate_config(ctx, &ctx->cfg, extra_cfg, 0);
-  if (res == VPX_CODEC_OK) {
-    ctx->vp8_cfg = *extra_cfg;
-    set_vp8e_config(&ctx->oxcf, ctx->cfg, ctx->vp8_cfg, NULL);
-    vp8_change_config(ctx->cpi, &ctx->oxcf);
+  if (res != VPX_CODEC_OK) return res;
+
+  if (setjmp(ctx->cpi->common.error.jmp)) {
+    const vpx_codec_err_t codec_err =
+        update_error_state(ctx, &ctx->cpi->common.error);
+    ctx->cpi->common.error.setjmp = 0;
+    vpx_clear_system_state();
+    assert(codec_err != VPX_CODEC_OK);
+    return codec_err;
   }
-  return res;
+  ctx->cpi->common.error.setjmp = 1;
+  ctx->vp8_cfg = *extra_cfg;
+  set_vp8e_config(&ctx->oxcf, ctx->cfg, ctx->vp8_cfg, NULL);
+  vp8_change_config(ctx->cpi, &ctx->oxcf);
+  ctx->cpi->common.error.setjmp = 0;
+  return VPX_CODEC_OK;
 }
 
 static vpx_codec_err_t set_cpu_used(vpx_codec_alg_priv_t *ctx, va_list args) {
@@ -605,6 +650,18 @@ static vpx_codec_err_t set_screen_content_mode(vpx_codec_alg_priv_t *ctx,
   return update_extracfg(ctx, &extra_cfg);
 }
 
+static vpx_codec_err_t ctrl_set_rtc_external_ratectrl(vpx_codec_alg_priv_t *ctx,
+                                                      va_list args) {
+  VP8_COMP *cpi = ctx->cpi;
+  const unsigned int data = CAST(VP8E_SET_RTC_EXTERNAL_RATECTRL, args);
+  if (data) {
+    cpi->cyclic_refresh_mode_enabled = 0;
+    cpi->rt_always_update_correction_factor = 1;
+    cpi->rt_drop_recode_on_overshoot = 0;
+  }
+  return VPX_CODEC_OK;
+}
+
 static vpx_codec_err_t vp8e_mr_alloc_mem(const vpx_codec_enc_cfg_t *cfg,
                                          void **mem_loc) {
   vpx_codec_err_t res = VPX_CODEC_OK;
@@ -630,9 +687,20 @@ static vpx_codec_err_t vp8e_mr_alloc_mem(const vpx_codec_enc_cfg_t *cfg,
   }
 #else
   (void)cfg;
-  (void)mem_loc;
+  *mem_loc = NULL;
 #endif
   return res;
+}
+
+static void vp8e_mr_free_mem(void *mem_loc) {
+#if CONFIG_MULTI_RES_ENCODING
+  LOWER_RES_FRAME_INFO *shared_mem_loc = (LOWER_RES_FRAME_INFO *)mem_loc;
+  free(shared_mem_loc->mb_info);
+  free(mem_loc);
+#else
+  (void)mem_loc;
+  assert(!mem_loc);
+#endif
 }
 
 static vpx_codec_err_t vp8e_init(vpx_codec_ctx_t *ctx,
@@ -672,6 +740,7 @@ static vpx_codec_err_t vp8e_init(vpx_codec_ctx_t *ctx,
     priv->cx_data = malloc(priv->cx_data_sz);
 
     if (!priv->cx_data) {
+      priv->cx_data_sz = 0;
       return VPX_CODEC_MEM_ERROR;
     }
 
@@ -681,7 +750,7 @@ static vpx_codec_err_t vp8e_init(vpx_codec_ctx_t *ctx,
       ctx->priv->enc.total_encoders = 1;
     }
 
-    once(vp8_initialize_enc);
+    vp8_initialize_enc();
 
     res = validate_config(priv, &priv->cfg, &priv->vp8_cfg, 0);
 
@@ -694,7 +763,17 @@ static vpx_codec_err_t vp8e_init(vpx_codec_ctx_t *ctx,
 
       set_vp8e_config(&priv->oxcf, priv->cfg, priv->vp8_cfg, mr_cfg);
       priv->cpi = vp8_create_compressor(&priv->oxcf);
-      if (!priv->cpi) res = VPX_CODEC_MEM_ERROR;
+      if (!priv->cpi) {
+#if CONFIG_MULTI_RES_ENCODING
+        // Release ownership of mr_cfg->mr_low_res_mode_info on failure. This
+        // prevents ownership confusion with the caller and avoids a double
+        // free when vpx_codec_destroy() is called on this instance.
+        priv->oxcf.mr_total_resolutions = 0;
+        priv->oxcf.mr_encoder_id = 0;
+        priv->oxcf.mr_low_res_mode_info = NULL;
+#endif
+        res = VPX_CODEC_MEM_ERROR;
+      }
     }
   }
 
@@ -706,10 +785,7 @@ static vpx_codec_err_t vp8e_destroy(vpx_codec_alg_priv_t *ctx) {
   /* Free multi-encoder shared memory */
   if (ctx->oxcf.mr_total_resolutions > 0 &&
       (ctx->oxcf.mr_encoder_id == ctx->oxcf.mr_total_resolutions - 1)) {
-    LOWER_RES_FRAME_INFO *shared_mem_loc =
-        (LOWER_RES_FRAME_INFO *)ctx->oxcf.mr_low_res_mode_info;
-    free(shared_mem_loc->mb_info);
-    free(ctx->oxcf.mr_low_res_mode_info);
+    vp8e_mr_free_mem(ctx->oxcf.mr_low_res_mode_info);
   }
 #endif
 
@@ -730,6 +806,10 @@ static vpx_codec_err_t image2yuvconfig(const vpx_image_t *img,
   yv12->u_buffer = img->planes[VPX_PLANE_U];
   yv12->v_buffer = img->planes[VPX_PLANE_V];
 
+  // TODO(issue 520751602): this should use img->w/h to set y_width/y_height
+  // and that should be used to calculate uv_width/height after the code is
+  // updated to correctly use uv_crop_width/height to avoid using uninitialized
+  // data from the border.
   yv12->y_crop_width = y_w;
   yv12->y_crop_height = y_h;
   yv12->y_width = y_w;
@@ -740,15 +820,16 @@ static vpx_codec_err_t image2yuvconfig(const vpx_image_t *img,
   yv12->uv_height = uv_h;
 
   yv12->y_stride = img->stride[VPX_PLANE_Y];
+  assert(img->stride[VPX_PLANE_U] == img->stride[VPX_PLANE_V]);
   yv12->uv_stride = img->stride[VPX_PLANE_U];
 
   yv12->border = (img->stride[VPX_PLANE_Y] - img->w) / 2;
   return res;
 }
 
-static void pick_quickcompress_mode(vpx_codec_alg_priv_t *ctx,
-                                    unsigned long duration,
-                                    unsigned long deadline) {
+static vpx_codec_err_t pick_quickcompress_mode(vpx_codec_alg_priv_t *ctx,
+                                               unsigned long duration,
+                                               vpx_enc_deadline_t deadline) {
   int new_qc;
 
 #if !(CONFIG_REALTIME_ONLY)
@@ -757,13 +838,15 @@ static void pick_quickcompress_mode(vpx_codec_alg_priv_t *ctx,
 
   if (deadline) {
     /* Convert duration parameter from stream timebase to microseconds */
-    uint64_t duration_us;
-
     VPX_STATIC_ASSERT(TICKS_PER_SEC > 1000000 &&
                       (TICKS_PER_SEC % 1000000) == 0);
 
-    duration_us = duration * (uint64_t)ctx->timestamp_ratio.num /
-                  (ctx->timestamp_ratio.den * (TICKS_PER_SEC / 1000000));
+    if (duration > UINT64_MAX / (uint64_t)ctx->timestamp_ratio.num) {
+      ERROR("duration is too big");
+    }
+    uint64_t duration_us =
+        duration * (uint64_t)ctx->timestamp_ratio.num /
+        ((uint64_t)ctx->timestamp_ratio.den * (TICKS_PER_SEC / 1000000));
 
     /* If the deadline is more that the duration this frame is to be shown,
      * use good quality mode. Otherwise use realtime mode.
@@ -789,6 +872,7 @@ static void pick_quickcompress_mode(vpx_codec_alg_priv_t *ctx,
     ctx->oxcf.Mode = new_qc;
     vp8_change_config(ctx->cpi, &ctx->oxcf);
   }
+  return VPX_CODEC_OK;
 }
 
 static vpx_codec_err_t set_reference_and_update(vpx_codec_alg_priv_t *ctx,
@@ -838,7 +922,7 @@ static vpx_codec_err_t vp8e_encode(vpx_codec_alg_priv_t *ctx,
                                    const vpx_image_t *img, vpx_codec_pts_t pts,
                                    unsigned long duration,
                                    vpx_enc_frame_flags_t enc_flags,
-                                   unsigned long deadline) {
+                                   vpx_enc_deadline_t deadline) {
   volatile vpx_codec_err_t res = VPX_CODEC_OK;
   // Make a copy as volatile to avoid -Wclobbered with longjmp.
   volatile vpx_enc_frame_flags_t flags = enc_flags;
@@ -863,13 +947,7 @@ static vpx_codec_err_t vp8e_encode(vpx_codec_alg_priv_t *ctx,
 
   if (!res) res = validate_config(ctx, &ctx->cfg, &ctx->vp8_cfg, 1);
 
-  if (!ctx->pts_offset_initialized) {
-    ctx->pts_offset = pts_val;
-    ctx->pts_offset_initialized = 1;
-  }
-  pts_val -= ctx->pts_offset;
-
-  pick_quickcompress_mode(ctx, duration, deadline);
+  if (!res) res = pick_quickcompress_mode(ctx, duration, deadline);
   vpx_codec_pkt_list_init(&ctx->pkt_list);
 
   // If no flags are set in the encode call, then use the frame flags as
@@ -890,26 +968,37 @@ static vpx_codec_err_t vp8e_encode(vpx_codec_alg_priv_t *ctx,
     }
   }
 
-  if (setjmp(ctx->cpi->common.error.jmp)) {
-    ctx->cpi->common.error.setjmp = 0;
-    vpx_clear_system_state();
-    return VPX_CODEC_CORRUPT_FRAME;
-  }
-
-  /* Initialize the encoder instance on the first frame*/
+  /* Initialize the encoder instance on the first frame */
   if (!res && ctx->cpi) {
     unsigned int lib_flags;
-    YV12_BUFFER_CONFIG sd;
     int64_t dst_time_stamp, dst_end_time_stamp;
     size_t size, cx_data_sz;
     unsigned char *cx_data;
     unsigned char *cx_data_end;
     int comp_data_state = 0;
 
-    /* Set up internal flags */
-    if (ctx->base.init_flags & VPX_CODEC_USE_PSNR) {
-      ((VP8_COMP *)ctx->cpi)->b_calculate_psnr = 1;
+    if (setjmp(ctx->cpi->common.error.jmp)) {
+      ctx->cpi->common.error.setjmp = 0;
+      res = update_error_state(ctx, &ctx->cpi->common.error);
+      vpx_clear_system_state();
+      return res;
     }
+    ctx->cpi->common.error.setjmp = 1;
+
+    // Per-frame PSNR is not supported when g_lag_in_frames is greater than 0.
+    if ((flags & VPX_EFLAG_CALCULATE_PSNR) && ctx->cfg.g_lag_in_frames != 0) {
+      vpx_internal_error(
+          &ctx->cpi->common.error, VPX_CODEC_INCAPABLE,
+          "Cannot calculate per-frame PSNR when g_lag_in_frames is nonzero");
+    }
+    /* Set up internal flags */
+#if CONFIG_INTERNAL_STATS
+    assert(((VP8_COMP *)ctx->cpi)->b_calculate_psnr == 1);
+#else
+    ((VP8_COMP *)ctx->cpi)->b_calculate_psnr =
+        (ctx->base.init_flags & VPX_CODEC_USE_PSNR) ||
+        (flags & VPX_EFLAG_CALCULATE_PSNR);
+#endif
 
     if (ctx->base.init_flags & VPX_CODEC_USE_OUTPUT_PARTITION) {
       ((VP8_COMP *)ctx->cpi)->output_partition = 1;
@@ -918,12 +1007,44 @@ static vpx_codec_err_t vp8e_encode(vpx_codec_alg_priv_t *ctx,
     /* Convert API flags to internal codec lib flags */
     lib_flags = (flags & VPX_EFLAG_FORCE_KF) ? FRAMEFLAGS_KEY : 0;
 
-    dst_time_stamp =
-        pts_val * ctx->timestamp_ratio.num / ctx->timestamp_ratio.den;
-    dst_end_time_stamp = (pts_val + (int64_t)duration) *
-                         ctx->timestamp_ratio.num / ctx->timestamp_ratio.den;
-
     if (img != NULL) {
+      YV12_BUFFER_CONFIG sd;
+
+      if (!ctx->pts_offset_initialized) {
+        ctx->pts_offset = pts_val;
+        ctx->pts_offset_initialized = 1;
+      }
+      if (pts_val < ctx->pts_offset) {
+        vpx_internal_error(&ctx->cpi->common.error, VPX_CODEC_INVALID_PARAM,
+                           "pts is smaller than initial pts");
+      }
+      pts_val -= ctx->pts_offset;
+      if (pts_val > INT64_MAX / ctx->timestamp_ratio.num) {
+        vpx_internal_error(
+            &ctx->cpi->common.error, VPX_CODEC_INVALID_PARAM,
+            "conversion of relative pts to ticks would overflow");
+      }
+      dst_time_stamp =
+          pts_val * ctx->timestamp_ratio.num / ctx->timestamp_ratio.den;
+#if ULONG_MAX > INT64_MAX
+      if (duration > INT64_MAX) {
+        vpx_internal_error(&ctx->cpi->common.error, VPX_CODEC_INVALID_PARAM,
+                           "duration is too big");
+      }
+#endif
+      if (pts_val > INT64_MAX - (int64_t)duration) {
+        vpx_internal_error(&ctx->cpi->common.error, VPX_CODEC_INVALID_PARAM,
+                           "relative pts + duration is too big");
+      }
+      vpx_codec_pts_t pts_end = pts_val + (int64_t)duration;
+      if (pts_end > INT64_MAX / ctx->timestamp_ratio.num) {
+        vpx_internal_error(
+            &ctx->cpi->common.error, VPX_CODEC_INVALID_PARAM,
+            "conversion of relative pts + duration to ticks would overflow");
+      }
+      dst_end_time_stamp =
+          pts_end * ctx->timestamp_ratio.num / ctx->timestamp_ratio.den;
+
       res = image2yuvconfig(img, &sd);
 
       if (vp8_receive_raw_frame(ctx->cpi, ctx->next_frame_flag | lib_flags, &sd,
@@ -941,14 +1062,13 @@ static vpx_codec_err_t vp8e_encode(vpx_codec_alg_priv_t *ctx,
     cx_data_end = ctx->cx_data + cx_data_sz;
     lib_flags = 0;
 
-    ctx->cpi->common.error.setjmp = 1;
-
     while (cx_data_sz >= ctx->cx_data_sz / 2) {
       comp_data_state = vp8_get_compressed_data(
           ctx->cpi, &lib_flags, &size, cx_data, cx_data_end, &dst_time_stamp,
           &dst_end_time_stamp, !img);
 
       if (comp_data_state == VPX_CODEC_CORRUPT_FRAME) {
+        ctx->cpi->common.error.setjmp = 0;
         return VPX_CODEC_CORRUPT_FRAME;
       } else if (comp_data_state == -1) {
         break;
@@ -1038,6 +1158,7 @@ static vpx_codec_err_t vp8e_encode(vpx_codec_alg_priv_t *ctx,
         }
       }
     }
+    ctx->cpi->common.error.setjmp = 0;
   }
 
   return res;
@@ -1057,7 +1178,9 @@ static vpx_codec_err_t vp8e_set_reference(vpx_codec_alg_priv_t *ctx,
     YV12_BUFFER_CONFIG sd;
 
     image2yuvconfig(&frame->img, &sd);
-    vp8_set_reference(ctx->cpi, frame->frame_type, &sd);
+    if (vp8_set_reference(ctx->cpi, frame->frame_type, &sd)) {
+      return VPX_CODEC_INVALID_PARAM;
+    }
     return VPX_CODEC_OK;
   } else {
     return VPX_CODEC_INVALID_PARAM;
@@ -1073,7 +1196,9 @@ static vpx_codec_err_t vp8e_get_reference(vpx_codec_alg_priv_t *ctx,
     YV12_BUFFER_CONFIG sd;
 
     image2yuvconfig(&frame->img, &sd);
-    vp8_get_reference(ctx->cpi, frame->frame_type, &sd);
+    if (vp8_get_reference(ctx->cpi, frame->frame_type, &sd)) {
+      return VPX_CODEC_INVALID_PARAM;
+    }
     return VPX_CODEC_OK;
   } else {
     return VPX_CODEC_INVALID_PARAM;
@@ -1203,8 +1328,8 @@ static vpx_codec_err_t vp8e_set_scalemode(vpx_codec_alg_priv_t *ctx,
   if (data) {
     int res;
     vpx_scaling_mode_t scalemode = *(vpx_scaling_mode_t *)data;
-    res = vp8_set_internal_size(ctx->cpi, (VPX_SCALING)scalemode.h_scaling_mode,
-                                (VPX_SCALING)scalemode.v_scaling_mode);
+    res = vp8_set_internal_size(ctx->cpi, scalemode.h_scaling_mode,
+                                scalemode.v_scaling_mode);
 
     if (!res) {
       /*force next frame a key frame to effect scaling mode */
@@ -1243,6 +1368,7 @@ static vpx_codec_ctrl_fn_map_t vp8e_ctf_maps[] = {
   { VP8E_SET_MAX_INTRA_BITRATE_PCT, set_rc_max_intra_bitrate_pct },
   { VP8E_SET_SCREEN_CONTENT_MODE, set_screen_content_mode },
   { VP8E_SET_GF_CBR_BOOST_PCT, ctrl_set_rc_gf_cbr_boost_pct },
+  { VP8E_SET_RTC_EXTERNAL_RATECTRL, ctrl_set_rtc_external_ratectrl },
   { -1, NULL },
 };
 
@@ -1270,8 +1396,8 @@ static vpx_codec_enc_cfg_map_t vp8e_usage_cfg_map[] = {
         0,  /* rc_resize_allowed */
         1,  /* rc_scaled_width */
         1,  /* rc_scaled_height */
-        60, /* rc_resize_down_thresold */
-        30, /* rc_resize_up_thresold */
+        60, /* rc_resize_down_thresh */
+        30, /* rc_resize_up_thresh */
 
         VPX_VBR,     /* rc_end_usage */
         { NULL, 0 }, /* rc_twopass_stats_in */
@@ -1352,5 +1478,6 @@ CODEC_INTERFACE(vpx_codec_vp8_cx) = {
       NULL,
       vp8e_get_preview,
       vp8e_mr_alloc_mem,
+      vp8e_mr_free_mem,
   } /* encoder functions */
 };

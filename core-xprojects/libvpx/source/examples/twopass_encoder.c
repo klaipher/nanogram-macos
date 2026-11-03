@@ -84,6 +84,7 @@ static int get_frame_stats(vpx_codec_ctx_t *ctx, const vpx_image_t *img,
       const uint8_t *const pkt_buf = pkt->data.twopass_stats.buf;
       const size_t pkt_size = pkt->data.twopass_stats.sz;
       stats->buf = realloc(stats->buf, stats->sz + pkt_size);
+      if (!stats->buf) die("Failed to reallocate stats buffer.");
       memcpy((uint8_t *)stats->buf + stats->sz, pkt_buf, pkt_size);
       stats->sz += pkt_size;
     }
@@ -190,7 +191,6 @@ static void pass1(vpx_image_t *raw, FILE *infile, const char *outfile_name,
 int main(int argc, char **argv) {
   FILE *infile = NULL;
   int w, h;
-  vpx_codec_ctx_t codec;
   vpx_codec_enc_cfg_t cfg;
   vpx_image_t raw;
   vpx_codec_err_t res;
@@ -221,13 +221,14 @@ int main(int argc, char **argv) {
     die("Invalid frame size: %dx%d", w, h);
 
   if (!vpx_img_alloc(&raw, VPX_IMG_FMT_I420, w, h, 1))
-    die("Failed to allocate image", w, h);
+    die("Failed to allocate image (%dx%d)", w, h);
 
   printf("Using %s\n", vpx_codec_iface_name(encoder->codec_interface()));
 
   // Configuration
   res = vpx_codec_enc_config_default(encoder->codec_interface(), &cfg, 0);
-  if (res) die_codec(&codec, "Failed to get default codec config.");
+  if (res)
+    die("Failed to get default codec config: %s", vpx_codec_err_to_string(res));
 
   cfg.g_w = w;
   cfg.g_h = h;
