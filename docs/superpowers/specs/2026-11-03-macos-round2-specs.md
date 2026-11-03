@@ -818,7 +818,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 
 ## db: database and MediaBox
 
-### R2-34. StorageBox runs one SQLite write transaction each time a fetch starts and for every downloaded chunk — `todo` (group: db)
+### R2-34. StorageBox runs one SQLite write transaction each time a fetch starts and for every downloaded chunk — `done (core c7ee3cdd1f; iOS 80947bac/a566a470 StorageBox ported whole, incl. lazy open outside the main process)` (group: db)
 
 - **Evidence**: `submodules/telegram-ios/submodules/Postbox/Sources/MediaBox.swift:663-665` and `:879-881`
   (`fetchedResourceData`/`fetchedResource` call `storageBox.add(...)` on every fetch start, the latter before checking
@@ -843,7 +843,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: M
 - **Confidence**: high
 
-### R2-35. Video readers reopen and stat the media file for every 64-256 KB read, and the lookahead re-checks the cache per read — `todo` (group: db)
+### R2-35. Video readers reopen and stat the media file for every 64-256 KB read, and the lookahead re-checks the cache per read — `done (core a9fb33a8e5 FFMpegFileReader + ManagedFile.read(at:); TelegramMedia lookahead in the superproject; the lookahead copy has no test target, so only FFMpegFileReader is unit-tested)` (group: db)
 
 - **Evidence**: `submodules/telegram-ios/submodules/MediaPlayer/Sources/FFMpegFileReader.swift:27-38` (`.resource`
   source: every ≤256 KB read calls `mediaBox.internal_resourceData`); `Postbox/Sources/MediaBox.swift:705-731`
@@ -869,7 +869,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: M
 - **Confidence**: high
 
-### R2-36. MediaBox re-touches (`utime`) every used file every 10 s — `todo` (group: db)
+### R2-36. MediaBox re-touches (`utime`) every used file every 10 s — `done (core 0ad7bb0efa)` (group: db)
 
 - **Evidence**: `submodules/telegram-ios/submodules/Postbox/Sources/TimeBasedCleanup.swift:582-611` (each path touched
   in a 10 s window gets `utime(path, nil)`, every window, with no memory of recent touches); `MediaBox.swift:707-709`
@@ -887,7 +887,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-37. Cache eviction runs once per launch and never again; schedule it with NSBackgroundActivityScheduler — `todo` (group: db)
+### R2-37. Cache eviction runs once per launch and never again; schedule it with NSBackgroundActivityScheduler — `done (core ab56b607a5 rescan; NanogramRuntime CacheMaintenanceScheduler + AppDelegate wiring; the launch scan is kept)` (group: db)
 
 - **Evidence**: `Postbox/Sources/TimeBasedCleanup.swift:366-372` (`setMaxStoreTimes` rescans only when a value
   changes), `:575-579` (`scanOnce |> delay(scanDelay)`: one scan after setup, no repeat); `TelegramCore/Sources/Account/
@@ -915,7 +915,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: M
 - **Confidence**: high
 
-### R2-38. The account database never shrinks: no VACUUM is scheduled, and `vacuum()` crashes on any failure — `todo` (group: db)
+### R2-38. The account database never shrinks: no VACUUM is scheduled, and `vacuum()` crashes on any failure — `done (core b505651341 vacuum + optimizeStorageIfNeeded; run by R2-37's scheduler only while no window is key; vacuum tests run on an unencrypted box as on iOS)` (group: db)
 
 - **Evidence**: `Postbox/Sources/Postbox.swift:4589-4595` (`optimizeStorage` → `valueBox.vacuum()`; no caller in
   Telegram-Mac, packages or TelegramCore); `SqliteValueBox.swift:2529-2534` (VACUUM + `wal_checkpoint(TRUNCATE)` behind
@@ -939,7 +939,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: M
 - **Confidence**: high
 
-### R2-39. M9 port gap: a corrupt FTS5 search index deletes the whole account database — `todo` (group: db)
+### R2-39. M9 port gap: a corrupt FTS5 search index deletes the whole account database — `done (core b505651341)` (group: db)
 
 - **Evidence**: `Postbox/Sources/SqliteValueBox.swift:80-99` (`step()`: `SQLITE_CORRUPT` with `pathToRemoveOnError` →
   `removeDatabaseFiles` + `preconditionFailure`); FTS statements step through it (`fullTextMatch`, `fullTextSet`,
@@ -957,7 +957,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-40. Single-queue SQLite connections are opened `SQLITE_OPEN_FULLMUTEX`, and recommended compile options are missing — `todo` (group: db)
+### R2-40. Single-queue SQLite connections are opened `SQLITE_OPEN_FULLMUTEX`, and recommended compile options are missing — `done (core ce0886d4b5; TSan suite clean; benchmark A/B inconclusive under load, no gain claimed)` (group: db)
 
 Merged from two reviewers (libraries and database).
 
@@ -984,7 +984,7 @@ Merged from two reviewers (libraries and database).
 - **Size**: S
 - **Confidence**: medium
 
-### R2-41. PostboxEncoder/Decoder convert every field key to Data and decode strings through an extra copy — `todo` (group: db)
+### R2-41. PostboxEncoder/Decoder convert every field key to Data and decode strings through an extra copy — `done (core fafef7d68c; leading BOM keeps the Foundation path so decoded values are unchanged)` (group: db)
 
 - **Evidence**: `Postbox/Sources/Coding.swift:359-366` (`encodeKey`: `key.data(using: .utf8)!` per field), `:945-951`
   (`positionOnKey`: the same per lookup), `:1194-1212` (`decodeStringForKey`/`decodeOptionalStringForKey`:
@@ -1005,7 +1005,7 @@ Merged from two reviewers (libraries and database).
 - **Size**: S
 - **Confidence**: medium
 
-### R2-42. `exists()` reads and copies the whole value; the cheaper statement is dead code and invalid on WITHOUT ROWID tables — `todo` (group: db)
+### R2-42. `exists()` reads and copies the whole value; the cheaper statement is dead code and invalid on WITHOUT ROWID tables — `done (core b505651341)` (group: db)
 
 - **Evidence**: `Postbox/Sources/SqliteValueBox.swift:1835-1841` (`exists` → `get` → `SELECT value`, malloc + memcpy);
   `:1350-1360` (`existsStatement`, `SELECT rowid FROM t WHERE key=?`, never called; WITHOUT ROWID tables have no rowid).
@@ -1023,7 +1023,7 @@ Merged from two reviewers (libraries and database).
 - **Size**: S
 - **Confidence**: medium
 
-### R2-43. SQLCipher page cache sizes: 32 pages in the share extension, SQLite's 2 MB default in the main app — `todo` (group: db)
+### R2-43. SQLCipher page cache sizes: 32 pages in the share extension, SQLite's 2 MB default in the main app — `partial (core b505651341: cacheSizePages, 256 pages for the share extension and standaloneStateManager; main-app 2 MB vs 8/16 MB not measured, left at the default)` (group: db)
 
 - **Evidence**: `Postbox/Sources/SqliteValueBox.swift:591-594` (`!useCaches` → `PRAGMA cache_size=32`; otherwise the
   compile-time default, ~2,000 KiB); `Telegram-Mac/account/SharedAccountContext.swift:272-274` and
