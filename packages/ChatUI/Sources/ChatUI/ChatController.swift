@@ -36,6 +36,7 @@ import TelegramTheme
 import TelegramUtils
 import Strings
 import InputView
+import LocalAudioTranscription
 import NanogramRuntime
 
 
@@ -7268,6 +7269,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 }
             } else {
                 
+                func transcribeOnServer() {
                 let currentTime = Int32(Date().timeIntervalSince1970)
                 if !context.isPremium, message.audioTranscription == nil {
                     if let cooldownUntilTime = context.audioTranscriptionTrial.cooldownUntilTime, cooldownUntilTime > currentTime {
@@ -7310,6 +7312,37 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     }
                     
                 }), forKey: messageId)
+                }
+
+                if let file = message.media.first as? TelegramMediaFile, LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled, isPremium: context.isPremium, isVoice: file.isVoice, hasServerTranscription: message.audioTranscription != nil), let path = context.account.postbox.mediaBox.completedResourcePath(file.resource) {
+                    strongSelf.updateState { state in
+                        var state = state
+                        state.transribe[messageId] = .loading
+                        return state
+                    }
+                    let signal = LocalAudioTranscription.shared.transcribe(path: path, localeIdentifiers: LocalAudioTranscription.localeCandidates(appLanguage: appAppearance.languageCode))
+                    |> mapToSignal { text -> Signal<Bool, NoError> in
+                        guard let text = text else {
+                            return .single(false)
+                        }
+                        return context.engine.messages.storeLocallyTranscribedAudio(messageId: messageId, text: text, isFinal: true, error: nil) |> map { _ -> Bool in return true } |> then(.single(true))
+                    }
+                    |> deliverOnMainQueue
+                    strongSelf.transcribeDisposable.set(signal.start(next: { [weak strongSelf] success in
+                        guard let strongSelf = strongSelf else { return }
+                        if success {
+                            strongSelf.updateState { state in
+                                var state = state
+                                state.transribe[messageId] = .revealed(true)
+                                return state
+                            }
+                        } else {
+                            transcribeOnServer()
+                        }
+                    }), forKey: messageId)
+                } else {
+                    transcribeOnServer()
+                }
             }
 
         }
