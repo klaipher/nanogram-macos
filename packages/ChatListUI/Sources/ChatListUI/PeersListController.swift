@@ -1135,6 +1135,7 @@ public class PeerListContainerView : Control {
 
         tableView.wantsLayer = true
         tableView.layer?.masksToBounds = true
+        tableView.clipView.skipsDisplayOnScroll = true
         tableMaskLayer.backgroundColor = NSColor.black.cgColor
         tableMaskLayer.disableActions()
         tableView.layer?.mask = tableMaskLayer
