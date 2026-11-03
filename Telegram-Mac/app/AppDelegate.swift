@@ -276,6 +276,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     private(set) var appEncryption: AppEncryptionParameters!
     private var memoryPressureMonitor: MemoryPressureMonitor?
+    private var cacheMaintenanceScheduler: CacheMaintenanceScheduler?
     private var rustEngineCrash: CrashedRun?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -963,6 +964,30 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 self.memoryPressureMonitor?.releaseAccountCaches = { [weak sharedContext] in
                     return sharedContext?.releaseAccountCaches() ?? 0
                 }
+                self.cacheMaintenanceScheduler = CacheMaintenanceScheduler(bundleIdentifier: Bundle.main.bundleIdentifier ?? "org.klaipher.Nanogram", jobs: { [weak sharedContext] completion in
+                    guard let sharedContext else {
+                        completion([])
+                        return
+                    }
+                    let _ = (sharedContext.activeAccounts |> take(1)).start(next: { accounts in
+                        completion(accounts.accounts.map { _, account, _ -> CacheMaintenanceScheduler.Job in
+                            return { done in
+                                let windowIsKey = Signal<Bool, NoError> { subscriber in
+                                    subscriber.putNext(NSApp.keyWindow != nil)
+                                    subscriber.putCompletion()
+                                    return EmptyDisposable
+                                } |> runOn(.mainQueue())
+                                let optimizeDatabase = windowIsKey |> mapToSignal { windowIsKey -> Signal<Never, NoError> in
+                                    if windowIsKey {
+                                        return .complete()
+                                    }
+                                    return account.postbox.optimizeStorageIfNeeded() |> ignoreValues
+                                }
+                                let _ = (account.rescanCaches() |> then(optimizeDatabase)).start(completed: done)
+                            }
+                        })
+                    })
+                })
                 
                 self.supportAccountContextValue = .init(applicationContext: sharedApplicationContext)
                 
