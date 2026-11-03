@@ -16,8 +16,9 @@ mkdir -p ${BUILD_DIR}
 
 # Clone OpenH264 into the build directory if not already cloned
 if [ ! -d "${BUILD_DIR}/openh264" ]; then
-    git clone -b v2.4.1 https://github.com/cisco/openh264.git ${BUILD_DIR}/openh264
+    git clone -b v2.7.0 --depth 1 https://github.com/cisco/openh264.git ${BUILD_DIR}/openh264
 fi
+[ "$(git -C ${BUILD_DIR}/openh264 rev-parse HEAD)" = "1bca62311e447fd9c39fc93de2c4b96cd5ce971c" ]
 
 # Define the output prefix for the final universal binary
 USED_PREFIX=${BUILD_DIR}/output

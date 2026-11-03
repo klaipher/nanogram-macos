@@ -58,6 +58,11 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn("--enable-runtime-cpu-detect", script)
         self.assertIn('target="arm64-darwin24-gcc"', script)
 
+    def test_openh264(self):
+        script = read(CORE / "OpenH264" / "OpenH264" / "build.sh")
+        self.assertIn("-b v2.7.0 ", script)
+        self.assertIn("1bca62311e447fd9c39fc93de2c4b96cd5ce971c", script)
+
 
 if __name__ == "__main__":
     unittest.main()
