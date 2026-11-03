@@ -293,10 +293,9 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
             content.categoryIdentifier = UNNotification.replyCategory
         }
         
-        if let image = notification.contentImage {
-            if let attachment = UNNotificationAttachment.create(identifier: "image", image: image, options: nil) {
-                content.attachments = [attachment]
-            }
+        let avatarPNG = notification.contentImage.flatMap { $0.nanogramPNGRepresentation }
+        if let avatarPNG = avatarPNG, let attachment = UNNotificationAttachment.create(identifier: notification.identifier ?? "image", png: avatarPNG) {
+            content.attachments = [attachment]
         }
         content.userInfo = notification.userInfo ?? [:]
         let soundSettings = self.soundSettings
@@ -326,7 +325,12 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
             }
         }
         
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: notification.identifier ?? "", content: content, trigger: nil), withCompletionHandler: { error in
+        var finalContent: UNNotificationContent = content
+        if #available(macOS 12.0, *), let info = CommunicationNotificationInfo(userInfo: content.userInfo, avatarPNG: avatarPNG) {
+            finalContent = CommunicationNotifications.apply(info, to: content)
+        }
+
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: notification.identifier ?? "", content: finalContent, trigger: nil), withCompletionHandler: { error in
                         
            
         })
@@ -378,22 +382,20 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
 @available(macOS 10.14, *)
 private extension UNNotificationAttachment {
 
-    static func create(identifier: String, image: NSImage, options: [NSObject : AnyObject]?) -> UNNotificationAttachment? {
-        let fileManager = FileManager.default
-        let tmpSubFolderName = ProcessInfo.processInfo.globallyUniqueString
-        let tmpSubFolderURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(tmpSubFolderName, isDirectory: true)
-        do {
-            try fileManager.createDirectory(at: tmpSubFolderURL, withIntermediateDirectories: true, attributes: nil)
-            let imageFileIdentifier = identifier+".jpeg"
-            let fileURL = tmpSubFolderURL.appendingPathComponent(imageFileIdentifier)
-            let imageData = image.tiffRepresentation(using: .jpeg, factor: 1)
-            try imageData?.write(to: fileURL)
-            let imageAttachment = try UNNotificationAttachment(identifier: imageFileIdentifier, url: fileURL, options: options)
-            return imageAttachment
-        } catch {
-            print("error " + error.localizedDescription)
+    static func create(identifier: String, png: Data) -> UNNotificationAttachment? {
+        guard let fileURL = NotificationAvatarStore.write(png, identifier: identifier) else {
+            return nil
         }
-        return nil
+        return try? UNNotificationAttachment(identifier: fileURL.lastPathComponent, url: fileURL, options: nil)
+    }
+}
+
+private extension NSImage {
+    var nanogramPNGRepresentation: Data? {
+        guard let cgImage = self.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return nil
+        }
+        return NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:])
     }
 }
 

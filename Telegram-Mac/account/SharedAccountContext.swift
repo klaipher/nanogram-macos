@@ -584,6 +584,7 @@ class SharedAccountContext {
             let activeAccountIds = Set(accounts.map { $0.account.id })
             for accountId in Array(self.spotlights.keys) where !activeAccountIds.contains(accountId) {
                 self.spotlights.removeValue(forKey: accountId)?.removeFromIndex()
+                CommunicationNotifications.deleteDonations(accountId: accountId.int64)
             }
             for info in accounts where self.spotlights[info.account.id]?.engine.account !== info.account {
                 self.spotlights[info.account.id]?.removeFromIndex()

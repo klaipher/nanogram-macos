@@ -8,6 +8,7 @@ import ObjcUtils
 import InAppSettings
 import PasscodeCore
 import WalletContext
+import NanogramRuntime
 
 func getNotificationMessageId(userInfo:[AnyHashable: Any], for prefix: String) -> MessageId? {
     if let msgId = userInfo["\(prefix).message.id"] as? Int32, let msgNamespace = userInfo["\(prefix).message.namespace"] as? Int32, let namespace = userInfo["\(prefix).peer.namespace"] as? Int32, let id = userInfo["\(prefix).peer.id"] as? Int64 {
@@ -804,6 +805,21 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                             
                             dict["accountId"] = account.id.int64
                             dict["timestamp"] = Int32(Date().timeIntervalSince1970)
+
+                            if case .messages = source, !screenIsLocked, !presentation.hideSender, let chatPeer = message.peers[message.id.peerId] {
+                                let sender = message.author ?? chatPeer
+                                dict[CommunicationNotificationInfo.conversationKey] = message.id.peerId.toInt64()
+                                dict[CommunicationNotificationInfo.senderIdKey] = sender.id.toInt64()
+                                dict[CommunicationNotificationInfo.senderNameKey] = sender.displayTitle
+                                if message.id.peerId.namespace != Namespaces.Peer.CloudUser {
+                                    dict[CommunicationNotificationInfo.groupNameKey] = chatPeer.displayTitle
+                                }
+                                if let threadId = message.threadId {
+                                    dict[CommunicationNotificationInfo.threadKey] = threadId
+                                }
+                                dict[CommunicationNotificationInfo.mutedKey] = message.muted
+                                dict[CommunicationNotificationInfo.accountKey] = account.id.int64
+                            }
 
                             let notifiedKey = source.key(for: message)
                             if alreadyNotified.insert(notifiedKey).inserted {
