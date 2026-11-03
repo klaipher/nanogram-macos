@@ -15,6 +15,11 @@ def finding(findings, name):
 
 
 class DoctorTests(unittest.TestCase):
+    def setUp(self):
+        patcher = mock.patch.object(doctor, "cache_root_size", return_value=0)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_doctor_missing_config(self):
         with tempfile.TemporaryDirectory() as empty, mock.patch.dict(os.environ, {"TG_IOS_CONFIG": empty}):
             result = finding(doctor.run_doctor(), "api-credentials")
@@ -31,6 +36,17 @@ class DoctorTests(unittest.TestCase):
     def test_doctor_xcode_27_ok(self):
         with mock.patch.object(config, "xcode_version", return_value="27.2"):
             self.assertTrue(finding(doctor.run_doctor(), "xcode").ok)
+
+    def test_caches_over_cap_warns(self):
+        with mock.patch.dict(os.environ, {"NANOGRAM_CACHE_MAX_GB": "40"}), \
+                mock.patch.object(doctor, "cache_root_size", return_value=41 * 1024**3):
+            result = doctor.check_caches()
+        self.assertFalse(result.ok)
+        self.assertFalse(result.required)
+        self.assertIn("tg prune", result.hint)
+        with mock.patch.object(doctor, "cache_root_size", return_value=10 * 1024**3):
+            self.assertTrue(doctor.check_caches().ok)
+            self.assertIn("caches", [f.name for f in doctor.run_doctor()])
 
     def test_require_file_raises_one_line(self):
         with tempfile.TemporaryDirectory() as empty:

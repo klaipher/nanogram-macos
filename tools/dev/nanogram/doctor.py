@@ -77,6 +77,20 @@ def check_disk(root: Path | None = None) -> Finding:
     return Finding("disk", False, f"only {free_gb} GB free, a first build needs {MIN_FREE_GB} GB: free some space")
 
 
+def cache_root_size() -> int:
+    from .disk import disk_usage
+    return disk_usage(config.CACHE_DIR) if config.CACHE_DIR.is_dir() else 0
+
+
+def check_caches() -> Finding:
+    from .disk import gigabytes, max_total_bytes
+    size, cap = cache_root_size(), max_total_bytes(None)
+    shown = f"{config.CACHE_DIR} holds {gigabytes(size)} (cap {gigabytes(cap)})"
+    if size <= cap:
+        return Finding("caches", True, shown, required=False)
+    return Finding("caches", False, f"{shown}: run tg prune (tg prune --dry-run lists what goes)", required=False)
+
+
 def check_api_credentials() -> Finding:
     path = config.api_credentials_path()
     if path.is_file():
@@ -123,6 +137,7 @@ def run_doctor() -> list[Finding]:
         check_rustup(),
         check_submodules(),
         check_disk(),
+        check_caches(),
         check_api_credentials(),
         check_asc_key(),
         *check_identities(),

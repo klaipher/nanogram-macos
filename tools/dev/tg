@@ -28,6 +28,12 @@ cmd_doctor() { py doctor; }
 
 cmd_frameworks() { py frameworks "$@"; }
 
+# tg clean [--all]: this checkout's DerivedData/Build (all of its DerivedData with --all) and build-output/apps.
+cmd_clean() { py disk clean "$@"; }
+
+# tg prune [--dry-run] [--max-gb N]: lists everything under ~/.cache/nanogram-macos, removes stale build caches.
+cmd_prune() { py disk prune "$@"; }
+
 # Writes the gitignored NanogramSecrets.swift (api_id/api_hash); prints only the path, never the values.
 cmd_credentials() { py credentials || die "cannot generate API credentials"; }
 
@@ -249,7 +255,7 @@ usage: tools/dev/tg <command> [options]
 
   setup            submodules, Rust toolchain, native libraries
   doctor           check prerequisites
-  frameworks       build the native libraries (arm64) [--verify-only]
+  frameworks       native libraries (arm64): current, restored from the shared cache, or built [--no-cache] [--verify-only]
   credentials      generate NanogramSecrets.swift from ~/.config/telegram-ios/api-credentials.json
   build            build the app [--release] [--clean] [--edition mas|direct]
   xcode [edition]  open the workspace in Xcode with our settings (quit Xcode first)
@@ -262,6 +268,8 @@ usage: tools/dev/tg <command> [options]
   sync-upstream    fast-forward upstream, merge it, rebuild, update the warning baseline [--no-build] [--after-merge]
   testflight       archive and upload the mas edition
   release-direct   notarized dmg + appcast for the direct edition (local)
+  clean            remove this checkout's build products [--all]
+  prune            list caches and build files, remove stale ones [--dry-run] [--max-gb N]
 USAGE
 }
 
@@ -272,6 +280,8 @@ main() {
     doctor) cmd_doctor "$@" ;;
     setup) cmd_setup "$@" ;;
     frameworks) cmd_frameworks "$@" ;;
+    clean) cmd_clean "$@" ;;
+    prune) cmd_prune "$@" ;;
     credentials) cmd_credentials ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;
