@@ -1072,7 +1072,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 - **How to verify**: after reconfiguring, check `grep 'HAVE_I8MM 1' config.h`, check that `nm libavcodec.a | grep -c i8mm` > 0, and run `checkasm --bench` for hevc_pel.
 - **Confidence**: medium (the build side is verified; HEVC software-decode frequency is unknown).
 
-### H11. No `OSSignposter` intervals or MetricKit on the Mac; port the iOS signposts and the on-device report store (iOS `de19913f`) — `todo`
+### H11. No `OSSignposter` intervals or MetricKit on the Mac; port the iOS signposts and the on-device report store (iOS `de19913f`) — `done (73de50e)`
 
 - **Evidence**: no `os_signpost`, `OSSignposter`, `MXMetricManager` or `MetricKit` in `Telegram-Mac/` or `packages/` (grep).
   `packages/CrashReports/Sources/CrashReports/CrashReportStore.swift` has no MetricKit input. SDK: `MXMetricManager` is macOS 12 (marked
@@ -1086,7 +1086,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 - **How to verify**: an xctrace Time Profiler launch of the Debug app shows the intervals on the login screen and in the labs. Add unit tests of the report store's dedup and limits.
 - **Confidence**: medium (which MetricKit payloads macOS actually delivers was not checked).
 
-### H12. Passport MRZ OCR is a bundled Hough-transform plus neural net run synchronously on main; use Vision — `todo` (low priority)
+### H12. Passport MRZ OCR is a bundled Hough-transform plus neural net run synchronously on main; use Vision — `done (1a0cdb0)` (low priority)
 
 - **Evidence**: `packages/OCR/Sources/ocr.mm` (630 lines), `genann.c` (357) and `fast-edge.cpp` (550).
   `packages/PassportUI/Sources/PassportUI/PassportController.swift:93-95,2294` calls `recognizeMRZ(image.precomposed(), nil)` in the main-thread file-panel completion.
@@ -1178,7 +1178,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   before and after, and confirm identical output with a vpxdec-style `--md5` check.
 - **Confidence**: high.
 
-### H16. The voice-note recorder changes the microphone's system-wide sample rate, does not resample 44.1 kHz input, and locks and allocates on the IO thread; use AVAudioEngine and AVAudioConverter — `todo`
+### H16. The voice-note recorder changes the microphone's system-wide sample rate, does not resample 44.1 kHz input, and locks and allocates on the IO thread; use AVAudioEngine and AVAudioConverter — `done (c18caa9)`
 
 - **Evidence**: `packages/TelegramMedia/Sources/AudioRecorder.swift:431-433` (raw `kAudioUnitSubType_HALOutput`). `:470-498` reads the available nominal
   rates, picks the entry whose `mMinimum == 48000` or else `table[0]`, then calls `AudioObjectSetPropertyData(kAudioDevicePropertyNominalSampleRate)` on the
@@ -1224,7 +1224,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   `TASK_POWER_INFO` wake-ups, old vs new). The existing rate tests must still pass.
 - **Confidence**: medium.
 
-### H18. Translation falls back to scraping Google's private `gtx` endpoint with a spoofed User-Agent; use Apple's on-device Translation framework through the existing TelegramCore hook — `todo`
+### H18. Translation falls back to scraping Google's private `gtx` endpoint with a spoofed User-Agent; use Apple's on-device Translation framework through the existing TelegramCore hook — `partial (d0a7c3e): macOS 26+ on-device path, gtx deleted; macOS 15-25 hidden-view path and the download-consent sheet not done (server fallback)`
 
 - **Evidence**: `packages/Translate/Sources/Translate/Translate.swift:277-282,334` (random fake browser User-Agents) and `:321-365`
   (`translate.googleapis.com/translate_a/single?client=gtx`, the URL split into pieces, sent over `URLSession.shared`).
@@ -1248,7 +1248,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   A SwiftPM test on macOS 26 translating en→de with installed models. `strings` on the binary shows no `translate_a`, and `nettop` shows no googleapis.com connection.
 - **Confidence**: high.
 
-### H19. Voice messages are transcribed only by the Premium/trial server; add on-device transcription with the composer's SpeechAnalyzer engine — `todo`
+### H19. Voice messages are transcribed only by the Premium/trial server; add on-device transcription with the composer's SpeechAnalyzer engine — `partial (0f80540): engine + action done; results are not labelled local-only and the switch has no UI yet (UserDefaults nanogram.localVoiceTranscription)`
 
 - **Evidence**: `packages/ChatUI/Sources/ChatUI/ChatController.swift:7221-7290` (Premium and trial checks, then only
   `engine.messages.transcribeAudio` at `:7273`). `ChatInputDictationEngine.swift:405-433,614-680` already runs SpeechAnalyzer/SpeechTranscriber with
@@ -1327,7 +1327,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   format and attachments. In DecodeBench, render one frame through software and through VT and compare with `compare_rgba.py`.
 - **Confidence**: medium.
 
-### H23. Photo Live Text is a custom Vision stack that runs on every gallery photo and rewrites one shared Postbox blob per photo; use VisionKit — `todo`
+### H23. Photo Live Text is a custom Vision stack that runs on every gallery photo and rewrites one shared Postbox blob per photo; use VisionKit — `partial (9d62367): custom UI kept (one Vision pass, per-photo file cache, 1 s dwell, shared CIContext); VisionKit overlay not adopted`
 
 - **Evidence**: `packages/GalleryUI/Sources/GalleryUI/GalleryRecognition.swift:46-75` (every photo at magnify 1 and visible starts `TextRecognizing.recognize`).
   `packages/TextRecognizing/Sources/TextRecognizing/TextRecognizing.swift:202-262` (accurate OCR, then a second `perform` for barcodes, and `NLLanguageRecognizer` per line)
@@ -1398,7 +1398,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 - **How to verify**: in the VideoPlayerLab/MediaPlaybackLab host with a local file, check `isPictureInPicturePossible`, start and stop, and confirm that delegate play, pause and seek reach the player.
 - **Confidence**: medium.
 
-### H27. No App Intents, Shortcuts or Focus filter — `todo` (integration, no efficiency gain)
+### H27. No App Intents, Shortcuts or Focus filter — `done (02d4e35)` (integration, no efficiency gain)
 
 - **Evidence**: no `AppIntents`, `AppShortcutsProvider`, `SetFocusFilterIntent` or INIntent handling in `Telegram-Mac/` or `packages/`, and no `NSUserActivityTypes`.
   The only system entry point is the CoreSpotlight continuation (`AppDelegate.swift:1756-1766`).
