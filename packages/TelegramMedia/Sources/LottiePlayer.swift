@@ -1338,10 +1338,11 @@ private final class WebPRenderer : RenderContainer {
     }
 }
 
-private final class WebmRenderer : RenderContainer {
+final class WebmRenderer : RenderContainer {
     
     private let animation: LottieAnimation
     private var decoder: SoftwareVideoSource?
+    private var makeDecoder: (() -> SoftwareVideoSource)?
     private let framerate: Int
     
     
@@ -1350,10 +1351,16 @@ private final class WebmRenderer : RenderContainer {
     private let fileSupplyment: TRLotFileSupplyment?
     private let detectedEndFrame: Atomic<Int32?>
 
-    init(animation: LottieAnimation, decoder: SoftwareVideoSource, fileSupplyment: TRLotFileSupplyment?) {
+    init(animation: LottieAnimation, makeDecoder: @escaping () -> SoftwareVideoSource, fileSupplyment: TRLotFileSupplyment?) {
         self.animation = animation
-        self.decoder = decoder
-        self.framerate = decoder.getFramerate()
+        if let fileSupplyment = fileSupplyment, fileSupplyment.isFinished, fileSupplyment.fps > 0 {
+            self.framerate = Int(fileSupplyment.fps)
+            self.makeDecoder = makeDecoder
+        } else {
+            let decoder = makeDecoder()
+            self.decoder = decoder
+            self.framerate = decoder.getFramerate()
+        }
         self.fileSupplyment = fileSupplyment
         if let storedEndFrame = fileSupplyment?.endFrame, storedEndFrame > 0 {
             self.detectedEndFrame = Atomic(value: storedEndFrame)
@@ -1389,6 +1396,10 @@ private final class WebmRenderer : RenderContainer {
             }
         }
 
+        if self.decoder == nil, let makeDecoder = self.makeDecoder {
+            self.makeDecoder = nil
+            self.decoder = makeDecoder()
+        }
         guard let decoder = self.decoder else {
             return nil
         }
@@ -1453,6 +1464,7 @@ private final class WebmRenderer : RenderContainer {
         if let fileSupplyment = fileSupplyment {
             fileSupplyment.markFinished()
             self.decoder = nil
+            self.makeDecoder = nil
         }
     }
     func setColor(_ color: NSColor, keyPath: String) {
@@ -1808,8 +1820,10 @@ public final class LottieAnimation : Equatable {
                 case .none:
                     fileSupplyment = nil
                 }
-                let decoder = SoftwareVideoSource(path: path, hintVP9: true, unpremultiplyAlpha: premultiply, reusePixelBuffers: fileSupplyment == nil)
-                return WebmRenderer(animation: self, decoder: decoder, fileSupplyment: fileSupplyment)
+                let reusePixelBuffers = fileSupplyment == nil
+                return WebmRenderer(animation: self, makeDecoder: {
+                    return SoftwareVideoSource(path: path, hintVP9: true, unpremultiplyAlpha: premultiply, reusePixelBuffers: reusePixelBuffers)
+                }, fileSupplyment: fileSupplyment)
             }
         }
         return nil
