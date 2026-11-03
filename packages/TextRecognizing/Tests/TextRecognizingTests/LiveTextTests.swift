@@ -165,6 +165,47 @@ final class LiveTextTests: XCTestCase {
         XCTAssertNil(view.hitTest(NSPoint(x: 200, y: 200)))
     }
 
+    @available(macOS 13.0, *)
+    private func visibleButton(in view: NSView) -> NSButton? {
+        if let button = view as? NSButton, !button.isHiddenOrHasHiddenAncestor, button.frame.width > 0, button.frame.height > 0 {
+            return button
+        }
+        for subview in view.subviews {
+            if let button = self.visibleButton(in: subview) {
+                return button
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    func testLiveTextButtonReceivesClicks() throws {
+        guard #available(macOS 13.0, *), ImageAnalyzer.isSupported else {
+            throw XCTSkip("VisionKit image analysis unavailable")
+        }
+        _ = NSApplication.shared
+        let result = try XCTUnwrap(self.analyze(self.textImage("NANOGRAM LIVE TEXT")))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        window.contentView = container
+        let view = LiveTextView(frame: NSRect(x: 100, y: 50, width: 800, height: 533))
+        container.addSubview(view)
+        view.set(result)
+        self.spin(until: { self.visibleButton(in: view.overlayView) != nil }, timeout: 5)
+
+        let button = try XCTUnwrap(self.visibleButton(in: view.overlayView))
+        let frame = button.convert(button.bounds, to: container)
+        let center = NSPoint(x: frame.midX, y: frame.midY)
+        let hit = try XCTUnwrap(container.hitTest(center))
+        XCTAssertTrue(hit === button || hit.isDescendant(of: button), "\(type(of: hit))")
+
+        XCTAssertFalse(view.overlayView.selectableItemsHighlighted)
+        button.performClick(nil)
+        XCTAssertTrue(view.overlayView.selectableItemsHighlighted)
+
+        XCTAssertNil(container.hitTest(NSPoint(x: 150, y: 560)).flatMap { $0.isDescendant(of: view) ? $0 : nil })
+    }
+
     func testOldRecognitionFilesAreRemovedOnce() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("LiveTextTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }

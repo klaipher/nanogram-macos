@@ -77,12 +77,26 @@ public final class LiveTextView: NSView, ImageAnalysisOverlayViewDelegate {
         guard self.bounds.contains(local) else {
             return nil
         }
+        let hit = super.hitTest(point)
+        if let hit, LiveTextView.isOverlayControl(hit, in: self) {
+            return hit
+        }
         let overlayPoint = self.overlayView.convert(local, from: self)
         guard self.overlayView.hasInteractiveItem(at: overlayPoint) || self.overlayView.hasActiveTextSelection else {
             return nil
         }
-        let hit = super.hitTest(point)
         return hit === self ? self.overlayView : hit
+    }
+
+    private static func isOverlayControl(_ view: NSView, in container: NSView) -> Bool {
+        var current: NSView? = view
+        while let candidate = current, candidate !== container {
+            if candidate is NSControl {
+                return true
+            }
+            current = candidate.superview
+        }
+        return false
     }
 
     public func normalizedPoint(fromWindow point: NSPoint) -> CGPoint? {
