@@ -202,6 +202,10 @@ final class UnauthorizedApplicationContext {
     func applyExternalLoginCode(_ code: String) {
         authController.applyExternalLoginCode(code)
     }
+
+    func applyNewTheme() {
+        rootController.updateLocalizationAndTheme(theme: theme)
+    }
     
     deinit {
         account.shouldBeServiceTaskMaster.set(.single(.never))

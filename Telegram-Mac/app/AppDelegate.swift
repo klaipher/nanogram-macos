@@ -687,6 +687,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                     if let theme = updatedTheme {
                         if self.contextValue == nil {
                             telegramUpdateTheme(theme, window: window, animated: true)
+                            self.authContextValue?.applyNewTheme()
                         } else {
                             self.enumerateApplicationContexts({ context in
                                 telegramUpdateTheme(theme, window: context.context.window, animated: true)
