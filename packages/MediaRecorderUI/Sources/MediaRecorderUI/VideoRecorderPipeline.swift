@@ -153,6 +153,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     
     private let startRecordAfterAudioBuffer:Atomic<Bool> = Atomic(value: false)
     private var resumeAfterAudioBuffer: Bool = false
+    private var deviceObservers: [NSObjectProtocol] = []
     private var pipelineSetupFailed: Bool = false
 
     public static let videoMessageMaxDuration: Double = 60
@@ -228,6 +229,8 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         
         videoConnection = videoOutput.connection(with: .video)
         audioConnection = audioOutput.connection(with: .audio)
+        
+        self.observeCaptureInterruptions()
 
         
         _configureFps()
@@ -660,7 +663,52 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
 
 
     
+    private func observeCaptureInterruptions() {
+        let queue = VideoRecorderPipeline.queue
+        self.deviceObservers.append(NotificationCenter.default.addObserver(forName: AVCaptureDevice.wasDisconnectedNotification, object: nil, queue: nil, using: { [weak self] notification in
+            guard let device = notification.object as? AVCaptureDevice, device.hasMediaType(.audio) else {
+                return
+            }
+            let uniqueID = device.uniqueID
+            queue.async {
+                self?.audioDeviceWasDisconnected(uniqueID: uniqueID)
+            }
+        }))
+        self.deviceObservers.append(NotificationCenter.default.addObserver(forName: AVCaptureSession.runtimeErrorNotification, object: self.session, queue: nil, using: { [weak self] _ in
+            queue.async {
+                guard let self, !self.isDiscarded else {
+                    return
+                }
+                switch self.status {
+                case .stoppingRecording, .finishRecording, .stopped, .failed:
+                    return
+                default:
+                    self.session.startRunning()
+                }
+            }
+        }))
+    }
+    
+    private func audioDeviceWasDisconnected(uniqueID: String) {
+        guard !self.isDiscarded, self.audioDevice?.uniqueID == uniqueID else {
+            return
+        }
+        let fallback = AVCaptureDevice.default(for: .audio).flatMap { $0.uniqueID != uniqueID && $0.isConnected && !$0.isSuspended ? $0 : nil } ?? AVCaptureDevice.devices(for: .audio).first(where: { $0.uniqueID != uniqueID && $0.isConnected && !$0.isSuspended })
+        guard let fallback else {
+            return
+        }
+        if self.audioDeviceInput == nil {
+            self.audioDevice = fallback
+            return
+        }
+        self.setSelectedAudioDevice(fallback)
+        self.audioConnection = self.audioOutput.connection(with: .audio)
+    }
+    
     deinit {
+        for observer in self.deviceObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
         VideoRecorderPipeline.queue.sync {
             stopCapture()
             removeAllFiles()
