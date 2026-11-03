@@ -9,7 +9,7 @@ public struct CrashReport: Equatable, Sendable {
     public let buildVersion: String
 }
 
-public final class CrashReportStore {
+public final class CrashReportStore: @unchecked Sendable {
     private static let rescanDelays: [Double] = [0, 15, 45, 120, 300]
     private static let maxReports = 5
 
