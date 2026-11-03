@@ -20,6 +20,15 @@ private let videoCameraRetainedBufferCount:Int = 16;
 
 private let roundVideoPlaneFrameCount = 27
 
+let roundVideoDecorationIsEnabled = false
+
+func applyRoundVideoDecoration(to renderer: TGVideoCameraRenderer, decoration: () -> (watermark: CGImage, planeFrames: CGImage)? = roundVideoDecoration) {
+    guard roundVideoDecorationIsEnabled, let decoration = decoration() else {
+        return
+    }
+    renderer.setDecorationWatermark(decoration.watermark, planeFrames: decoration.planeFrames, planeFrameCount: roundVideoPlaneFrameCount)
+}
+
 private func roundVideoDecoration() -> (watermark: CGImage, planeFrames: CGImage)? {
     guard let watermark = NSImage(named: "RoundVideoCorner")?.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
         return nil
@@ -174,9 +183,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         renderer.orientation = .portrait
         renderer.mirror = true
         renderer.outputSide = self.outputSide
-        if let decoration = roundVideoDecoration() {
-            renderer.setDecorationWatermark(decoration.watermark, planeFrames: decoration.planeFrames, planeFrameCount: roundVideoPlaneFrameCount)
-        }
+        applyRoundVideoDecoration(to: renderer)
         
         if session.canSetSessionPreset(.hd1280x720) {
             session.sessionPreset = .hd1280x720
