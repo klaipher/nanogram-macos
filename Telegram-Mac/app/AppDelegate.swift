@@ -161,35 +161,6 @@ final class SharedApplicationContext {
     }
 }
 
-private final class CtxInstallLayer : SimpleLayer {
-    private var timer: SwiftSignalKit.Timer?
-    override init() {
-        super.init()
-        self.contentsScale = 1
-        self.frame = NSMakeRect(-1, -1, 1, 1)
-        self.isOpaque = false
-        self.timer = SwiftSignalKit.Timer(timeout: 10, repeat: true, completion: { [weak self] in
-            self?.setNeedsDisplay()
-        }, queue: .mainQueue())
-        
-        self.timer?.start()
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    override func draw(in ctx: CGContext) {
-//        if FastSettings.useNativeGraphicContext {
-//        #if !APP_STORE
-//            DeviceGraphicsContextSettings.install(ctx)
-//        #endif
-//        } else {
-//            DeviceGraphicsContextSettings.install(nil)
-//        }
-    }
-}
-
 extension RLottieBridge : @retroactive R_LottieBridge {
    
 }
@@ -312,12 +283,6 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         return context
     }
     
-    private var ctxLayer: CtxInstallLayer?
-    
-    func updateGraphicContext() {
-        ctxLayer?.display()
-    }
-    
     
 
     
@@ -416,12 +381,6 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         #endif
 //        })
         
-//        let ctxLayer = CtxInstallLayer()
-//        self.ctxLayer = ctxLayer
-//        window.contentView?.layer?.addSublayer(ctxLayer)
-        
-//        ctxLayer.setNeedsDisplay()
-//        ctxLayer.display()
                 
 
         uiLocalizationFunc = { key in

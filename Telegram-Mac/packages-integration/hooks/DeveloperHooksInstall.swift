@@ -5,8 +5,6 @@ import NanogramLogExport
 
 func installDeveloperUIHooks() {
     DeveloperHooks.install(DeveloperHooks(
-        updateGraphicContext: {
-        appDelegate?.updateGraphicContext() },
         forceRLottieBackend: {
             return LottieBackend.forceRLottie
         },

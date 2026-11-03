@@ -165,8 +165,6 @@ public class FastSettings {
     
     private static let kConfirmWebApp = "kConfirmWebApp"
 
-    private static let kAnimateInputEmoji = "kAnimateInputEmoji"
-    private static let kUseNativeGraphicContext = "kUseNativeGraphicContext"
 
     
     private static let kPhotoSize = "kPhotoSize"
@@ -685,19 +683,6 @@ public class FastSettings {
         return intersection.count != peerIds.count
     }
     
-    public static var animateInputEmoji: Bool {
-        return UserDefaults.standard.bool(forKey: kAnimateInputEmoji)
-    }
-    public static func toggleAnimateInputEmoji() {
-        return UserDefaults.standard.set(!animateInputEmoji, forKey: kAnimateInputEmoji)
-    }
-    public static var useNativeGraphicContext: Bool {
-        let value = UserDefaults.standard.value(forKey: kUseNativeGraphicContext) as? Bool
-        return value ?? true
-    }
-    public static func toggleNativeGraphicContext() {
-        return UserDefaults.standard.set(!useNativeGraphicContext, forKey: kUseNativeGraphicContext)
-    }
     
     
     public static var premiumPerks:[String] {

@@ -17,65 +17,46 @@ import FoundationUtils
 import AccountResetSupport
 import AlertsUI
 import InAppSettings
-import FilePanels
 
 
 private final class Arguments {
     public let context: any AccountContextProtocol
-    public let importColors: () -> Void
-    public let exportColors: () -> Void
     public let toggleLogs: (Bool) -> Void
     public let navigateToLogs: () -> Void
     public let addAccount: () -> Void
     public let toggleMenu: (Bool) -> Void
-    public let toggleAnimatedInputEmoji: () -> Void
-    public let toggleNativeGraphicContext: () -> Void
     public let toggleDebugWebApp: () -> Void
     public let toggleNetwork: () -> Void
     public let selectNetworkEngine: (NetworkEngineKind) -> Void
     public let toggleDownloads: () -> Void
-    public let toggleCanViewPeerId: () -> Void
-    public let crash: () -> Void
     public let memoryReport: () -> Void
     public let toggleAccessibilityTree: () -> Void
     public let accessibilityAudit: () -> Void
     public let toggleForceRLottieBackend: () -> Void
     public let resetApp: (DeveloperAppReset) -> Void
     public init(context: any AccountContextProtocol,
-         importColors: @escaping () -> Void,
-         exportColors: @escaping () -> Void,
          toggleLogs: @escaping (Bool) -> Void,
          navigateToLogs: @escaping () -> Void,
          addAccount: @escaping () -> Void,
          toggleMenu: @escaping (Bool) -> Void,
-         toggleAnimatedInputEmoji: @escaping () -> Void,
-         toggleNativeGraphicContext: @escaping () -> Void,
          toggleDebugWebApp: @escaping () -> Void,
          toggleNetwork: @escaping () -> Void,
          selectNetworkEngine: @escaping (NetworkEngineKind) -> Void,
          toggleDownloads: @escaping () -> Void,
-         toggleCanViewPeerId: @escaping () -> Void,
-         crash: @escaping () -> Void,
          memoryReport: @escaping () -> Void,
          toggleAccessibilityTree: @escaping () -> Void,
          accessibilityAudit: @escaping () -> Void,
          toggleForceRLottieBackend: @escaping () -> Void,
          resetApp: @escaping (DeveloperAppReset) -> Void) {
         self.context = context
-        self.importColors = importColors
-        self.exportColors = exportColors
         self.toggleLogs = toggleLogs
         self.navigateToLogs = navigateToLogs
         self.addAccount = addAccount
         self.toggleMenu = toggleMenu
-        self.toggleAnimatedInputEmoji = toggleAnimatedInputEmoji
-        self.toggleNativeGraphicContext = toggleNativeGraphicContext
         self.toggleDebugWebApp = toggleDebugWebApp
         self.toggleNetwork = toggleNetwork
         self.selectNetworkEngine = selectNetworkEngine
         self.toggleDownloads = toggleDownloads
-        self.toggleCanViewPeerId = toggleCanViewPeerId
-        self.crash = crash
         self.memoryReport = memoryReport
         self.toggleAccessibilityTree = toggleAccessibilityTree
         self.accessibilityAudit = accessibilityAudit
@@ -87,32 +68,23 @@ private final class Arguments {
 private struct State: Equatable {
     public var logToFile: Bool = false
     public var legacyMenu: Bool = false
-    public var animateInputEmoji: Bool = false
-    public var useNativeGraphicContext: Bool = false
     public var debugWebApp: Bool = false
     public var useNetworkFramework: Bool = false
     public var networkEngine: NetworkEngineKind = .mtProtoKit
     public var activeNetworkEngine: NetworkEngineKind = .mtProtoKit
-    public var useExperimentalDownload: Bool = false
-    public var canViewPeerId: Bool = false
+    public var useExperimentalDownload: Bool = true
     public var accessibilityTree: Bool = true
     public var forceRLottieBackend: Bool = false
 }
 
 private let _id_add_account = InputDataIdentifier("_id_add_account")
-private let _id_import_colors = InputDataIdentifier("_id_import_colors")
-private let _id_export_colors = InputDataIdentifier("_id_export_colors")
 private let _id_toggle_logs = InputDataIdentifier("_id_toggle_logs")
 private let _id_open_logs = InputDataIdentifier("_id_open_logs")
 private let _id_toggle_menu = InputDataIdentifier("_id_toggle_menu")
-private let _id_animate_input_emoji = InputDataIdentifier("_id_animate_input_emoji")
-private let _id_native_graphic_context = InputDataIdentifier("_id_native_graphic_context")
 private let _id_debug_web_app = InputDataIdentifier("_id_debug_web_app")
 private let _id_network = InputDataIdentifier("_id_network")
 private let _id_network_engine = InputDataIdentifier("_id_network_engine")
 private let _id_downloads = InputDataIdentifier("_id_downloads")
-private let _id_show_peer_id = InputDataIdentifier("_id_show_peer_id")
-private let _id_crash = InputDataIdentifier("_id_crash")
 private let _id_memory_report = InputDataIdentifier("_id_memory_report")
 private let _id_accessibility_tree = InputDataIdentifier("_id_accessibility_tree")
 private let _id_accessibility_audit = InputDataIdentifier("_id_accessibility_audit")
@@ -176,36 +148,18 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     entries.append(.desc(sectionId: sectionId, index: index, text: .plain("INTERFACE"), data: .init(viewType: .textTopItem)))
     index += 1
 
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_toggle_menu, data: InputDataGeneralData(name: "Native Context Menu (Get Ready for glitches)", color: theme.colors.text, type: .switchable(state.legacyMenu), viewType: .firstItem, action: {
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_toggle_menu, data: InputDataGeneralData(name: "Native Context Menus (NSMenu)", color: theme.colors.text, type: .switchable(state.legacyMenu), viewType: .firstItem, action: {
         arguments.toggleMenu(!state.legacyMenu)
     })))
     index += 1
 
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_native_graphic_context, data: InputDataGeneralData(name: "Use Native Graphic Context", color: theme.colors.text, type: .switchable(state.useNativeGraphicContext), viewType: .innerItem, action: arguments.toggleNativeGraphicContext)))
-    index += 1
-
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_show_peer_id, data: InputDataGeneralData(name: "Show Peer Id on Profile Page", color: theme.colors.text, type: .switchable(state.canViewPeerId), viewType: .lastItem, action: arguments.toggleCanViewPeerId)))
-    index += 1
-
-    entries.append(.sectionId(sectionId, type: .normal))
-    sectionId += 1
-
-    entries.append(.desc(sectionId: sectionId, index: index, text: .plain("ANIMATIONS"), data: .init(viewType: .textTopItem)))
-    index += 1
-
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_animate_input_emoji, data: InputDataGeneralData(name: "Animate Emoji to Input", color: theme.colors.text, type: .switchable(state.animateInputEmoji), viewType: .firstItem, action: arguments.toggleAnimatedInputEmoji)))
-    index += 1
-
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_force_rlottie, data: InputDataGeneralData(name: "Lottie: force rlottie", color: theme.colors.text, type: .switchable(state.forceRLottieBackend), viewType: .lastItem, action: arguments.toggleForceRLottieBackend)))
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_force_rlottie, data: InputDataGeneralData(name: "Lottie: rlottie instead of tlottie", color: theme.colors.text, type: .switchable(state.forceRLottieBackend), viewType: .lastItem, action: arguments.toggleForceRLottieBackend)))
     index += 1
 
     entries.append(.sectionId(sectionId, type: .normal))
     sectionId += 1
 
     entries.append(.desc(sectionId: sectionId, index: index, text: .plain("NETWORK"), data: .init(viewType: .textTopItem)))
-    index += 1
-
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_network, data: InputDataGeneralData(name: "Experimental Network", color: theme.colors.text, type: .switchable(state.useNetworkFramework), viewType: .firstItem, action: arguments.toggleNetwork)))
     index += 1
 
     let networkEngineTitle: (NetworkEngineKind) -> String = { engine in
@@ -228,10 +182,16 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
             arguments.selectNetworkEngine(.rust)
         })
     ]
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_network_engine, data: InputDataGeneralData(name: "Network Engine", color: theme.colors.text, type: .contextSelector(networkEngineValue, networkEngineItems), viewType: .innerItem)))
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_network_engine, data: InputDataGeneralData(name: "Network Engine", color: theme.colors.text, type: .contextSelector(networkEngineValue, networkEngineItems), viewType: .firstItem)))
     index += 1
 
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_downloads, data: InputDataGeneralData(name: "Experimental Downloads", color: theme.colors.text, type: .switchable(state.useExperimentalDownload), viewType: .lastItem, action: arguments.toggleDownloads)))
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_downloads, data: InputDataGeneralData(name: "Downloads v2 (restart required)", color: theme.colors.text, type: .switchable(state.useExperimentalDownload), viewType: .innerItem, action: arguments.toggleDownloads)))
+    index += 1
+
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_network, data: InputDataGeneralData(name: "MtProtoKit: Network.framework TCP (restart required)", color: theme.colors.text, type: .switchable(state.useNetworkFramework), viewType: .lastItem, action: arguments.toggleNetwork)))
+    index += 1
+
+    entries.append(.desc(sectionId: sectionId, index: index, text: .plain("Downloads v2 is the newer cloud-media downloader; it is on by default and the server can switch it off. The Network.framework transport applies only while MtProtoKit runs; it stays off until its keepalive fix reaches the macOS core."), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
     index += 1
 
     entries.append(.sectionId(sectionId, type: .normal))
@@ -249,10 +209,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_accessibility_tree, data: InputDataGeneralData(name: "VoiceOver Accessibility Tree", color: theme.colors.text, type: .switchable(state.accessibilityTree), viewType: .innerItem, action: arguments.toggleAccessibilityTree)))
     index += 1
 
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_accessibility_audit, data: InputDataGeneralData(name: "Accessibility Audit (to clipboard)", color: theme.colors.text, type: .none, viewType: .innerItem, action: arguments.accessibilityAudit)))
-    index += 1
-
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_crash, data: InputDataGeneralData(name: "Crash App", color: theme.colors.redUI, type: .none, viewType: .lastItem, action: arguments.crash)))
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_accessibility_audit, data: InputDataGeneralData(name: "Accessibility Audit (to clipboard)", color: theme.colors.text, type: .none, viewType: .lastItem, action: arguments.accessibilityAudit)))
     index += 1
 
     entries.append(.sectionId(sectionId, type: .normal))
@@ -284,14 +241,11 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
     let initialState = State(
         logToFile: false,
         legacyMenu: System.legacyMenu,
-        animateInputEmoji: FastSettings.animateInputEmoji,
-        useNativeGraphicContext: FastSettings.useNativeGraphicContext,
         debugWebApp: FastSettings.debugWebApp,
-        useNetworkFramework: false,
+        useNetworkFramework: DeveloperNetworkSwitches(settings: nil).networkFrameworkTransport,
         networkEngine: .mtProtoKit,
         activeNetworkEngine: context.account.network.engineKind,
-        useExperimentalDownload: false,
-        canViewPeerId: FastSettings.canViewPeerId,
+        useExperimentalDownload: DeveloperNetworkSwitches(settings: nil).downloadsV2,
         accessibilityTree: FastSettings.accessibilityTreeEnabled,
         forceRLottieBackend: DeveloperHooks.shared.forceRLottieBackend()
     )
@@ -302,25 +256,7 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
         statePromise.set(stateValue.modify(f))
     }
 
-    let arguments = Arguments(context: context, importColors: {
-        filePanel(with: ["palette"], allowMultiple: false, for: context.window, completion: { list in
-            if let path = list?.first {
-                if let palette = importPalette(path) {
-                    let palettesDir = ApiEnvironment.containerURL!.appendingPathComponent("Palettes").path
-                    try? FileManager.default.createDirectory(atPath: palettesDir, withIntermediateDirectories: true, attributes: nil)
-                    try? FileManager.default.removeItem(atPath: palettesDir + "/" + path.nsstring.lastPathComponent)
-                    try? FileManager.default.copyItem(atPath: path, toPath: palettesDir + "/" + path.nsstring.lastPathComponent)
-                    _ = updateThemeInteractivetly(accountManager: context.sharedContext.accountManager, f: { settings in
-                        return settings.withUpdatedPalette(palette).withUpdatedCloudTheme(nil)
-                    }).start()
-                } else {
-                    alert(for: context.window, info: "Parsing Error")
-                }
-            }
-        })
-    }, exportColors: {
-        exportPalette(palette: theme.colors)
-    }, toggleLogs: { enabled in
+    let arguments = Arguments(context: context, toggleLogs: { enabled in
         MTLogSetEnabled(enabled)
         _ = updateLoggingSettings(accountManager: context.sharedContext.accountManager, {
             $0.withUpdatedLogToFile(enabled)
@@ -342,21 +278,6 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
             current.legacyMenu = value
             return current
         }
-    }, toggleAnimatedInputEmoji: {
-        FastSettings.toggleAnimateInputEmoji()
-        updateState { current in
-            var current = current
-            current.animateInputEmoji = FastSettings.animateInputEmoji
-            return current
-        }
-    }, toggleNativeGraphicContext: {
-        FastSettings.toggleNativeGraphicContext()
-        DeveloperHooks.shared.updateGraphicContext()
-        updateState { current in
-            var current = current
-            current.useNativeGraphicContext = FastSettings.useNativeGraphicContext
-            return current
-        }
     }, toggleDebugWebApp: {
         FastSettings.toggleDebugWebApp()
         updateState { current in
@@ -366,13 +287,7 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
         }
     }, toggleNetwork: {
         _ = updateNetworkSettingsInteractively(postbox: context.account.postbox, network: context.account.network, { current in
-            var current = current
-            if let value = current.useNetworkFramework {
-                current.useNetworkFramework = !value
-            } else {
-                current.useNetworkFramework = true
-            }
-            return current
+            return DeveloperNetworkSwitches.toggleNetworkFrameworkTransport(current)
         }).start()
     }, selectNetworkEngine: { engine in
         if stateValue.with({ $0.networkEngine }) == engine {
@@ -401,24 +316,8 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
         }
     }, toggleDownloads: {
         _ = updateNetworkSettingsInteractively(postbox: context.account.postbox, network: context.account.network, { current in
-            var current = current
-            if let value = current.useExperimentalDownload {
-                current.useExperimentalDownload = !value
-            } else {
-                current.useExperimentalDownload = true
-            }
-            return current
+            return DeveloperNetworkSwitches.toggleDownloadsV2(current)
         }).start()
-    }, toggleCanViewPeerId: {
-        FastSettings.canViewPeerId = !FastSettings.canViewPeerId
-        updateState { current in
-            var current = current
-            current.canViewPeerId = FastSettings.canViewPeerId
-            return current
-        }
-    }, crash: {
-        var array: [Int] = []
-        array[1] = 0
     }, memoryReport: {
         let report = layerMemoryReport()
         Logger.shared.log("Memory", report)
@@ -486,12 +385,13 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
     ).start(next: { sharedData, networkSettings in
         let logging = sharedData.entries[SharedDataKeys.loggingSettings]?.get(LoggingSettings.self) ?? LoggingSettings.defaultSettings
         let networkEngine = sharedData.entries[SharedDataKeys.networkEngineSettings]?.get(NetworkEngineSettings.self) ?? NetworkEngineSettings.defaultSettings
+        let networkSwitches = DeveloperNetworkSwitches(settings: networkSettings)
         updateState { current in
             var current = current
             current.logToFile = logging.logToFile
-            current.useNetworkFramework = networkSettings.useNetworkFramework ?? false
+            current.useNetworkFramework = networkSwitches.networkFrameworkTransport
             current.networkEngine = networkEngine.engine
-            current.useExperimentalDownload = networkSettings.useExperimentalDownload ?? false
+            current.useExperimentalDownload = networkSwitches.downloadsV2
             return current
         }
     }))
