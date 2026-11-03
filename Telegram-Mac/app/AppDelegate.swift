@@ -50,6 +50,7 @@ import PerfLab
 import SettingsUI
 import NanogramDebug
 import NanogramDebugUI
+import NanogramRuntime
 import Mozjpeg
 
 //#if BETA || DEBUG
@@ -224,7 +225,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     }
     
     
-    let presentAccountStatus = Promise(false)
+    let presentAccountStatus = ValuePromise(false, ignoreRepeated: true)
     var containerUrl:String!
     
     private let sharedContextPromise = Promise<SharedApplicationContext>()
@@ -1312,10 +1313,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                     sharedContext.updateStatusBarLock(value.isLocked)
                 }
                 
-                self.timer = SwiftSignalKit.Timer(timeout: 5, repeat: true, completion: {
-                    self.updatePeerPresence()
-                }, queue: .mainQueue())
-                self.timer?.start()
+                self.updatePeerPresence()
                 
             })
         })
@@ -1333,11 +1331,24 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     private func updatePeerPresence() {
         if let sharedApplicationContextValue = sharedApplicationContextValue {
-            let isOnline = NSApp.isActive && NSApp.isRunning && !NSApp.isHidden && !sharedApplicationContextValue.sharedWakeupManager.isSleeping && !sharedApplicationContextValue.notificationManager._lockedValue.screenLock && !sharedApplicationContextValue.notificationManager._lockedValue.passcodeLock && SystemIdleTime() < 30
+            let idleTime = Double(SystemIdleTime())
+            let isOnline = NSApp.isActive && NSApp.isRunning && !NSApp.isHidden && !sharedApplicationContextValue.sharedWakeupManager.isSleeping && !sharedApplicationContextValue.notificationManager._lockedValue.screenLock && !sharedApplicationContextValue.notificationManager._lockedValue.passcodeLock && idleTime < PresenceIdleSchedule.idleThreshold
             
-            
-            presentAccountStatus.set(.single(isOnline) |> then(.single(isOnline) |> delay(50, queue: Queue.concurrentBackgroundQueue())) |> restart)
+            presentAccountStatus.set(isOnline)
+            schedulePeerPresenceCheck(idleTime: idleTime)
         }
+    }
+
+    private func schedulePeerPresenceCheck(idleTime: Double) {
+        self.timer?.invalidate()
+        self.timer = nil
+        guard let timeout = PresenceIdleSchedule.nextCheck(isActive: NSApp.isActive && !NSApp.isHidden, idleTime: idleTime) else {
+            return
+        }
+        self.timer = SwiftSignalKit.Timer(timeout: timeout, repeat: false, completion: { [weak self] in
+            self?.updatePeerPresence()
+        }, queue: .mainQueue())
+        self.timer?.start()
     }
     
     @objc public func windiwDidChangeBackingProperties() {

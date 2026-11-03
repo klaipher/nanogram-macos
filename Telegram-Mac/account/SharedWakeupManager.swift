@@ -2,6 +2,7 @@ import Cocoa
 import SwiftSignalKit
 import Postbox
 import TelegramCore
+import NanogramRuntime
 
 
 
@@ -45,11 +46,18 @@ class SharedWakeupManager {
     private var stateManagmentReseted: Set<AccountRecordId> = Set()
     private var ringingStatesDisposables: [AccountRecordId: Disposable] = [:]
     private var inForeground: Bool = false
+    private let appliedFlags = AccountWakeupFlagsCache<AccountRecordId>()
 
-    private(set) var isSleeping: Bool = false {
+    private var sleepState = SleepState() {
         didSet {
-            onSleepValueUpdated?(isSleeping)
+            if sleepState.isSleeping != oldValue.isSleeping {
+                onSleepValueUpdated?(sleepState.isSleeping)
+            }
         }
+    }
+
+    var isSleeping: Bool {
+        return sleepState.isSleeping
     }
     
     var onSleepValueUpdated:((Bool)->Void)?
@@ -58,15 +66,14 @@ class SharedWakeupManager {
         self.sharedContext = sharedContext
         
         
-        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveWakeNote(_:)), name: NSWorkspace.willSleepNotification, object: nil)
-        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveSleepNote(_:)), name: NSWorkspace.didWakeNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveSystemSleepNote(_:)), name: NSWorkspace.willSleepNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveSystemWakeNote(_:)), name: NSWorkspace.didWakeNotification, object: nil)
+
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveScreensWakeNote(_:)), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveScreensSleepNote(_:)), name: NSWorkspace.screensDidSleepNotification, object: nil)
 
         
-         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveWakeNote(_:)), name: NSWorkspace.screensDidWakeNotification, object: nil)
-        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveSleepNote(_:)), name: NSWorkspace.screensDidSleepNotification, object: nil)
-
-        
-        _ = (inForeground |> deliverOnMainQueue).start(next: { value in
+        _ = (inForeground |> distinctUntilChanged |> deliverOnMainQueue).start(next: { value in
                 self.inForeground = value
                 self.checkTasks()
             })
@@ -96,23 +103,22 @@ class SharedWakeupManager {
         updateAccounts()
     }
     
-    @objc func receiveSleepNote(_ notification: Notification) {
-        if !self.isSleeping {
-            for (account, _, _) in self.accountsAndTasks {
-               account.shouldBeServiceTaskMaster.set(.single(.never))
-            }
-        }
-        self.isSleeping = true
-        
+    @objc func receiveSystemSleepNote(_ notification: Notification) {
+        sleepState.systemWillSleep()
+        updateAccounts()
     }
     
-    @objc func receiveWakeNote(_ notificaiton:Notification) {
-        if self.isSleeping {
-            for (account, _, _) in self.accountsAndTasks {
-               account.shouldBeServiceTaskMaster.set(.single(.never) |> then(.single(.always)))
-            }
-        }
-        self.isSleeping = false
+    @objc func receiveSystemWakeNote(_ notification: Notification) {
+        sleepState.systemDidWake()
+        updateAccounts()
+    }
+
+    @objc func receiveScreensSleepNote(_ notification: Notification) {
+        sleepState.screensDidSleep()
+    }
+
+    @objc func receiveScreensWakeNote(_ notification: Notification) {
+        sleepState.screensDidWake()
     }
 
     private func updateRindingsStatuses(_ accounts:[Account]) {
@@ -169,15 +175,27 @@ class SharedWakeupManager {
         
     }
     
+    private func flags(primary: Bool, tasks: AccountTasks, account: Account) -> AccountWakeupFlags {
+        let based = appDelegate?.supportAccountContextValue?.find(account.id)
+        return AccountWakeupFlags(serviceTaskMaster: sleepState.keepsNetwork, keepWorkerConnections: tasks.backgroundAudio, keepOnlinePresence: (primary || based != nil) && self.inForeground, keepBackgroundDownloads: tasks.backgroundDownloads)
+    }
+
     private func updateAccounts() {
+        appliedFlags.keep(only: Set(self.accountsAndTasks.map { $0.0.id }))
         for (account, primary, tasks) in self.accountsAndTasks {
-            account.shouldBeServiceTaskMaster.set(.single(.always))
-            account.shouldExplicitelyKeepWorkerConnections.set(.single(tasks.backgroundAudio))
-            
-            let based = appDelegate?.supportAccountContextValue?.find(account.id)
-            
-            account.shouldKeepOnlinePresence.set(.single((primary || based != nil) && self.inForeground))
-            account.shouldKeepBackgroundDownloadConnections.set(.single(tasks.backgroundDownloads))
+            let flags = self.flags(primary: primary, tasks: tasks, account: account)
+            for flag in appliedFlags.changes(for: account.id, flags) {
+                switch flag {
+                case .serviceTaskMaster:
+                    account.shouldBeServiceTaskMaster.set(.single(flags.serviceTaskMaster ? .always : .never))
+                case .keepWorkerConnections:
+                    account.shouldExplicitelyKeepWorkerConnections.set(.single(flags.keepWorkerConnections))
+                case .keepOnlinePresence:
+                    account.shouldKeepOnlinePresence.set(.single(flags.keepOnlinePresence))
+                case .keepBackgroundDownloads:
+                    account.shouldKeepBackgroundDownloadConnections.set(.single(flags.keepBackgroundDownloads))
+                }
+            }
             
             if !stateManagmentReseted.contains(account.id) {
                 account.resetStateManagement()
