@@ -5,6 +5,7 @@ import PackageDescription
 let deps: [(String, String)] = [
     ("TGUIKit", "../TGUIKit"),
     ("PerfLab", "../PerfLab"),
+    ("NanogramRuntime", "../NanogramRuntime"),
     ("ColorPalette", "../ColorPalette"),
     ("InAppSettings", "../InAppSettings"),
     ("Localization", "../Localization"),

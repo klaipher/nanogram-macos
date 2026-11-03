@@ -36,6 +36,7 @@ import TelegramTheme
 import TelegramUtils
 import Strings
 import InputView
+import NanogramRuntime
 
 
 private func calculateAdjustedPoint(for point: CGPoint,
@@ -2672,6 +2673,12 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     private let initialDataHandler:Promise<ChatHistoryCombinedInitialData> = Promise()
 
     let previousView = Atomic<ChatHistoryView?>(value: nil)
+    private let historyVisibility = ValuePromise<Bool>(true, ignoreRepeated: true)
+    private lazy var historyVisibilityObserver = WindowVisibilityObserver(onChange: { [weak self] visible in
+        self?.historyVisibility.set(visible)
+    })
+    private let historyAppliedOnce = Atomic<Bool>(value: false)
+    private let historySkippedWhileHidden = Atomic<Bool>(value: false)
 
     /// Stored on the controller (not a `viewDidLoad` local) so we can null
     /// its contents from `cleanup()` and release the held `Appearance`
@@ -4084,6 +4091,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         })
 
         let previousHistoryViewUpdateId = Atomic<Int?>(value: nil)
+        let historyAppliedOnce = self.historyAppliedOnce
+        let historySkippedWhileHidden = self.historySkippedWhileHidden
         let historyViewTransition = combineLatest(queue: queue,
                                                   historyViewUpdate,
                                                   appearanceSignal,
@@ -4099,8 +4108,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                                                   reactions,
                                                   historyUiState,
                                                   historyPeerView,
-                                                  recommendedChannels
-    ) |> mapToQueue { update, appearance, maxReadIndex, searchState, animatedEmojiStickers, messageEffects, savedMessageTags, customChannelDiscussionReadState, customThreadOutgoingReadState, updatingMedia, adMessages, reactions, uiState, peerView, recommendedChannels -> Signal<(TableUpdateTransition, MessageHistoryView?, ChatHistoryCombinedInitialData, Bool, ChatHistoryView), NoError> in
+                                                  recommendedChannels,
+                                                  historyVisibility.get()
+    ) |> mapToQueue { update, appearance, maxReadIndex, searchState, animatedEmojiStickers, messageEffects, savedMessageTags, customChannelDiscussionReadState, customThreadOutgoingReadState, updatingMedia, adMessages, reactions, uiState, peerView, recommendedChannels, isVisible -> Signal<(TableUpdateTransition, MessageHistoryView?, ChatHistoryCombinedInitialData, Bool, ChatHistoryView), NoError> in
                                     
             let pollAnswersLoading = uiState.pollAnswers
             let threadLoading = uiState.threadLoading
@@ -4148,6 +4158,16 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             default:
                 break
             }
+
+            var isPlainGenericUpdate = false
+            if case .Generic(type: .Generic) = updateType {
+                isPlainGenericUpdate = true
+            }
+            if !HistoryVisibilityGate.shouldApply(visible: isVisible, isPlainGenericUpdate: isPlainGenericUpdate, hasScrollPosition: scrollPosition != nil, appliedOnce: historyAppliedOnce.with { $0 }) {
+                _ = historySkippedWhileHidden.swap(true)
+                return .complete()
+            }
+            let catchesUpAfterHidden = isVisible && historySkippedWhileHidden.swap(false)
             
             
             // The stored Atomic is `Appearance?`; the only time it's nil is
@@ -4164,7 +4184,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 break
             }
             
-            let animationInterface: TableAnimationInterface = TableAnimationInterface(nextTransaction.isExutable && view?.laterId == nil, true, animatedRows)
+            let animationInterface: TableAnimationInterface? = catchesUpAfterHidden ? nil : TableAnimationInterface(nextTransaction.isExutable && view?.laterId == nil, true, animatedRows)
             let timeDifference = context.timeDifference
             let bigEmojiEnabled = context.sharedContext.baseSettings.bigEmoji
 
@@ -4241,6 +4261,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         let appliedTransition = historyViewTransition |> map { [weak self] transition, view, initialData, isLoading, proccesedView in
             self?.applyTransition(transition, initialData: initialData, isLoading: isLoading, processedView: proccesedView)
+            if !isLoading {
+                _ = historyAppliedOnce.swap(true)
+            }
         }
         
         
@@ -10801,6 +10824,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
+        historyVisibilityObserver.window = genericView.window
         isPushedGlobalBackground = true
         updateBubblesBackButton()
         

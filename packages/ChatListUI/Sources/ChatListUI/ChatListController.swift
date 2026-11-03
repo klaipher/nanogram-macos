@@ -22,6 +22,7 @@ import ChatUI
 import ChatModeTypes
 import InlineStickerLayer
 import InputDataUI
+import NanogramRuntime
 
 private final class Arguments {
     let context: any AccountContextProtocol
@@ -740,6 +741,12 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     
     private let previousChatList:Atomic<EngineChatList?> = Atomic(value: nil)
     private let first = Atomic(value:true)
+    private let chatListVisibility = ValuePromise<Bool>(true, ignoreRepeated: true)
+    private lazy var chatListVisibilityObserver = WindowVisibilityObserver(onChange: { [weak self] visible in
+        self?.chatListVisibility.set(visible)
+    })
+    private let chatListAppliedOnce = Atomic<Bool>(value: false)
+    private let chatListSkippedWhileHidden = Atomic<Bool>(value: false)
     private let animated = Atomic(value: false)
     private let removePeerIdGroupDisposable = MetaDisposable()
     private let downloadsDisposable = MetaDisposable()
@@ -784,6 +791,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         let animated: Atomic<Bool> = self.animated
         let animateGroupNextTransition = self.animateGroupNextTransition
         var scroll:TableScrollState? = nil
+        let chatListAppliedOnce = self.chatListAppliedOnce
+        let chatListSkippedWhileHidden = self.chatListSkippedWhileHidden
         
         let preferHighQualityStories: Signal<Bool, NoError> = combineLatest(
             context.sharedContext.baseApplicationSettings
@@ -977,7 +986,12 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         
         
-        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals -> Signal<TableUpdateTransition, NoError> in
+        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<TableUpdateTransition, NoError> in
+            if !HistoryVisibilityGate.shouldApply(visible: isVisible, isPlainGenericUpdate: !value.2 && !scrollUp.with { $0 }, hasScrollPosition: scroll != nil, appliedOnce: chatListAppliedOnce.with { $0 }) {
+                _ = chatListSkippedWhileHidden.swap(true)
+                return .complete()
+            }
+            let catchesUpAfterHidden = isVisible && chatListSkippedWhileHidden.swap(false)
             let (suggestions, crashReportCard) = suggestionsAndCrashReport
                                 
             let filterData = value.1
@@ -1140,6 +1154,10 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             
             
             var animated = animated.swap(true)
+
+            if catchesUpAfterHidden {
+                animated = false
+            }
                         
             if value.2 {
                 animated = false
@@ -1172,6 +1190,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition -> Signal<Void, NoError> in
             self?.enqueueTransition(transition)
+            _ = chatListAppliedOnce.swap(true)
             return .complete()
         }
         
@@ -1644,7 +1663,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
-        
+        chatListVisibilityObserver.window = genericView.window
         subContext?.load(force: true)
         
         let isLocked = ChatListUIHooks.shared.appPasslock() ?? .single(false)
