@@ -61,7 +61,7 @@ private func dictFromLocalization(_ value: Localization) -> [String: String] {
 
 public typealias LocalizationTransform = ([String: String], String) -> [String: String]
 
-private let _localizationTransform: Atomic<LocalizationTransform?> = Atomic(value: nil)
+nonisolated(unsafe) private let _localizationTransform: Atomic<LocalizationTransform?> = Atomic(value: nil)
 
 public func installLocalizationTransform(_ transform: @escaping LocalizationTransform) {
     _ = _localizationTransform.swap(transform)

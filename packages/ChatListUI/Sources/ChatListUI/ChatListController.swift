@@ -743,6 +743,18 @@ struct ChatListPageKey: Equatable {
     }
 }
 
+@MainActor
+private func chatListPageTableState(_ tableView: TableView) -> (geometry: ChatListPageGeometry, isAnimatingScroll: Bool)? {
+    let viewport = tableView.frame.height
+    guard viewport > 0, tableView.count > 0 else {
+        return nil
+    }
+    let offset = tableView.documentOffset.y
+    let documentHeight = tableView.documentSize.height
+    let geometry = ChatListPageGeometry(remainingAbove: offset, remainingBelow: documentHeight - offset - viewport, viewport: viewport, rowHeight: documentHeight / CGFloat(tableView.count))
+    return (geometry, tableView.clipView.isAnimateScrolling)
+}
+
 public class ChatListController<Context: AccountContextProtocol> : PeersListController<Context>, ChatListControllerKind {
     
     private let folderUpdatesDisposable = MetaDisposable()
@@ -753,7 +765,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     }
     
     private func chatListDidScroll(_ position: ScrollPosition) {
-        guard !genericView.tableView.clipView.isAnimateScrolling else {
+        let view = genericView
+        guard !MainActor.assumeIsolated({ view.tableView.clipView.isAnimateScrolling }) else {
             return
         }
         switch position.direction {
@@ -768,16 +781,12 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     }
     
     private func requestChatListPageIfNeeded() {
-        let tableView = genericView.tableView
-        let viewport = tableView.frame.height
-        guard viewport > 0, tableView.count > 0 else {
+        let view = genericView
+        guard let table = MainActor.assumeIsolated({ chatListPageTableState(view.tableView) }) else {
             return
         }
-        let offset = tableView.documentOffset.y
-        let documentHeight = tableView.documentSize.height
-        let geometry = ChatListPageGeometry(remainingAbove: offset, remainingBelow: documentHeight - offset - viewport, viewport: viewport, rowHeight: documentHeight / CGFloat(tableView.count))
         let currentKey = ChatListPageKey(stateValue.with { $0.filterData })
-        guard let next = chatListPager.nextRequest(currentKey: currentKey, geometry: geometry, isAnimatingScroll: tableView.clipView.isAnimateScrolling) else {
+        guard let next = chatListPager.nextRequest(currentKey: currentKey, geometry: table.geometry, isAnimatingScroll: table.isAnimatingScroll) else {
             return
         }
         _ = animated.swap(false)
@@ -1329,11 +1338,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }))
         
         
-        genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] position in
-            self?.chatListDidScroll(position)
-        }))
-        
         genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] scroll in
+            self?.chatListDidScroll(scroll)
            
             var refreshStoryPeerIds:[PeerId] = []
             self?.genericView.tableView.enumerateVisibleItems(with: { item in
