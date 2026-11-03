@@ -21,13 +21,13 @@ public enum NanogramLogExportDestination: CaseIterable, Equatable, Sendable {
     public var title: String {
         switch self {
         case .nanogram:
-            return "Send via Nanogram…"
+            return "Send via Nanogram…" //TODOLANG
         case .email:
-            return "Send via Email…"
+            return "Send via Email…" //TODOLANG
         case .otherApps:
-            return "Other Apps…"
+            return "Other Apps…" //TODOLANG
         case .saveToFolder:
-            return "Save to…"
+            return "Save to…" //TODOLANG
         }
     }
 }
@@ -44,7 +44,16 @@ public struct NanogramLogExportSpec: Equatable, Sendable {
     public let packaging: NanogramLogExportPackaging
 
     public var menuTitle: String {
-        return "Send \(self.what)"
+        return "Send \(self.what)" //TODOLANG
+    }
+
+    public var unavailableText: String {
+        switch self.kind {
+        case .crashReports:
+            return "Crash reports aren't available in the App Store edition." //TODOLANG
+        case .appLogs, .callLogs, .metricKit:
+            return "\(self.what) aren't available in this edition." //TODOLANG
+        }
     }
 
     public var archiveName: String {
@@ -56,28 +65,28 @@ public struct NanogramLogExportSpec: Equatable, Sendable {
         let tag: String
         switch kind {
         case .appLogs:
-            self.what = "App Logs"
-            subjectWhat = "logs"
+            self.what = "App Logs" //TODOLANG
+            subjectWhat = "logs" //TODOLANG
             tag = "app"
             self.packaging = .archive
         case .callLogs:
-            self.what = "Call Logs"
-            subjectWhat = "call logs"
+            self.what = "Call Logs" //TODOLANG
+            subjectWhat = "call logs" //TODOLANG
             tag = "calls"
             self.packaging = .archive
         case .crashReports:
-            self.what = "Crash Reports"
-            subjectWhat = "crash reports"
+            self.what = "Crash Reports" //TODOLANG
+            subjectWhat = "crash reports" //TODOLANG
             tag = "crash"
             self.packaging = .separateFiles
         case .metricKit:
-            self.what = "MetricKit Reports"
-            subjectWhat = "MetricKit reports"
+            self.what = "MetricKit Reports" //TODOLANG
+            subjectWhat = "MetricKit reports" //TODOLANG
             tag = "metrickit"
-            self.packaging = .separateFiles
+            self.packaging = .archive
         }
         self.kind = kind
-        self.subject = "Nanogram macOS \(subjectWhat) (\(appVersion) (\(buildNumber)))"
+        self.subject = "Nanogram macOS \(subjectWhat) (\(appVersion) (\(buildNumber)))" //TODOLANG
         self.fileBaseName = "nanogram-logs-\(tag)"
     }
 

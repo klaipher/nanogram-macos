@@ -14,18 +14,31 @@ import NanogramLogExport
 
 let nanogramCrashReportStore = CrashReportStore(handledKey: "crashReports.handledUntil." + ApiEnvironment.prefix)
 
+func nanogramLogExportKindIsAvailable(_ kind: NanogramLogExportKind) -> Bool {
+    switch kind {
+    case .crashReports:
+        return nanogramCrashReportStore.isAvailable
+    case .appLogs, .callLogs, .metricKit:
+        return true
+    }
+}
+
 private final class NanogramLogShareObject: ShareObject {
     private let files: [URL]
-    private let sent: @MainActor @Sendable (Bool) -> Void
+    private let queued: ([MessageId]) -> Void
 
-    init(_ context: AccountContext, files: [URL], sent: @escaping @MainActor @Sendable (Bool) -> Void) {
+    init(_ context: AccountContext, files: [URL], queued: @escaping ([MessageId]) -> Void) {
         self.files = files
-        self.sent = sent
+        self.queued = queued
         super.init(context)
     }
 
     override var messagesCount: Int {
         return self.files.count
+    }
+
+    override var successText: String {
+        return "Sending…" //TODOLANG
     }
 
     override func possibilityPerformTo(_ peer: Peer) -> Bool {
@@ -38,7 +51,7 @@ private final class NanogramLogShareObject: ShareObject {
         let silent = self.withoutSound
         let atDate = self.scheduleDate
         let containers = self.files.map { MediaSenderContainer(path: $0.path, isFile: true) }
-        let sent = self.sent
+        let queued = self.queued
         let signals = peerIds.map { peerId -> Signal<[MessageId?], NoError> in
             let threadId = threadIds[peerId] ?? threadId
             let stars = sendPaidMessageStars[peerId]
@@ -52,13 +65,70 @@ private final class NanogramLogShareObject: ShareObject {
         |> take(1)
         |> deliverOnMainQueue
         |> beforeNext { results in
-            let delivered = results.allSatisfy { ids in ids.contains(where: { $0 != nil }) }
-            DispatchQueue.main.async {
-                sent(delivered)
-            }
+            queued(results.flatMap { ids in ids.compactMap { $0 } })
         }
         |> ignoreValues
         |> castError(String.self)
+    }
+}
+
+private final class NanogramLogChatSend {
+    private let completion: NanogramLogChatSendCompletion
+    private let disposable = MetaDisposable()
+    private var tracking = false
+    private var reported = false
+
+    init(completion: @escaping NanogramLogChatSendCompletion) {
+        self.completion = completion
+    }
+
+    func pickerClosed(sent: Bool) {
+        if !sent && !self.tracking {
+            self.report(.cancelled)
+        }
+    }
+
+    func track(_ ids: [MessageId], context: AccountContext) {
+        guard !self.reported, !self.tracking else {
+            return
+        }
+        self.tracking = true
+        if ids.isEmpty {
+            self.report(.failed)
+            return
+        }
+        let items = ids.map { TelegramEngine.EngineData.Item.Messages.Message(id: $0) }
+        self.disposable.set((context.engine.data.subscribe(EngineDataList(items))
+        |> map { messages -> NanogramLogChatSendResult? in
+            return nanogramLogChatUploadResult(messages.map { message -> NanogramLogChatUploadState in
+                guard let message = message else {
+                    return .sent
+                }
+                if message.flags.contains(.Failed) {
+                    return .failed
+                }
+                return message.flags.contains(.Unsent) ? .pending : .sent
+            })
+        }
+        |> filter { $0 != nil }
+        |> take(1)
+        |> deliverOnMainQueue).start(next: { result in
+            if let result = result {
+                self.report(result)
+            }
+        }))
+    }
+
+    private func report(_ result: NanogramLogChatSendResult) {
+        guard !self.reported else {
+            return
+        }
+        self.reported = true
+        self.disposable.dispose()
+        let completion = self.completion
+        DispatchQueue.main.async {
+            completion(result)
+        }
     }
 }
 
@@ -108,11 +178,17 @@ func installNanogramLogExportHooks() {
         return currentLogExportContext() != nil
     }, sendToChat: { files, _, completion in
         guard let context = currentLogExportContext() else {
-            completion(false)
+            completion(.failed)
             return
         }
+        let send = NanogramLogChatSend(completion: completion)
+        let share = NanogramLogShareObject(context, files: files, queued: { ids in
+            send.track(ids, context: context)
+        })
         context.window.makeKeyAndOrderFront(nil)
-        showModal(with: ShareModalController(NanogramLogShareObject(context, files: files, sent: completion)), for: context.window)
+        showModal(with: ShareModalController(share, completion: { sent in
+            send.pickerClosed(sent: sent)
+        }), for: context.window)
     }, showProgress: { window in
         guard let window = window as? Window else {
             return {}
@@ -128,5 +204,7 @@ func installNanogramLogExportHooks() {
         } else {
             NanogramLogExportHooks.standalone.showMessage(window, text)
         }
+    }, availableKinds: {
+        return NanogramLogExportKind.allCases.filter(nanogramLogExportKindIsAvailable)
     }))
 }

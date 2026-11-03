@@ -129,7 +129,7 @@ func installChatListUIHooks() {
             let info = strings().crashReportCardInfo
             let urls = reports.map { $0.url }
             return ChatListCrashReportCard(id: newest.incidentId, title: title, info: info, icon: crashReportIcon(), action: {
-                NanogramLogExport.present(kind: .crashReports, window: context.concrete.window, collect: { urls }, onDestinationChosen: {
+                NanogramLogExport.present(kind: .crashReports, window: context.concrete.window, collect: { urls }, onDelivered: {
                     nanogramCrashReportStore.markHandled(reports)
                 })
             }, dismiss: {

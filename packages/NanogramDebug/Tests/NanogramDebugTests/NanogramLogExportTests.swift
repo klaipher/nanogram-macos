@@ -44,8 +44,30 @@ final class NanogramLogExportTests: XCTestCase {
         XCTAssertEqual(baseNames.count, NanogramLogExportKind.allCases.count)
     }
 
-    func testJSONReportsAreSeparateFiles() {
-        XCTAssertEqual(NanogramLogExportKind.allCases.filter { NanogramLogExportSpec(kind: $0, appVersion: "", buildNumber: "").packaging == .separateFiles }, [.crashReports, .metricKit])
+    func testOnlyCrashReportsAreSeparateFiles() {
+        XCTAssertEqual(NanogramLogExportKind.allCases.filter { NanogramLogExportSpec(kind: $0, appVersion: "", buildNumber: "").packaging == .separateFiles }, [.crashReports])
+    }
+
+    func testMetricKitReportsAreZippedIntoOneFile() throws {
+        let reports = self.directory.appendingPathComponent("MetricKit", isDirectory: true)
+        try FileManager.default.createDirectory(at: reports, withIntermediateDirectories: true)
+        var sources: [URL] = []
+        for index in 0 ..< 60 {
+            let file = reports.appendingPathComponent("metrics-\(index)-aa.json")
+            try Data("{\"index\":\(index)}".utf8).write(to: file)
+            sources.append(file)
+        }
+        let output = self.directory.appendingPathComponent("out", isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+
+        let files = try NanogramLogExportFiles.prepare(spec: NanogramLogExportSpec(kind: .metricKit, appVersion: self.version, buildNumber: self.build), sources: sources, in: output)
+        XCTAssertEqual(files.map(\.lastPathComponent), ["nanogram-logs-metrickit.zip"])
+        let archive = try Data(contentsOf: files[0])
+        XCTAssertEqual(Array(archive.prefix(2)), [0x50, 0x4b])
+        for index in 0 ..< 60 {
+            XCTAssertNotNil(archive.range(of: Data("metrics-\(index)-aa.json".utf8)), "\(index)")
+        }
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: output.path), ["nanogram-logs-metrickit.zip"])
     }
 
     func testDestinations() {
@@ -76,16 +98,10 @@ final class NanogramLogExportTests: XCTestCase {
     }
 
     func testSeparateFilesKindCopiesEveryReport() throws {
-        let first = self.directory.appendingPathComponent("metrics-1-aa.json")
         let second = self.directory.appendingPathComponent("Nanogram-2026-11-03-120000.ips")
-        try Data("{}".utf8).write(to: first)
         try Data("{\"bug_type\":\"309\"}\n{}".utf8).write(to: second)
         let output = self.directory.appendingPathComponent("out", isDirectory: true)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-
-        let metricKit = try NanogramLogExportFiles.prepare(spec: NanogramLogExportSpec(kind: .metricKit, appVersion: self.version, buildNumber: self.build), sources: [first], in: output)
-        XCTAssertEqual(metricKit.map(\.lastPathComponent), ["nanogram-logs-metrickit-metrics-1-aa.json"])
-        XCTAssertEqual(try Data(contentsOf: metricKit[0]), Data("{}".utf8))
 
         let crash = try NanogramLogExportFiles.prepare(spec: NanogramLogExportSpec(kind: .crashReports, appVersion: self.version, buildNumber: self.build), sources: [second], in: output)
         XCTAssertEqual(crash.map(\.lastPathComponent), ["nanogram-logs-crash-Nanogram-2026-11-03-120000.ips"])

@@ -39,6 +39,8 @@ public final class NanogramDebugWindowController: NSWindowController {
         return self.controls[id]
     }
 
+    private(set) var logNotes: [String] = []
+
     func logButton(for kind: NanogramLogExportKind) -> NSButton? {
         return self.logButtons[kind]
     }
@@ -100,15 +102,20 @@ public final class NanogramDebugWindowController: NSWindowController {
     }
 
     private func buildLogsSection() {
-        let header = NSTextField(labelWithString: "Logs")
+        let header = NSTextField(labelWithString: "Logs") //TODOLANG
         header.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
         self.stack.addArrangedSubview(header)
-        self.stack.addArrangedSubview(self.secondaryLabel("Each export asks where to send it: a Nanogram chat, an email, another app, or a folder."))
-        for kind in NanogramLogExportKind.allCases {
+        self.stack.addArrangedSubview(self.secondaryLabel("Each export asks where to send it: a Nanogram chat, an email, another app, or a folder.")) //TODOLANG
+        let available = NanogramLogExport.availableKinds
+        for kind in available {
             let button = NSButton(title: NanogramLogExportSpec.current(kind).menuTitle + "…", target: self, action: #selector(sendLogs(_:)))
             button.identifier = NSUserInterfaceItemIdentifier("logs." + kind.rawValue)
             self.logButtons[kind] = button
             self.stack.addArrangedSubview(button)
+        }
+        self.logNotes = NanogramLogExportKind.allCases.filter { !available.contains($0) }.map { NanogramLogExportSpec.current($0).unavailableText }
+        for note in self.logNotes {
+            self.stack.addArrangedSubview(self.secondaryLabel(note))
         }
         self.logProgress.style = .spinning
         self.logProgress.controlSize = .small
