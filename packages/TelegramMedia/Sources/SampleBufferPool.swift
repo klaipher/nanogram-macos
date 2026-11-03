@@ -58,6 +58,10 @@ public func takeSampleBufferLayer() -> SampleBufferLayer {
             layer.flushAndRemoveImage()
             layer.setAffineTransform(CGAffineTransform.identity)
             layer.removeFromSuperlayer()
+            layer.controlTimebase = nil
+            layer.videoGravity = .resizeAspect
+            layer.opacity = 1
+            layer.isHidden = false
             let _ = pool.modify { list in
                 var list = list
                 if list.count < maximumPooledSampleBufferLayers {

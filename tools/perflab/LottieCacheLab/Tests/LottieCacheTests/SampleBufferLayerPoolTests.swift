@@ -40,4 +40,23 @@ final class SampleBufferLayerPoolTests: XCTestCase {
         XCTAssertEqual(hits, 16)
         withExtendedLifetime(reused) {}
     }
+
+    func testAReusedLayerDoesNotInheritTheLastTilesPresentationState() {
+        var holder: SampleBufferLayer? = takeSampleBufferLayer()
+        let first = holder!.layer
+        first.videoGravity = .resizeAspectFill
+        first.opacity = 0.25
+        first.isHidden = true
+        let timebase = try? CMTimebase(sourceClock: CMClockGetHostTimeClock())
+        first.controlTimebase = timebase
+        holder = nil
+        self.drainMain()
+        let second = takeSampleBufferLayer()
+        XCTAssertTrue(second.layer === first)
+        XCTAssertEqual(second.layer.videoGravity, .resizeAspect)
+        XCTAssertEqual(second.layer.opacity, 1)
+        XCTAssertFalse(second.layer.isHidden)
+        XCTAssertNil(second.layer.controlTimebase)
+        withExtendedLifetime(second) {}
+    }
 }
