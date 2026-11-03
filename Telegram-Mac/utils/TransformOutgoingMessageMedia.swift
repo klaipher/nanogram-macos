@@ -64,14 +64,13 @@ public func transformOutgoingMessageMedia(postbox: Postbox, network: Network, re
                             thumbedFile = resource.localFilePath
                         } else {
                             if file.isVideo && file.isAnimated {
-                                thumbedFile = data.0.path + ".mp4"
+                                thumbedFile = NSTemporaryDirectory() + "\(UUID().uuidString).mp4"
                             } else {
-                                thumbedFile = data.0.path.appending(".\(file.fileName?.nsstring.pathExtension ?? data.1 ?? "mp4")")
+                                thumbedFile = NSTemporaryDirectory() + "\(UUID().uuidString).\(file.fileName?.nsstring.pathExtension ?? data.1 ?? "mp4")"
                             }
                         }
                         
                         if resource == nil {
-                            try? FileManager.default.removeItem(atPath: thumbedFile)
                             try? FileManager.default.createSymbolicLink(atPath: thumbedFile, withDestinationPath: data.0.path)
                         }
                         
@@ -95,7 +94,8 @@ public func transformOutgoingMessageMedia(postbox: Postbox, network: Network, re
                             thumbImage = try? imageGenerator.copyCGImage(at: CMTime(seconds: 0.0, preferredTimescale: asset.duration.timescale), actualTime: nil)
    
                         }
-                        if thumbedFile != resource?.localFilePath {
+                        if resource == nil {
+                            // only the temporary link made above, never MediaBox's own file
                             try? FileManager.default.removeItem(atPath: thumbedFile)
                         }
                         
