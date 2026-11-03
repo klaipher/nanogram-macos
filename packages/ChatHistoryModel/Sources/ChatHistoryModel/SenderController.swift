@@ -446,6 +446,15 @@ public class Sender: NSObject {
         }
     }
     
+    static let maxAnimationFileSize: Int64 = 10 * 1024 * 1024
+
+    static func isAnimatedVideo(hasAudio: Bool, fileSize: Int64?, mime: String, inCollage: Bool, isEditedPhoto: Bool) -> Bool {
+        guard !hasAudio, !inCollage, !isEditedPhoto, mime.hasSuffix("mp4"), let fileSize else {
+            return false
+        }
+        return fileSize < maxAnimationFileSize
+    }
+    
     public static func fileAttributes(for mime:String, path:String, isMedia:Bool = false, inCollage: Bool = false) -> [TelegramMediaFileAttribute] {
         var attrs:[TelegramMediaFileAttribute] = []
         
@@ -486,17 +495,12 @@ public class Sender: NSObject {
                 size = NSMakeSize(floor(abs(size.width)), floor(abs(size.height)))
                 attrs.append(TelegramMediaFileAttribute.Video(duration: Double(CMTimeGetSeconds(asset.duration)), size: PixelDimensions(size), flags: [.supportsStreaming], preloadSize: nil, coverTime: nil, videoCodec: nil))
                 attrs.append(TelegramMediaFileAttribute.FileName(fileName: path.nsstring.lastPathComponent.nsstring.deletingPathExtension.appending(".mp4")))
-                if !inCollage, !isEditedPhoto {
-                    if audio == nil, let size = fileSize(path), size < Int32(10 * 1024 * 1024), mime.hasSuffix("mp4") {
-                        attrs.append(TelegramMediaFileAttribute.Animated)
-                    }
+                if isAnimatedVideo(hasAudio: audio != nil, fileSize: fileSize(path).map { Int64($0) }, mime: mime, inCollage: inCollage, isEditedPhoto: isEditedPhoto) {
+                    attrs.append(TelegramMediaFileAttribute.Animated)
                 }
                 
                 if !mime.hasSuffix("mp4") {
                     attrs.append(.hintFileIsLarge)
-                }
-                if audio == nil, !isEditedPhoto {
-                    attrs.append(.Animated)
                 }
                 return attrs
             }
