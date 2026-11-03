@@ -40,4 +40,36 @@ final class VisibilityGatedSignalTests: XCTestCase {
         XCTAssertEqual(subscriptions, 0)
         disposable.dispose()
     }
+
+    func testAPollerCreatedPerSubscriptionExistsOnlyWhileVisible() {
+        final class Poller {
+            static var alive = 0
+            static var created = 0
+            init() {
+                Poller.alive += 1
+                Poller.created += 1
+            }
+            deinit {
+                Poller.alive -= 1
+            }
+        }
+        let scoped = Signal<Int, NoError> { subscriber in
+            let poller = Poller()
+            subscriber.putNext(Poller.created)
+            return ActionDisposable {
+                withExtendedLifetime(poller) {}
+            }
+        }
+        let visible = ValuePromise<Bool>(false, ignoreRepeated: true)
+        let disposable = whileVisible(scoped, visible: visible.get()).start()
+        XCTAssertEqual(Poller.created, 0)
+        visible.set(true)
+        XCTAssertEqual(Poller.alive, 1)
+        visible.set(false)
+        XCTAssertEqual(Poller.alive, 0)
+        visible.set(true)
+        XCTAssertEqual(Poller.created, 2)
+        disposable.dispose()
+        XCTAssertEqual(Poller.alive, 0)
+    }
 }

@@ -2719,7 +2719,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     
     
     private var liveTranslate: ChatLiveTranslateContext?
-    private var stories: PeerExpiringStoryListContext?
+    private weak var stories: PeerExpiringStoryListContext?
     private var themeSelector: ChatThemeSelectorController<Context>? = nil
     
     private let uiState: Atomic<State> = Atomic(value: State())
@@ -3878,15 +3878,19 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         }
         
                 
-        if chatLocation().peerId.namespace == Namespaces.Peer.CloudUser || chatLocation().peerId.namespace == Namespaces.Peer.CloudChannel, chatLocation().peerId != context.peerId, mode == .history {
-            self.stories = PeerExpiringStoryListContext(account: context.account, peerId: peerId)
-        } else {
-            self.stories = nil
-        }
-        
         let storiesSignal: Signal<PeerExpiringStoryListContext.State?, NoError>
-        if let stories = self.stories {
-            storiesSignal = .single(nil) |> then(stories.state |> map(Optional.init))
+        if chatLocation().peerId.namespace == Namespaces.Peer.CloudUser || chatLocation().peerId.namespace == Namespaces.Peer.CloudChannel, chatLocation().peerId != context.peerId, mode == .history {
+            let account = context.account
+            let visibleStories = Signal<PeerExpiringStoryListContext.State, NoError> { [weak self] subscriber in
+                let stories = PeerExpiringStoryListContext(account: account, peerId: peerId)
+                self?.stories = stories
+                let disposable = stories.state.start(next: subscriber.putNext)
+                return ActionDisposable {
+                    disposable.dispose()
+                    withExtendedLifetime(stories) {}
+                }
+            } |> runOn(.mainQueue())
+            storiesSignal = .single(nil) |> then(whileVisible(visibleStories, visible: self.historyVisibility.get()) |> map(Optional.init))
         } else {
             storiesSignal = .single(nil)
         }
