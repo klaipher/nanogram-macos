@@ -11,7 +11,7 @@ public final class OnDeviceTranslationService: ExperimentalInternalTranslationSe
     }
 
     public static func install() {
-        if OnDeviceTranslation.shared.isAvailable, engineExperimentalInternalTranslationService == nil {
+        if engineExperimentalInternalTranslationService == nil {
             engineExperimentalInternalTranslationService = OnDeviceTranslationService()
         }
     }

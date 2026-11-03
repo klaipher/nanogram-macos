@@ -976,44 +976,40 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
 
 
 func translateBlocks(context: any AccountContextProtocol, from: String?, to: String, blocks: [(String, [MessageTextEntity])], configState: AppConfigTranslateState, tone: TranslationTone = .neutral, onDevice: OnDeviceTranslation = .shared) -> Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> {
-    func translateOnDevice(_ text: String) -> Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> {
-        return onDevice.translate(text: text, from: from, to: to)
-        |> castError(Translate.Error.self)
-        |> mapToSignal { value in
-            if let value = value {
-                return .single((detect: value.detect, result: value.result, entities: []))
-            } else {
-                return .fail(.generic)
-            }
-        }
+    typealias Value = (detect: String?, result: String, entities: [MessageTextEntity])
+    let mode: TranslationManualMode
+    switch configState {
+    case .enabled:
+        mode = .enabled
+    case .alternative:
+        mode = .alternative
+    case .disabled, .system:
+        return .single((detect: nil, result: "", entities: []))
     }
-    var signals:[(Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error>, Bool)] = []
+    let steps = TranslationRouting.steps(mode: mode, onDeviceAvailable: onDevice.isAvailable)
+    var signals:[(Signal<Value, Translate.Error>, Bool)] = []
     for block in blocks {
-        switch configState {
-        case .enabled:
-            signals.append((context.engine.messages.translate(text: block.0, toLang: to, entities: block.1, tone: tone) |> `catch` { error in
+        let server: () -> Signal<Value?, ServerTranslationFailure> = {
+            return context.engine.messages.translate(text: block.0, toLang: to, entities: block.1, tone: tone)
+            |> map { value -> Value? in
+                return value.map { (detect: nil, result: $0.0, entities: $0.1) }
+            }
+            |> mapError { error -> ServerTranslationFailure in
                 switch error {
                 case .tryAlternative:
-                    return .single(nil)
+                    return .tryAlternative
                 default:
-                    #if DEBUG
-                    return .single(nil)
-                    #endif
-                    return .fail(.generic)
+                    return .other
                 }
-            } |> mapToSignal { value in
-                if let value = value {
-                    return .single((detect: nil, result: value.0, entities: value.1))
-                } else {
-                    return translateOnDevice(block.0)
-                }
-            }, true))
-        case .alternative:
-            signals.append((translateOnDevice(block.0), false))
-        case .disabled, .system:
-            continue
+            }
         }
-        
+        let local: () -> Signal<Value?, NoError> = {
+            return onDevice.translate(text: block.0, from: from, to: to)
+            |> map { value -> Value? in
+                return value.map { (detect: $0.detect, result: $0.result, entities: []) }
+            }
+        }
+        signals.append((TranslationRouting.run(steps, server: server, onDevice: local), steps.first == .server))
     }
     var signal: Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> = .single((detect: nil, result: "", entities: []))
     for (index, (blockSignal, usesServer)) in signals.enumerated() {

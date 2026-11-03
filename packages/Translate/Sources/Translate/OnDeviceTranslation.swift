@@ -1,5 +1,6 @@
 import Foundation
 import SwiftSignalKit
+import NanogramDebug
 #if canImport(Translation)
 import Translation
 #endif
@@ -16,25 +17,56 @@ public protocol OnDeviceTranslationProvider: AnyObject {
 }
 
 public final class OnDeviceTranslation {
-    public static let shared = OnDeviceTranslation(provider: OnDeviceTranslation.systemProvider())
+    public static let legacyDebugOption = NanogramDebugOption.toggle(id: "translation.onDeviceBeforeMacOS26", section: "Translation", title: "On-device translation on macOS 15-25", detail: "Uses Apple's Translation models through a hidden SwiftUI view for installed language pairs. Off: Telegram's server translation. macOS 26 and later always translate on device.", defaultValue: false)
 
-    private let provider: OnDeviceTranslationProvider?
+    public static let shared = OnDeviceTranslation(resolveProvider: OnDeviceTranslation.systemProvider)
+
+    private let resolveProvider: () -> OnDeviceTranslationProvider?
+
+    private var provider: OnDeviceTranslationProvider? {
+        return self.resolveProvider()
+    }
 
     public init(provider: OnDeviceTranslationProvider?) {
-        self.provider = provider
+        self.resolveProvider = { provider }
+    }
+
+    public init(resolveProvider: @escaping () -> OnDeviceTranslationProvider?) {
+        self.resolveProvider = resolveProvider
     }
 
     public var isAvailable: Bool {
         return self.provider != nil
     }
 
-    private static func systemProvider() -> OnDeviceTranslationProvider? {
+    public static func selectProvider(osMajorVersion: Int, legacyEnabled: Bool, modern: () -> OnDeviceTranslationProvider?, legacy: () -> OnDeviceTranslationProvider?) -> OnDeviceTranslationProvider? {
+        if osMajorVersion >= 26 {
+            return modern()
+        }
+        if osMajorVersion >= 15, legacyEnabled {
+            return legacy()
+        }
+        return nil
+    }
+
+    private static let systemProviders: (modern: OnDeviceTranslationProvider?, legacy: OnDeviceTranslationProvider?) = {
+        var modern: OnDeviceTranslationProvider?
+        var legacy: OnDeviceTranslationProvider?
         #if canImport(Translation)
         if #available(macOS 26.0, *) {
-            return SystemTranslationProvider()
+            modern = SystemTranslationProvider()
         }
         #endif
-        return nil
+        #if canImport(Translation) && canImport(SwiftUI) && canImport(AppKit)
+        if #available(macOS 15.0, *) {
+            legacy = HiddenViewTranslationProvider()
+        }
+        #endif
+        return (modern, legacy)
+    }()
+
+    private static func systemProvider() -> OnDeviceTranslationProvider? {
+        return OnDeviceTranslation.selectProvider(osMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion, legacyEnabled: NanogramDebugSettings.shared.bool(OnDeviceTranslation.legacyDebugOption.id), modern: { OnDeviceTranslation.systemProviders.modern }, legacy: { OnDeviceTranslation.systemProviders.legacy })
     }
 
     public static func systemLanguageCode(_ code: String) -> String {

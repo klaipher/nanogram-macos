@@ -53,6 +53,7 @@ import NanogramDebug
 import NanogramDebugUI
 import NanogramRuntime
 import Mozjpeg
+import Translate
 
 //#if BETA || DEBUG
 //import Firebase
@@ -1413,6 +1414,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         nanogramDebugObservations.append(settings.observe("media.jpegWideGamut") { _ in
             applyJPEGWideGamut()
         })
+        settings.register(OnDeviceTranslation.legacyDebugOption)
         NanogramDebugMenu.install(openDeveloperScreen: { [weak self] in
             guard let context = self?.contextValue?.context, !context.isSupport else {
                 return false
