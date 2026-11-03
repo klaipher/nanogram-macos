@@ -228,7 +228,11 @@ final class AccountContext {
     let inlinePacksContext: InlineStickersContext
     let cachedGroupCallContexts: AccountGroupCallContextCacheImpl
     let networkStatusManager: NetworkStatusManager
+    #if APP_STORE
     lazy var inAppPurchaseManager: any InAppPurchaseManagerProtocol = InAppPurchaseManager(engine: self.engine)
+    #else
+    lazy var inAppPurchaseManager: any InAppPurchaseManagerProtocol = NoopInAppPurchaseManager()
+    #endif
     let starsContext: StarsContext
     let tonContext: StarsContext
     private let walletContextStorage: Any?
