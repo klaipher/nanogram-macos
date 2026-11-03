@@ -1848,3 +1848,87 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - How `AVCaptureVideoDataOutput` scales 1280×720 to the requested 500×500 (crop or fit, and with which filter); Q10 removes that step either way.
 - Whether Telegram servers keep ICC profiles in re-encoded photo sizes (Q8), and whether P3 photos are clipped in the DeviceRGB `DrawingContext` on display (already in "Not checked (H)").
 - Time-stretch quality at 1.5×/2×, volume normalisation of voice notes, and 4:4:4 chroma for screenshot JPEGs (product ideas, not evaluated).
+
+## Implementation status (2026-11-02)
+
+Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug build at the macOS 15 target succeeds, the app opens its login window and stays up 60 s with no crash report. Details, rulings and owner steps are in `.superpowers/sdd/runtime/progress.md`; core commits are in `submodules/telegram-ios` (branch `nanogram-mac-runtime`), tgcalls commits in `submodules/tgcalls` (local branch `nanogram-mac-runtime`).
+
+| Spec | Status | Commit |
+|---|---|---|
+| M1 | done | dd412d9 |
+| M2 | done | 7136832 |
+| M3 | done | 795c4f8, e605e56; core 3ec2f14, 3a11ddd |
+| M4 | done | 1ac6562 |
+| M5 | done | 934ac65, core d985e78 |
+| M6 | done | a84a3c8 |
+| M7 | done | b93d09d |
+| M8 | partial | 9734759 |
+| M9 | done | core 0319e83 |
+| M10 | done | core 10e47fe |
+| M11 | done | e48de99 |
+| M12 | done | 28b6e26 |
+| M13 | done | cdb8e5f |
+| M14 | done | f20014e |
+| M15 | stage 1 | — |
+| M16 | done | core 09ee786 |
+| M17 | stage 1 | — |
+| M18 | done | 1becb21 |
+| M19 | stage 1 | — |
+| M20 | dropped | 2184207 (lab) |
+| M21 | done | 770513f, core 1140dbe |
+| M22 | done | 47580f4 |
+| M23 | done | 6bbcf5e |
+| M24 | done | core 5751188 |
+| M25 | partial | cb8d0f1 |
+| M26 | done | f4e1837, core 19875d3 |
+| M27 | done | 25b7f7a, core d6c3ef8 (FFmpeg rebuild pending for the VT patch) |
+| M28 | done | core 0ff4315 |
+| M29 | partial | ee9a00f |
+| M30 | done | b78cfaf |
+| M31 | done | 311fe98 |
+| M32 | deferred (ruling) | — |
+| H1 | done | da40434 |
+| H2 | done | f4bb74b, core 1e9c875 |
+| H3 | done | core a001272 |
+| H4 | done | 2a53b7c |
+| H5 | partial | 28d0503 |
+| H6 | done | 9c174f7 |
+| H7 | done | 957d823, core 036e94f |
+| H8 | done | 0760adc |
+| H9 | done | 8f7c6e5 |
+| H10 | stage 1 | — |
+| H11 | done | 73de50e |
+| H12 | done | 1a0cdb0 |
+| H13 | done | 52ffa2d, core df65bdef |
+| H14 | partial | 091fa70 |
+| H15 | stage 1 | — |
+| H16 | done | c18caa9 |
+| H17 | done | 12d814a |
+| H18 | partial | d0a7c3e |
+| H19 | partial | 0f80540 |
+| H20 | measured, no change (ruling) | — |
+| H21 | not done (ruling) | — |
+| H22 | done | 9ad344d |
+| H23 | partial | 9d62367 |
+| H24 | partial | 0eb0950 |
+| H25 | partial | b0fbff2 |
+| H26 | not done (ruling) | — |
+| H27 | done | 02d4e35 |
+| H28 | partial | 9efe49a |
+| Q1 | done | 2955fe5 core |
+| Q2 | done | b23b004 core, 36315cc |
+| Q3 | done | 0879d4e |
+| Q4 | done | 0ee33a3 |
+| Q5 | partial | 9efe49a (via H28) |
+| Q6 | done | tgcalls 9ab1773, c66b2ea |
+| Q7 | done | 0a053b6 core |
+| Q8 | done | dab5e38, f51c974; Debug Settings switch, off |
+| Q9 | done | 85d4081, b78de4d; option off by default |
+| Q10 | done | ddfa750 |
+| Q11 | done | 2be3958 |
+| Q12 | done | fa42c17, 107ee55 |
+| Q13 | done | 3afe194 core |
+| Q14 | partial | 221326e |
+| Q15 | dropped | — |
+
+Integration fixes: 6fe2eb1, 4c375e3 (`CGWindowListCreateImage` is unavailable at the macOS 15 target; looked up at runtime).
