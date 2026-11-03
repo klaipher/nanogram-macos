@@ -128,8 +128,7 @@ final class ManagedAudioRecorderContext {
     private let inputDeviceUID: String?
     private let voiceProcessing: Bool
     private var engine: VoiceRecorderAudioEngine?
-    private var converter: VoiceRecorderInputConverter?
-    private let packetizer = VoiceRecorderPacketizer()
+    private let inputStream = VoiceRecorderInputStream()
     private var inputGeneration: Int = 0
     
     private var waveformSamples = Data()
@@ -170,19 +169,23 @@ final class ManagedAudioRecorderContext {
         assert(self.queue.isCurrent())
         
         self.paused = false
-        self.recordingState.set(.recording(duration: self.oggWriter.encodedDuration(), durationMediaTimestamp: CACurrentMediaTime()))
         
-        let engine = self.engine ?? VoiceRecorderAudioEngine(inputDeviceUID: self.inputDeviceUID, voiceProcessing: self.voiceProcessing)
-        self.engine = engine
-        let format = engine.inputFormat
-        if self.converter?.inputFormat != format {
-            if let converter = self.converter {
-                self.flushConverter(converter)
+        let engine: VoiceRecorderAudioEngine
+        if let current = self.engine {
+            engine = current
+        } else {
+            engine = VoiceRecorderAudioEngine(inputDeviceUID: self.inputDeviceUID, voiceProcessing: self.voiceProcessing)
+            let queue = self.queue
+            engine.onConfigurationChange = { [weak self] in
+                queue.async {
+                    self?.restartAfterConfigurationChange()
+                }
             }
-            self.converter = VoiceRecorderInputConverter(inputFormat: format)
+            self.engine = engine
         }
-        guard self.converter != nil else {
-            trace1("ManagedAudioRecorder", what: "unsupported input format \(format)")
+        guard VoiceRecorderInputConverter(inputFormat: engine.inputFormat) != nil else {
+            trace1("ManagedAudioRecorder", what: "unsupported input format \(engine.inputFormat)")
+            self.failToStart()
             return
         }
         self.inputGeneration += 1
@@ -199,28 +202,37 @@ final class ManagedAudioRecorderContext {
             }
         } catch {
             trace1("ManagedAudioRecorder", what: "input engine failed to start: \(error)")
+            self.failToStart()
+            return
         }
+        self.recordingState.set(.recording(duration: self.oggWriter.encodedDuration(), durationMediaTimestamp: CACurrentMediaTime()))
+    }
+    
+    private func failToStart() {
+        self.inputGeneration += 1
+        self.engine?.stop()
+        self.paused = true
+        self.recordingStateUpdateTimestamp = nil
+        self.recordingState.set(.paused(duration: self.oggWriter.encodedDuration()))
+    }
+    
+    private func restartAfterConfigurationChange() {
+        assert(self.queue.isCurrent())
+        guard !self.paused else {
+            return
+        }
+        trace1("ManagedAudioRecorder", what: "input configuration changed, restarting")
+        self.tearDownAudioUnit()
+        self.start()
     }
     
     private func processInput(_ buffer: AVAudioPCMBuffer, generation: Int) {
         assert(self.queue.isCurrent())
-        guard generation == self.inputGeneration, !self.paused, let converter = self.converter else {
+        guard generation == self.inputGeneration, !self.paused else {
             return
         }
-        converter.convert(buffer) { samples, count in
-            self.appendSamples(samples, count: count)
-        }
-    }
-    
-    private func flushConverter(_ converter: VoiceRecorderInputConverter) {
-        converter.flush { samples, count in
-            self.appendSamples(samples, count: count)
-        }
-    }
-    
-    private func appendSamples(_ samples: UnsafePointer<Int16>, count: Int) {
-        self.packetizer.append(samples, count: count) { packet, packetCount in
-            self.writePacket(packet, count: packetCount)
+        self.inputStream.process(buffer) { packet, count in
+            self.writePacket(packet, count: count)
         }
     }
     
@@ -254,8 +266,8 @@ final class ManagedAudioRecorderContext {
     private func tearDownAudioUnit() {
         self.inputGeneration += 1
         self.engine?.stop()
-        if let converter = self.converter {
-            self.flushConverter(converter)
+        self.inputStream.finish { packet, count in
+            self.writePacket(packet, count: count)
         }
     }
     

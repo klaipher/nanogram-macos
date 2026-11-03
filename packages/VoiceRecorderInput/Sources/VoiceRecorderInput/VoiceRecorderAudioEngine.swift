@@ -12,6 +12,20 @@ public final class VoiceRecorderAudioEngine {
     private let voiceProcessing: Bool
     private var configured = false
     private var tapInstalled = false
+    private var configurationObserver: NSObjectProtocol?
+    public var onConfigurationChange: (() -> Void)? {
+        didSet {
+            if let observer = self.configurationObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.configurationObserver = nil
+            }
+            if let onConfigurationChange = self.onConfigurationChange {
+                self.configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: self.engine, queue: nil, using: { _ in
+                    onConfigurationChange()
+                })
+            }
+        }
+    }
 
     public init(inputDeviceUID: String?, voiceProcessing: Bool) {
         self.inputDeviceUID = inputDeviceUID
@@ -19,6 +33,9 @@ public final class VoiceRecorderAudioEngine {
     }
 
     deinit {
+        if let observer = self.configurationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         self.stop()
     }
 
