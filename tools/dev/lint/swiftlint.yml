@@ -49,3 +49,20 @@ custom_rules:
       - string
     message: "This conversion traps when the value does not fit (or is NaN/infinite). Use clamping:, exactly: or truncatingIfNeeded:, or check the range first."
     severity: warning
+
+  # PeerChannelMemberCategoriesContextsManager.admins/recent/... returns (Disposable, control).
+  # The member-list context is ref-counted and never completes: discarding the disposable keeps
+  # it alive, loading and updating for the life of the account (iOS 42e24c27, Mac
+  # PeerMediaController delete and ChannelEventLogController filter).
+  discarded_member_list_subscription:
+    name: "Discarded member list subscription"
+    regex: '(?-s)(?<![\w.])_\s*=\s*\(?\s*(?:[\w.]+\.)?peerChannelMemberCategoriesContextsManager\s*\.\s*(?:admins|recent|mentions|restricted|contacts|banned|restrictedAndBanned)\s*\('
+    excluded_match_kinds:
+      - comment
+      - comment.mark
+      - comment.url
+      - doccomment
+      - doccomment.field
+      - string
+    message: "This subscription never completes; keep its disposable (the first element of the result) and dispose it with its owner."
+    severity: error

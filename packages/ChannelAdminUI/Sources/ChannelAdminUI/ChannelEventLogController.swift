@@ -427,16 +427,21 @@ open class ChannelEventLogController<Context: AccountContextProtocol>: TelegramG
         let peerId = self.peerId
         let isChannel = !self.isGroup
         let adminsPromise = ValuePromise<[RenderedChannelParticipant]?>(nil)
-        _ = context.peerChannelMemberCategoriesContextsManager.admins(peerId: peerId, updated: { membersState in
+        let (adminsDisposable, _) = context.peerChannelMemberCategoriesContextsManager.admins(peerId: peerId, updated: { membersState in
             if case .loading = membersState.loadingState, membersState.list.isEmpty {
                 adminsPromise.set(nil)
             } else {
                 adminsPromise.set(membersState.list)
             }
         })
+        
+        let filterDisposables = DisposableSet()
+        filterDisposables.add(adminsDisposable)
+        filterDisposable.set(filterDisposables)
             
         let admins = adminsPromise.get() |> filter { $0 != nil } |> take(1) |> map { $0! }
-        filterDisposable.set(showModalProgress(signal: admins, for: context.window).start(next: { [weak self] admins in
+        filterDisposables.add(showModalProgress(signal: admins, for: context.window).start(next: { [weak self] admins in
+            adminsDisposable.dispose()
             showModal(with: ChannelEventFilterModalController(context: context, peerId: peerId, isChannel: isChannel, admins: admins, state: state, updated: { [weak self] updatedState in
                 
                 _ = self?.scrollDownOnNext.swap(true)

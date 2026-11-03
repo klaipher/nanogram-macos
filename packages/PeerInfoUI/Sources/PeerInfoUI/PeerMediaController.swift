@@ -1689,7 +1689,7 @@
             if let strongSelf = self, let peer = strongSelf.peer {
                 
                 let adminsPromise = ValuePromise<[RenderedChannelParticipant]>([])
-                _ = context.peerChannelMemberCategoriesContextsManager.admins(peerId: peerId, updated: { membersState in
+                let (adminsDisposable, _) = context.peerChannelMemberCategoriesContextsManager.admins(peerId: peerId, updated: { membersState in
                     if case .loading = membersState.loadingState, membersState.list.isEmpty {
                         adminsPromise.set([])
                     } else {
@@ -1697,8 +1697,11 @@
                     }
                 })
                 
+                let actionDisposables = DisposableSet()
+                actionDisposables.add(adminsDisposable)
+                strongSelf.messagesActionDisposable.set(actionDisposables)
                 
-                self?.messagesActionDisposable.set(combineLatest(queue: .mainQueue(), context.account.postbox.messagesAtIds(messageIds), adminsPromise.get()).start( next:{ [weak strongSelf] messages, admins in
+                actionDisposables.add(combineLatest(queue: .mainQueue(), context.account.postbox.messagesAtIds(messageIds), adminsPromise.get()).start( next:{ [weak strongSelf] messages, admins in
                     if let strongSelf = strongSelf {
                         var canDelete:Bool = true
                         var canDeleteForEveryone = true

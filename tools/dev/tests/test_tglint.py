@@ -427,5 +427,40 @@ class SwiftLintRulesTests(RepoTestCase):
         ])
 
 
+    def test_discarded_member_list_subscription(self):
+        source = '\n'.join([
+            'func f(_ context: Context, _ peerId: PeerId, _ set: DisposableSet) {',
+            '    _ = context.peerChannelMemberCategoriesContextsManager.admins(peerId: peerId, updated: { _ in })',  # 2
+            '    let _ = context.peerChannelMemberCategoriesContextsManager.recent(peerId: peerId, updated: { _ in })',  # 3
+            '    _ = (context.peerChannelMemberCategoriesContextsManager.banned(peerId: peerId, updated: { _ in }))',  # 4
+            '    let (disposable, _) = context.peerChannelMemberCategoriesContextsManager.admins(peerId: peerId, updated: { _ in })',  # 5 ok
+            '    set.add(disposable)',
+            '    _ = context.peerChannelMemberCategoriesContextsManager.updateMemberBannedRights(peerId: peerId).start()',  # 7 ok
+            '    // _ = context.peerChannelMemberCategoriesContextsManager.admins(',  # 8 ok: comment
+            '}',
+        ])
+        violations = self.lint_new_file('packages/P/Sources/P.swift', source)
+        found = sorted((v['line'], v['severity']) for v in violations if v['rule_id'] == 'discarded_member_list_subscription')
+        self.assertEqual(found, [(2, 'error'), (3, 'error'), (4, 'error')])
+
+
+@unittest.skipUnless(HAVE_SWIFTLINT, 'SwiftLint not installed (python3 tools/dev/lint/tglint.py install)')
+class RepoMemberListSubscriptionsTests(unittest.TestCase):
+    """Every member-list subscription in the app keeps its disposable (port of iOS 42e24c27)."""
+
+    def test_repo_keeps_member_list_disposables(self):
+        if not os.path.exists(os.path.join(REPO, '.git')):
+            self.skipTest('not in a git checkout')
+        files = subprocess.run(
+            ['git', 'grep', '-l', 'peerChannelMemberCategoriesContextsManager', '--', '*.swift',
+             ':!submodules', ':!third-party', ':!core-xprojects'],
+            cwd=REPO, capture_output=True, text=True).stdout.split()
+        self.assertTrue(files)
+        violations = tglint.run_swiftlint(files, REPO)
+        found = sorted('{}:{}'.format(v['path'], v['line']) for v in violations
+                       if v['rule_id'] == 'discarded_member_list_subscription')
+        self.assertEqual(found, [])
+
+
 if __name__ == '__main__':
     unittest.main()
