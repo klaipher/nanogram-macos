@@ -975,12 +975,23 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
 
 
 
-func translateBlocks(context: any AccountContextProtocol, from: String?, to: String, blocks: [(String, [MessageTextEntity])], configState: AppConfigTranslateState, tone: TranslationTone = .neutral) -> Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> {
-    var signals:[Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error>] = []
+func translateBlocks(context: any AccountContextProtocol, from: String?, to: String, blocks: [(String, [MessageTextEntity])], configState: AppConfigTranslateState, tone: TranslationTone = .neutral, onDevice: OnDeviceTranslation = .shared) -> Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> {
+    func translateOnDevice(_ text: String) -> Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> {
+        return onDevice.translate(text: text, from: from, to: to)
+        |> castError(Translate.Error.self)
+        |> mapToSignal { value in
+            if let value = value {
+                return .single((detect: value.detect, result: value.result, entities: []))
+            } else {
+                return .fail(.generic)
+            }
+        }
+    }
+    var signals:[(Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error>, Bool)] = []
     for block in blocks {
         switch configState {
         case .enabled:
-            signals.append(context.engine.messages.translate(text: block.0, toLang: to, entities: block.1, tone: tone) |> `catch` { error in
+            signals.append((context.engine.messages.translate(text: block.0, toLang: to, entities: block.1, tone: tone) |> `catch` { error in
                 switch error {
                 case .tryAlternative:
                     return .single(nil)
@@ -994,23 +1005,19 @@ func translateBlocks(context: any AccountContextProtocol, from: String?, to: Str
                 if let value = value {
                     return .single((detect: nil, result: value.0, entities: value.1))
                 } else {
-                    return Translate.translateText(text: block.0, from: from, to: to) |> map {
-                        (detect: $0.detect, result: $0.result, entities: [])
-                    }
+                    return translateOnDevice(block.0)
                 }
-            })
+            }, true))
         case .alternative:
-            signals.append(Translate.translateText(text: block.0, from: from, to: to) |> map {
-                (detect: $0.detect, result: $0.result, entities: [])
-            })
+            signals.append((translateOnDevice(block.0), false))
         case .disabled, .system:
             continue
         }
         
     }
     var signal: Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> = .single((detect: nil, result: "", entities: []))
-    for (index, blockSignal) in signals.enumerated() {
-        let next = index == 0 ? blockSignal : (blockSignal |> delay(2.0, queue: .mainQueue()))
+    for (index, (blockSignal, usesServer)) in signals.enumerated() {
+        let next = index == 0 || !usesServer ? blockSignal : (blockSignal |> delay(2.0, queue: .mainQueue()))
         signal = signal |> mapToSignal { result in
             return next |> map { value in
                 var entities: [MessageTextEntity] = []

@@ -510,6 +510,7 @@ public final class ChatLiveTranslateContext {
     public init(peerId: PeerId, context: any AccountContextProtocol) {
         self.peerId = peerId
         self.context = context
+        OnDeviceTranslationService.install()
         
         let cachedData = getCachedDataView(peerId: peerId, postbox: context.account.postbox) |> map {
             $0
@@ -627,7 +628,7 @@ public final class ChatLiveTranslateContext {
     }
         
     private func activateTranslation(for msgIds: [MessageId], state: State) -> Void {
-        let signal = context.engine.messages.translateMessages(messageIds: msgIds, fromLang: nil, toLang: state.to, enableLocalIfPossible: false, tone: state.tone)
+        let signal = context.engine.messages.translateMessages(messageIds: msgIds, fromLang: state.from.isEmpty ? nil : state.from, toLang: state.to, enableLocalIfPossible: state.tone == .neutral, tone: state.tone)
 
         actionsDisposable.add(signal.start(error: { [weak self] error in
             self?.updateState { current in
