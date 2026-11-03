@@ -3,12 +3,23 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 HOME = Path.home()
 CACHE_DIR = Path(os.environ.get("NANOGRAM_CACHE_DIR", HOME / ".cache" / "nanogram-macos"))
-DERIVED_DATA = CACHE_DIR / "DerivedData"
+CHECKOUT_PREFIX = "nanogram-macos"
+
+
+def derived_data_dir(root: Path, cache_dir: Path, env: Mapping[str, str]) -> Path:
+    if env.get("NANOGRAM_DERIVED_DATA"):
+        return Path(env["NANOGRAM_DERIVED_DATA"])
+    suffix = Path(root).name.removeprefix(CHECKOUT_PREFIX).lstrip("-")
+    return Path(cache_dir) / (f"DerivedData-{suffix}" if suffix else "DerivedData")
+
+
+DERIVED_DATA = derived_data_dir(ROOT, CACHE_DIR, os.environ)
 TG_IOS_CONFIG = HOME / ".config" / "telegram-ios"
 MAC_CONFIG = HOME / ".config" / "nanogram-macos"
 BUILD_OUTPUT = ROOT / "build-output"
