@@ -364,8 +364,9 @@ public final class PeerCallScreen : ViewController {
     }
     
     private func updateWindowVisibility() {
+        self.isScreenVisible = self.screen.occlusionState.contains(.visible)
         if self.isLoaded() {
-            self.genericView.setWindowVisible(self.isHostedInTransition || self.screen.occlusionState.contains(.visible))
+            self.genericView.setWindowVisible(self.isHostedInTransition || self.isScreenVisible)
         }
         self.updateScreenSleep()
     }
@@ -382,8 +383,7 @@ public final class PeerCallScreen : ViewController {
         if case .active = state.externalState.videoState {
             hasVideo = true
         }
-        let isWindowVisible = self.screen.isVisible && self.screen.occlusionState.contains(.visible)
-        self.screenSleep.update(needed: ScreenSleepAssertion.isNeeded(hasVisibleVideo: hasVideo, isWindowVisible: isWindowVisible))
+        self.screenSleep.update(needed: ScreenSleepAssertion.isNeeded(hasVisibleVideo: hasVideo, isWindowVisible: self.isScreenVisible))
     }
     
     private func applyState(_ state: PeerCallState, arguments: Arguments, animated: Bool) {
@@ -502,6 +502,7 @@ public final class PeerCallScreen : ViewController {
     
     private let screenSleep = ScreenSleepAssertion(reason: "Video Call")
     private var callEnded = false
+    private var isScreenVisible = false
 
     deinit {
         if let occlusionObserver = self.occlusionObserver {

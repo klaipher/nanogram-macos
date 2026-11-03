@@ -2,6 +2,7 @@ import Foundation
 import QuartzCore
 import IOSurface
 import TGUIKit
+import SwiftSignalKit
 
 public final class LottieFrameSurface {
     public let surface: IOSurface
@@ -45,8 +46,8 @@ public final class LottieFrameSurfacePool {
         return CFAbsoluteTimeGetCurrent()
     }
 
-    static let defaultScheduleTrim: (Double, @escaping () -> Void) -> Void = { delay, work in
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + delay, execute: work)
+    static func defaultScheduleTrim(_ delay: Double, _ work: @escaping () -> Void) {
+        Queue.concurrentBackgroundQueue().after(delay, work)
     }
 
     var scheduleTrim: (Double, @escaping () -> Void) -> Void = LottieFrameSurfacePool.defaultScheduleTrim {

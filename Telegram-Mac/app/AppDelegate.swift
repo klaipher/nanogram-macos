@@ -1921,41 +1921,59 @@ private func autoNightBoundaries(_ schedule: AutoNightSchedule) -> [Int32] {
     }
 }
 
+private final class AutoNightTicker: NSObject {
+    private let schedule: AutoNightSchedule
+    private let tick: () -> Void
+    private var timer: SwiftSignalKit.Timer?
+
+    init(schedule: AutoNightSchedule, tick: @escaping () -> Void) {
+        self.schedule = schedule
+        self.tick = tick
+        super.init()
+        let names: [Notification.Name] = [.NSSystemClockDidChange, .NSSystemTimeZoneDidChange, .NSCalendarDayChanged]
+        for name in names {
+            NotificationCenter.default.addObserver(self, selector: #selector(self.clockChanged), name: name, object: nil)
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.clockChanged), name: NSWorkspace.didWakeNotification, object: nil)
+    }
+
+    @objc private func clockChanged() {
+        Queue.mainQueue().async {
+            self.arm()
+        }
+    }
+
+    func arm() {
+        self.tick()
+        var now = time_t(Int32(CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970))
+        var timeinfoNow = tm()
+        localtime_r(&now, &timeinfoNow)
+        let secondsOfDay = timeinfoNow.tm_hour * 60 * 60 + timeinfoNow.tm_min * 60 + timeinfoNow.tm_sec
+        self.timer?.invalidate()
+        let timer = SwiftSignalKit.Timer(timeout: AutoNightBoundarySchedule.nextCheck(secondsOfDay: secondsOfDay, boundaries: autoNightBoundaries(self.schedule)), repeat: false, completion: { [weak self] in
+            self?.arm()
+        }, queue: .mainQueue())
+        self.timer = timer
+        timer.start()
+    }
+
+    func invalidate() {
+        NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        self.timer?.invalidate()
+        self.timer = nil
+    }
+}
+
 private func autoNightTicks(_ schedule: AutoNightSchedule) -> Signal<Void, NoError> {
     return Signal { subscriber in
-        let timer = Atomic<SwiftSignalKit.Timer?>(value: nil)
-        var arm: (() -> Void)?
-        arm = {
+        let ticker = AutoNightTicker(schedule: schedule, tick: {
             subscriber.putNext(Void())
-            var now = time_t(Int32(CFAbsoluteTimeGetCurrent() + NSTimeIntervalSince1970))
-            var timeinfoNow = tm()
-            localtime_r(&now, &timeinfoNow)
-            let secondsOfDay = timeinfoNow.tm_hour * 60 * 60 + timeinfoNow.tm_min * 60 + timeinfoNow.tm_sec
-            let next = SwiftSignalKit.Timer(timeout: AutoNightBoundarySchedule.nextCheck(secondsOfDay: secondsOfDay, boundaries: autoNightBoundaries(schedule)), repeat: false, completion: {
-                arm?()
-            }, queue: .mainQueue())
-            timer.swap(next)?.invalidate()
-            next.start()
-        }
-        let names: [Notification.Name] = [.NSSystemClockDidChange, .NSSystemTimeZoneDidChange, .NSCalendarDayChanged]
-        var observers = names.map { name in
-            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main, using: { _ in
-                arm?()
-            })
-        }
-        let wake = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main, using: { _ in
-            arm?()
         })
-        arm?()
+        ticker.arm()
         return ActionDisposable {
             Queue.mainQueue().async {
-                for observer in observers {
-                    NotificationCenter.default.removeObserver(observer)
-                }
-                observers.removeAll()
-                NSWorkspace.shared.notificationCenter.removeObserver(wake)
-                timer.swap(nil)?.invalidate()
-                arm = nil
+                ticker.invalidate()
             }
         }
     } |> runOn(.mainQueue())

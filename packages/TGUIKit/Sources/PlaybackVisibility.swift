@@ -4,7 +4,7 @@ public enum PlaybackVisibility {
     public static let didChangeNotification = Notification.Name("TGUIKitPlaybackVisibilityDidChange")
 
     private static let lock = NSLock()
-    private static var screenAvailable = true
+    nonisolated(unsafe) private static var screenAvailable = true
 
     public static var isScreenAvailable: Bool {
         lock.lock()

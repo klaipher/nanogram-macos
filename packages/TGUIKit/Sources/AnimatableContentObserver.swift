@@ -151,21 +151,26 @@ public final class AnimatableContentTokenObserver {
             }
             self.handler?(notification)
         }
-        let center = NotificationCenter.default
-        tokens.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main, using: callback))
-        tokens.append(center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main, using: callback))
-        tokens.append(center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main, using: callback))
-        tokens.append(center.addObserver(forName: NSApplication.didHideNotification, object: nil, queue: .main, using: callback))
-        tokens.append(center.addObserver(forName: NSApplication.didUnhideNotification, object: nil, queue: .main, using: callback))
-        tokens.append(center.addObserver(forName: PlaybackVisibility.didChangeNotification, object: nil, queue: .main, using: callback))
+        var observed: [(Notification.Name, AnyObject?)] = [
+            (NSWindow.didBecomeKeyNotification, window),
+            (NSWindow.didResignKeyNotification, window),
+            (NSWindow.didChangeOcclusionStateNotification, window),
+            (NSApplication.didHideNotification, nil),
+            (NSApplication.didUnhideNotification, nil),
+            (PlaybackVisibility.didChangeNotification, nil)
+        ]
         if let contentView {
-            tokens.append(center.addObserver(forName: NSView.boundsDidChangeNotification, object: contentView, queue: .main, using: callback))
+            observed.append((NSView.boundsDidChangeNotification, contentView))
         }
         if let documentView {
-            tokens.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: documentView, queue: .main, using: callback))
+            observed.append((NSView.frameDidChangeNotification, documentView))
         }
         if contentView == nil || documentView == nil {
-            tokens.append(center.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main, using: callback))
+            observed.append((NSWindow.didResizeNotification, window))
+        }
+        let center = NotificationCenter.default
+        for (name, object) in observed {
+            tokens.append(center.addObserver(forName: name, object: object, queue: .main, using: callback))
         }
         observedWindow = window
         observedContentView = contentView
