@@ -10,6 +10,16 @@ ONLY_ACTIVE_ARCH = YES
 SWIFT_OPTIMIZATION_LEVEL[config=Debug] = -Onone
 LLVM_LTO[config=Debug] = NO
 
+// Day-to-day Debug speed (docs/local-development.md, "Day-to-day build speed"). Debug only: Release, archives and
+// the mas export keep upstream's values. The module verifier re-checks Sparkle and CodeSyntax on every build
+// (2–8 s); App Intents metadata extraction ran 170 times in a clean build of an app without App Intents.
+// The other three pin today's Debug values against upstream drift.
+DEBUG_INFORMATION_FORMAT[config=Debug] = dwarf
+SWIFT_COMPILATION_MODE[config=Debug] = singlefile
+GCC_OPTIMIZATION_LEVEL[config=Debug] = 0
+ENABLE_MODULE_VERIFIER[config=Debug] = NO
+LM_SKIP_METADATA_EXTRACTION[config=Debug] = YES
+
 GCC_OPTIMIZATION_LEVEL[config=Release] = 3
 LLVM_LTO[config=Release] = YES_THIN
 DEAD_CODE_STRIPPING[config=Release] = YES

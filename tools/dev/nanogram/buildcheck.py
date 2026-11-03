@@ -24,6 +24,7 @@ MACHO_MAGICS = {
     bytes.fromhex("cefaedfe"), bytes.fromhex("feedface"),
     bytes.fromhex("cafebabe"), bytes.fromhex("bebafeca"),
 }
+DEBUG_FORBIDDEN_TASKS = ("VerifyModule", "GenerateDSYMFile", "ExtractAppIntentsMetadata")
 TARGET_RE = re.compile(r"\(in target '([^']+)' from project '([^']+)'\)")
 TRIPLE_RE = re.compile(r"^([a-z0-9_]+)-apple-macos([0-9.]+)$")
 X86_RE = re.compile(r"\bx86_64\b")
@@ -105,8 +106,23 @@ def _is_successful_xcodebuild_log(log: str) -> bool:
             and "** BUILD SUCCEEDED **" in log)
 
 
+def _forbidden_debug_tasks(log: str) -> list[str]:
+    found = []
+    for line in log.splitlines():
+        name = line.split(" ", 1)[0]
+        if name in DEBUG_FORBIDDEN_TASKS and name not in found:
+            found.append(name)
+    return [f"{name} ran in a Debug build" for name in found]
+
+
 def check_log(log: str, release: bool = False, min_os: str = MIN_OS) -> list[str]:
-    """Problems found in an xcodebuild log; empty when every compile is arm64 for macOS `min_os`."""
+    """Problems found in an xcodebuild log; empty when every compile is arm64 for macOS `min_os`. A Debug log must
+    also show none of the tasks the fast Debug settings turn off (DEBUG_FORBIDDEN_TASKS)."""
+    forbidden = [] if release else _forbidden_debug_tasks(log)
+    return forbidden + _check_compiles(log, release, min_os)
+
+
+def _check_compiles(log: str, release: bool, min_os: str) -> list[str]:
     problems = _Problems()
     seen = 0
     for action, label, tool, raw_args in _blocks(log):
