@@ -199,6 +199,10 @@ public final class TextRecognizing {
         }
     }
     public static func recognize(_ cgImage: CGImage, postbox: Postbox?, stableId: MediaId?) -> Signal<Result, Error> {
+        return recognize(cgImage, cache: postbox.flatMap(RecognitionFileCache.forPostbox), stableId: stableId)
+    }
+
+    public static func recognize(_ cgImage: CGImage, cache: RecognitionFileCache?, stableId: MediaId?) -> Signal<Result, Error> {
         return Signal { subscriber in
             
             let requestHandler = VNImageRequestHandler(cgImage: cgImage)
@@ -222,17 +226,20 @@ public final class TextRecognizing {
             barcodeRequest.preferBackgroundProcessing = true
             barcodeRequest.symbologies = [.qr]
             
-            let signal = Cache.get(postbox: postbox, stableId: stableId) |> deliverOn(queue)
+            let signal: Signal<RecognitionFileCache.Entry?, NoError> = Signal { subscriber in
+                subscriber.putNext(stableId.flatMap { cache?.get($0) })
+                subscriber.putCompletion()
+                return EmptyDisposable
+            } |> runOn(queue)
             
             actionDisposable.set(signal.start(next: { cached in
-                if let cached = cached, let barcodes = cached.barcodes {
-                    subscriber.putNext(.finish(image: cgImage, text: cached.texts, barcodes: barcodes))
+                if let cached = cached {
+                    subscriber.putNext(.finish(image: cgImage, text: cached.texts, barcodes: cached.barcodes))
                     subscriber.putCompletion()
                     return
                 }
-                try? requestHandler.perform([barcodeRequest])
                 do {
-                    try requestHandler.perform([request])
+                    try requestHandler.perform([barcodeRequest, request])
                 } catch {
                     subscriber.putError(.generic)
                     return
@@ -257,8 +264,8 @@ public final class TextRecognizing {
                 }
                 subscriber.putNext(.finish(image: cgImage, text: results, barcodes: barcodes))
                 subscriber.putCompletion()
-                if let postbox = postbox, let stableId = stableId {
-                    _ = Cache.set(postbox: postbox, texts: results, barcodes: barcodes, stableId: stableId).start()
+                if let cache = cache, let stableId = stableId {
+                    cache.set(texts: results, barcodes: barcodes, stableId: stableId)
                 }
             }))
             
@@ -274,53 +281,3 @@ public final class TextRecognizing {
     
 
 }
-
-
-@available(macOS 10.15, *)
-internal extension TextRecognizing {
-
-    static let key = applicationSpecificPreferencesKey(1003)
-    
-    final class Cache {
-        struct Data : Codable {
-            let stableId: MediaId
-            let texts:[Result.Detected]
-            let barcodes:[Result.Barcode]?
-        }
-        private struct Entries : Codable {
-            var list: [Data]
-        }
-        static func get(postbox: Postbox?, stableId: MediaId?) -> Signal<Data?, NoError> {
-            if let postbox = postbox, let stableId = stableId {
-                return postbox.transaction { transaction -> Data? in
-                    let entries = transaction.getPreferencesEntry(key: key)?.get(Entries.self) ?? Entries(list: [])
-                    return entries.list.first(where: {
-                        $0.stableId == stableId
-                    })
-                }
-            } else {
-                return .single(nil)
-            }
-        }
-        static func set(postbox: Postbox, texts:[Result.Detected], barcodes:[Result.Barcode], stableId: MediaId) -> Signal<Void, NoError> {
-            return postbox.transaction { transaction -> Void in
-                transaction.updatePreferencesEntry(key: key, { entry in
-                    var entries = entry?.get(Entries.self) ?? Entries(list: [])
-                    let entry = Data(stableId: stableId, texts: texts, barcodes: barcodes)
-                    let index = entries.list.firstIndex(where: { $0.stableId == stableId})
-                    if let index = index {
-                        entries.list[index] = entry
-                    } else {
-                        entries.list.append(entry)
-                    }
-                    entries.list = Array(entries.list.suffix(100))
-                    
-                    return PreferencesEntry(entries)
-                })
-            }
-        }
-    }
-
-}
-
-

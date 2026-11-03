@@ -25,6 +25,7 @@ import FoundationUtils
 import ObjcUtils
 
 public final class GalleryRecognition {
+    static let dwell: Double = 1.0
     private let item: MGalleryPhotoItem
     private let disposable = MetaDisposable()
     private let translateDisposable = MetaDisposable()
@@ -61,7 +62,7 @@ public final class GalleryRecognition {
                     switch image.value {
                     case let .image(image, _):
                         if let image = image {
-                            return TextRecognizing.recognize(image._cgImage!, postbox: postbox, stableId: mediaId) |> map(Optional.init)
+                            return (Signal<TextRecognizing.Result?, TextRecognizing.Error>.complete() |> delay(GalleryRecognition.dwell, queue: .concurrentDefaultQueue())) |> then(TextRecognizing.recognize(image._cgImage!, postbox: postbox, stableId: mediaId) |> map(Optional.init))
                         } else {
                             return .single(nil)
                         }
