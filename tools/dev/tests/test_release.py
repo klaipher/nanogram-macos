@@ -126,6 +126,15 @@ class SettingsTests(unittest.TestCase):
                       xcconfig)
         self.assertNotIn("SWIFT_ENFORCE_EXCLUSIVE_ACCESS", xcconfig)
 
+    def test_cold_screens_build_for_size_and_hot_modules_stay_fast(self):
+        xcconfig = (ROOT / "nanogram" / "Nanogram.xcconfig").read_text()
+        self.assertIn("SWIFT_OPTIMIZATION_LEVEL[config=Release] = $(NANOGRAM_SWIFT_OPT_$(TARGET_NAME):default=-O)",
+                      xcconfig)
+        for module in ["WalletContext", "WalletUI", "StarsUI", "SettingsUI", "PassportUI", "ChatExportUI"]:
+            self.assertIn(f"NANOGRAM_SWIFT_OPT_{module} = -Osize", xcconfig)
+        for module in ["TelegramCore", "Postbox", "TGUIKit", "ChatUI", "ChatListUI", "TelegramMedia", "SwiftSignalKit"]:
+            self.assertNotIn(f"NANOGRAM_SWIFT_OPT_{module} ", xcconfig)
+
     def test_conditions(self):
         self.assertEqual(release.conditions("direct"), "$(inherited) NANOGRAM STABLE")
         self.assertEqual(release.conditions("mas"), "$(inherited) NANOGRAM STABLE NANOGRAM_MAS")
