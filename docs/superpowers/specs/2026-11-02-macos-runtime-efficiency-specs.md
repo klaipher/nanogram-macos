@@ -1594,7 +1594,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: CameraNeo `VideoRecorder.swift:774-781` (AAC at the source rate and channel count).
 - **Confidence**: medium (pause behaviour verified in code; HFP timing needs hardware).
 
-### Q5. Screen shares are converted to limited-range YUV but every Telegram Apple renderer decodes full range, so blacks are grey; fixes H28's `'420v'` too — `partial: not changed, owner decision on tdesktop/Android range (see ledger ruling)`
+### Q5. Screen shares are converted to limited-range YUV but every Telegram Apple renderer decodes full range, so blacks are grey; fixes H28's `'420v'` too — `partial: SCStream 420f/601 done by H28 (9efe49a); libyuv J420 switch is an owner decision (cross-client)`
 
 - **Evidence**: `submodules/tgcalls/tgcalls/desktop_capturer/DesktopCaptureSourceHelper.cpp:207-217` (`libyuv::ConvertToI420(..., FOURCC_ARGB)`, BT.601 limited range:
   `tg_owt/.../libyuv/source/row_common.cc:562`, `(66R+129G+25B+0x1080)>>8`). The receivers decode as full-range BT.601 with no 16/219 expansion:
