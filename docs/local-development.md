@@ -97,11 +97,11 @@ compare CPU seconds):
 | No-change `tg build`, description reused | 29–44 s, 36–39 CPU s (load 55–100) | 45 s, 41 CPU s for all of `tg build` (load 250→139) |
 | No-change `tg build`, description recreated | 147–251 s, 77 CPU s | 137 s, 71 CPU s (load 274→250), only after a setting, environment or package change |
 | First build in a different environment | 269 s, 542 CPU s | does not happen: the environment is fixed |
-| Editions check on a no-change build | 4.4–8.6 s | skipped (not yet measured on a real build) |
-| VerifyModule on every Debug build | 2.2–8.4 s | none (not yet measured on a real build) |
+| Editions check on a no-change build | 4.4–8.6 s | skipped: `editions: direct ok (unchanged since the last check)` on every no-change build (Stage 2 results) |
+| VerifyModule on every Debug build | 2.2–8.4 s | none: 0 `VerifyModule`, `ExtractAppIntentsMetadata` or `GenerateDSYMFile` tasks in a clean Debug build (Stage 2 results) |
 
-Not yet measured, because free disk stayed below the 30 GB a clean build needs: a clean Debug build with the new
-settings, the ChatUI edit builds, a Release build and the compilation-cache experiment.
+The clean Debug, ChatUI, TGUIKit and Release builds were measured after both packages landed: see "Stage 2
+results". The compilation-cache experiment was not run.
 
 ## Strictness, lint and `tg check`
 
@@ -335,6 +335,38 @@ seconds are the comparable number):
 
 Owner action: exclude `~/.cache/nanogram-macos` and the checkouts from ESET Endpoint Security's on-access scanning;
 its `scand` process was among the top CPU users during every measured build.
+
+## Stage 2 results
+
+Measured 2026-11-03 on `nanogram/stage2` with both packages (`build-output/stage2/integrate/`: `*.run.txt` wall time
+and load, `*.time.txt` `/usr/bin/time -l`, `*.log` xcodebuild with `-showBuildTimingSummary`). Every build ran
+through `tg` under `buildlock`, one after another, on the shared Mac (M-series, 10 cores, Xcode 27.2). Load average
+in brackets (1-minute value before → after); wall times are upper bounds, CPU seconds (user + sys of the whole
+command) are the comparable number. Free disk 16–73 GB during the runs.
+
+| What | Upstream (2026-11-02) | Stage 2 |
+|---|---|---|
+| Native libraries, empty `core-xprojects/*/build`, no Rust xcframeworks, empty cache | ~22 min universal, 2.3 GB (stage 1 arm64: 777 s on an idle Mac) | 958 s, 1,583 user + 390 sys CPU s (load 73→47); OpenSSL 269, webrtc 220, ffmpeg 93, libopus 73, OpenH264 65, libvpx 62, tde2e 57, wallet-engine 42, libwebp 23, mtproto-engine 13, mozjpeg 9, tlottie 9, dav1d 7 s; build dirs + xcframeworks 1.65 GB, cache 192 MB |
+| Native libraries, fresh worktree: no build dirs or xcframeworks, warm cache | same as above | 7.6 s, 4.8 CPU s (load 46): 13 restored |
+| Native libraries, everything current | upstream's script always rebuilt tlottie (≥ 54 s) | 2.4 s, 2.4 CPU s |
+| Clean Debug `tg build --clean` from an empty DerivedData | 401 s, 6.1 GB | 388 s, 1,956 + 304 CPU s (load 6→38); SwiftCompile 1,936 s (1,077 tasks), CompileC 311 s (514), SwiftDriver 300 s, SwiftEmitModule 216 s; 0 VerifyModule / ExtractAppIntentsMetadata / GenerateDSYMFile; DerivedData 5.7 GB (Build 3.7, ModuleCache 1.5) |
+| No-change `tg build` | 34 s | 22 s, 17 + 3 CPU s (load 16→13), description reused, editions check skipped. The first two builds after `--clean` recreated the description: 35 s / 29 s, 35 / 32 CPU s |
+| ChatUI body edit (`BigEmojiMessage.swift`, a string literal in a function) | 35 s | 32 s, 29 + 5 CPU s (load 13→10): 1 Swift task, 4 links, re-sign, editions check; reverting it 33 s |
+| TGUIKit public API added (`public func` in `AnimationStyle.swift`) | 222 s | 265 s, 765 + 136 CPU s (load 14→12): 819 Swift compile tasks, the same count as upstream's log; reverting it 428 s, 820 + 143 CPU s (load 15→54) |
+| Clean Release `tg build --release --clean` | 1,057 s universal, 11 GB | 1,507 s, 2,757 + 241 CPU s (load 20→128, 200 at the end); SwiftCompile 3,871 s (170 whole-module tasks), CompileC 326 s, GenerateDSYMFile 73 s; Build 3.4 GB, the module cache grew 1.5 → 3.0 GB (Debug and Release); **`buildcheck` failed**, see below |
+| Release app | 610 MB universal (main 423 MB, share extension 166 MB) | 308 MB arm64 (main 215 MB, share extension 83 MB, Sparkle 1.3 MB, resources 19 MB) |
+| Disk for one checkout | ~24 GB | ~10 GB: sources 2.5 GB (git objects live in the main clone), native libraries 192 MB in the shared cache (the checkout's 188 MB are clones of it), DerivedData 7.3 GB with Debug and Release (5.7 GB Debug only); `build-output` logs and app copies 1.1 GB on top |
+
+`tools/dev/tests/run.sh` (244 tests, 9 skipped) and `tg check` (732 s, including a clean Debug build from an empty
+DerivedData) passed before the measurements.
+
+**Release `buildcheck` fails.** 170 of the 225 links in the Release log have no `-flto=thin`: the app, the share
+extension and the Swift-only package targets. Xcode adds `-flto=thin` (plus `-cache_path_lto`) to a link only through
+`Clang.xcspec`'s `AdditionalLinkerArgs`, i.e. for targets that compile C (55 links have it, e.g. sqlcipher, libwebp,
+Sparkle), and the Swift compiles get no `-lto=llvm-thin`, so `LLVM_LTO = YES_THIN` gives ThinLTO to the C code only.
+The build itself succeeded; the editions check did not run. This is the stage 1 settings layer and check, first
+exercised here by a real Release build: either the check accepts links of Swift-only targets, or the Swift code gets
+ThinLTO (`-lto=llvm-thin` in `OTHER_SWIFT_FLAGS` for Release, a size and time trade-off to measure first).
 
 ## Keeping up with upstream
 
