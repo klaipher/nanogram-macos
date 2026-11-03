@@ -7,29 +7,75 @@ public enum VoiceRecorderAudioEngineError: Error {
 }
 
 public final class VoiceRecorderAudioEngine {
-    private let engine = AVAudioEngine()
+    private var engine: AVAudioEngine
+    private let makeEngine: () -> AVAudioEngine
+    private let resolveDevice: (String) -> AudioDeviceID?
     private let inputDeviceUID: String?
     private let voiceProcessing: Bool
     private var configured = false
     private var tapInstalled = false
     private var configurationObserver: NSObjectProtocol?
+    private let rebuildLock = NSLock()
+    private var needsRebuild = false
+    private var configurationChangeHandler: (() -> Void)?
     public var onConfigurationChange: (() -> Void)? {
-        didSet {
-            if let observer = self.configurationObserver {
-                NotificationCenter.default.removeObserver(observer)
-                self.configurationObserver = nil
-            }
-            if let onConfigurationChange = self.onConfigurationChange {
-                self.configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: self.engine, queue: nil, using: { _ in
-                    onConfigurationChange()
-                })
-            }
+        get {
+            self.rebuildLock.lock()
+            defer { self.rebuildLock.unlock() }
+            return self.configurationChangeHandler
+        }
+        set {
+            self.rebuildLock.lock()
+            self.configurationChangeHandler = newValue
+            self.rebuildLock.unlock()
         }
     }
 
-    public init(inputDeviceUID: String?, voiceProcessing: Bool) {
+    public convenience init(inputDeviceUID: String?, voiceProcessing: Bool) {
+        self.init(inputDeviceUID: inputDeviceUID, voiceProcessing: voiceProcessing, makeEngine: { AVAudioEngine() }, resolveDevice: { VoiceRecorderAudioEngine.device(uid: $0) })
+    }
+
+    init(inputDeviceUID: String?, voiceProcessing: Bool, makeEngine: @escaping () -> AVAudioEngine, resolveDevice: @escaping (String) -> AudioDeviceID?) {
         self.inputDeviceUID = inputDeviceUID
         self.voiceProcessing = voiceProcessing
+        self.makeEngine = makeEngine
+        self.resolveDevice = resolveDevice
+        self.engine = makeEngine()
+        self.observe(self.engine)
+    }
+
+    private func observe(_ engine: AVAudioEngine) {
+        if let observer = self.configurationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        self.configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil, using: { [weak self] _ in
+            guard let self else {
+                return
+            }
+            self.rebuildLock.lock()
+            self.needsRebuild = true
+            let handler = self.configurationChangeHandler
+            self.rebuildLock.unlock()
+            handler?()
+        })
+    }
+
+    private func rebuildIfNeeded() {
+        self.rebuildLock.lock()
+        let needsRebuild = self.needsRebuild
+        self.needsRebuild = false
+        self.rebuildLock.unlock()
+        guard needsRebuild else {
+            return
+        }
+        self.stop()
+        self.engine = self.makeEngine()
+        self.configured = false
+        self.observe(self.engine)
+    }
+
+    var currentEngine: AVAudioEngine {
+        return self.engine
     }
 
     deinit {
@@ -73,21 +119,25 @@ public final class VoiceRecorderAudioEngine {
         return rate
     }
 
+    func configureIfNeeded() {
+        self.configure()
+    }
+
     private func configure() {
+        self.rebuildIfNeeded()
         guard !self.configured else {
             return
         }
         self.configured = true
-        let input = self.engine.inputNode
-        if let uid = self.inputDeviceUID, let device = VoiceRecorderAudioEngine.device(uid: uid), let audioUnit = input.audioUnit {
+        if let uid = self.inputDeviceUID, let device = self.resolveDevice(uid), let audioUnit = self.engine.inputNode.audioUnit {
             var device = device
             AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &device, UInt32(MemoryLayout<AudioDeviceID>.size))
         }
         if self.voiceProcessing, #available(macOS 10.15, *) {
             do {
-                try input.setVoiceProcessingEnabled(true)
+                try self.engine.inputNode.setVoiceProcessingEnabled(true)
                 if #available(macOS 14.0, *) {
-                    input.voiceProcessingOtherAudioDuckingConfiguration = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
+                    self.engine.inputNode.voiceProcessingOtherAudioDuckingConfiguration = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
                 }
             } catch {
             }

@@ -21,7 +21,7 @@ func installMediaRecorderUIHooks() {
         guard let context = context as? AccountContext else {
             return nil
         }
-        return context.sharedContext.devicesContext.currentMicroId
+        return context.sharedContext.devicesContext.currentRecordingMicroId
     })
     installMediaRecorderHooks(hooks)
 }

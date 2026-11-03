@@ -62,3 +62,31 @@ final class MicrophonePolicyTests: XCTestCase {
         XCTAssertEqual(DevicesContext.resolveMicrophoneId(VoiceCallSettings.defaultSettings, candidates: [airPods, builtIn], defaultId: airPods.uniqueID), airPods.uniqueID)
     }
 }
+
+final class RecordingMicrophonePolicyTests: XCTestCase {
+    private let builtIn = CaptureDeviceCandidate(uniqueID: "BuiltInMicrophoneDevice", isAvailable: true, transport: .builtIn)
+    private let airPods = CaptureDeviceCandidate(uniqueID: "AirPods:input", isAvailable: true, transport: .bluetooth)
+    private let usb = CaptureDeviceCandidate(uniqueID: "USBMic", isAvailable: true, transport: .other)
+
+    func testWithoutAChoiceNotesFollowTheSystemDefault() {
+        XCTAssertNil(DevicesContext.resolveRecordingMicrophoneId(selectedId: nil, candidates: [airPods, builtIn], defaultId: airPods.uniqueID, preferBuiltInWithBluetooth: false))
+        XCTAssertNil(DevicesContext.resolveRecordingMicrophoneId(selectedId: nil, candidates: [usb, builtIn], defaultId: usb.uniqueID, preferBuiltInWithBluetooth: true))
+        XCTAssertNil(DevicesContext.resolveRecordingMicrophoneId(VoiceCallSettings.defaultSettings, candidates: [airPods, builtIn], defaultId: airPods.uniqueID))
+    }
+
+    func testAnExplicitChoiceIsPinned() {
+        XCTAssertEqual(DevicesContext.resolveRecordingMicrophoneId(selectedId: usb.uniqueID, candidates: [airPods, usb], defaultId: airPods.uniqueID, preferBuiltInWithBluetooth: false), usb.uniqueID)
+        XCTAssertEqual(DevicesContext.resolveRecordingMicrophoneId(selectedId: airPods.uniqueID, candidates: [airPods, builtIn], defaultId: airPods.uniqueID, preferBuiltInWithBluetooth: true), airPods.uniqueID)
+    }
+
+    func testTheBuiltInRedirectIsPinned() {
+        XCTAssertEqual(DevicesContext.resolveRecordingMicrophoneId(selectedId: nil, candidates: [airPods, builtIn], defaultId: airPods.uniqueID, preferBuiltInWithBluetooth: true), builtIn.uniqueID)
+        let settings = VoiceCallSettings.defaultSettings.withUpdatedBuiltInMicrophoneWithBluetooth(true)
+        XCTAssertEqual(DevicesContext.resolveRecordingMicrophoneId(settings, candidates: [airPods, builtIn], defaultId: airPods.uniqueID), builtIn.uniqueID)
+    }
+
+    func testAMissingChoiceFallsBackToTheSystemDefault() {
+        let missingUsb = CaptureDeviceCandidate(uniqueID: "USBMic", isAvailable: false, transport: .other)
+        XCTAssertNil(DevicesContext.resolveRecordingMicrophoneId(selectedId: missingUsb.uniqueID, candidates: [airPods, missingUsb], defaultId: airPods.uniqueID, preferBuiltInWithBluetooth: false))
+    }
+}
