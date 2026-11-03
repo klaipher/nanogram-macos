@@ -360,7 +360,7 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
     private let _next: GalleryNavigationButton = GalleryNavigationButton()
     
     private var hasInited: Bool = false
-    private var hasDeferredRelease: Bool = false
+    private var releaseSchedule = GalleryReleaseSchedule()
     
     public var selectedItemChanged: ((@escaping(MGalleryItem) -> Void)->Void)!
     public var transition: ((@escaping(UpdateTransition<MGalleryItem>, MGalleryItem?) -> Void) -> Void)!
@@ -631,12 +631,33 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
         controller.transitionStyle = .horizontalStrip
     }
     
+    private var hasPendingTransitions: Bool {
+        return lockedTransition || !queuedTransitions.isEmpty
+    }
+
     private func releaseDistantItems(around index: Int) {
         let items = self.items
-        let hasPendingChanges = lockedTransition || !queuedTransitions.isEmpty
-        hasDeferredRelease = hasPendingChanges
         let displayedIndex: Int? = items.isEmpty ? nil : controller.selectedIndex
-        for itemIndex in GalleryItemRelease.indicesToRelease(itemCount: items.count, around: index, displayedIndex: displayedIndex, hasPendingChanges: hasPendingChanges) {
+        let decision = releaseSchedule.note(itemCount: items.count, index: index, displayedIndex: displayedIndex, pending: hasPendingTransitions)
+        #if DEBUG
+        if decision.oldRuleWouldReleaseDisplayed, let displayedIndex = displayedIndex {
+            Logger.shared.log("GalleryRelease", "kept shown item: shown=\(displayedIndex) newIndex=\(index) count=\(items.count) queued=\(queuedTransitions.count) locked=\(lockedTransition)")
+        }
+        #endif
+        for itemIndex in decision.indices {
+            items[itemIndex].releaseResources()
+        }
+    }
+
+    private func flushDeferredRelease() {
+        let items = self.items
+        let indices = releaseSchedule.flush(itemCount: items.count, displayedIndex: controller.selectedIndex, pending: hasPendingTransitions)
+        #if DEBUG
+        if !indices.isEmpty {
+            Logger.shared.log("GalleryRelease", "deferred release flushed: shown=\(controller.selectedIndex) count=\(items.count) released=\(indices.count)")
+        }
+        #endif
+        for itemIndex in indices {
             items[itemIndex].releaseResources()
         }
     }
@@ -782,9 +803,7 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
             if let item = selectedItem {
                 (controller.selectedViewController?.view as? GMagnifyView)?.updateStatus(item.status)
             }
-            if hasDeferredRelease, !self.items.isEmpty {
-                releaseDistantItems(around: controller.selectedIndex)
-            }
+            flushDeferredRelease()
             afterTransaction?()
 
             return items.isEmpty
