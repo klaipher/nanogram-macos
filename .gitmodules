@@ -10,7 +10,8 @@
 	branch = nanogram-mac
 [submodule "submodules/tgcalls"]
 	path = submodules/tgcalls
-	url = https://github.com/TelegramMessenger/tgcalls
+	url = https://github.com/klaipher/tgcalls
+	branch = nanogram-mac
 [submodule "submodules/tg_owt"]
 	path = submodules/tg_owt
 	url = https://github.com/macosswift/tg_owt

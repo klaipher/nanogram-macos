@@ -149,6 +149,14 @@ class PinnedVersionsTests(unittest.TestCase):
             self.assertTrue(is_ancestor(rlottie, commit, pin), f"rlottie {pin} does not contain {commit}")
         self.assertIn("url = https://github.com/klaipher/rlottie", read(ROOT / ".gitmodules"))
 
+    def test_tgcalls_is_the_klaipher_fork(self):
+        tgcalls = ROOT / "submodules" / "tgcalls"
+        pin = gitlink(ROOT, "submodules/tgcalls")
+        for commit in ("bdda8eff9f62547b4621c09f6a8873a61aecd95c", "6926af015580a1377e1b1bcad191d076453192cb"):
+            self.assertTrue(is_ancestor(tgcalls, commit, pin), f"tgcalls {pin} does not contain {commit}")
+        modules = read(ROOT / ".gitmodules")
+        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-mac\n', modules)
+
     def test_libprisma(self):
         self.assertEqual(gitlink(ROOT, "submodules/libprisma"), "086296336c69723f58ca6aa603434ef8cf682c39")
 

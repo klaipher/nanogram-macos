@@ -116,7 +116,6 @@
   "ShareUI": 228,
   "ShortPeerRow": 44,
   "SidebarUI": 53,
-  "Sparkle": 289,
   "StarsUI": 471,
   "StatisticsUI": 44,
   "StickerSettingsUI": 27,
@@ -154,11 +153,11 @@
   "WebProxyTransport": 66,
   "WidgetUI": 76,
   "Zip": 1,
-  "app": 904,
+  "app": 838,
   "libprisma": 1,
   "minizip": 1,
   "regex": 6,
   "rlottie": 73,
   "sqlcipher": 195,
-  "tgcalls": 21
+  "tgcalls": 26
 }
