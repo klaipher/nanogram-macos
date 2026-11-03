@@ -614,7 +614,6 @@ struct ChatListStateProjection: Equatable {
         let showTags: Bool
         let requestTimestamp: TimeInterval
     }
-    let activities: PeerListState.InputActivities
     let appear: PeerListState.AppearMode
     let controllerAppear: PeerListState.AppearMode
     let forumPeer: PeerListState.ForumData?
@@ -625,12 +624,6 @@ struct ChatListStateProjection: Equatable {
     let filterData: Filter
 
     init(_ state: PeerListState) {
-        self.activities = PeerListState.InputActivities(activities: state.activities.activities.filter { space, _ in
-            if case .voiceChat = space.category {
-                return false
-            }
-            return true
-        })
         self.appear = state.appear
         self.controllerAppear = state.controllerAppear
         self.forumPeer = state.forumPeer
@@ -639,6 +632,47 @@ struct ChatListStateProjection: Equatable {
         self.selectedForum = state.selectedForum
         self.splitState = state.splitState
         self.filterData = Filter(filter: state.filterData.filter, tabs: state.filterData.tabs, showTags: state.filterData.showTags, requestTimestamp: state.filterData.requestTimestamp)
+    }
+}
+
+final class ChatListActivityFeed {
+    private let lock = NSLock()
+    private var latest = PeerListState.InputActivities(activities: [:])
+    private var loadedSpaces: Set<PeerActivitySpace> = []
+    private var lastRelevant: [PeerActivitySpace: [PeerListState.InputActivities.Activity]]?
+
+    static func withoutVoiceChats(_ activities: PeerListState.InputActivities) -> PeerListState.InputActivities {
+        return PeerListState.InputActivities(activities: activities.activities.filter { space, _ in
+            if case .voiceChat = space.category {
+                return false
+            }
+            return true
+        })
+    }
+
+    func update(_ activities: PeerListState.InputActivities) -> Bool {
+        let activities = ChatListActivityFeed.withoutVoiceChats(activities)
+        self.lock.lock()
+        defer {
+            self.lock.unlock()
+        }
+        self.latest = activities
+        let relevant = activities.activities.filter { self.loadedSpaces.contains($0.key) }
+        if relevant == self.lastRelevant {
+            return false
+        }
+        self.lastRelevant = relevant
+        return true
+    }
+
+    func activities(loading spaces: Set<PeerActivitySpace>) -> PeerListState.InputActivities {
+        self.lock.lock()
+        defer {
+            self.lock.unlock()
+        }
+        self.loadedSpaces = spaces
+        self.lastRelevant = self.latest.activities.filter { spaces.contains($0.key) }
+        return self.latest
     }
 }
 
@@ -986,7 +1020,15 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         
         
-        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<TableUpdateTransition, NoError> in
+        let activityFeed = ChatListActivityFeed()
+        let activityTicks: Signal<Void, NoError> = stateUpdater
+        |> map { $0.activities }
+        |> distinctUntilChanged
+        |> filter { activityFeed.update($0) }
+        |> map { _ in Void() }
+        let projectedState: Signal<ChatListStateProjection, NoError> = combineLatest(stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, activityTicks)
+        |> map { state, _ in state }
+        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, projectedState, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<TableUpdateTransition, NoError> in
             if !HistoryVisibilityGate.shouldApply(visible: isVisible, isPlainGenericUpdate: !value.2 && !scrollUp.with { $0 }, hasScrollPosition: scroll != nil, appliedOnce: chatListAppliedOnce.with { $0 }) {
                 _ = chatListSkippedWhileHidden.swap(true)
                 return .complete()
@@ -1033,19 +1075,21 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                     return false
                 })
             }
-            var mapped: [UIChatListEntry] = prepare.map { item in
-                let space: PeerActivitySpace
-                var generalStatus: ItemHideStatus? = nil
+            let spaces: [PeerActivitySpace] = prepare.map { item in
                 switch item.0.id {
                 case let .forum(threadId):
-                    space = .init(peerId: item.0.renderedPeer.peerId, category: .thread(threadId))
-                    if threadId == 1, item.0.threadData?.isHidden == true {
-                        generalStatus = state.hiddenItems.generalTopic ?? .hidden(true)
-                    }
+                    return .init(peerId: item.0.renderedPeer.peerId, category: .thread(threadId))
                 case let .chatList(peerId):
-                    space = .init(peerId: peerId, category: .global)
+                    return .init(peerId: peerId, category: .global)
                 }
-                return .chat(item.0, state.activities.activities[space] ?? [], item.1, filter: filterData.filter, generalStatus: generalStatus, selectedForum: state.selectedForum, appearMode: state.controllerAppear, hideContent: state.appear == .short, folders: rowFolders, communityCategories: update.communityCategories, canPreviewChat: additionalSettings.previewChats)
+            }
+            let activities = activityFeed.activities(loading: Set(spaces))
+            var mapped: [UIChatListEntry] = zip(prepare, spaces).map { item, space in
+                var generalStatus: ItemHideStatus? = nil
+                if case let .forum(threadId) = item.0.id, threadId == 1, item.0.threadData?.isHidden == true {
+                    generalStatus = state.hiddenItems.generalTopic ?? .hidden(true)
+                }
+                return .chat(item.0, activities.activities[space] ?? [], item.1, filter: filterData.filter, generalStatus: generalStatus, selectedForum: state.selectedForum, appearMode: state.controllerAppear, hideContent: state.appear == .short, folders: rowFolders, communityCategories: update.communityCategories, canPreviewChat: additionalSettings.previewChats)
             }
             
             if case .filter = filterData.filter, mapped.isEmpty {} else {

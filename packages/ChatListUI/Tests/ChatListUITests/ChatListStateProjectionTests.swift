@@ -52,15 +52,51 @@ final class ChatListStateProjectionTests: XCTestCase {
         XCTAssertNotEqual(ChatListStateProjection(state), ChatListStateProjection(controllerAppear))
     }
 
-    func testVoiceChatActivitiesDoNotRebuildTheList() {
+    func testTypingDoesNotChangeTheProjectionTheActivityFeedDecides() {
         let state = base()
-        var speaking = state
-        let space = PeerActivitySpace(peerId: PeerId(namespace: Namespaces.Peer.CloudChannel, id: ._internalFromInt64Value(5)), category: .voiceChat)
-        speaking.activities = .init(activities: [space: []])
-        XCTAssertEqual(ChatListStateProjection(state), ChatListStateProjection(speaking))
-
         var typing = state
-        typing.activities = .init(activities: [PeerActivitySpace(peerId: space.peerId, category: .global): []])
-        XCTAssertNotEqual(ChatListStateProjection(state), ChatListStateProjection(typing))
+        typing.activities = .init(activities: [PeerActivitySpace(peerId: PeerId(namespace: Namespaces.Peer.CloudChannel, id: ._internalFromInt64Value(5)), category: .global): []])
+        XCTAssertEqual(ChatListStateProjection(state), ChatListStateProjection(typing))
+    }
+
+    private func space(_ id: Int64, _ category: PeerActivitySpace.Category = .global) -> PeerActivitySpace {
+        return PeerActivitySpace(peerId: PeerId(namespace: Namespaces.Peer.CloudChannel, id: ._internalFromInt64Value(id)), category: category)
+    }
+
+    private func typing(_ id: Int64, by userId: Int64, timestamp: Int32 = 0) -> PeerListState.InputActivities.Activity {
+        let user = TelegramUser(id: PeerId(namespace: Namespaces.Peer.CloudUser, id: ._internalFromInt64Value(userId)), accessHash: nil, firstName: "U\(userId)", lastName: nil, username: nil, phone: nil, photo: [], botInfo: nil, restrictionInfo: nil, flags: [], emojiStatus: nil, usernames: [], storiesHidden: nil, nameColor: nil, backgroundEmojiId: nil, profileColor: nil, profileBackgroundEmojiId: nil, subscriberCount: nil, verificationIconFileId: nil)
+        return .init(user, .typingText)
+    }
+
+    func testTypingOutsideTheLoadedRowsDoesNotRebuildTheList() {
+        let feed = ChatListActivityFeed()
+        XCTAssertTrue(feed.update(.init(activities: [:])))
+        let loaded: Set<PeerActivitySpace> = [space(1), space(2)]
+        XCTAssertEqual(feed.activities(loading: loaded), .init(activities: [:]))
+        var rebuilds = 0
+        for index in 0 ..< 100 {
+            var activities: [PeerActivitySpace: [PeerListState.InputActivities.Activity]] = [:]
+            if index % 2 == 0 {
+                activities[space(Int64(100 + index))] = [typing(Int64(100 + index), by: 7)]
+            }
+            activities[space(1, .voiceChat)] = index % 3 == 0 ? [typing(1, by: 8)] : nil
+            if feed.update(.init(activities: activities)) {
+                rebuilds += 1
+            }
+        }
+        XCTAssertEqual(rebuilds, 0)
+        XCTAssertTrue(feed.update(.init(activities: [space(2): [typing(2, by: 9)]])))
+        XCTAssertEqual(feed.activities(loading: loaded).activities[space(2)], [typing(2, by: 9)])
+        XCTAssertFalse(feed.update(.init(activities: [space(2): [typing(2, by: 9)]])))
+        XCTAssertTrue(feed.update(.init(activities: [:])))
+    }
+
+    func testAChatPagedInWhileSomeoneTypesShowsTheActivity() {
+        let feed = ChatListActivityFeed()
+        _ = feed.update(.init(activities: [:]))
+        _ = feed.activities(loading: [space(1)])
+        XCTAssertFalse(feed.update(.init(activities: [space(50): [typing(50, by: 3)]])))
+        XCTAssertEqual(feed.activities(loading: [space(1), space(50)]).activities[space(50)], [typing(50, by: 3)])
+        XCTAssertTrue(feed.update(.init(activities: [:])))
     }
 }
