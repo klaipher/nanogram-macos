@@ -37,11 +37,7 @@ class UNUserNotifications : NSObject {
     }
     static var _current:UNUserNotifications?
     static func initialize(manager: SharedNotificationManager) {
-        if #available(macOS 10.14, *) {
-            _current = UNUserNotificationsNew(manager: manager)
-        } else {
-            _current = UNUserNotificationsOld(manager: manager)
-        }
+        _current = UNUserNotificationsNew(manager: manager)
     }
     static var current:UNUserNotifications? {
         return _current
@@ -56,16 +52,11 @@ class UNUserNotifications : NSObject {
     
     static var authorizationStatus: Signal<AuthorizationStatus, NoError> {
         return Signal { subscriber in
-            if #available(macOS 10.14, *) {
-                UNUserNotificationCenter.current().getNotificationSettings { settings in
-                    if let value = AuthorizationStatus(rawValue: settings.authorizationStatus.rawValue) {
-                        subscriber.putNext(value)
-                        subscriber.putCompletion()
-                    }
+            UNUserNotificationCenter.current().getNotificationSettings { settings in
+                if let value = AuthorizationStatus(rawValue: settings.authorizationStatus.rawValue) {
+                    subscriber.putNext(value)
+                    subscriber.putCompletion()
                 }
-            } else {
-                subscriber.putNext(.authorized)
-                subscriber.putCompletion()
             }
             return EmptyDisposable
         }
@@ -149,94 +140,6 @@ class UNUserNotifications : NSObject {
 }
 
 
-final class UNUserNotificationsOld : UNUserNotifications, NSUserNotificationCenterDelegate {
-    func userNotificationCenter(_ center: NSUserNotificationCenter, didDeliver notification: NSUserNotification) {
-        
-        let window: Window?
-        if let accountId = notification.userInfo?["accountId"] as? Int64 {
-            let accountId = AccountRecordId(rawValue: accountId)
-            window = manager.find(accountId)?.window
-        } else {
-            window = manager.find(nil)?.window
-        }
-        guard let window = window else {
-            return
-        }
-        if manager.requestUserAttention && !window.isKeyWindow {
-            NSApp.requestUserAttention(.informationalRequest)
-        }
-        if let soundName = notification.soundName {
-            if soundName != "default" {
-                appDelegate?.playSound(soundName)
-                notification.soundName = nil
-            }
-        }
-    }
-    
-    required init(manager: SharedNotificationManager) {
-        super.init(manager: manager)
-        NSUserNotificationCenter.default.delegate = self
-    }
-    
-    
-
-    @objc func userNotificationCenter(_ center: NSUserNotificationCenter, didDismissAlert notification: NSUserNotification) {
-        if let userInfo = notification.userInfo, let timestamp = userInfo["timestamp"] as? Int32, let _ = userInfo["accountId"] as? Int64, let messageId = getNotificationMessageId(userInfo: userInfo, for: "reply") {
-            
-            bindings.applyMaxReadIndexInteractively(MessageIndex(id: messageId, timestamp: timestamp))
-        }
-    }
-    
-    func userNotificationCenter(_ center: NSUserNotificationCenter, didActivate notification: NSUserNotification) {
-        center.removeDeliveredNotification(notification)
-    }
-    override func authorize(completion:@escaping(UNUserNotifications)->Void) {
-        completion(self)
-    }
-    
-    override func clearNotifies(_ peerId:PeerId, maxId:MessageId) {
-        queue.async {
-            
-           let deliveredNotifications = NSUserNotificationCenter.default.deliveredNotifications
-                        
-            for notification in deliveredNotifications {
-                if let notificationMessageId = getNotificationMessageId(userInfo: notification.userInfo ?? [:], for: "reply") {
-                                   
-                    let timestamp = notification.userInfo?["timestamp"] as? Int32 ?? 0
-                    
-                    if notificationMessageId.peerId == peerId, notificationMessageId <= maxId {
-                        NSUserNotificationCenter.default.removeDeliveredNotification(notification)
-                    } else if timestamp == 0 || timestamp + 24 * 60 * 60 < Int32(Date().timeIntervalSince1970) {
-                        NSUserNotificationCenter.default.removeDeliveredNotification(notification)
-                    }
-                }
-            }
-        }
-    }
-
-
-    override func clearNotifies(by msgIds: [MessageId]) {
-        queue.async {
-            let deliveredNotifications = NSUserNotificationCenter.default.deliveredNotifications
-            
-            for notification in deliveredNotifications {
-                if let notificationMessageId = getNotificationMessageId(userInfo: notification.userInfo ?? [:], for: "reply") {
-                    for msgId in msgIds {
-                        if notificationMessageId == msgId {
-                            NSUserNotificationCenter.default.removeDeliveredNotification(notification)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    override func add(_ notification: NSUserNotification) -> Void {
-        NSUserNotificationCenter.default.deliver(notification)
-    }
-}
-    
-@available(macOS 10.14, *)
 final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCenterDelegate {
     
     private var soundSettings: UNNotificationSetting? = nil
@@ -327,7 +230,7 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
         }
         
         var finalContent: UNNotificationContent = content
-        if #available(macOS 12.0, *), let info = CommunicationNotificationInfo(userInfo: content.userInfo, avatarPNG: avatarPNG) {
+        if let info = CommunicationNotificationInfo(userInfo: content.userInfo, avatarPNG: avatarPNG) {
             finalContent = CommunicationNotifications.apply(info, to: content)
         }
 
@@ -380,7 +283,6 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
 
 
 
-@available(macOS 10.14, *)
 private extension UNNotificationAttachment {
 
     static func create(identifier: String, png: Data) -> UNNotificationAttachment? {
@@ -401,7 +303,6 @@ private extension NSImage {
 }
 
 
-@available(macOS 10.14, *)
 private extension UNNotification {
     static let replyCategory: String = "reply"
 }
