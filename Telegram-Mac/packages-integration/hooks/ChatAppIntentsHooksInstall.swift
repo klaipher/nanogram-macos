@@ -177,78 +177,94 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
     }
 }
 
-final class ChatFocusFolderMembership {
-    static let shared = ChatFocusFolderMembership()
+final class AppChatFocusFolders {
+    static let shared = AppChatFocusFolders()
 
-    private let lock = NSLock()
-    private var filters: [Int64: [ChatListFilter]] = [:]
-    private var refreshed: [Int64: Double] = [:]
+    private(set) var membership: ChatFocusFolderMembership!
     private let disposables = DisposableDict<Int64>()
 
-    private func refreshIfNeeded(_ account: Account) {
-        let accountId = account.id.int64
-        let now = CFAbsoluteTimeGetCurrent()
-        self.lock.lock()
-        let last = self.refreshed[accountId]
-        if let last = last, now - last < 60 {
-            self.lock.unlock()
+    private init() {
+        self.membership = ChatFocusFolderMembership(store: ChatFocusFilterStore.shared, requestFolders: { accountId in
+            DispatchQueue.main.async {
+                AppChatFocusFolders.shared.subscribe(accountId)
+            }
+        })
+    }
+
+    private func subscribe(_ accountId: Int64) {
+        guard let context = accountContext(accountId) else {
+            self.membership.clearFolders(accountId: accountId)
             return
         }
-        self.refreshed[accountId] = now
-        self.lock.unlock()
-        self.disposables.set((TelegramEngine(account: account).peers.currentChatListFilters() |> take(1)).start(next: { [weak self] filters in
-            guard let self = self else {
-                return
-            }
-            self.lock.lock()
-            self.filters[accountId] = filters
-            self.lock.unlock()
+        self.disposables.set(context.engine.peers.updatedChatListFilters().start(next: { [weak self] filters in
+            self?.membership.setFolders(filters.compactMap(AppChatFocusFolders.rules), accountId: accountId)
         }), forKey: accountId)
     }
 
-    func allows(account: Account, peer: Peer?, peerId: PeerId) -> Bool {
-        let accountId = account.id.int64
-        let store = ChatFocusFilterStore.shared
-        guard store.needsFolderMembership(accountId: accountId) else {
-            return store.allows(accountId: accountId, peerId: peerId.toInt64(), folderIds: Set())
+    private static func rules(_ filter: ChatListFilter) -> ChatFocusFolderRules? {
+        guard case let .filter(id, _, _, data) = filter else {
+            return nil
         }
-        self.refreshIfNeeded(account)
-        self.lock.lock()
-        let filters = self.filters[accountId] ?? []
-        self.lock.unlock()
-        var folderIds = Set<Int32>()
-        for filter in filters {
-            if case let .filter(id, _, _, data) = filter, ChatFocusFolderMembership.folder(data, contains: peer, peerId: peerId) {
-                folderIds.insert(id)
-            }
+        var categories: ChatFocusFolderCategories = []
+        if data.categories.contains(.contacts) {
+            categories.insert(.contacts)
         }
-        return store.allows(accountId: accountId, peerId: peerId.toInt64(), folderIds: folderIds)
+        if data.categories.contains(.nonContacts) {
+            categories.insert(.nonContacts)
+        }
+        if data.categories.contains(.groups) {
+            categories.insert(.groups)
+        }
+        if data.categories.contains(.channels) {
+            categories.insert(.channels)
+        }
+        if data.categories.contains(.bots) {
+            categories.insert(.bots)
+        }
+        return ChatFocusFolderRules(id: id, includePeerIds: Set(data.includePeers.peers.map { $0.toInt64() }), excludePeerIds: Set(data.excludePeers.map { $0.toInt64() }), categories: categories, excludeMuted: data.excludeMuted, excludeRead: data.excludeRead, excludeArchived: data.excludeArchived)
     }
 
-    private static func folder(_ data: ChatListFilterData, contains peer: Peer?, peerId: PeerId) -> Bool {
-        if data.excludePeers.contains(peerId) {
-            return false
+    func needsChatDetails(accountId: Int64) -> Bool {
+        return self.membership.needsChatDetails(accountId: accountId)
+    }
+
+    static func chat(transaction: Transaction, peerId: PeerId, isMuted: Bool, hasUnseenMention: Bool) -> ChatFocusChat {
+        var peerIds: [Int64] = [peerId.toInt64()]
+        var peer = transaction.getPeer(peerId)
+        if let secretChat = peer as? TelegramSecretChat {
+            peerIds.append(secretChat.regularPeerId.toInt64())
+            peer = transaction.getPeer(secretChat.regularPeerId)
         }
-        if data.includePeers.peers.contains(peerId) {
-            return true
-        }
-        guard let peer = peer else {
-            return false
-        }
+        let kind: ChatFocusChat.Kind
         if let user = peer as? TelegramUser {
             if user.botInfo != nil {
-                return data.categories.contains(.bots)
+                kind = .bot
+            } else {
+                kind = .user(isContact: transaction.isPeerContact(peerId: user.id))
             }
-            return data.categories.contains(.contacts) || data.categories.contains(.nonContacts)
         } else if let channel = peer as? TelegramChannel {
             if case .broadcast = channel.info {
-                return data.categories.contains(.channels)
+                kind = .channel
+            } else {
+                kind = .group
             }
-            return data.categories.contains(.groups)
-        } else if peer is TelegramGroup {
-            return data.categories.contains(.groups)
+        } else if peer is TelegramCommunity {
+            kind = .community([.groups, .channels])
+        } else {
+            kind = .group
         }
-        return false
+        let isArchived = transaction.getPeerChatListIndex(peerId)?.0 == Namespaces.PeerGroup.archive
+        return ChatFocusChat(peerIds: peerIds, kind: kind, isMuted: isMuted, hasUnseenMention: hasUnseenMention, isUnread: true, isArchived: isArchived)
+    }
+
+    func allows(accountId: Int64, chat: ChatFocusChat?, peerId: PeerId) -> Bool {
+        if let chat = chat {
+            return self.membership.allows(accountId: accountId, chat: chat)
+        }
+        if self.needsChatDetails(accountId: accountId) {
+            return true
+        }
+        return self.membership.allows(accountId: accountId, chat: ChatFocusChat(peerIds: [peerId.toInt64()], kind: .group, isMuted: false, hasUnseenMention: false, isUnread: true, isArchived: false))
     }
 }
 
@@ -256,4 +272,5 @@ private let appChatIntentsDataSource = AppChatIntentsDataSource()
 
 func installChatAppIntentsHooks() {
     ChatIntentsBridge.dataSource = appChatIntentsDataSource
+    _ = AppChatFocusFolders.shared
 }

@@ -208,6 +208,7 @@ public struct ChatFocusFilter: Codable, Equatable {
 
 public final class ChatFocusFilterStore {
     public static let shared = ChatFocusFilterStore(defaults: .standard)
+    public static let didChangeNotification = Notification.Name("ChatFocusFilterStoreDidChange")
     private static let key = "nanogram.focusFilter"
 
     private let defaults: UserDefaults
@@ -238,6 +239,7 @@ public final class ChatFocusFilterStore {
         } else if let data = try? JSONEncoder().encode(filter) {
             self.defaults.set(data, forKey: ChatFocusFilterStore.key)
         }
+        NotificationCenter.default.post(name: ChatFocusFilterStore.didChangeNotification, object: self)
     }
 
     public func needsFolderMembership(accountId: Int64) -> Bool {
