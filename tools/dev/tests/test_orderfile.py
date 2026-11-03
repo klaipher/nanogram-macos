@@ -1,5 +1,7 @@
 import importlib.util
 import os
+import plistlib
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -38,6 +40,13 @@ class OrderFileTests(unittest.TestCase):
         self.assertEqual(mapping['Foo()'], ['_$sFoo'])
         self.assertEqual(mapping['Foo.full()'], ['_$sFoo'])
         self.assertEqual(mapping['$sFoo'], ['_$sFoo'])
+
+    def test_executable_name_comes_from_the_app_info_plist(self):
+        with tempfile.TemporaryDirectory() as app:
+            os.makedirs(os.path.join(app, 'Contents'))
+            with open(os.path.join(app, 'Contents', 'Info.plist'), 'wb') as f:
+                plistlib.dump({'CFBundleExecutable': 'Nanogram'}, f)
+            self.assertEqual(orderfile.executable_name_of(app), 'Nanogram')
 
 
 if __name__ == '__main__':

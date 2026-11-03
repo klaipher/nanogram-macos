@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate a launch order file for the Telegram for macOS executable.
+"""Generate a launch order file for the Nanogram for macOS executable.
 
 Usage (build the app first; the login screen is enough, no account is needed):
-    python3 tools/dev/orderfile.py --app <path/to/Telegram.app> [--runs 3] [--out Telegram-Mac/OrderFiles/Telegram.order]
+    python3 tools/dev/orderfile.py --app <path/to/Nanogram.app> [--runs 3] [--out Telegram-Mac/OrderFiles/Telegram.order]
 
 What it does:
 1. Records --runs launches with the Instruments "App Launch" template (xctrace, 1 ms samples).
@@ -21,6 +21,7 @@ start of __TEXT,__text.
 import argparse
 import collections
 import os
+import plistlib
 import subprocess
 import sys
 import tempfile
@@ -29,6 +30,11 @@ import xml.etree.ElementTree as ET
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_OUT = os.path.join(ROOT, 'Telegram-Mac', 'OrderFiles', 'Telegram.order')
 MAX_CANDIDATES = 4
+
+
+def executable_name_of(app):
+    with open(os.path.join(app, 'Contents', 'Info.plist'), 'rb') as f:
+        return plistlib.load(f)['CFBundleExecutable']
 
 
 def run(args, **kwargs):
@@ -117,13 +123,13 @@ def record_launch(executable, trace_path, xml_path, seconds):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--app', required=True, help='path to Telegram.app')
+    parser.add_argument('--app', required=True, help='path to Nanogram.app')
     parser.add_argument('--runs', type=int, default=3)
     parser.add_argument('--seconds', type=int, default=8)
     parser.add_argument('--out', default=DEFAULT_OUT)
     args = parser.parse_args()
 
-    executable_name = 'Telegram'
+    executable_name = executable_name_of(args.app)
     executable = os.path.join(args.app, 'Contents', 'MacOS', executable_name)
     if not os.path.exists(executable):
         sys.exit(f'{executable} does not exist')
