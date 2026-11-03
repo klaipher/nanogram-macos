@@ -92,6 +92,11 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn("cpu_family = 'aarch64'", cross)
         self.assertIn("cpu = 'aarch64'", cross)
 
+    def test_sqlcipher(self):
+        sources = TG_IOS / "submodules" / "sqlcipher"
+        self.assertIn('#define SQLITE_VERSION        "3.54.1"', read(sources / "PublicHeaders" / "sqlcipher" / "sqlite3.h"))
+        self.assertIn("#define CIPHER_VERSION_NUMBER 4.20.0", read(sources / "Sources" / "sqlite3.c"))
+
 
 if __name__ == "__main__":
     unittest.main()
