@@ -1152,3 +1152,93 @@ Merged from two reviewers (libraries and database).
   `SQLITE_TRANSIENT` vs `SQLITE_STATIC` binds; `SQLITE_DQS=0`; busy-timeout contention between the app and
   TelegramShare; the stale-partial sweep and keeping MediaBoxFileMap's meta file open (iOS `2398d68d`, lower value
   after M28); the AccountManager database in detail.
+
+## Implementation status
+
+Integration of round 2 on `nanogram/integration` (2026-11-03, at 1f6a0a0f; core `mac/core` 34c2fed08a on top of
+9f63c699; tgcalls a598e27, local `nanogram-mac` fast-forwarded to it). Ledger:
+`.superpowers/sdd/final/progress.md`.
+
+- **Builds** (all under `buildlock`):
+  - clean Debug, MAS edition: 371 s, buildcheck and editions ok;
+  - clean Debug, direct edition (`tg warnings`): 330 s, buildcheck and editions ok;
+  - `tg build --release` (direct): 939 s, buildcheck ok (Release settings), editions ok.
+- **Warnings.** The clean direct build has 19,294 upstream warnings in 159 packages, 540 of them deprecations.
+  - Today's round-2 work had added 5 warnings. Integration fixed 3: R2-23's `EditVideoStill` and R2-40's
+    Debug switch (core 34c2fed08a).
+  - The other 2 are ruled as baseline: R2-34's StorageBox is the iOS file verbatim, and R2-26's `FFMpegCodecIdAV1`
+    follows the FFMpegBinding pattern that upstream uses at 9 other sites.
+  - The rest of the increase is round-1 code that the baseline never counted (see 1f6a0a0f).
+  - `nanogram/deprecations-baseline.json` now exists, so R2-24's deprecation gate is active.
+  - The `"MtProtoKit": 0` entry is gone, and `tools/dev/tests/run.sh` passes.
+- **Launch.** The Debug direct build ran isolated from the launch home for 70 s: no crash report (4 before, 4 after),
+  5 windows, about 2% CPU at 30 s and at 65 s, 237 MB RSS.
+
+- **Tests.**
+  - Tooling (`tools/dev/tests/run.sh`): 323, with 2 skipped and none failing once the baseline was rewritten.
+  - Package suites touched today pass: NanogramKit 27, ChatAppIntents 17, LocalAudioTranscription 11 (1 skipped),
+    NanogramDebug 11, VP9Hardware 9, VoiceRecorderInput 9, TGGifConverter 3, Translate 28, TGVideoCameraMovie 16,
+    NanogramRuntime 65, ImageCanvasUI 5.
+  - Core classes touched today pass: Postbox 117 (Coding, RecentFileTouches, SqliteValueBox*, StorageBox*,
+    TimeBasedCleanup*) and MediaPlayer 35 (FFMpeg*, SoftwareVideo*, ChunkMediaPlayer*).
+  - These failures do not come from round 2:
+    - **TGUIKit** (635 tests, 7 failures):
+      - DateExtractionTests, upstream: the NSDataDetector locale results changed.
+      - AppMenuScreenPositionTests: depends on screen geometry.
+      - DisplayLinkRateTests: a timing test that got 19 ticks/s against 25 ± 3 at load ~30.
+    - **PrivateCallScreen**: `swift test` copies `Assets.xcassets` without compiling it, so tests that load images
+      trap. Without those classes the other suites pass (23 + 11).
+    - **ChatUITests** (xcodebuild, 168 tests): 3 SubmoduleCompatibility tests regex-match iOS TelegramUI sources
+      that stage 1's core pin already changed; those files are unchanged today.
+    - **ChatListUITests** (xcodebuild, 132 tests): ChatListStateProjectionTests (R2-7) pass. Two
+      FloatingTabBarIntegrationTests failed in both runs, and both wait for Lottie frames. The display was asleep and
+      the screen locked (`CGDisplayIsAsleep` = 1), so no display-link frames arrived; DisplayLinkRateTests skipped in
+      the same state. Re-check with the display awake.
+  - SettingsUIAccountResetTests pass 16/16 through their own xcodebuild runner. Plain `swift test` cannot link them
+    without the native libraries.
+
+| Spec | Group | Status | Commits | Tests |
+|---|---|---|---|---|
+| R2-1 | perf | done | 564afadc, e180fb3d | TGUIKit VisibilityGatedSignalTests |
+| R2-2 | perf | done | b9823a2b | NanogramRuntime PasslockScheduleTests, presence sleep/lock |
+| R2-3 | perf | done | 1dbe5649 | TGUIKit PlaybackVisibilityTests, AnimatableContentObserverTests |
+| R2-4 | perf | done | 4ddcfe6a | TGUIKit ScreenSleepAssertionTests |
+| R2-5 | perf | dropped (deferred) | — | needs a playback harness with real media; R2-3 already stops the player while nothing can see it |
+| R2-6 | perf | done | a395cd55 | LottieCacheLab ChunkMediaPlayerTickTests |
+| R2-7 | perf | done | 5d51bc60 | ChatListUITests ChatListStateProjectionTests (xcodebuild test) |
+| R2-8 | perf | done | 227e2822 | not feasible (app target, AccountContext) |
+| R2-9 | perf | done | 8368b117 | NanogramRuntime SecondTickTests, AutoNightBoundaryScheduleTests |
+| R2-10 | perf | done | b7d4a30c | not feasible (`Network` is final; TelegramContext has no test target) |
+| R2-11 | perf | done | c8b1217a | not feasible (launch code) |
+| R2-12 | perf | done | a5cf5e12 | not feasible (ChatExportUI has no test target) |
+| R2-13 | perf | done | 0fc5915d, 7bbbbcbb | test_release.py; size gain not measured |
+| R2-14 | modern | done | aa2f8a48 | not feasible (package needs TelegramCore); Debug build |
+| R2-15 | modern | done | cf6564b9 | Debug build (dead-code removal) |
+| R2-16 | modern | done | 3b62caf2 | TGUIKit display-link suites |
+| R2-17 | modern | partial | c0ab3100, 5039642a, 7fec9f07 | test_fork_packages.py; NanogramRuntime Swift 6 migration still to do |
+| R2-18 | modern | done | c0ab3100 | ChatAppIntentsTests (red → green) |
+| R2-19 | modern | partial | fbcf564e | TGGifConverterTests; real-time encoder mode kept (offline measured 2–3× slower) |
+| R2-20 | modern | done | cb16b9f3 | NanogramRuntime PlistCacheFileTests, TGUIKit WindowSaverTests |
+| R2-21 | modern | done | ba583d5a | not feasible (visual); fade over Metal/video layers not yet watched |
+| R2-22 | modern | done | 92019618 | TGUIKit TransactionHandlerTests; `ocr_nn.bin` absent from the app |
+| R2-23 | modern | done | 81a7044a, integration 6c189bbd | ImageCanvasUITests EditVideoStillTests |
+| R2-24 | modern | partial | 02d835c1, integration (baselines) | test_warnings.py; deprecation baseline written by integration; renderer move left with R2-5 |
+| R2-25 | libs | done | — (merge already carried the patch) | FFMpegVideoToolboxAttachmentTests, FFMpegFileReaderPixelBufferReuseTests, FFMpegHardwareFallbackTests |
+| R2-26 | libs | partial | core 3afbf70868 | FFMpegSoftwareDecodeThreadsTests; AV1 ≥ 720p only, no AV1 benchmark |
+| R2-27 | libs | done | 8559624b | test_frameworks NativeBuildFlagTests |
+| R2-28 | libs | partial | 8559624b | test_frameworks; tg_owt stays at 14.0, OpenSSL not vendored |
+| R2-29 | libs | done | tgcalls a598e27 (pin 6e528e30) | tgcalls tests/group_audio; not checked in a real call |
+| R2-30 | libs | done | tgcalls 013adcb (pin 6e528e30) | tgcalls tests/log_sink |
+| R2-31 | libs | done | 8559624b | test_frameworks |
+| R2-32 | libs | done | ecb53118 | NanogramKit UpdateCheckScheduleTests |
+| R2-33 | libs | dropped | — | not cheap (LLVM tools, render harness, stored profile, benchmark) |
+| R2-34 | db | done | core c7ee3cdd1f | StorageBoxRegistrationTests, StorageBoxBatchedUpdateTests, StorageBoxPeerStatsTests |
+| R2-35 | db | done | core a9fb33a8e5, fb193d21 | FFMpegFileReaderCompleteResourceTests; TelegramMedia lookahead: Debug build only |
+| R2-36 | db | done | core 0ad7bb0efa | RecentFileTouchesTests, TimeBasedCleanupTests |
+| R2-37 | db | done | core ab56b607a5, 37e831b4 | CacheMaintenanceSchedulerTests; AppDelegate wiring not unit-testable |
+| R2-38 | db | done | core b505651341, ab56b607a5, 37e831b4 | SqliteValueBoxVacuumTests (unencrypted box, as on iOS) |
+| R2-39 | db | done | core b505651341 | SqliteValueBoxConnectionTests (FTS self-heal) |
+| R2-40 | db | done | core ce0886d4b5, integration core 34c2fed08a | mutex-mode and Debug-switch tests, TSan suite; no speed gain claimed |
+| R2-41 | db | done | core fafef7d68c | PostboxCodingKeyAndStringTests |
+| R2-42 | db | done | core b505651341 | SqliteValueBoxConnectionTests (exists on all table kinds) |
+| R2-43 | db | partial | core b505651341 | testCacheSizeIsOnlyChangedWhenAsked; main-app page cache not measured |
