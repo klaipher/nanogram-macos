@@ -371,7 +371,7 @@ private final class CallVideoLabSession {
     }
 
     private func captureWindow(_ window: Window, name: String) {
-        guard let image = CGWindowListCreateImage(.null, .optionIncludingWindow, CGWindowID(window.windowNumber), [.boundsIgnoreFraming, .bestResolution]) else {
+        guard let image = windowListCreateImage(CGWindowID(window.windowNumber)) else {
             NSLog("CallVideoLab: window capture failed")
             return
         }
@@ -394,4 +394,14 @@ private final class CallVideoLabSession {
         NSLog("CallVideoLab: captured %@", url.path)
     }
 }
+
+private func windowListCreateImage(_ windowID: CGWindowID) -> CGImage? {
+    guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else {
+        return nil
+    }
+    typealias Fn = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+    let create = unsafeBitCast(symbol, to: Fn.self)
+    return create(.null, CGWindowListOption.optionIncludingWindow.rawValue, windowID, CGWindowImageOption([.boundsIgnoreFraming, .bestResolution]).rawValue)?.takeRetainedValue()
+}
+
 #endif
