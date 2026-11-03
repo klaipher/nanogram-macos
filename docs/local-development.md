@@ -2,6 +2,22 @@
 
 Everything goes through `tools/dev/tg`. Run `tools/dev/tg help` for the command list.
 
+| Command | Does |
+|---|---|
+| `tg setup`, `tg doctor` | submodules, Rust toolchain, native libraries; check prerequisites |
+| `tg frameworks [--verify-only]` | build the native libraries, arm64 only |
+| `tg credentials` | write `NanogramSecrets.swift` from `~/.config/telegram-ios/api-credentials.json` |
+| `tg build [--release] [--clean] [--edition mas\|direct]`, `tg run` | build (and launch) the app; every build runs the checks below |
+| `tg xcode [mas\|direct]` | open the workspace in Xcode with our settings |
+| `tg test`, `tg lint`, `tg warnings [--update]`, `tg check` | package tests, crash-risk lint, warning baseline, the pre-push gate |
+| `tg sync-upstream` | merge upstream telegram-macos (see Keeping up with upstream) |
+| `tg sparkle-key [sign <archive>]` | the direct edition's EdDSA update key |
+| `tg testflight [--export-only]` | archive, export and upload the App Store edition |
+| `tg release-direct [--allow-dirty]` | notarized dmg, appcast and source archive for the direct edition |
+
+The settings live in our own files (`nanogram/`, `tools/dev/`, `packages/Nanogram*`); upstream's project files
+and manifests change only by small, marked hook lines.
+
 ## Prerequisites
 
 - Apple Silicon Mac, macOS 15 or newer, **Xcode 27.x** selected (`xcode-select -p`) with the Metal toolchain
@@ -43,7 +59,7 @@ It opens the workspace with `XCODE_XCCONFIG_FILE` pointing at the edition xcconf
 
 ## Strictness, lint and `tg check`
 
-Our packages (`packages/Nanogram*`) build in Swift 6 mode with warnings as errors. Upstream code gets the same
+Strictness follows option A of the stage 1 design: strict for our code, a ratchet for upstream's. Our packages (`packages/Nanogram*`) build in Swift 6 mode with warnings as errors. Upstream code gets the same
 data-race checks as warnings (`-strict-concurrency=complete` in `nanogram/Nanogram.xcconfig`); TelegramCore's
 manifest adds `-warnings-as-errors`, so there `-no-warnings-as-errors` keeps them warnings (Swift has no umbrella
 diagnostic group to pass to `-Wwarning`).
@@ -68,6 +84,8 @@ python3 tools/dev/lint/tglint.py install-hook   # pre-push hook: lint the pushed
 - `tg check` and `tg test` look at the changes since the merge-base with the branch's upstream (or
   `origin/<branch>`); pass `--base REV` to choose. Every step runs and the failures are listed at the end.
   The pre-push hook skips once with `git push --no-verify`; `TG_PRE_PUSH_CHECK=0` lints only.
+- The hook is not installed for you: the owner runs `python3 tools/dev/lint/tglint.py install-hook` once per
+  clone (`--uninstall` removes it).
 
 ## Identity, credentials and editions
 
@@ -137,20 +155,27 @@ app that ships a `.metal` file.
 
 ## Sparkle (direct edition)
 
-The direct edition updates from `https://github.com/klaipher/nanogram-releases/releases/latest/download/appcast.xml`
+The direct edition updates with Sparkle 2.10.1 (`submodules/Sparkle` = sparkle-project/Sparkle `ab7d7129`, built
+from source by the workspace) from `https://github.com/klaipher/nanogram-releases/releases/latest/download/appcast.xml`
 (`SFEED_URL` in `nanogram/editions/direct.xcconfig`), with EdDSA signatures only: Info.plist `SUPublicEDKey` comes
-from `SPARKLE_ED_PUBLIC_KEY` in the same file, and there is no DSA key. We stay on upstream's Sparkle 1.21 (it
-checks EdDSA for `.zip` app updates; installer packages would need DSA): Sparkle 2 would rewrite upstream's
-updater file. Nothing is published from here; the owner publishes releases and the appcast.
+from `SPARKLE_ED_PUBLIC_KEY` in the same file, and there is no DSA key. The mas edition has no Sparkle at all.
 
+- Upstream's `AppUpdateViewController.swift` drives Sparkle 1's private driver classes, which Sparkle 2 removed, so
+  it is compiled out under `NANOGRAM`. `Telegram-Mac/updater/NanogramUpdater.swift` gives the app the same API on
+  an `SPUUpdater` with its own user driver: the update button, the settings row, the update screen and crash
+  recovery work unchanged; updates are checked hourly and downloaded automatically, "Update" installs and
+  relaunches, quitting with a ready update installs it. NanogramKit's `UpdateFlow` folds Sparkle's callbacks into
+  one state (tested).
+- `direct.xcconfig` does not build Sparkle's legacy `SUUpdater` (MainMenu.xib instantiates it and would start a
+  second updater with the standard UI), legacy DSA support, or the installer and downloader XPC services (for
+  sandboxed apps only).
 - `tools/dev/tg sparkle-key` creates the private key once at `~/.config/nanogram-macos/sparkle_ed25519` (folder
-  0700, file 0600: a base64 32-byte RFC 8032 seed, the format Sparkle 2's `sign_update --ed-key-file` reads) and
-  prints the public key. It never overwrites an existing key and never prints the private one. Back the key up
-  outside this Mac: losing it means installed copies reject every later update.
+  0700, file 0600: a base64 32-byte RFC 8032 seed, the format `sign_update --ed-key-file` reads) and prints the
+  public key. It never overwrites an existing key and never prints the private one. Back the key up outside this
+  Mac: losing it means installed copies reject every later update.
 - `tools/dev/tg sparkle-key sign <archive>` prints the appcast enclosure attributes
-  (`sparkle:edSignature="…" length="…"`). Sparkle 1.21's own `generate_keys`/`sign_update` keep the key in the
-  login Keychain only, so `tools/dev/nanogram/sparkle.py` builds a small helper from Sparkle's vendored ed25519
-  code into `~/.cache/nanogram-macos/sparkle-ed25519/`; the key reaches it on stdin only.
+  (`sparkle:edSignature="…" length="…"`). `tools/dev/nanogram/sparkle.py` builds a small helper from Sparkle's
+  vendored ed25519 code into `~/.cache/nanogram-macos/sparkle-ed25519/`; the key reaches it on stdin only.
 - `tg build` fails a direct app without our feed or a valid `SUPublicEDKey`, and a mas app with any feed.
 
 Xcode can reuse a cached build description without re-reading an edition xcconfig (seen here: build mas, edit
@@ -178,13 +203,19 @@ Xcode's automatic signing through the App Store Connect API key (`~/.config/tele
 - `tg testflight [--export-only]`: mas edition, signed with the distribution entitlements (Maps and Communication Notifications included) and the App
   Store profile, exported as a signed `.pkg`, uploaded with `xcrun altool` (xcodebuild's own upload refuses the API
   key). Before building, it checks (read-only) that the App Store Connect app has the macOS platform and stops with
-  one line if not. `--export-only` signs and stops.
+  one line if not. `--export-only` signs and stops. The export asks App Store Connect for the next build number
+  and has once hung there for 14 minutes; it now stops after 600 s with a "run it again" line, and the retry of the
+  same archive usually finishes in about a minute.
 - `tg release-direct [--allow-dirty]`: direct edition, exported with Developer ID, notarized (`notarytool`) and
-  stapled, put in an APFS ULFO `.dmg` that is notarized and stapled too, signed for Sparkle (`appcast.xml`, one item,
+  stapled, put in an APFS ULFO `.dmg` that is signed with the same Developer ID (Gatekeeper checks the disk
+  image's own signature), notarized and stapled too, signed for Sparkle (`appcast.xml`, one item,
   enclosure `…/releases/download/v<version>-<build>/Nanogram-<version>-<build>.dmg`), plus
   `Nanogram-<version>-<build>-source.tar.gz` (`git archive` of the superproject and every submodule). It refuses
   uncommitted tracked changes, so the source archive matches the binary. Nothing is uploaded: the owner creates
-  the GitHub release in `klaipher/nanogram-releases` with the dmg, `appcast.xml` and the source archive.
+  the GitHub release in `klaipher/nanogram-releases` with the dmg, `appcast.xml` and the source archive. When
+  `notarytool`'s polling times out after Apple has the upload, it waits on that submission id instead of failing.
+  Check a dmg with `xcrun stapler validate <dmg>` and
+  `spctl -a -t open --context context:primary-signature -vv <dmg>` ("accepted", "Notarized Developer ID").
 
 ## Native libraries
 
@@ -236,6 +267,17 @@ manual workaround; the arm64 run built every library on the first try (webrtc af
 `upstream` holds Telegram's real history (`telegram/master`, no snapshot commits), so our merges have proper
 bases and a generic fix can go upstream as a pull request. Only upstream's commits ever land on `upstream`.
 
+Owner rule: we sync only code Telegram has released.
+
+- macOS: telegram-macos has no release tags, so take upstream only up to a commit that bumps the shipped build
+  number (`CFBundleVersion` in `Telegram-Mac/Info.plist`, upstream's "Bump the build number to <N>" or a release
+  merge such as `24295527 Merge branch 'release' into master (13.1)`). Commits after the last such bump wait for
+  the next one. `tg sync-upstream` fast-forwards to the tip of `telegram/master`, so when the tip is past the last
+  bump, run it with `--no-build`, then `git merge --abort` (or skip the command) and merge the bump commit by
+  hand: `git merge --no-ff <bump-commit>`.
+- iOS core (TelegramCore, Postbox and the rest in `submodules/telegram-ios`): only official `release-*` tags of
+  Telegram-iOS, imported as snapshots (see The shared Telegram core below).
+
 ```sh
 tools/dev/tg sync-upstream             # on main, with a clean working tree
 tools/dev/tg sync-upstream --no-build  # fetch and merge only
@@ -252,9 +294,10 @@ What it does (`tools/dev/nanogram/sync.py`, then `tools/dev/tg`):
 3. On conflicts nothing is resolved or committed: the merge stays in progress, the conflicted paths are listed
    and the exit status is 1. Resolve, `git add`, `git commit`, then `tools/dev/tg sync-upstream --after-merge`;
    or `git merge --abort`. Our changes sit in our own files and small hook lines, so conflicts should be few.
-4. If upstream moved its `submodules/telegram-ios` pin, it prints the commands that rebase our `nanogram-mac`
-   branch of the telegram-ios fork onto the new pin (`git rebase --onto <new> <old> nanogram-mac`) and point the
-   superproject at it. That rebase is done by hand: its conflicts are TelegramCore code, not tooling.
+4. If upstream moved its `submodules/telegram-ios` pin, it says so and prints rebase commands for the old
+   `nanogram-mac` branch. Do not run them: the core now lives on the history-free `mac/core` branch, and a rebase
+   onto upstream's pin would pull Telegram's history into it. Update the core as described in The shared Telegram
+   core below, to the iOS release the new Mac pin belongs to.
 5. After a clean merge: `git submodule update --init --recursive`, the local submodule fixes (`localfixes.py`),
    `tg frameworks` (rebuilds only libraries whose stamp changed), `tg warnings --update` (a clean debug build with
    buildcheck and the edition checks; warnings that arrive with upstream code join
@@ -264,3 +307,60 @@ Rehearsed 2026-11-02 in a temporary clone: `telegram/master` had nothing new sin
 merge"); replaying our commits onto upstream's tip minus 5 and syncing merged those 5 real upstream commits
 (23 files) cleanly in about a second, and the result was byte-identical to `nanogram/stage1`; an edit on a line
 upstream changed stopped with that one path listed, `MERGE_HEAD` set and nothing committed.
+
+## The shared Telegram core
+
+`submodules/telegram-ios` is not Telegram-iOS: it comes from our iOS fork's repository,
+`https://github.com/klaipher/nanogram.git`, branch `mac/core` (`.gitmodules`). That repository holds no Telegram
+history: its `upstream` branch is one snapshot commit per official Telegram-iOS release (`b46f1ec6 Import upstream
+Telegram-iOS release-13.1.1`, then `0650eac5 … release-13.1.2`), each with `Upstream-Tag:` and `Upstream-Commit:`
+trailers. `mac/core` is our Mac core work (the Xcode 27 MetalEngine fix, FFmpeg, the runtime H-items, …) on top of
+the release-13.1.1 snapshot; the superproject pins `9f63c699`, whose tree equals the core the Mac merge built.
+
+Rules for the core checkout:
+
+- Commits go on the local branch `mac/core`, on top of the current pin. Never merge or rebase anything that carries
+  Telegram's history into it (no `Telegram-iOS` branches, no `fetch` of tags; fetch with `--no-tags`).
+- The checkout's push URL is set to `DISABLED` on purpose; the owner pushes `mac/core` to `klaipher/nanogram`.
+- After a core commit, point the superproject at it (`git add submodules/telegram-ios`) and commit there.
+
+Moving the core to a new Telegram-iOS release, without its history:
+
+1. In the iOS repository (`~/Projects/nanogram-ios`): `tools/dev/tg sync-upstream release-<X>`. It fetches only
+   that tag (`--depth 1 --no-tags`) and adds a snapshot commit with that tree to `upstream`, whose only parent is
+   the previous snapshot. The iOS fork merges it into its `main` as usual.
+2. In `submodules/telegram-ios`: fetch that `upstream` branch from `klaipher/nanogram` (`git fetch --no-tags
+   origin upstream`), check out `mac/core` and `git merge <snapshot commit>`. The merge brings only the snapshot
+   chain, so `mac/core` stays history-free. Resolve the conflicts in our core commits.
+3. Build and test the Mac app on it (`tg build`, `tg check`, `tg warnings --update` if upstream warnings moved),
+   then commit the new pin in the superproject.
+
+Upstream's Mac app pins a Telegram-iOS commit, not a tag. Move the core to the newest `release-*` tag that
+contains that pin (`git tag --contains <pin>` in a Telegram-iOS clone, or the first release after it), never to a
+commit past the newest tag.
+
+Other forks we pin: `submodules/tgcalls` = `klaipher/tgcalls` branch `nanogram-mac` (the iOS fork's tgcalls plus
+two Mac build commits), `submodules/rlottie` = `klaipher/rlottie` branch `nanogram-mac`. Run
+`git submodule sync --recursive` after `.gitmodules` URLs change; existing checkouts keep their old remotes until then.
+
+## Debug Settings and feature switches
+
+The app menu has **Nanogram → Debug Settings…** (`packages/NanogramDebug`, installed by `AppDelegate`). Signed in,
+it opens upstream's Developer screen, which gains a **Debug Switches…** row; signed out, or with Option held, it
+opens the switches window. Upstream's five-click gesture still works.
+
+Switches are `NanogramDebugOption`s registered in `NanogramDebugSettings.shared`, stored in the app's
+UserDefaults as `nanogram.debug.<id>`; an unset key means the default. Reset one or all from the window.
+
+| Switch (`id`) | Section | Default | Effect |
+|---|---|---|---|
+| `display.maxFrameRate` | Display | off | caps the shared display link that drives app animations at 60 or 30 Hz |
+| `media.jpegWideGamut` | Media | off | Display P3 photos are sent with their ICC profile instead of being flattened to sRGB |
+| `media.systemPictureInPicture` | Media | off | gallery videos use macOS picture-in-picture instead of Telegram's floating player (web and HLS videos keep Telegram's) |
+| `translation.onDeviceBeforeMacOS26` | Translation | off | on macOS 15–25, translate on device with Apple's Translation models; off uses Telegram's server. macOS 26+ always translates on device |
+| `voice.onDeviceTranscription` | Voice | **on** | non-Premium accounts transcribe voice messages with Apple's on-device speech recognition, labelled on-device; off uses Telegram's server (Premium or trial) |
+
+Add a switch by declaring a `static let debugOption = NanogramDebugOption.toggle(…)` (or `.choice`) next to the
+feature, registering it in `AppDelegate.installNanogramDebugMenu()`, and reading it through
+`NanogramDebugSettings.shared` (`bool`, `choice`, `observe` for live changes). Ship new behaviour behind a switch
+that defaults to off until it is proven on a real account.
