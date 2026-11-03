@@ -56,7 +56,7 @@ let package = Package(
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
             ],
             path: "Sources/ImageCanvasUI",
-            resources: [.copy("Resources/Assets.xcassets")]),
+            resources: [.process("Resources/Assets.xcassets")]),
         .testTarget(
             name: "ImageCanvasUITests",
             dependencies: [
