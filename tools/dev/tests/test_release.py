@@ -205,6 +205,93 @@ class BuildNumberStampTests(unittest.TestCase):
             self.assertEqual([c.args for c in resign.call_args_list], [(appex, None), (app, entitlements)])
 
 
+def fake_app(root: Path) -> Path:
+    app = root / "Nanogram.app"
+    for path in ("Contents/MacOS/Nanogram", "Contents/PlugIns/Share.appex/Contents/MacOS/Share"):
+        (app / path).parent.mkdir(parents=True, exist_ok=True)
+        (app / path).write_bytes(bytes.fromhex("cffaedfe") + b"\0" * 60)
+    bundle = app / "Contents" / "Resources" / "MetalEngine_MetalEngine.bundle" / "Contents"
+    (bundle / "Resources").mkdir(parents=True)
+    (bundle / "Resources" / "default.metallib").write_bytes(b"MTLB" + b"\0" * 60)
+    (bundle / "_CodeSignature").mkdir()
+    (bundle / "_CodeSignature" / "CodeResources").write_text("seal")
+    return app
+
+
+DISTRIBUTION = "Apple Distribution: Owner (YGTMYL879P)"
+DEVELOPMENT = "Apple Development: owner@example.com (DC8G7G3PSH)"
+
+
+class ResourceBundleSigningTests(unittest.TestCase):
+    def test_archive_drops_the_signature_of_code_free_resource_bundles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            bundle = app / "Contents" / "Resources" / "MetalEngine_MetalEngine.bundle"
+            self.assertEqual(release.unsign_resource_bundles(app), [bundle])
+            self.assertFalse((bundle / "Contents" / "_CodeSignature").exists())
+            self.assertTrue((bundle / "Contents" / "Resources" / "default.metallib").is_file())
+
+    def test_resource_bundle_with_code_keeps_its_signature(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            bundle = app / "Contents" / "Resources" / "MetalEngine_MetalEngine.bundle"
+            (bundle / "Contents" / "MacOS").mkdir()
+            (bundle / "Contents" / "MacOS" / "stub").write_bytes(bytes.fromhex("cffaedfe") + b"\0" * 60)
+            self.assertEqual(release.unsign_resource_bundles(app), [])
+            self.assertTrue((bundle / "Contents" / "_CodeSignature").is_dir())
+
+    def test_development_signed_resource_bundle_fails_the_export_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            authorities = {app: DISTRIBUTION, app / "Contents" / "PlugIns" / "Share.appex": DISTRIBUTION}
+            with mock.patch.object(release, "_authority", side_effect=lambda path: authorities.get(path, DEVELOPMENT)):
+                problems = release.check_distribution_signing(app, "mas")
+            self.assertEqual(len(problems), 1)
+            self.assertIn("MetalEngine_MetalEngine.bundle is signed by Apple Development", problems[0])
+
+    def test_unsigned_mach_o_in_a_resource_bundle_fails_the_export_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            release.unsign_resource_bundles(app)
+            stub = app / "Contents" / "Resources" / "MetalEngine_MetalEngine.bundle" / "Contents" / "MacOS" / "x"
+            stub.parent.mkdir()
+            stub.write_bytes(bytes.fromhex("cafebabe") + b"\0" * 60)
+            authorities = {app: DISTRIBUTION, app / "Contents" / "PlugIns" / "Share.appex": DISTRIBUTION}
+            with mock.patch.object(release, "_authority", side_effect=lambda path: authorities.get(path)):
+                problems = release.check_distribution_signing(app, "mas")
+            self.assertEqual(len(problems), 1)
+            self.assertIn("MacOS/x is signed by no identity", problems[0])
+
+    def test_distribution_signed_app_passes_for_its_edition_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            with mock.patch.object(release, "_authority", return_value=DISTRIBUTION):
+                self.assertEqual(release.check_distribution_signing(app, "mas"), [])
+                self.assertEqual(len(release.check_distribution_signing(app, "direct")), 3)
+            with mock.patch.object(release, "_authority", return_value="Apple Distribution: Other (AAAAAAAAAA)"):
+                self.assertEqual(len(release.check_distribution_signing(app, "mas")), 3)
+
+    def test_embedded_apple_font_fails_the_export_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            release.unsign_resource_bundles(app)
+            font = app / "Contents" / "PlugIns" / "Share.appex" / "Contents" / "Resources" / "fonts"
+            font.mkdir(parents=True)
+            (font / "SFCompactRounded-Semibold.otf").write_bytes(b"OTTO")
+            with mock.patch.object(release, "_authority", return_value=DISTRIBUTION):
+                with self.assertRaises(release.ReleaseError), mock.patch("sys.stderr"):
+                    release.check_exported_app(app, "mas")
+                (font / "SFCompactRounded-Semibold.otf").unlink()
+                with mock.patch("sys.stdout"):
+                    release.check_exported_app(app, "mas")
+
+    def test_project_embeds_no_apple_font(self):
+        for path in ("Telegram.xcodeproj/project.pbxproj", "Telegram-Mac/Info.plist", "TelegramShare/Info.plist"):
+            text = (ROOT / path).read_text()
+            self.assertNotIn("SFCompact", text, path)
+            self.assertNotIn("ATSApplicationFontsPath", text, path)
+
+
 class MacPlatformTests(unittest.TestCase):
     def test_missing_mac_platform_stops_with_one_line(self):
         versions = {"data": [{"attributes": {"platform": "IOS", "versionString": "1.0"}}]}

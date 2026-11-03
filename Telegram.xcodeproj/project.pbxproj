@@ -773,9 +773,6 @@
 		C232EAC91E1D536200C4D38C /* SEModalProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C232EAC81E1D536200C4D38C /* SEModalProgressView.swift */; };
 		C23BC36E1E9ACCD100D79F92 /* SEUnauthorizedViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23BC36D1E9ACCD100D79F92 /* SEUnauthorizedViewController.swift */; };
 		C23BC3701E9ACCF900D79F92 /* SEPasslockController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23BC36F1E9ACCF900D79F92 /* SEPasslockController.swift */; };
-		C23D0D7A1F1A609300AF5151 /* SFCompactRounded-Semibold.otf in Resources */ = {isa = PBXBuildFile; fileRef = C23D0D781F1A609300AF5151 /* SFCompactRounded-Semibold.otf */; };
-		C23D0D7C1F1A649900AF5151 /* SFCompactRounded-Semibold.otf in Resources */ = {isa = PBXBuildFile; fileRef = C23D0D781F1A609300AF5151 /* SFCompactRounded-Semibold.otf */; };
-		C23D0D7D1F1A692100AF5151 /* SFCompactRounded-Semibold.otf in CopyFiles */ = {isa = PBXBuildFile; fileRef = C23D0D781F1A609300AF5151 /* SFCompactRounded-Semibold.otf */; };
 		C24949141E5B763F00D7ED5D /* ApplicationContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24949131E5B763F00D7ED5D /* ApplicationContext.swift */; };
 		C24DAB931E0828B6005EE404 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C24DAB921E0828B6005EE404 /* JavaScriptCore.framework */; };
 		C250B01A1DB66B44004E9FBE /* InAppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = C250B0191DB66B44004E9FBE /* InAppLinks.swift */; };
@@ -1026,16 +1023,6 @@
 				275E4B402EEC24C400BC1A68 /* Sparkle.framework in Copy Files */,
 			);
 			name = "Copy Files";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		C232EAA91E1D080100C4D38C /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = fonts;
-			dstSubfolderSpec = 7;
-			files = (
-				C23D0D7D1F1A692100AF5151 /* SFCompactRounded-Semibold.otf in CopyFiles */,
-			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -1829,7 +1816,6 @@
 		C23CF96F1E70BD030009CD06 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Localizable.strings; sourceTree = "<group>"; };
 		C23CF9711E70BD0B0009CD06 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/ShareViewController.strings; sourceTree = "<group>"; };
 		C23CF9731E70BD0B0009CD06 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = nl.lproj/Localizable.strings; sourceTree = "<group>"; };
-		C23D0D781F1A609300AF5151 /* SFCompactRounded-Semibold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SFCompactRounded-Semibold.otf"; sourceTree = "<group>"; };
 		C24949131E5B763F00D7ED5D /* ApplicationContext.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ApplicationContext.swift; sourceTree = "<group>"; };
 		C24DAB921E0828B6005EE404 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		845CFCF457831DA800FBA7CF /* Spotlight.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Spotlight.swift; sourceTree = "<group>"; };
@@ -3100,7 +3086,6 @@
 			children = (
 				48D762EE21D8B9044692EFB0 /* data */,
 				47D925C201EC8AB795EB9BED /* shaders */,
-				343673DC3ABB71E3674BDCCC /* fonts */,
 				A65E34E2CEB962279BC862DB /* keys */,
 				9307BA574F76E961D54A1049 /* config */,
 				270FECB22E38DD19006F6468 /* levels */,
@@ -3164,14 +3149,6 @@
 				C21A48B31F7D0D6B0095ADB1 /* VideoMessage.vsh */,
 			);
 			path = shaders;
-			sourceTree = "<group>";
-		};
-		343673DC3ABB71E3674BDCCC /* fonts */ = {
-			isa = PBXGroup;
-			children = (
-				C23D0D781F1A609300AF5151 /* SFCompactRounded-Semibold.otf */,
-			);
-			path = fonts;
 			sourceTree = "<group>";
 		};
 		A65E34E2CEB962279BC862DB /* keys */ = {
@@ -3649,7 +3626,6 @@
 				C232EA8D1E1D07E700C4D38C /* Sources */,
 				C232EA8E1E1D07E700C4D38C /* Frameworks */,
 				C232EA8F1E1D07E700C4D38C /* Resources */,
-				C232EAA91E1D080100C4D38C /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -4007,7 +3983,6 @@
 				C299B2001F1E11AF00922882 /* Localizable.strings in Resources */,
 				270375F22C9CDF20003EC235 /* duck_passcode.tgs in Resources */,
 				C232EA9B1E1D07E700C4D38C /* ShareViewController.xib in Resources */,
-				C23D0D7A1F1A609300AF5151 /* SFCompactRounded-Semibold.otf in Resources */,
 				C232EAC21E1D448C00C4D38C /* Assets.xcassets in Resources */,
 				C232EA951E1D07E700C4D38C /* icon.icns in Resources */,
 				270376052CA1A760003EC235 /* duck_uploads.tgs in Resources */,
@@ -4549,7 +4524,6 @@
 				C21074241E77F5DF006EE5EF /* dsa_pub_prod.pem in Resources */,
 				2733672C276214050027441E /* menu_select_messages.tgs in Resources */,
 				9F03681922771A9700456348 /* anim_archive.json in Resources */,
-				C23D0D7C1F1A649900AF5151 /* SFCompactRounded-Semibold.otf in Resources */,
 				2751E79F27F34415003E3937 /* menu_autodelete_never.tgs in Resources */,
 				27CB176C27638EF800DD25E0 /* menu_collapse.tgs in Resources */,
 				2733673B276242010027441E /* menu_add_to_favorites.tgs in Resources */,

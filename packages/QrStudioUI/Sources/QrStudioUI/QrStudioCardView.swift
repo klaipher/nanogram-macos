@@ -4,15 +4,11 @@ import CoreText
 import TGUIKit
 
 private func qrStudioUsernameFont(size: CGFloat, weight: NSFont.Weight) -> NSFont {
-    if #available(macOS 10.15, *) {
-        let base = NSFont.systemFont(ofSize: size, weight: weight)
-        if let descriptor = base.fontDescriptor.withDesign(.rounded), let font = NSFont(descriptor: descriptor, size: size) {
-            return font
-        }
-        return base
+    let base = NSFont.systemFont(ofSize: size, weight: weight)
+    if let descriptor = base.fontDescriptor.withDesign(.rounded), let font = NSFont(descriptor: descriptor, size: size) {
+        return font
     }
-    let name = weight == .heavy ? ".SFCompactRounded-Heavy" : ".SFCompactRounded-Bold"
-    return NSFont(name: name, size: size) ?? NSFont.systemFont(ofSize: size, weight: weight)
+    return base
 }
 
 private func qrStudioFontLineHeight(_ font: NSFont) -> CGFloat {

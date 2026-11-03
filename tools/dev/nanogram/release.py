@@ -29,6 +29,12 @@ from nanogram import branding, buildcheck, config, editions
 TEAM = "YGTMYL879P"
 APP_STORE_APP_ID = "6829268176"
 METHODS = {"mas": "app-store-connect", "direct": "developer-id"}
+DISTRIBUTION_AUTHORITIES = {"mas": "Apple Distribution:", "direct": "Developer ID Application:"}
+MACHO_MAGICS = {bytes.fromhex(magic) for magic in ("feedface", "feedfacf", "cefaedfe", "cffaedfe", "cafebabe",
+                                                    "bebafeca")}
+NESTED_CODE_DIRS = ("Frameworks", "PlugIns", "XPCServices", "Helpers", "Library/LoginItems")
+APPLE_FONT_PREFIXES = ("SF", ".SF", "NewYork")
+FONT_SUFFIXES = (".otf", ".ttf", ".ttc")
 WORKSPACE = "Telegram-Mac.xcworkspace"
 PBXPROJ = config.ROOT / "Telegram.xcodeproj" / "project.pbxproj"
 # Written by the launch order file generator (M31, tools/dev/orderfile.py on the runtime branch). The Release
@@ -44,7 +50,7 @@ EXPORT_TIMEOUT = 600
 
 __all__ = ["AscKey", "asc_key", "build_number", "marketing_version", "conditions", "release_settings",
            "archive_command", "archive", "export_options", "export", "set_build_number", "ensure_mac_platform",
-           "upload_mas", "testflight", "notarize", "make_dmg", "appcast_entry", "appcast", "source_archive",
+           "upload_mas", "unsign_resource_bundles", "check_distribution_signing", "check_exported_app", "testflight", "notarize", "make_dmg", "appcast_entry", "appcast", "source_archive",
            "release_direct"]
 
 
@@ -188,6 +194,9 @@ def archive(edition: str, build: str, out_dir: Path, key: AscKey) -> Path:
     log = Path(out_dir) / "archive.log"
     print(f"==> Archiving Release ({edition} edition, build {build}), log: {log}", flush=True)
     _run_logged(archive_command(edition, build, archive_path, key), log, "archive")
+    unsigned = unsign_resource_bundles(archived_app(archive_path))
+    if unsigned:
+        print(f"==> Removed the build signature of {len(unsigned)} resource bundles", flush=True)
     set_build_number(archive_path, build, DISTRIBUTION_ENTITLEMENTS.get(edition))
     check_archive(archive_path, log, edition)
     return archive_path
@@ -213,6 +222,99 @@ def _signing_authority(bundle: Path) -> str:
     if not match:
         raise ReleaseError(f"{bundle} is not signed with an identity")
     return match.group(1)
+
+
+def _authority(path: Path) -> str | None:
+    info = subprocess.run(["codesign", "-dvv", str(path)], capture_output=True, text=True).stderr
+    match = re.search(r"^Authority=(.+)$", info, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _is_macho(path: Path) -> bool:
+    try:
+        with Path(path).open("rb") as handle:
+            return handle.read(4) in MACHO_MAGICS
+    except OSError:
+        return False
+
+
+def _has_signature(bundle: Path) -> bool:
+    return (Path(bundle) / "Contents" / "_CodeSignature").is_dir() or (Path(bundle) / "_CodeSignature").is_dir()
+
+
+def resource_bundles(app: Path) -> list[Path]:
+    return sorted((Path(app) / "Contents" / "Resources").glob("*.bundle"))
+
+
+def _macho_files(bundle: Path) -> list[Path]:
+    return sorted(path for path in Path(bundle).rglob("*")
+                  if path.is_file() and not path.is_symlink() and _is_macho(path))
+
+
+def unsign_resource_bundles(app: Path) -> list[Path]:
+    unsigned = []
+    for bundle in resource_bundles(app):
+        if _macho_files(bundle):
+            continue
+        for signature in (bundle / "Contents" / "_CodeSignature", bundle / "_CodeSignature"):
+            if signature.is_dir():
+                shutil.rmtree(signature)
+                unsigned.append(bundle)
+    return unsigned
+
+
+def nested_code(app: Path) -> list[Path]:
+    app = Path(app)
+    contents = app / "Contents"
+    code = [app]
+    for directory in NESTED_CODE_DIRS:
+        code += sorted(path for path in (contents / directory).glob("*") if not path.is_symlink())
+    for bundle in resource_bundles(app):
+        if _has_signature(bundle):
+            code.append(bundle)
+        code += _macho_files(bundle)
+    return code
+
+
+def check_distribution_signing(app: Path, edition: str) -> list[str]:
+    prefix, team = DISTRIBUTION_AUTHORITIES[edition], f"({TEAM})"
+    problems = []
+    for item in nested_code(app):
+        authority = _authority(item)
+        if not authority or not authority.startswith(prefix) or not authority.endswith(team):
+            where = item.relative_to(Path(app).parent)
+            problems.append(f"{where} is signed by {authority or 'no identity'}, expected {prefix} ... {team}")
+    return problems
+
+
+def apple_fonts(app: Path) -> list[str]:
+    return sorted(str(path.relative_to(Path(app).parent)) for path in Path(app).rglob("*")
+                  if path.suffix.lower() in FONT_SUFFIXES and path.name.startswith(APPLE_FONT_PREFIXES))
+
+
+def check_exported_app(app: Path, edition: str) -> None:
+    problems = check_distribution_signing(app, edition)
+    problems += [f"Apple system font in the bundle (ITMS-91182): {font}" for font in apple_fonts(app)]
+    if problems:
+        for problem in problems:
+            print(f"release: {problem}", file=sys.stderr)
+        raise ReleaseError(f"the exported {edition} app failed its signing checks ({len(problems)} problems, "
+                           "see above)")
+    print(f"==> every nested code item of {Path(app).name} is signed for {edition} distribution", flush=True)
+
+
+def check_exported_pkg(pkg: Path, edition: str) -> None:
+    expanded = Path(pkg).parent / f".{Path(pkg).stem}.expanded"
+    if expanded.exists():
+        shutil.rmtree(expanded)
+    try:
+        result = subprocess.run(["pkgutil", "--expand-full", str(pkg), str(expanded)], capture_output=True,
+                                text=True)
+        if result.returncode != 0:
+            raise ReleaseError(f"pkgutil cannot expand {pkg}: {result.stderr.strip()}")
+        check_exported_app(_single(expanded, "*/Payload/*.app"), edition)
+    finally:
+        shutil.rmtree(expanded, ignore_errors=True)
 
 
 def _archive_identity(bundle: Path) -> str:
@@ -342,6 +444,7 @@ def testflight(export_only: bool = False) -> Path:
     archive_path = archive("mas", build, out_dir, key)
     pkg = _single(export(archive_path, "mas", out_dir, key), "*.pkg")
     print(verify_pkg(pkg), flush=True)
+    check_exported_pkg(pkg, "mas")
     if export_only:
         print(f"==> Signed for the App Store, not uploaded: {pkg} (Nanogram {version} ({build}))")
         return pkg
@@ -517,8 +620,7 @@ def release_direct(allow_dirty: bool = False) -> Path:
     archive_path = archive("direct", build, out_dir, key)
     app = _single(export(archive_path, "direct", out_dir, key), "*.app")
     authority = _signing_authority(app)
-    if not authority.startswith("Developer ID Application:"):
-        raise ReleaseError(f"exported app is signed by {authority!r}, expected a Developer ID Application identity")
+    check_exported_app(app, "direct")
     _check(["codesign", "--verify", "--deep", "--strict", str(app)], "codesign --verify --deep --strict")
     notarize(app, key)
     name = f"Nanogram-{version}-{build}"
