@@ -103,13 +103,9 @@ public final class SoftwareVideoLayerFrameManager {
             if let strongSelf = self {
                 let dimensions = isSecondary ? strongSelf.secondaryDimensions : strongSelf.primaryDimensions
                 strongSelf.hardwareSlot = nil
-                var skipLoopFilter = false
-                if SoftwareVideoLayerFrameManager.usesHardwareDecoding {
-                    let options = GifTileHardwareDecoding.decoderOptions(width: dimensions.map { Int($0.width) }, height: dimensions.map { Int($0.height) }, hintVP9: strongSelf.hintVP9)
-                    strongSelf.hardwareSlot = options.slot
-                    skipLoopFilter = options.skipLoopFilter
-                }
-                let _ = strongSelf.source.swap(SoftwareVideoSource(path: path, hintVP9: strongSelf.hintVP9, unpremultiplyAlpha: true, useHardwareAcceleration: strongSelf.hardwareSlot != nil, skipLoopFilter: skipLoopFilter))
+                let tile = GifTileVideoSource(path: path, hintVP9: strongSelf.hintVP9, width: dimensions.map { Int($0.width) }, height: dimensions.map { Int($0.height) }, usesHardwareDecoding: SoftwareVideoLayerFrameManager.usesHardwareDecoding)
+                strongSelf.hardwareSlot = tile.hardwareSlot
+                let _ = strongSelf.source.swap(tile.source)
             }
         }))
     }
@@ -121,24 +117,15 @@ public final class SoftwareVideoLayerFrameManager {
             }
             
             if let baseTimestamp = self.baseTimestamp {
-                var index = 0
-                var latestFrameIndex: Int?
-                while index < self.frames.count {
-                    if baseTimestamp + self.frames[index].position.seconds + self.frames[index].duration.seconds <= timestamp {
-                        latestFrameIndex = index
-                        //print("latestFrameIndex = \(index)")
-                    }
-                    index += 1
-                }
-                if let latestFrameIndex = latestFrameIndex {
-                    let frame = self.frames[latestFrameIndex]
-                    for i in (0 ... latestFrameIndex).reversed() {
-                        self.frames.remove(at: i)
-                    }
+                let due = GifTileFrameSchedule.framesToEnqueue(self.frames, baseTimestamp: baseTimestamp, timestamp: timestamp)
+                if due.consumedCount > 0 {
+                    self.frames.removeFirst(due.consumedCount)
                     if self.layerHolder.layer.status == .failed {
                         self.layerHolder.layer.flush()
                     }
-                    self.layerHolder.layer.enqueue(frame.sampleBuffer)
+                    for frame in due.enqueue {
+                        self.layerHolder.layer.enqueue(frame.sampleBuffer)
+                    }
                     DispatchQueue.main.async {
                         self.onRender?()
                     }
@@ -152,7 +139,7 @@ public final class SoftwareVideoLayerFrameManager {
     private var polling = false
     
     private func poll() {
-        if self.frames.count < 2 && !self.polling, self.source.with ({ $0 != nil }) {
+        if self.frames.count < 2 && !self.polling, self.source.with ({ $0?.hasStream == true }) {
             self.polling = true
             let minPts = self.minPts
             let maxPts = self.maxPts
