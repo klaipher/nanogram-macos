@@ -33,6 +33,9 @@ final class HiddenTranslationModel: ObservableObject {
         if let index = self.jobs.firstIndex(where: { $0.id == id }) {
             let job = self.jobs.remove(at: index)
             job.completion(nil)
+            if index == 0 {
+                self.kick()
+            }
         }
     }
 
@@ -105,13 +108,36 @@ public final class HiddenViewTranslationProvider: OnDeviceTranslationProvider {
     }
 
     private let timeout: TimeInterval
-    private let hostWindow: @MainActor () -> NSWindow?
+    private let hostWindow: (@MainActor () -> NSWindow?)?
     @MainActor private var model: HiddenTranslationModel?
-    @MainActor private var hostView: NSView?
+    @MainActor var hostView: NSView?
+    @MainActor private var dedicatedWindow: NSWindow?
 
-    public init(timeout: TimeInterval = 15.0, hostWindow: @escaping @MainActor () -> NSWindow? = { NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }) }) {
+    public init(timeout: TimeInterval = 15.0, hostWindow: (@MainActor () -> NSWindow?)? = nil) {
         self.timeout = timeout
         self.hostWindow = hostWindow
+    }
+
+    @MainActor
+    private func resolvedHostWindow() -> NSWindow? {
+        if let hostWindow = self.hostWindow {
+            return hostWindow()
+        }
+        if let window = self.dedicatedWindow {
+            return window
+        }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.ignoresMouseEvents = true
+        window.isOpaque = false
+        window.hasShadow = false
+        window.backgroundColor = .clear
+        window.alphaValue = 0.01
+        window.isExcludedFromWindowsMenu = true
+        window.collectionBehavior = [.transient, .ignoresCycle, .canJoinAllSpaces]
+        window.orderFrontRegardless()
+        self.dedicatedWindow = window
+        return window
     }
 
     public func status(from: String, to: String) async -> OnDeviceTranslationStatus {
@@ -128,8 +154,8 @@ public final class HiddenViewTranslationProvider: OnDeviceTranslationProvider {
     }
 
     @MainActor
-    private func attachedModel() -> HiddenTranslationModel? {
-        guard let window = self.hostWindow(), let contentView = window.contentView else {
+    func attachedModel() -> HiddenTranslationModel? {
+        guard let window = self.resolvedHostWindow(), let contentView = window.contentView else {
             return nil
         }
         let model = self.model ?? HiddenTranslationModel()
