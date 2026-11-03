@@ -788,11 +788,8 @@ public final class InlineStickerItemLayer : SimpleLayer {
                 } |> deliverOnMainQueue).start(next: { [weak self] data in
                     if let data = data {
                         let maximumFps: Int = 30
-                        var cache: ASCachePurpose = .temporaryLZ4(.effect)
                         let colors = self?.getColors?(file) ?? []
-                        if !colors.isEmpty {
-                            cache = .none
-                        }
+                        let cache = inlineStickerCachePurpose(changesColorsLive: false)
                         let type: LottieAnimationType
                         if file.isWebm {
                             type = .webm
