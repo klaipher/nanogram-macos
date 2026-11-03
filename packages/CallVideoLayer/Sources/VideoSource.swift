@@ -79,10 +79,12 @@ public final class VideoSourceOutput {
     public let followsDeviceOrientation: Bool
     public let mirrorDirection: MirrorDirection
     public let sourceId: Int
+    public let yuvConversion: VideoYUVConversion
     public private(set) var textureReferences: [CVMetalTexture]
     private let textureCache: CVMetalTextureCache?
     
-    public init(resolution: CGSize, textureLayout: TextureLayout, dataBuffer: DataBuffer, rotationAngle: Float, followsDeviceOrientation: Bool, mirrorDirection: MirrorDirection, sourceId: Int, textureReferences: [CVMetalTexture] = [], textureCache: CVMetalTextureCache? = nil) {
+    public init(resolution: CGSize, textureLayout: TextureLayout, dataBuffer: DataBuffer, rotationAngle: Float, followsDeviceOrientation: Bool, mirrorDirection: MirrorDirection, sourceId: Int, textureReferences: [CVMetalTexture] = [], textureCache: CVMetalTextureCache? = nil, yuvConversion: VideoYUVConversion = .fullRange601) {
+        self.yuvConversion = yuvConversion
         self.resolution = resolution
         self.textureLayout = textureLayout
         self.dataBuffer = dataBuffer

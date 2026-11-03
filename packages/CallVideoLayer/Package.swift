@@ -3,6 +3,22 @@
 
 import PackageDescription
 
+let callVideoLayerTestLibraries: [(path: String, name: String)] = [
+    ("webrtc/build/webrtc", "mac_framework_objc_static"),
+    ("openssl/build/openssl/lib", "ssl"),
+    ("openssl/build/openssl/lib", "crypto"),
+    ("ffmpeg/build/ffmpeg/lib", "avformat"),
+    ("ffmpeg/build/ffmpeg/lib", "avcodec"),
+    ("ffmpeg/build/ffmpeg/lib", "swresample"),
+    ("ffmpeg/build/ffmpeg/lib", "avutil"),
+    ("OpenH264/build/output/lib", "openh264"),
+    ("libvpx/build/libvpx/lib", "vpx"),
+    ("dav1d/build/dav1d/lib", "dav1d"),
+    ("libopus/build/libopus/lib", "opus"),
+    ("Mozjpeg/build", "jpeg"),
+]
+let callVideoLayerTestLinkerFlags: [String] = callVideoLayerTestLibraries.flatMap { ["-L", "../../core-xprojects/" + $0.path, "-l" + $0.name] }
+
 let package = Package(
     name: "CallVideoLayer",
     platforms: [.macOS(.v10_13)],
@@ -21,6 +37,7 @@ let package = Package(
         .package(name: "TgVoipWebrtc", path: "../../submodules/tgcalls"),
         .package(name: "TelegramVoip", path: "../../submodules/telegram-ios/submodules/TelegramVoip"),
         .package(name: "YuvConversion", path: "../../submodules/telegram-ios/submodules/YuvConversion"),
+        .package(name: "rnoise", path: "../../submodules/telegram-ios/third-party/rnnoise"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -34,6 +51,23 @@ let package = Package(
                            .product(name: "TelegramVoip", package: "TelegramVoip", condition: nil),
                            .product(name: "YuvConversion", package: "YuvConversion", condition: nil)],
             path: "Sources/",
-            resources: [.copy("CallScreenShaders.metal")])
+            resources: [.copy("CallScreenShaders.metal")]),
+        .testTarget(
+            name: "CallVideoLayerTests",
+            dependencies: ["CallVideoLayer", .product(name: "rnoise", package: "rnoise")],
+            path: "Tests/CallVideoLayerTests",
+            linkerSettings: [
+                .unsafeFlags(callVideoLayerTestLinkerFlags),
+                .linkedFramework("VideoToolbox"),
+                .linkedFramework("CoreMedia"),
+                .linkedFramework("AudioToolbox"),
+                .linkedFramework("CoreAudio"),
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("ScreenCaptureKit"),
+                .linkedLibrary("z"),
+                .linkedLibrary("bz2"),
+                .linkedLibrary("iconv"),
+                .linkedLibrary("c++"),
+            ]),
     ]
 )
