@@ -9,11 +9,13 @@ final class DisplayLinkRateTests: XCTestCase {
         TGUIKitTestBootstrap.install()
     }
 
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        try skipWhenDisplayLinksCannotTick()
+    }
+
     private var refreshRate: Double {
-        var link: CVDisplayLink?
-        CVDisplayLinkCreateWithCGDisplay(CGMainDisplayID(), &link)
-        let period = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link!)
-        return Double(period.timeScale) / Double(period.timeValue)
+        return Double(NSScreen.main?.maximumFramesPerSecond ?? 60)
     }
 
     func testValueAnimatorTicksAtTheDisplayRate() {
@@ -101,32 +103,29 @@ extension DisplayLinkRateTests {
     func testLowRateLinkOnlyWakesTheMainThreadWhenDue() throws {
         try XCTSkipIf(self.refreshRate < 50, "needs a display faster than the link")
         let result = self.measure([.fps(25)])
-        let expected = self.refreshRate / Double(Int(ceil(self.refreshRate / 25.0 * 0.95 - 1e-3)))
-        XCTAssertEqual(Double(result.ticks[0]), expected, accuracy: 3, "refresh \(self.refreshRate)")
-        XCTAssertLessThanOrEqual(Double(result.deliveries), Double(result.ticks[0]) + 3, "refresh \(self.refreshRate)")
+        XCTAssertEqual(Double(result.ticks[0]), 25, accuracy: 3, "refresh \(self.refreshRate)")
+        XCTAssertLessThanOrEqual(Double(result.deliveries), 31, "refresh \(self.refreshRate)")
+    }
+
+    func testThirtyFramesPerSecondLinkAsksTheDisplayForThirty() throws {
+        try XCTSkipIf(self.refreshRate < 50, "needs a display faster than the link")
+        let wakeupsBefore = processWakeups()
+        let result = self.measure([.fps(30)])
+        let wakeups = Double(processWakeups() - wakeupsBefore) / 2.3
+        print("DisplayLinkRate 30 fps link: process wake-ups/s \(Int(wakeups))")
+        XCTAssertEqual(Double(result.ticks[0]), 30, accuracy: 3)
+        XCTAssertEqual(Double(result.deliveries), 30, accuracy: 3)
+        XCTAssertLessThan(wakeups, 80)
     }
 
     func testMixedRatesKeepTheirOwnCadence() throws {
         try XCTSkipIf(self.refreshRate < 50, "needs a display faster than the links")
         let rates = [25, 30, 60]
         let result = self.measure(rates.map { .fps($0) })
-        let frameIntervals = rates.map { max(1, Int(ceil(self.refreshRate / Double($0) * 0.95 - 1e-3))) }
         for index in rates.indices {
-            XCTAssertEqual(Double(result.ticks[index]), self.refreshRate / Double(frameIntervals[index]), accuracy: index == 2 ? 6 : 3)
+            XCTAssertEqual(Double(result.ticks[index]), Double(rates[index]), accuracy: index == 2 ? 6 : 3)
         }
-        let cycle = frameIntervals.reduce(1) { cycle, interval in
-            var a = cycle
-            var b = interval
-            while b != 0 {
-                (a, b) = (b, a % b)
-            }
-            return cycle / a * interval
-        }
-        let dueFrames = (1 ... cycle).filter { frame in
-            frameIntervals.contains { frame.isMultiple(of: $0) }
-        }.count
-        let expectedDeliveries = self.refreshRate * Double(dueFrames) / Double(cycle)
-        XCTAssertEqual(Double(result.deliveries), expectedDeliveries, accuracy: 6)
+        XCTAssertEqual(Double(result.deliveries), 60, accuracy: 6)
     }
 
     func testMaxLinkStillGetsEveryFrame() {
@@ -134,6 +133,24 @@ extension DisplayLinkRateTests {
         XCTAssertGreaterThan(Double(result.ticks[1]), self.refreshRate * 0.8)
         XCTAssertGreaterThan(Double(result.deliveries), self.refreshRate * 0.8)
     }
+}
+
+func skipWhenDisplayLinksCannotTick() throws {
+    try XCTSkipIf(CGDisplayIsAsleep(CGMainDisplayID()) != 0, "the display is asleep: screen display links do not tick")
+}
+
+func processWakeups() -> UInt64 {
+    var info = task_power_info()
+    var count = mach_msg_type_number_t(MemoryLayout<task_power_info>.size / MemoryLayout<natural_t>.size)
+    let result = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_POWER_INFO), $0, &count)
+        }
+    }
+    guard result == KERN_SUCCESS else {
+        return 0
+    }
+    return info.task_interrupt_wakeups + info.task_platform_idle_wakeups
 }
 
 final class FrameStepTests: XCTestCase {

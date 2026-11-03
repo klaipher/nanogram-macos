@@ -61,7 +61,7 @@ public final class PendingChatRemovals {
 
         let timer = SwiftSignalKit.Timer(timeout: PendingChatRemovals.timeout, repeat: false, completion: { [weak self] in
             self?.commitPending()
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         self.timer = timer
         timer.start()
     }

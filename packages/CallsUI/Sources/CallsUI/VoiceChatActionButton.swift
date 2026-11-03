@@ -168,6 +168,7 @@ public final class VoiceChatActionButtonBackgroundView: View {
             animation.fromValue = NSNumber(value: Float(0.0))
             animation.toValue = NSNumber(value: Float.pi * 2.0)
             animation.repeatCount = Float.infinity
+            animation.setDecorativeLoopFrameRate()
             animation.beginTime = 0.0
             self.maskProgressLayer.add(animation, forKey: "progressRotation")
 
@@ -192,6 +193,7 @@ public final class VoiceChatActionButtonBackgroundView: View {
 
             let groupAnimation = CAAnimationGroup()
             groupAnimation.repeatCount = Float.infinity
+            groupAnimation.setDecorativeLoopFrameRate()
             groupAnimation.animations = [shrinkAnimation, growthAnimation, rotateAnimation]
             groupAnimation.duration = 2.0
 

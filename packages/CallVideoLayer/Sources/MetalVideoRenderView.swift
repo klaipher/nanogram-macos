@@ -275,7 +275,8 @@ private final class AdaptedCallVideoSource: VideoSource {
                         mirrorDirection: mirrorDirection,
                         sourceId: sourceId,
                         textureReferences: [cvMetalTextureY, cvMetalTextureUV],
-                        textureCache: textureCache
+                        textureCache: textureCache,
+                        yuvConversion: VideoYUVConversion(pixelBuffer: nativeBuffer.pixelBuffer)
                     )
                 case let .i420(i420Buffer):
                     guard let pixelBufferPoolState = pixelBufferPoolState.unsafeGet() else {

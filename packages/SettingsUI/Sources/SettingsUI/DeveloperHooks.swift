@@ -4,11 +4,13 @@ public struct DeveloperHooks {
     public let updateGraphicContext: () -> Void
     public let forceRLottieBackend: () -> Bool
     public let toggleForceRLottieBackend: () -> Void
+    public let openNanogramSwitches: (() -> Void)?
 
-    public init(updateGraphicContext: @escaping () -> Void, forceRLottieBackend: @escaping () -> Bool, toggleForceRLottieBackend: @escaping () -> Void) {
+    public init(updateGraphicContext: @escaping () -> Void, forceRLottieBackend: @escaping () -> Bool, toggleForceRLottieBackend: @escaping () -> Void, openNanogramSwitches: (() -> Void)? = nil) {
         self.updateGraphicContext = updateGraphicContext
         self.forceRLottieBackend = forceRLottieBackend
         self.toggleForceRLottieBackend = toggleForceRLottieBackend
+        self.openNanogramSwitches = openNanogramSwitches
     }
 
     private static var _shared: DeveloperHooks?

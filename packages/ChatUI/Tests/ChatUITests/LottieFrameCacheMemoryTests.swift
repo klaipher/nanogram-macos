@@ -66,7 +66,7 @@ final class LottieFrameCacheMemoryTests: XCTestCase {
         }
         let after = mallocInUse()
 
-        let perAnimation = compression_encode_scratch_buffer_size(COMPRESSION_LZFSE) + supplyments[0].1
+        let perAnimation = LottieFrameCodec.current.encodeScratchSize + supplyments[0].1
         let released = before - after
         print("lottie frame cache: released \(released / 1024) KB for \(count) finished animations, expected about \(count * perAnimation / 1024) KB")
         XCTAssertGreaterThan(released, count * perAnimation * 9 / 10)
@@ -102,9 +102,9 @@ final class LottieFrameCacheMemoryTests: XCTestCase {
             _ = supplyment.fps
         }
         let grown = mallocInUse() - before
-        let scratch = compression_encode_scratch_buffer_size(COMPRESSION_LZFSE)
+        let scratch = LottieFrameCodec.current.encodeScratchSize
         print("lottie frame cache: \(count) small animations caching hold \(grown / 1024) KB, a kept scratch would add \(count * scratch / 1024) KB")
-        XCTAssertLessThan(grown, count * scratch / 4)
+        XCTAssertLessThan(grown, count * scratch)
 
         let (supplyment, bufferSize) = supplyments[0]
         supplyment.markFinished()

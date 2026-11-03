@@ -166,6 +166,7 @@ final class QrStudioPhasedAnimation {
             animation.duration = frames.period
             animation.calculationMode = .discrete
             animation.repeatCount = .infinity
+            animation.setDecorativeLoopFrameRate()
             animation.isRemovedOnCompletion = false
             if startsFromFirstFrame {
                 layer.contents = frames.frames[0]

@@ -1,8 +1,9 @@
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 #import <AVFoundation/AVFoundation.h>
+#import "TGVideoCameraRenderer.h"
 
-@interface TGVideoCameraGLRenderer : NSObject
+@interface TGVideoCameraGLRenderer : NSObject <TGVideoCameraRenderer>
 
 @property (nonatomic, readonly) __attribute__((NSObject)) CMFormatDescriptionRef outputFormatDescription;
 @property (nonatomic, assign) AVCaptureVideoOrientation orientation;
@@ -10,6 +11,7 @@
 @property (nonatomic, assign) CGFloat opacity;
 @property (nonatomic, readonly) bool hasPreviousPixelbuffer;
 @property (nonatomic, assign) NSInteger decorationFrame;
+@property (nonatomic, assign) NSInteger outputSide;
 
 - (void)setDecorationWatermark:(CGImageRef)watermark planeFrames:(CGImageRef)planeFrames planeFrameCount:(NSInteger)planeFrameCount;
 - (bool)prepareForInputWithFormatDescription:(CMFormatDescriptionRef)inputFormatDescription outputRetainedBufferCountHint:(size_t)outputRetainedBufferCountHint;

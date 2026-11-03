@@ -1292,7 +1292,7 @@ public func DiceRollController(context: any AccountContextProtocol, interactions
             }
             return current
         }
-    }, queue: .mainQueue())
+    }, queue: .mainQueue(), leeway: .precise)
     diceTimer.start()
     actionsDisposable.add(ActionDisposable {
         diceTimer.invalidate()

@@ -19,6 +19,7 @@ private func addHeartbeatAnimation(to layer: CALayer) {
     
     // Repeat the animation indefinitely
     animation.repeatCount = Float.infinity
+    animation.setDecorativeLoopFrameRate()
     animation.autoreverses = true
     
     

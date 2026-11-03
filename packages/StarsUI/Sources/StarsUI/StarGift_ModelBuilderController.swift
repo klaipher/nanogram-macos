@@ -887,7 +887,7 @@ private final class HeaderView: GeneralRowView {
                 guard let self, self.window != nil, !self.visibleRect.isEmpty,
                       let item = self.item as? HeaderItem else { return }
                 item.arguments.makeNextPattern()
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             timer?.start()
         }
     }

@@ -114,7 +114,7 @@ public class SliderView: Control {
         transitionTimer?.invalidate()
         transitionTimer = Timer.init(timeout: scheduledTransitionInterval, repeat: true, completion: { [weak self] in
             self?._handleTimerTick()
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
     }
 
     @objc fileprivate func _prepareTransition(to index: Int) {

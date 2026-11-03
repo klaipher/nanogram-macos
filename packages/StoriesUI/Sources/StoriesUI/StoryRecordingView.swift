@@ -448,6 +448,7 @@ class StoryRecordingView: View {
             animate.fromValue = 1.0
             animate.toValue = 0.3
             animate.repeatCount = .infinity
+            animate.setDecorativeLoopFrameRate()
             animate.duration = 1.5
             
             animate.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)

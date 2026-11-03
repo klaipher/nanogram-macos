@@ -48,6 +48,7 @@ final class AvatarVideoExport {
     private var finishing = false
     private var finished = false
     private var succeeded = false
+    private let tagsRec709: Bool
 
     init(codec: String) throws {
         self.path = NSTemporaryDirectory() + "tgs_\(UUID().uuidString).mp4"
@@ -55,6 +56,16 @@ final class AvatarVideoExport {
         var settings: [String: Any] = [AVVideoWidthKey: 640, AVVideoHeightKey: 640, AVVideoCodecKey: codec]
         if codec == AVVideoCodecType.h264.rawValue {
             settings[AVVideoCompressionPropertiesKey] = [AVVideoAverageBitRateKey: 1500000, AVVideoMaxKeyFrameIntervalKey: 3]
+        }
+        if codec == AVVideoCodecType.h264.rawValue || codec == AVVideoCodecType.hevc.rawValue {
+            settings[AVVideoColorPropertiesKey] = [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+            ]
+            self.tagsRec709 = true
+        } else {
+            self.tagsRec709 = false
         }
         guard self.writer.canApply(outputSettings: settings, forMediaType: .video) else {
             throw NSError(domain: "AvatarVideoExport", code: 1)
@@ -102,6 +113,11 @@ final class AvatarVideoExport {
                 }
                 switch frame {
                 case let .frame(buffer, time):
+                    if self.tagsRec709 {
+                        CVBufferSetAttachment(buffer, kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_709_2, .shouldPropagate)
+                        CVBufferSetAttachment(buffer, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2, .shouldPropagate)
+                        CVBufferSetAttachment(buffer, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2, .shouldPropagate)
+                    }
                     guard self.adaptor.append(buffer, withPresentationTime: time) else {
                         self.resolve(success: false)
                         return

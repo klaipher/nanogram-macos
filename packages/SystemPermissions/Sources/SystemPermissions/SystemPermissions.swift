@@ -13,13 +13,6 @@ public func requestCameraPermission() -> Signal<Bool, NoError> {
 }
 public func screenCaptureAvailable() -> Bool {
     if #available(macOS 13.0, *) {
-        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGDisplayStreamCreateWithDispatchQueue") {
-            typealias Handler = @convention(block) (Int32, UInt64, OpaquePointer?, OpaquePointer?) -> Void
-            typealias Create = @convention(c) (CGDirectDisplayID, Int, Int, Int32, CFDictionary?, DispatchQueue, Handler?) -> Unmanaged<AnyObject>?
-            let stream = unsafeBitCast(symbol, to: Create.self)(CGMainDisplayID(), 1, 1, Int32(kCVPixelFormatType_32BGRA), nil, DispatchQueue.main, { _, _, _, _ in
-            })?.takeRetainedValue()
-            _ = stream != nil
-        }
         return true
     } else {
         return false

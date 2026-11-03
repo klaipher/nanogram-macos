@@ -8,6 +8,8 @@ import ObjcUtils
 import InAppSettings
 import PasscodeCore
 import WalletContext
+import NanogramRuntime
+import ChatAppIntents
 
 func getNotificationMessageId(userInfo:[AnyHashable: Any], for prefix: String) -> MessageId? {
     if let msgId = userInfo["\(prefix).message.id"] as? Int32, let msgNamespace = userInfo["\(prefix).message.namespace"] as? Int32, let namespace = userInfo["\(prefix).peer.namespace"] as? Int32, let id = userInfo["\(prefix).peer.id"] as? Int64 {
@@ -34,6 +36,7 @@ struct NotificationPresentation {
     let sound: PeerMessageSound
     let showPreview: Bool
     let hideSender: Bool
+    var focusChat: ChatFocusChat? = nil
 }
 
 private func effectiveCategorySound(_ sound: PeerMessageSound) -> PeerMessageSound {
@@ -565,7 +568,11 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                         var result: [String: NotificationPresentation] = [:]
                         for source in sources {
                             for message in source.messages {
-                                result[source.key(for: message)] = notificationPresentation(source: source, message: message, globalSettings: globalSettings, peerSettings: transaction.getPeerNotificationSettings(id: message.id.peerId) as? TelegramPeerNotificationSettings)
+                                var presentation = notificationPresentation(source: source, message: message, globalSettings: globalSettings, peerSettings: transaction.getPeerNotificationSettings(id: message.id.peerId) as? TelegramPeerNotificationSettings)
+                                if AppChatFocusFolders.shared.needsChatDetails(accountId: account.id.int64) {
+                                    presentation.focusChat = AppChatFocusFolders.chat(transaction: transaction, peerId: message.id.peerId, isMuted: presentation.muted || source.threadData?.notificationSettings.isMuted == true, hasUnseenMention: message.consumableMention != nil)
+                                }
+                                result[source.key(for: message)] = presentation
                             }
                         }
                         return result
@@ -617,6 +624,9 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                             if message.consumableMention == nil {
                                 continue
                             }
+                        }
+                        if !AppChatFocusFolders.shared.allows(accountId: account.id.int64, chat: presentation.focusChat, peerId: message.id.peerId) {
+                            continue
                         }
                         
                         if message.author?.id != account.peerId || message.wasScheduled {
@@ -804,6 +814,21 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                             
                             dict["accountId"] = account.id.int64
                             dict["timestamp"] = Int32(Date().timeIntervalSince1970)
+
+                            if case .messages = source, !screenIsLocked, !presentation.hideSender, let chatPeer = message.peers[message.id.peerId] {
+                                let sender = message.author ?? chatPeer
+                                dict[CommunicationNotificationInfo.conversationKey] = message.id.peerId.toInt64()
+                                dict[CommunicationNotificationInfo.senderIdKey] = sender.id.toInt64()
+                                dict[CommunicationNotificationInfo.senderNameKey] = sender.displayTitle
+                                if message.id.peerId.namespace != Namespaces.Peer.CloudUser {
+                                    dict[CommunicationNotificationInfo.groupNameKey] = chatPeer.displayTitle
+                                }
+                                if let threadId = message.threadId {
+                                    dict[CommunicationNotificationInfo.threadKey] = threadId
+                                }
+                                dict[CommunicationNotificationInfo.mutedKey] = message.muted
+                                dict[CommunicationNotificationInfo.accountKey] = account.id.int64
+                            }
 
                             let notifiedKey = source.key(for: message)
                             if alreadyNotified.insert(notifiedKey).inserted {

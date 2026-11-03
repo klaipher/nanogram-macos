@@ -38,7 +38,8 @@ private struct DstData : Codable {
 }
 
 
-private let version = 70
+private let version = 71
+private let frameCodec = LottieFrameCodec.current
 
 private func decodeDstData(_ data: Data) -> DstData? {
     guard let root = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else {
@@ -151,7 +152,7 @@ final class TRLotData {
     fileprivate var decodeScratchBuffer: UnsafeMutableRawPointer? {
         assert(queue.isCurrent())
         if self.decodeScratch == nil {
-            self.decodeScratch = malloc(compression_decode_scratch_buffer_size(COMPRESSION_LZFSE))
+            self.decodeScratch = malloc(frameCodec.decodeScratchSize)
         }
         return self.decodeScratch
     }
@@ -159,7 +160,7 @@ final class TRLotData {
     fileprivate var encodeScratchBuffer: UnsafeMutableRawPointer? {
         assert(queue.isCurrent())
         if self.encodeScratch == nil {
-            self.encodeScratch = malloc(compression_encode_scratch_buffer_size(COMPRESSION_LZFSE))
+            self.encodeScratch = malloc(frameCodec.encodeScratchSize)
         }
         return self.encodeScratch
     }
@@ -266,13 +267,13 @@ final class TRLotData {
 
         let path = TRLotData.directory + animation.cacheKey
         
-        return path + "-v\(version)-lzfse-bs\(bufferSize)-lt\(animation.liveTime)-map"
+        return path + "-v\(version)-\(frameCodec.fileTag)-bs\(bufferSize)-lt\(animation.liveTime)-map"
     }
     
     static func dataPath(_ animation: LottieAnimation, bufferSize: Int) -> String {
         let path = TRLotData.directory + animation.cacheKey
         
-        return path + "-v\(version)-lzfse-bs\(bufferSize)-lt\(animation.liveTime)-data"
+        return path + "-v\(version)-\(frameCodec.fileTag)-bs\(bufferSize)-lt\(animation.liveTime)-data"
     }
     
     init(_ animation: LottieAnimation, bufferSize: Int, queue: Queue) {
@@ -456,14 +457,14 @@ final class TRLotFileSupplyment {
                                 return body
                             })
                             
-                            length = compression_encode_buffer(dst, self.bufferSize, ui8, self.bufferSize, nil, COMPRESSION_LZFSE)
+                            length = frameCodec.encode(ui8, count: self.bufferSize, into: dst, capacity: self.bufferSize, scratch: nil)
                             dstDelta.deallocate()
                         }
                         
                         
                     } else {
                         let scratch = self.bufferSize <= TRLotData.transientScratchBufferSize ? nil : self.data.encodeScratchBuffer
-                        length = compression_encode_buffer(dst, self.bufferSize, address, self.bufferSize, scratch, COMPRESSION_LZFSE)
+                        length = frameCodec.encode(address, count: self.bufferSize, into: dst, capacity: self.bufferSize, scratch: scratch)
                     }
                     let _ = self.data.writeFrame(frame: Int(current.1), data: Data(bytes: dst, count: length))
                 }
@@ -508,7 +509,7 @@ final class TRLotFileSupplyment {
                     do {
                         let unsafePointer = compressed.baseAddress!.assumingMemoryBound(to: UInt8.self)
 
-                        let _ = compression_decode_buffer(address, bufferSize, unsafePointer, compressed.count, self.data.decodeScratchBuffer, COMPRESSION_LZFSE)
+                        let _ = frameCodec.decode(unsafePointer, count: compressed.count, into: address, capacity: bufferSize, scratch: self.data.decodeScratchBuffer)
 
                         if let previous = previous, enableDifference {
                             previous.withUnsafeBytes { pointer in
@@ -554,30 +555,64 @@ private final class CacheRemovable {
     }
     
     private func clean() {
-        
-        let fileURLs = try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: TRLotData.directory), includingPropertiesForKeys: nil, options: .skipsHiddenFiles )
-        if let fileURLs = fileURLs {
-            for url in fileURLs {
-                let path = url.path
-                let name = path.nsstring.lastPathComponent
-                if let index = name.range(of: "-lt", options: .backwards) {
-                    let tail = String(name[index.upperBound...])
-                    if let until = tail.range(of: "-") {
-                        if let liveTime = TimeInterval(tail[..<until.lowerBound]) {
-                            if let createdAt = FileManager.default.modificationDateForFileAtPath(path: path), createdAt.timeIntervalSince1970 + liveTime < Date().timeIntervalSince1970 {
-                                try? FileManager.default.removeItem(at: url)
-                            }
-                            continue
-                        }
-                    }
-                }
-                try? FileManager.default.removeItem(at: url)
-            }
-        }
-        
-        
+        cleanLottieCache(directory: TRLotData.directory, now: Date(), byteBudget: lottieCacheByteBudget)
     }
     
+}
+
+let lottieCacheByteBudget: Int64 = 512 * 1024 * 1024
+
+private struct LottieCacheEntry {
+    var urls: [URL] = []
+    var bytes: Int64 = 0
+    var modified: Date = .distantPast
+}
+
+func cleanLottieCache(directory: String, now: Date, byteBudget: Int64) {
+    let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+    guard let fileURLs = try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: directory), includingPropertiesForKeys: keys, options: .skipsHiddenFiles) else {
+        return
+    }
+    var entries: [String: LottieCacheEntry] = [:]
+    for url in fileURLs {
+        let name = url.lastPathComponent
+        guard let index = name.range(of: "-lt", options: .backwards) else {
+            try? FileManager.default.removeItem(at: url)
+            continue
+        }
+        let tail = name[index.upperBound...]
+        guard let until = tail.range(of: "-"), let liveTime = TimeInterval(tail[..<until.lowerBound]) else {
+            try? FileManager.default.removeItem(at: url)
+            continue
+        }
+        let values = try? url.resourceValues(forKeys: Set(keys))
+        guard let modified = values?.contentModificationDate else {
+            continue
+        }
+        if modified.timeIntervalSince1970 + liveTime < now.timeIntervalSince1970 {
+            try? FileManager.default.removeItem(at: url)
+            continue
+        }
+        let group = String(name[..<until.upperBound])
+        var entry = entries[group] ?? LottieCacheEntry()
+        entry.urls.append(url)
+        entry.bytes += Int64(values?.fileSize ?? 0)
+        entry.modified = max(entry.modified, modified)
+        entries[group] = entry
+    }
+    var total = entries.values.reduce(Int64(0)) { $0 + $1.bytes }
+    guard total > byteBudget else {
+        return
+    }
+    for entry in entries.values.sorted(by: { $0.modified < $1.modified }) {
+        if total <= byteBudget {
+            break
+        }
+        for url in entry.urls {
+            try? FileManager.default.removeItem(at: url)
+        }
+        total -= entry.bytes
+    }
 }
 private let cleaner = CacheRemovable()
 

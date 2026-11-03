@@ -21,12 +21,14 @@ let package = Package(
         .package(name: "OpusBinding", path: "../../submodules/telegram-ios/submodules/OpusBinding"),
         .package(name: "TelegramVoip", path: "../../submodules/telegram-ios/submodules/TelegramVoip"),
         .package(name: "GZIP", path: "../GZIP"),
+        .package(name: "VP9Hardware", path: "../VP9Hardware"),
         .package(name: "TGUIKit", path: "../TGUIKit"),
         .package(name: "libwebp", path: "../../submodules/libwebp"),
         .package(name: "ApiCredentials", path: "../ApiCredentials"),
         .package(name: "ObjcUtils", path: "../ObjcUtils"),
         .package(name: "TelegramMediaResources", path: "../TelegramMediaResources"),
         .package(name: "TelegramMediaPlayer", path: "../../submodules/telegram-ios/submodules/MediaPlayer"),
+        .package(name: "VoiceRecorderInput", path: "../VoiceRecorderInput"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -37,6 +39,7 @@ let package = Package(
                            .product(name: "TGUIKit", package: "TGUIKit", condition: nil),
                            .product(name: "TelegramCore", package: "TelegramCore", condition: nil),
                            .product(name: "GZIP", package: "GZIP", condition: nil),
+                           .product(name: "VP9Hardware", package: "VP9Hardware", condition: nil),
                            .product(name: "Postbox", package: "Postbox", condition: nil),
                            .product(name: "libwebp", package: "libwebp", condition: nil),
                            .product(name: "ApiCredentials", package: "ApiCredentials", condition: nil),
@@ -45,6 +48,7 @@ let package = Package(
                            .product(name: "TelegramMediaPlayer", package: "TelegramMediaPlayer", condition: nil),
                            .product(name: "OpusBinding", package: "OpusBinding", condition: nil),
                            .product(name: "TelegramVoip", package: "TelegramVoip", condition: nil),
+                           .product(name: "VoiceRecorderInput", package: "VoiceRecorderInput", condition: nil),
                           ],
             path: "Sources"),
     ]

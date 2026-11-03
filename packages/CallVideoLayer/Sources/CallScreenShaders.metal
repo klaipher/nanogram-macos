@@ -350,9 +350,18 @@ fragment half4 callMicBlobFragment(
 }
 
 
-static half3 videoYUVToRGB(half y, half2 uv) {
-    uv -= half2(0.5, 0.5);
-    return half3(y + 1.403 * uv.y, y - 0.344 * uv.x - 0.714 * uv.y, y + 1.770 * uv.x);
+struct VideoYUVParameters {
+    float4 column0;
+    float4 column1;
+    float4 column2;
+    float4 offset;
+    float4 scale;
+};
+
+static half3 videoYUVToRGB(half y, half2 uv, constant VideoYUVParameters &parameters) {
+    float3 yuv = (float3(float(y), float(uv.x), float(uv.y)) - parameters.offset.xyz) * parameters.scale.xyz;
+    float3x3 matrix = float3x3(parameters.column0.xyz, parameters.column1.xyz, parameters.column2.xyz);
+    return half3(matrix * yuv);
 }
 
 constant int VIDEO_DOWNSCALE_TAPS = 4;
@@ -361,6 +370,7 @@ kernel void videoBiPlanarDownscale(
     texture2d<half, access::sample> inTextureY [[ texture(0) ]],
     texture2d<half, access::sample> inTextureUV [[ texture(1) ]],
     texture2d<half, access::write> outTexture [[ texture(2) ]],
+    constant VideoYUVParameters &parameters [[ buffer(0) ]],
     uint2 gid [[ thread_position_in_grid ]]
 ) {
     uint2 size = uint2(outTexture.get_width(), outTexture.get_height());
@@ -373,7 +383,7 @@ kernel void videoBiPlanarDownscale(
     for (int j = 0; j < VIDEO_DOWNSCALE_TAPS; j++) {
         for (int i = 0; i < VIDEO_DOWNSCALE_TAPS; i++) {
             float2 position = (float2(gid) + (float2(i, j) + 0.5) / float(VIDEO_DOWNSCALE_TAPS)) * cell;
-            sum += clamp(videoYUVToRGB(inTextureY.sample(sampler, position).r, inTextureUV.sample(sampler, position).rg), half3(0.0), half3(1.0));
+            sum += clamp(videoYUVToRGB(inTextureY.sample(sampler, position).r, inTextureUV.sample(sampler, position).rg, parameters), half3(0.0), half3(1.0));
         }
     }
     outTexture.write(half4(sum / half(VIDEO_DOWNSCALE_TAPS * VIDEO_DOWNSCALE_TAPS), 1.0), gid);
@@ -384,6 +394,7 @@ kernel void videoTriPlanarDownscale(
     texture2d<half, access::sample> inTextureU [[ texture(1) ]],
     texture2d<half, access::sample> inTextureV [[ texture(2) ]],
     texture2d<half, access::write> outTexture [[ texture(3) ]],
+    constant VideoYUVParameters &parameters [[ buffer(0) ]],
     uint2 gid [[ thread_position_in_grid ]]
 ) {
     uint2 size = uint2(outTexture.get_width(), outTexture.get_height());
@@ -397,7 +408,7 @@ kernel void videoTriPlanarDownscale(
         for (int i = 0; i < VIDEO_DOWNSCALE_TAPS; i++) {
             float2 position = (float2(gid) + (float2(i, j) + 0.5) / float(VIDEO_DOWNSCALE_TAPS)) * cell;
             half2 uv = half2(inTextureU.sample(sampler, position).r, inTextureV.sample(sampler, position).r);
-            sum += clamp(videoYUVToRGB(inTextureY.sample(sampler, position).r, uv), half3(0.0), half3(1.0));
+            sum += clamp(videoYUVToRGB(inTextureY.sample(sampler, position).r, uv, parameters), half3(0.0), half3(1.0));
         }
     }
     outTexture.write(half4(sum / half(VIDEO_DOWNSCALE_TAPS * VIDEO_DOWNSCALE_TAPS), 1.0), gid);
@@ -475,21 +486,23 @@ fragment half4 mainVideoFragment(
 fragment half4 videoBiPlanarFragment(
     QuadVertexOut in [[stage_in]],
     texture2d<half> textureY [[ texture(0) ]],
-    texture2d<half> textureUV [[ texture(1) ]]
+    texture2d<half> textureUV [[ texture(1) ]],
+    constant VideoYUVParameters &parameters [[ buffer(0) ]]
 ) {
     constexpr sampler sampler(coord::normalized, address::clamp_to_edge, filter::linear);
-    return half4(videoYUVToRGB(textureY.sample(sampler, in.uv).r, textureUV.sample(sampler, in.uv).rg), 1.0);
+    return half4(videoYUVToRGB(textureY.sample(sampler, in.uv).r, textureUV.sample(sampler, in.uv).rg, parameters), 1.0);
 }
 
 fragment half4 videoTriPlanarFragment(
     QuadVertexOut in [[stage_in]],
     texture2d<half> textureY [[ texture(0) ]],
     texture2d<half> textureU [[ texture(1) ]],
-    texture2d<half> textureV [[ texture(2) ]]
+    texture2d<half> textureV [[ texture(2) ]],
+    constant VideoYUVParameters &parameters [[ buffer(0) ]]
 ) {
     constexpr sampler sampler(coord::normalized, address::clamp_to_edge, filter::linear);
     half2 uv = half2(textureU.sample(sampler, in.uv).r, textureV.sample(sampler, in.uv).r);
-    return half4(videoYUVToRGB(textureY.sample(sampler, in.uv).r, uv), 1.0);
+    return half4(videoYUVToRGB(textureY.sample(sampler, in.uv).r, uv, parameters), 1.0);
 }
 
 fragment half4 videoBGRAFragment(

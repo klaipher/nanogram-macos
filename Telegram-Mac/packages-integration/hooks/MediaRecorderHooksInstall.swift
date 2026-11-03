@@ -17,6 +17,11 @@ func installMediaRecorderUIHooks() {
             return
         }
         chatInteraction.update({ $0.withoutRecordingState() })
+    }, microphoneDeviceId: { context in
+        guard let context = context as? AccountContext else {
+            return nil
+        }
+        return context.sharedContext.devicesContext.currentRecordingMicroId
     })
     installMediaRecorderHooks(hooks)
 }

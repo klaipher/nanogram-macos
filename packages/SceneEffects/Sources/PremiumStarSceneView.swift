@@ -214,6 +214,7 @@ public final class PremiumStarSceneView: View, SCNSceneRendererDelegate, Premium
         animation.timingFunction = CAMediaTimingFunction(name: .linear)
         animation.autoreverses = true
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         
         node.geometry?.materials.first?.diffuse.addAnimation(animation, forKey: "gradient")
     }
@@ -239,6 +240,7 @@ public final class PremiumStarSceneView: View, SCNSceneRendererDelegate, Premium
         group.beginTime = 1.0
         group.duration = 3.0
         group.repeatCount = .infinity
+        group.setDecorativeLoopFrameRate()
         
         node.geometry?.materials.first?.emission.addAnimation(group, forKey: "shimmer")
         

@@ -127,7 +127,7 @@ public final class EditVideoCropController: ModalViewController {
 
     private func applyState() {
         let oriented = EditVideoRenderer.orient(CIImage(cgImage: still), orientation)
-        if let image = EditVideoRenderer.context.createCGImage(oriented, from: oriented.extent) {
+        if let image = EditVideoRenderer.stillImage(oriented, from: oriented.extent) {
             genericView.imageView.image = image
             genericView.imageSize = image.size
         }

@@ -43,11 +43,18 @@ import StoriesUI
 import ChatListUI
 import WalletContext
 import CrashRecoveryUI
+import CrashReports
 import StarsUI
 #if DEBUG
 import PerfLab
 #endif
 import SettingsUI
+import NanogramDebug
+import NanogramDebugUI
+import NanogramRuntime
+import Mozjpeg
+import Translate
+import LocalAudioTranscription
 
 //#if BETA || DEBUG
 //import Firebase
@@ -221,7 +228,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     }
     
     
-    let presentAccountStatus = Promise(false)
+    let presentAccountStatus = ValuePromise(false, ignoreRepeated: true)
     var containerUrl:String!
     
     private let sharedContextPromise = Promise<SharedApplicationContext>()
@@ -317,6 +324,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
 
         installInvalidFrameDetector()
         memoryPressureMonitor = MemoryPressureMonitor()
+        if #available(macOS 12.0, *) {
+            MetricReportCollector.shared.start()
+        }
         Queue.concurrentBackgroundQueue().async {
             migrateWallpapersToEightBitChannels()
         }
@@ -967,6 +977,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 let sharedApplicationContext = SharedApplicationContext(sharedContext: sharedContext, notificationManager: sharedNotificationManager, sharedWakeupManager: sharedWakeupManager)
                 
                 self.sharedApplicationContextValue = sharedApplicationContext
+                self.memoryPressureMonitor?.releaseAccountCaches = { [weak sharedContext] in
+                    return sharedContext?.releaseAccountCaches() ?? 0
+                }
                 
                 self.supportAccountContextValue = .init(applicationContext: sharedApplicationContext)
                 
@@ -1301,15 +1314,14 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                     self.updatePeerPresence()
                 }
                 sharedContext.updateStatusBarLock(sharedNotificationManager.isLocked)
+                sharedContext.updateSpotlightLock(sharedNotificationManager._lockedValue.passcodeLock)
                 sharedNotificationManager.didUpdateLocked = { value in
                     self.updatePeerPresence()
                     sharedContext.updateStatusBarLock(value.isLocked)
+                    sharedContext.updateSpotlightLock(value.passcodeLock)
                 }
                 
-                self.timer = SwiftSignalKit.Timer(timeout: 5, repeat: true, completion: {
-                    self.updatePeerPresence()
-                }, queue: .mainQueue())
-                self.timer?.start()
+                self.updatePeerPresence()
                 
             })
         })
@@ -1327,11 +1339,24 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     private func updatePeerPresence() {
         if let sharedApplicationContextValue = sharedApplicationContextValue {
-            let isOnline = NSApp.isActive && NSApp.isRunning && !NSApp.isHidden && !sharedApplicationContextValue.sharedWakeupManager.isSleeping && !sharedApplicationContextValue.notificationManager._lockedValue.screenLock && !sharedApplicationContextValue.notificationManager._lockedValue.passcodeLock && SystemIdleTime() < 30
+            let idleTime = Double(SystemIdleTime())
+            let isOnline = NSApp.isActive && NSApp.isRunning && !NSApp.isHidden && !sharedApplicationContextValue.sharedWakeupManager.isSleeping && !sharedApplicationContextValue.notificationManager._lockedValue.screenLock && !sharedApplicationContextValue.notificationManager._lockedValue.passcodeLock && idleTime < PresenceIdleSchedule.idleThreshold
             
-            
-            presentAccountStatus.set(.single(isOnline) |> then(.single(isOnline) |> delay(50, queue: Queue.concurrentBackgroundQueue())) |> restart)
+            presentAccountStatus.set(isOnline)
+            schedulePeerPresenceCheck(idleTime: idleTime)
         }
+    }
+
+    private func schedulePeerPresenceCheck(idleTime: Double) {
+        self.timer?.invalidate()
+        self.timer = nil
+        guard let timeout = PresenceIdleSchedule.nextCheck(isActive: NSApp.isActive && !NSApp.isHidden, idleTime: idleTime) else {
+            return
+        }
+        self.timer = SwiftSignalKit.Timer(timeout: timeout, repeat: false, completion: { [weak self] in
+            self?.updatePeerPresence()
+        }, queue: .mainQueue())
+        self.timer?.start()
     }
     
     @objc public func windiwDidChangeBackingProperties() {
@@ -1367,6 +1392,40 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         }
         #endif
         installServicesMenu()
+        installNanogramDebugMenu()
+    }
+
+    private var nanogramDebugObservations: [NanogramDebugObservation] = []
+
+    private func installNanogramDebugMenu() {
+        let settings = NanogramDebugSettings.shared
+        settings.register(.choice(id: "display.maxFrameRate", section: "Display", title: "Frame-rate cap", detail: "Caps the shared display link that drives app animations.", options: [NanogramDebugChoice(id: "off", title: "Off"), NanogramDebugChoice(id: "60", title: "60 Hz"), NanogramDebugChoice(id: "30", title: "30 Hz")], defaultValue: "off"))
+        let applyFrameRateCap = {
+            SharedDisplayLinkDriver.shared.maximumFramesPerSecondLimit = settings.choice("display.maxFrameRate").flatMap { Int($0) }
+        }
+        applyFrameRateCap()
+        nanogramDebugObservations.append(settings.observe("display.maxFrameRate") { _ in
+            applyFrameRateCap()
+        })
+        settings.register(.toggle(id: "media.jpegWideGamut", section: "Media", title: "Keep wide-gamut colour in sent photos", detail: "Display P3 photos are sent with their ICC profile instead of being flattened to sRGB.", defaultValue: false))
+        let applyJPEGWideGamut = {
+            setJPEGPreservesWideGamut(settings.bool("media.jpegWideGamut"))
+        }
+        applyJPEGWideGamut()
+        nanogramDebugObservations.append(settings.observe("media.jpegWideGamut") { _ in
+            applyJPEGWideGamut()
+        })
+        settings.register(OnDeviceTranslation.legacyDebugOption)
+        settings.register(LocalAudioTranscription.debugOption)
+        settings.register(SystemPictureInPicture.debugOption)
+        NanogramDebugMenu.install(openDeveloperScreen: { [weak self] in
+            guard let context = self?.contextValue?.context, !context.isSupport else {
+                return false
+            }
+            context.window.makeKeyAndOrderFront(nil)
+            context.bindings.rootNavigation().push(DeveloperViewController(context: context))
+            return true
+        })
     }
 
     private func installServicesMenu() {

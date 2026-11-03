@@ -100,6 +100,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     public let session: AVCaptureSession = AVCaptureSession()
     
     public let config: VideoMessageConfig
+    public let outputSide: Int
     
     private var status: VideoCameraRecordingStatus = .idle {
         didSet {
@@ -119,7 +120,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         } |> distinctUntilChanged
     }
     
-    private let renderer:TGVideoCameraGLRenderer = TGVideoCameraGLRenderer()
+    private let renderer: TGVideoCameraRenderer = (TGVideoCameraMetalRenderer() as TGVideoCameraRenderer?) ?? TGVideoCameraGLRenderer()
     private var renderingEnabled: Bool = false
 
     private var recorder: TGVideoCameraMovieRecorder!
@@ -151,24 +152,28 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     private static let queue: Queue = Queue(name: "org.telegram.InstantVideoQueue")
     
     private let startRecordAfterAudioBuffer:Atomic<Bool> = Atomic(value: false)
+    private var resumeAfterAudioBuffer: Bool = false
+    private var deviceObservers: [NSObjectProtocol] = []
     private var pipelineSetupFailed: Bool = false
 
     public static let videoMessageMaxDuration: Double = 60
 
     private var liveUploading: PreUploadManager?
-    public init(path: String, config: VideoMessageConfig, liveUploading: PreUploadManager?) {
+    public init(path: String, config: VideoMessageConfig, liveUploading: PreUploadManager?, audioInputDeviceId: String? = nil) {
         self.path = path
         let url = URL(fileURLWithPath: path)
         self.url = url
         self.currentURL = url
         self.liveUploading = liveUploading
         self.config = config
+        self.outputSide = TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: config.diameter)
         super.init()
         
         recorder = TGVideoCameraMovieRecorder(url: url, delegate: self, callbackQueue: VideoRecorderPipeline.queue.queue)
         
         renderer.orientation = .portrait
         renderer.mirror = true
+        renderer.outputSide = self.outputSide
         if let decoration = roundVideoDecoration() {
             renderer.setDecorationWatermark(decoration.watermark, planeFrames: decoration.planeFrames, planeFrameCount: roundVideoPlaneFrameCount)
         }
@@ -196,7 +201,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             
         let videoDevice = videoDevices.filter({ $0.isConnected && !$0.isSuspended }).first(where: { $0.position == .front || $0.position == .unspecified })
         
-        let audioDevice = audioDevices.first(where: { $0.isConnected && !$0.isSuspended})
+        let audioDevice = audioDevices.first(where: { $0.uniqueID == audioInputDeviceId && $0.isConnected && !$0.isSuspended }) ?? audioDevices.first(where: { $0.isConnected && !$0.isSuspended})
 
 
         if let videoDevice = videoDevice {
@@ -211,7 +216,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         
         videoOutput.alwaysDiscardsLateVideoFrames = false
 
-        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferIOSurfacePropertiesKey as String: [:], kCVPixelBufferWidthKey as String: 500, kCVPixelBufferHeightKey as String: 500]
+        videoOutput.videoSettings = captureVideoSettings()
         
         videoOutput.setSampleBufferDelegate(self, queue: VideoRecorderPipeline.queue.queue)
         session.addOutput(videoOutput)
@@ -224,6 +229,8 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         
         videoConnection = videoOutput.connection(with: .video)
         audioConnection = audioOutput.connection(with: .audio)
+        
+        self.observeCaptureInterruptions()
 
         
         _configureFps()
@@ -281,6 +288,24 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             self.videoDeviceInput = videoDeviceInput
         }
         session.commitConfiguration()
+        videoOutput.videoSettings = captureVideoSettings()
+    }
+    
+    private func captureVideoSettings() -> [String: Any] {
+        var settings: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+            kCVPixelBufferMetalCompatibilityKey as String: true
+        ]
+        if let device = videoDevice {
+            let source = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+            let capped = TGVideoCameraCaptureDimensions(source)
+            if capped.width != source.width || capped.height != source.height {
+                settings[kCVPixelBufferWidthKey as String] = Int(capped.width)
+                settings[kCVPixelBufferHeightKey as String] = Int(capped.height)
+            }
+        }
+        return settings
     }
   
     
@@ -327,6 +352,12 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             
             if startRecordAfterAudioBuffer.swap(false) {
                 self.startRecording()
+                return
+            }
+            
+            if self.resumeAfterAudioBuffer {
+                self.resumeAfterAudioBuffer = false
+                self.continueRecordingAfterResume()
                 return
             }
             
@@ -395,9 +426,10 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     }
     
     private func configureRecorderTracks() {
-        let audioSettings = TGMediaVideoConversionPresetSettings.audioSettings(for: TGMediaVideoConversionPresetVideoMessage, bitrate: Int32(config.audioBitrate))
+        let sourceSampleRate = self.outputAudioFormatDescription.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mSampleRate } ?? 48000.0
+        let audioSettings = TGMediaVideoConversionPresetSettings.audioSettings(for: TGMediaVideoConversionPresetVideoMessage, bitrate: Int32(config.audioBitrate), sourceSampleRate: sourceSampleRate)
         recorder.addAudioTrack(withSourceFormatDescription: outputAudioFormatDescription, settings: audioSettings)
-        let size: CGSize = TGMediaVideoConversionPresetSettings.maximumSize(for: TGMediaVideoConversionPresetVideoMessage)
+        let size = CGSize(width: self.outputSide, height: self.outputSide)
         let videoSettings = TGMediaVideoConversionPresetSettings.videoSettings(for: TGMediaVideoConversionPresetVideoMessage, dimensions: size, bitrate: Int32(config.videoBitrate))
         recorder.addVideoTrack(withSourceFormatDescription: outputVideoFormatDescription, transform: CGAffineTransform.identity, settings: videoSettings)
         
@@ -413,7 +445,47 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             self.isPaused = true
             self.renderingEnabled = false
             self.recorder.finishRecording()
+            self.closeMicrophone()
         }
+    }
+    
+    private func closeMicrophone() {
+        guard let audioDeviceInput = self.audioDeviceInput else {
+            return
+        }
+        self.session.beginConfiguration()
+        self.session.removeInput(audioDeviceInput)
+        self.session.commitConfiguration()
+        self.audioDeviceInput = nil
+    }
+    
+    private func reopenMicrophone() {
+        guard self.audioDeviceInput == nil, let audioDevice = self.audioDevice else {
+            return
+        }
+        self.setSelectedAudioDevice(audioDevice)
+        if self.audioDeviceInput == nil {
+            self.session.stopRunning()
+            self.setSelectedAudioDevice(audioDevice)
+            self.session.startRunning()
+        }
+        self.audioConnection = self.audioOutput.connection(with: .audio)
+    }
+    
+    private func continueRecordingAfterResume() {
+        if self.isDiscarded {
+            return
+        }
+        switch self.status {
+        case .stoppingRecording, .finishRecording, .stopped, .failed:
+            return
+        default:
+            break
+        }
+        self.configureRecorderTracks()
+        self.isPaused = false
+        self.renderingEnabled = true
+        self.status = .recording
     }
     
     public func resume() {
@@ -429,11 +501,24 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             let nextURL = URL(fileURLWithPath: next)
             self.currentURL = nextURL
             self.recorder = TGVideoCameraMovieRecorder(url: nextURL, delegate: self, callbackQueue: VideoRecorderPipeline.queue.queue)
-            self.configureRecorderTracks()
-            
-            self.isPaused = false
-            self.renderingEnabled = true
-            self.status = .recording
+            if self.audioDevice != nil {
+                let previousAudioFormatDescription = self.outputAudioFormatDescription
+                self.outputAudioFormatDescription = nil
+                self.resumeAfterAudioBuffer = true
+                self.reopenMicrophone()
+                VideoRecorderPipeline.queue.after(3.0, {
+                    guard self.resumeAfterAudioBuffer else {
+                        return
+                    }
+                    self.resumeAfterAudioBuffer = false
+                    if self.outputAudioFormatDescription == nil {
+                        self.outputAudioFormatDescription = previousAudioFormatDescription
+                    }
+                    self.continueRecordingAfterResume()
+                })
+            } else {
+                self.continueRecordingAfterResume()
+            }
         }
     }
     
@@ -596,7 +681,52 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
 
 
     
+    private func observeCaptureInterruptions() {
+        let queue = VideoRecorderPipeline.queue
+        self.deviceObservers.append(NotificationCenter.default.addObserver(forName: AVCaptureDevice.wasDisconnectedNotification, object: nil, queue: nil, using: { [weak self] notification in
+            guard let device = notification.object as? AVCaptureDevice, device.hasMediaType(.audio) else {
+                return
+            }
+            let uniqueID = device.uniqueID
+            queue.async {
+                self?.audioDeviceWasDisconnected(uniqueID: uniqueID)
+            }
+        }))
+        self.deviceObservers.append(NotificationCenter.default.addObserver(forName: AVCaptureSession.runtimeErrorNotification, object: self.session, queue: nil, using: { [weak self] _ in
+            queue.async {
+                guard let self, !self.isDiscarded else {
+                    return
+                }
+                switch self.status {
+                case .stoppingRecording, .finishRecording, .stopped, .failed:
+                    return
+                default:
+                    self.session.startRunning()
+                }
+            }
+        }))
+    }
+    
+    private func audioDeviceWasDisconnected(uniqueID: String) {
+        guard !self.isDiscarded, self.audioDevice?.uniqueID == uniqueID else {
+            return
+        }
+        let fallback = AVCaptureDevice.default(for: .audio).flatMap { $0.uniqueID != uniqueID && $0.isConnected && !$0.isSuspended ? $0 : nil } ?? AVCaptureDevice.devices(for: .audio).first(where: { $0.uniqueID != uniqueID && $0.isConnected && !$0.isSuspended })
+        guard let fallback else {
+            return
+        }
+        if self.audioDeviceInput == nil {
+            self.audioDevice = fallback
+            return
+        }
+        self.setSelectedAudioDevice(fallback)
+        self.audioConnection = self.audioOutput.connection(with: .audio)
+    }
+    
     deinit {
+        for observer in self.deviceObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
         VideoRecorderPipeline.queue.sync {
             stopCapture()
             removeAllFiles()

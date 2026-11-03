@@ -85,7 +85,7 @@ final class ChatStarReactionUndoView : Control {
         
         
         self.timer?.invalidate()
-        self.timer = .init(timeout: 5, repeat: false, completion: complete, queue: .mainQueue())
+        self.timer = .init(timeout: 5, repeat: false, completion: complete, queue: .mainQueue(), leeway: .precise)
         self.timer?.start()
         
         

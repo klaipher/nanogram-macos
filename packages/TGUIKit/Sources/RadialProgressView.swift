@@ -752,6 +752,7 @@ public class RadialProgressView: Control {
             animation.toValue = fromValue + CGFloat.pi * 2.0
             animation.duration = Double(2.0 * CGFloat.pi / RadialProgressView.rotationSpeed)
             animation.repeatCount = .infinity
+            animation.setDecorativeLoopFrameRate()
             animation.timingFunction = CAMediaTimingFunction(name: .linear)
             layer.add(animation, forKey: Self.rotationAnimationKey)
         } else if !animate || self.isCutout {

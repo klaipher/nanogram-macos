@@ -34,12 +34,36 @@
     }
 }
 
++ (NSInteger)videoMessageSideForDiameter:(NSInteger)diameter
+{
+    NSNumber *explicitSide = [self _vmSide];
+    if (explicitSide != nil && explicitSide.integerValue > 0)
+        return explicitSide.integerValue;
+    
+    if (diameter <= 0)
+        diameter = 384;
+    diameter = MAX(240, MIN(640, diameter));
+    return diameter & ~1;
+}
+
 + (bool)keepAudioForPreset:(TGMediaVideoConversionPreset)preset
 {
     return preset != TGMediaVideoConversionPresetAnimation;
 }
 
++ (double)audioSampleRateForSourceSampleRate:(double)sourceSampleRate
+{
+    if (fabs(sourceSampleRate - 44100.0) < 1.0)
+        return 44100.0;
+    return 48000.0;
+}
+
 + (NSDictionary *)audioSettingsForPreset:(TGMediaVideoConversionPreset)preset bitrate:(int)bitrate
+{
+    return [self audioSettingsForPreset:preset bitrate:bitrate sourceSampleRate:44100.0];
+}
+
++ (NSDictionary *)audioSettingsForPreset:(TGMediaVideoConversionPreset)preset bitrate:(int)bitrate sourceSampleRate:(double)sourceSampleRate
 {
     NSInteger channels = [self _audioChannelsCountForPreset:preset];
     
@@ -50,7 +74,7 @@
     return @
     {
     AVFormatIDKey: @(kAudioFormatMPEG4AAC),
-    AVSampleRateKey: @44100.0f,
+    AVSampleRateKey: @([self audioSampleRateForSourceSampleRate:sourceSampleRate]),
     AVEncoderBitRateKey: @(bitrate * 1000),
     AVNumberOfChannelsKey: @(channels),
     AVChannelLayoutKey: [NSData dataWithBytes:&acl length:sizeof(acl)]
@@ -77,7 +101,9 @@
     {
     AVVideoAverageBitRateKey: @(bitrate * 1000),
     AVVideoCleanApertureKey: videoCleanApertureSettings,
-    AVVideoPixelAspectRatioKey: videoAspectRatioSettings
+    AVVideoPixelAspectRatioKey: videoAspectRatioSettings,
+    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+    AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC
     };
     
     return @
@@ -85,7 +111,13 @@
     AVVideoCodecKey: AVVideoCodecTypeH264,
     AVVideoCompressionPropertiesKey: codecSettings,
     AVVideoWidthKey: @((NSInteger)dimensions.width),
-    AVVideoHeightKey: @((NSInteger)dimensions.height)
+    AVVideoHeightKey: @((NSInteger)dimensions.height),
+    AVVideoColorPropertiesKey: @
+    {
+    AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+    AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+    AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+    }
     };
 }
 

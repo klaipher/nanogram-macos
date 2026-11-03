@@ -1469,7 +1469,7 @@ private final class HeaderView : GeneralRowView {
             self.timer = .init(timeout: 2.5, repeat: true, completion: {
                 item.makeNextPattern()
                 update()
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             self.timer?.start()
         } else {
             self.timer = nil

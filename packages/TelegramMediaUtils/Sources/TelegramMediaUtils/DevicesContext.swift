@@ -82,12 +82,31 @@ public func sizeof <T> (_ value : [T]) -> Int
     return (MemoryLayout<T>.size * value.count)
 }
 
+public enum CaptureDeviceTransport: Equatable {
+    case builtIn
+    case bluetooth
+    case other
+
+    public init(coreAudioTransportType: UInt32) {
+        switch coreAudioTransportType {
+        case kAudioDeviceTransportTypeBuiltIn:
+            self = .builtIn
+        case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE:
+            self = .bluetooth
+        default:
+            self = .other
+        }
+    }
+}
+
 public struct CaptureDeviceCandidate: Equatable {
     public let uniqueID: String
     public let isAvailable: Bool
-    public init(uniqueID: String, isAvailable: Bool) {
+    public let transport: CaptureDeviceTransport
+    public init(uniqueID: String, isAvailable: Bool, transport: CaptureDeviceTransport = .other) {
         self.uniqueID = uniqueID
         self.isAvailable = isAvailable
+        self.transport = transport
     }
 }
 
@@ -177,6 +196,7 @@ public final class DevicesContext : NSObject {
     
     private let _currentCameraId: Atomic<String?> = Atomic(value: nil)
     private let _currentMicroId: Atomic<String?> = Atomic(value: nil)
+    private let _currentRecordingMicroId: Atomic<String?> = Atomic(value: nil)
     private let _currentOutputId: Atomic<String?> = Atomic(value: nil)
     
     public var currentCameraId: String? {
@@ -184,6 +204,9 @@ public final class DevicesContext : NSObject {
     }
     public var currentMicroId: String? {
         return _currentMicroId.with { $0 }
+    }
+    public var currentRecordingMicroId: String? {
+        return _currentRecordingMicroId.with { $0 }
     }
     public var currentOutputId: String? {
         return _currentOutputId.with { $0 }
@@ -240,6 +263,7 @@ public final class DevicesContext : NSObject {
         
         let currentCameraId = self._currentCameraId
         let currentMicroId = self._currentMicroId
+        let currentRecordingMicroId = self._currentRecordingMicroId
         let currentOutputId = self._currentOutputId
         
         var tracker = DevicesChangeTracker()
@@ -250,6 +274,7 @@ public final class DevicesContext : NSObject {
             let outputUpdated = DevicesContext.updateOutputId(settings, devices: devices)
             
             _ = currentMicroId.swap(inputUpdated)
+            _ = currentRecordingMicroId.swap(DevicesContext.updateRecordingMicroId(settings, devices: devices))
             _ = currentCameraId.swap(cameraUpdated)
             _ = currentOutputId.swap(outputUpdated)
             
@@ -310,6 +335,35 @@ public final class DevicesContext : NSObject {
         return defaultId
     }
     
+    public static func resolveMicrophoneId(selectedId: String?, candidates: [CaptureDeviceCandidate], defaultId: String?, preferBuiltInWithBluetooth: Bool) -> String? {
+        if let selectedId, let device = candidates.first(where: { $0.uniqueID == selectedId }), device.isAvailable {
+            return device.uniqueID
+        }
+        if preferBuiltInWithBluetooth, let defaultId, let defaultDevice = candidates.first(where: { $0.uniqueID == defaultId }), defaultDevice.transport == .bluetooth, let builtIn = candidates.first(where: { $0.transport == .builtIn && $0.isAvailable }) {
+            return builtIn.uniqueID
+        }
+        return defaultId
+    }
+    
+    public static func resolveMicrophoneId(_ settings: VoiceCallSettings, candidates: [CaptureDeviceCandidate], defaultId: String?) -> String? {
+        return resolveMicrophoneId(selectedId: settings.audioInputDeviceId, candidates: candidates, defaultId: defaultId, preferBuiltInWithBluetooth: settings.builtInMicrophoneWithBluetooth)
+    }
+    
+    public static func resolveRecordingMicrophoneId(selectedId: String?, candidates: [CaptureDeviceCandidate], defaultId: String?, preferBuiltInWithBluetooth: Bool) -> String? {
+        let resolved = resolveMicrophoneId(selectedId: selectedId, candidates: candidates, defaultId: defaultId, preferBuiltInWithBluetooth: preferBuiltInWithBluetooth)
+        if let selectedId, resolved == selectedId {
+            return resolved
+        }
+        if resolved != defaultId {
+            return resolved
+        }
+        return nil
+    }
+    
+    public static func resolveRecordingMicrophoneId(_ settings: VoiceCallSettings, candidates: [CaptureDeviceCandidate], defaultId: String?) -> String? {
+        return resolveRecordingMicrophoneId(selectedId: settings.audioInputDeviceId, candidates: candidates, defaultId: defaultId, preferBuiltInWithBluetooth: settings.builtInMicrophoneWithBluetooth)
+    }
+    
     public static func resolveOutputDeviceId(selectedId: String?, available: [String], defaultId: String?) -> String? {
         if let selectedId, available.contains(selectedId) {
             return selectedId
@@ -318,7 +372,7 @@ public final class DevicesContext : NSObject {
     }
     
     private static func candidates(_ devices: [AVCaptureDevice]) -> [CaptureDeviceCandidate] {
-        return devices.map { CaptureDeviceCandidate(uniqueID: $0.uniqueID, isAvailable: $0.isConnected && !$0.isSuspended) }
+        return devices.map { CaptureDeviceCandidate(uniqueID: $0.uniqueID, isAvailable: $0.isConnected && !$0.isSuspended, transport: $0.hasMediaType(.audio) ? CaptureDeviceTransport(coreAudioTransportType: UInt32(bitPattern: $0.transportType)) : .other) }
     }
     
     public static func updateCameraId(_ settings: VoiceCallSettings, devices: IODevices) -> String? {
@@ -326,7 +380,11 @@ public final class DevicesContext : NSObject {
     }
     
     public static func updateMicroId(_ settings: VoiceCallSettings, devices: IODevices) -> String? {
-        return resolveCaptureDeviceId(selectedId: settings.audioInputDeviceId, candidates: candidates(devices.audioInput), defaultId: AVCaptureDevice.default(for: .audio)?.uniqueID)
+        return resolveMicrophoneId(settings, candidates: candidates(devices.audioInput), defaultId: AVCaptureDevice.default(for: .audio)?.uniqueID)
+    }
+    
+    public static func updateRecordingMicroId(_ settings: VoiceCallSettings, devices: IODevices) -> String? {
+        return resolveRecordingMicrophoneId(settings, candidates: candidates(devices.audioInput), defaultId: AVCaptureDevice.default(for: .audio)?.uniqueID)
     }
     
     public static func updateOutputId(_ settings: VoiceCallSettings, devices: IODevices) -> String? {

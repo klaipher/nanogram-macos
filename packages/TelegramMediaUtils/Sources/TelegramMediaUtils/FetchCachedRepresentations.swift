@@ -71,7 +71,8 @@ public func makeLottieImage(from zippedData: Data,
 }
 
 
-private let cacheThreadPool = ThreadPool(threadCount: 1, threadPriority: 0.1)
+private let cacheThreadPool = ThreadPool(threadCount: 1, qos: .utility)
+private let animationCacheThreadPool = ThreadPool(threadCount: 2, qos: .utility)
 
 
 public func fetchCachedResourceRepresentation(account: Account, resource: MediaResource, representation: CachedMediaResourceRepresentation) -> Signal<CachedMediaResourceRepresentationResult, NoError> {
@@ -392,7 +393,7 @@ private func fetchCachedAnimatedStickerRepresentation(account: Account, resource
         data = account.postbox.mediaBox.resourceData(resource, option: .complete(waitUntilFetchStatus: false))
     }
 
-    return data |> deliverOn(lottieThreadPool) |> map { resourceData -> (CGImage?, Data?, MediaResourceData) in
+    return data |> deliverOn(animationCacheThreadPool) |> map { resourceData -> (CGImage?, Data?, MediaResourceData) in
         if resourceData.complete {
             if let data = try? Data(contentsOf: URL(fileURLWithPath: resourceData.path), options: [.mappedIfSafe]) {
                 return (nil, data, resourceData)
@@ -413,7 +414,8 @@ private func fetchCachedAnimatedStickerRepresentation(account: Account, resource
                     let decoder = SoftwareVideoSource(path: resourceData.path, hintVP9: true, unpremultiplyAlpha: true)
                     image = decoder.preview(size: representation.size, backingScale: 2)
                 } else {
-                    image = convertFromWebP(data)?._cgImage ?? NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                    let targetPixelSize = CGSize(width: representation.size.width * 2, height: representation.size.height * 2)
+                    image = WebPCreateImageFittingPixelSize(data, targetPixelSize) ?? convertFromWebP(data)?._cgImage ?? NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
                     
                     if image == nil, let data = TGGUnzipData(data, 8 * 1024 * 1024) {
                         if let json = String(data: transformedWithFitzModifier(data: data, fitzModifier: representation.fitzModifier), encoding: .utf8), json.length > 0 {
@@ -433,23 +435,13 @@ private func fetchCachedAnimatedStickerRepresentation(account: Account, resource
                             })
                             free(memoryData)
                         }
-                    } else if image != nil {
-                        let webp = WebPImageDecoder(data: data, scale: 2.0)
-                        let fullSizeWebp = webp?.frame(at: 0, decodeForDisplay: true)?.image?._cgImage
-                        image = fullSizeWebp ?? image
                     }
                 }
                
                 
                 if let image = image, let colorDestination = CGImageDestinationCreateWithData(colorData as CFMutableData, kUTTypePNG, 1, nil) {
                     CGImageDestinationSetProperties(colorDestination, [:] as CFDictionary)
-                    
-                    let colorQuality: Float
-                    colorQuality = 0.4
-                    
-                    let options = NSMutableDictionary()
-                    options.setObject(colorQuality as NSNumber, forKey: kCGImageDestinationLossyCompressionQuality as NSString)
-                    CGImageDestinationAddImage(colorDestination, image, options as CFDictionary)
+                    CGImageDestinationAddImage(colorDestination, image, nil)
                     if CGImageDestinationFinalize(colorDestination)  {
                         try? colorData.write(to: url, options: .atomic)
                         return .single(.temporaryPath(path))
@@ -760,7 +752,7 @@ private func fetchCachedSlotRepresentation(account: Account, data: [(Data, Int32
         return ActionDisposable {
             
         }
-    } |> runOn(lottieThreadPool)
+    } |> runOn(animationCacheThreadPool)
 }
 
 private func fetchCachedDiceRepresentation(account: Account, data: Data, representation: CachedDiceRepresentation) -> Signal<CachedMediaResourceRepresentationResult, NoError> {
@@ -817,12 +809,12 @@ private func fetchCachedDiceRepresentation(account: Account, data: Data, represe
         return ActionDisposable {
             
         }
-    } |> runOn(lottieThreadPool)
+    } |> runOn(animationCacheThreadPool)
 }
 
 public func getAnimatedStickerThumb(data: Data, size: NSSize = NSMakeSize(512, 512)) -> Signal<String?, NoError> {
     
-    return .single(data) |> deliverOn(lottieThreadPool) |> map { data -> String? in
+    return .single(data) |> deliverOn(animationCacheThreadPool) |> map { data -> String? in
         var dataValue: Data! = TGGUnzipData(data, 8 * 1024 * 1024)
         if dataValue == nil {
             dataValue = data

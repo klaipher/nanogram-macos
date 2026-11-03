@@ -513,7 +513,7 @@ public func ExportedInvitationController(invitation: _ExportedInvitation, peerId
             controller?.centerModalHeader = ModalHeaderData(title: invitation.title ?? strings().exportedInvitationTitle, subtitle: getSubtitle())
             modalController.updateLocalizationAndTheme(theme: theme)
         }
-    }, queue: .mainQueue())
+    }, queue: .mainQueue(), leeway: .precise)
 
     timer.start()
 

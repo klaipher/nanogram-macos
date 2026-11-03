@@ -482,6 +482,9 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
             } else if let view = self.livePhotoButton, NSPointInRect(point, view.frame) {
                 return .invokeNext
             }
+            if let recognition = view.recognition, recognition.openCode(atWindow: event.locationInWindow) {
+                return .invoked
+            }
             if let recognitionView = view.recognition?.view, let hitTestView, hitTestView !== recognitionView, hitTestView.isDescendant(of: recognitionView) {
                 return .rejected
             }
@@ -606,7 +609,9 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
                 
                 let point = window.mouseLocationOutsideOfEventStream
                 let hitTestView = window.contentView?.hitTest(point)
-                if view.contentView == hitTestView || hitTestView == view.recognition?.view {
+                if let event = NSApp.currentEvent, let menu = view.recognition?.codeMenu(atWindow: point) {
+                    AppMenu.show(menu: menu, event: event, for: view)
+                } else if view.contentView == hitTestView || hitTestView == view.recognition?.view {
                     if let event = NSApp.currentEvent, let menu = interactions.contextMenu() {
                         AppMenu.show(menu: menu, event: event, for: view)
                     }

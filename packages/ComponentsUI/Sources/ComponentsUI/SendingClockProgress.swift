@@ -70,6 +70,7 @@ open class SendingClockProgress: View {
         animation.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)
         animation.duration = 6
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.fromValue = 0
         animation.toValue = (Double.pi * 2.0)
         animation.beginTime = 1.0
@@ -83,6 +84,7 @@ open class SendingClockProgress: View {
         animation.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)
         animation.duration = 1
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.fromValue = 0
         animation.toValue = (Double.pi * 2.0)
         animation.beginTime = 1.0

@@ -133,6 +133,7 @@ public final class VoiceTranscriptionControl: Control {
                 endAnimation.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 endAnimation.fillMode = .forwards
                 endAnimation.repeatCount = .infinity
+                endAnimation.setDecorativeLoopFrameRate()
                 inProgressLayer.add(endAnimation, forKey: "strokeEnd")
                 
                 let startAnimation = CABasicAnimation(keyPath: "strokeStart")
@@ -142,6 +143,7 @@ public final class VoiceTranscriptionControl: Control {
                 startAnimation.timingFunction = CAMediaTimingFunction(name: .easeIn)
                 startAnimation.fillMode = .forwards
                 startAnimation.repeatCount = .infinity
+                startAnimation.setDecorativeLoopFrameRate()
                 inProgressLayer.add(startAnimation, forKey: "strokeStart")
                 
                 self.layer?.addSublayer(inProgressLayer)

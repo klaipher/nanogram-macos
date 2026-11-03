@@ -28,6 +28,7 @@ private final class GroupCallSpeakingView : View {
         
         animationView.layer?.removeAllAnimations()
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.isRemovedOnCompletion = false
         animationView.layer?.add(animation, forKey: "contents")
     }
@@ -81,6 +82,7 @@ private final class GroupCallRecordingView : Control {
         animation.duration = 1.0
         animation.autoreverses = true
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.isRemovedOnCompletion = false
         animation.fillMode = CAMediaTimingFillMode.forwards
         

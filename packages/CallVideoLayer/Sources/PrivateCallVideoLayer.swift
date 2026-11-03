@@ -213,6 +213,8 @@ final class PrivateCallVideoLayer: MetalEngineSubjectLayer, MetalEngineSubject {
                 encodeVideoGeometry(encoder: encoder, placement: placement, spec: renderSpec, video: videoTextures)
                 encoder.setFragmentTexture(biPlanar.y, index: 0)
                 encoder.setFragmentTexture(biPlanar.uv, index: 1)
+                var parameters = videoTextures.yuvConversion.shaderParameters
+                encoder.setFragmentBytes(&parameters, length: MemoryLayout<VideoYUVConversion.ShaderParameters>.size, index: 0)
                 encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
             })
         case let .triPlanar(triPlanar):
@@ -221,6 +223,8 @@ final class PrivateCallVideoLayer: MetalEngineSubjectLayer, MetalEngineSubject {
                 encoder.setFragmentTexture(triPlanar.y, index: 0)
                 encoder.setFragmentTexture(triPlanar.u, index: 1)
                 encoder.setFragmentTexture(triPlanar.v, index: 2)
+                var parameters = videoTextures.yuvConversion.shaderParameters
+                encoder.setFragmentBytes(&parameters, length: MemoryLayout<VideoYUVConversion.ShaderParameters>.size, index: 0)
                 encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
             })
         case let .bgra(bgra):
@@ -278,6 +282,8 @@ final class PrivateCallVideoLayer: MetalEngineSubjectLayer, MetalEngineSubject {
                 computeEncoder.setTexture(triPlanar.v, index: 2)
                 computeEncoder.setTexture(downscaledTexture, index: 3)
             }
+            var yuvParameters = videoTextures.yuvConversion.shaderParameters
+            computeEncoder.setBytes(&yuvParameters, length: MemoryLayout<VideoYUVConversion.ShaderParameters>.size, index: 0)
             computeEncoder.dispatchThreadgroups(threadgroupCount, threadsPerThreadgroup: threadgroupSize)
             
             computeEncoder.setComputePipelineState(blurState.computePipelineStateHorizontal)

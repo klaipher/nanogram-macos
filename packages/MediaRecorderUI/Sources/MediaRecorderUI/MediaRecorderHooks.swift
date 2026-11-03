@@ -9,11 +9,14 @@ import TelegramMediaUtils
 public struct MediaRecorderHooks {
     public let setPendingMedia: (Any, Signal<[MediaSenderContainer], NoError>) -> Void
     public let clearRecordingState: (Any) -> Void
+    public let microphoneDeviceId: (any AccountContextProtocol) -> String?
 
     public init(setPendingMedia: @escaping (Any, Signal<[MediaSenderContainer], NoError>) -> Void,
-                clearRecordingState: @escaping (Any) -> Void) {
+                clearRecordingState: @escaping (Any) -> Void,
+                microphoneDeviceId: @escaping (any AccountContextProtocol) -> String?) {
         self.setPendingMedia = setPendingMedia
         self.clearRecordingState = clearRecordingState
+        self.microphoneDeviceId = microphoneDeviceId
     }
 
     private static var value: MediaRecorderHooks?

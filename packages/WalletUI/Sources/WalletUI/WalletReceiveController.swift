@@ -288,6 +288,7 @@ private final class WalletReceiveAddressRingView: NSView {
             animation.rotationMode = .rotateAuto
             animation.duration = duration
             animation.repeatCount = .infinity
+            animation.setDecorativeLoopFrameRate()
             animation.timeOffset = duration * Double(ringLayout.phases[index])
             animation.isRemovedOnCompletion = false
             shape.add(animation, forKey: "ring")

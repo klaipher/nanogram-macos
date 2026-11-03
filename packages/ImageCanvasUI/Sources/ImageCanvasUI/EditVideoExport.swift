@@ -309,7 +309,15 @@ public enum EditVideoRenderer {
 
     private static let kernel: CIColorKernel? = CIColorKernel(source: source)
 
-    public static let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
+    public static let context = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, .outputColorSpace: CGColorSpace(name: CGColorSpace.itur_709)!])
+
+    private static let stillColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+
+    public static func stillImage(_ image: CIImage, from rect: CGRect) -> CGImage? {
+        return context.createCGImage(image, from: rect, format: .RGBA8, colorSpace: stillColorSpace)
+    }
+    
+    static let highQualityDownsampleThreshold: CGFloat = 0.75
 
     static func components(_ hex: UInt32?) -> CIVector {
         guard let hex = hex else {
@@ -407,7 +415,14 @@ public enum EditVideoRenderer {
         let rect = cropRect(spec.crop, in: oriented)
         image = image.cropped(to: rect).transformed(by: CGAffineTransform(translationX: -rect.minX, y: -rect.minY))
         if let outputSize = outputSize, rect.width > 0, rect.height > 0 {
-            image = image.transformed(by: CGAffineTransform(scaleX: outputSize.width / rect.width, y: outputSize.height / rect.height))
+            let scaleX = outputSize.width / rect.width
+            let scaleY = outputSize.height / rect.height
+            let transform = CGAffineTransform(scaleX: scaleX, y: scaleY)
+            if max(scaleX, scaleY) < highQualityDownsampleThreshold {
+                image = image.transformed(by: transform, highQualityDownsample: true)
+            } else {
+                image = image.transformed(by: transform)
+            }
             image = image.cropped(to: CGRect(origin: .zero, size: outputSize))
         }
         return image
@@ -429,6 +444,9 @@ public enum EditVideoRenderer {
             let output = render(request.sourceImage, spec: spec, enhance: enhance, outputSize: outputSize)
             request.finish(with: output, context: context)
         })
+        composition.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
+        composition.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
+        composition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
         let display = composition.renderSize
         composition.renderSize = outputSize ?? croppedSize(display: display, spec: spec)
         if outputSize != nil, spec.hasAdjustments || spec.overlay != nil {
@@ -523,7 +541,7 @@ public enum EditVideoExport {
         let scale = min(1.0, maxSide / max(size.width, size.height))
         let target = CGSize(width: max(1, floor(size.width * scale)), height: max(1, floor(size.height * scale)))
         image = image.transformed(by: CGAffineTransform(scaleX: target.width / size.width, y: target.height / size.height))
-        return EditVideoRenderer.context.createCGImage(image, from: CGRect(origin: .zero, size: target))
+        return EditVideoRenderer.stillImage(image, from: CGRect(origin: .zero, size: target))
     }
 
     public static func export(_ spec: EditVideoRenderSpec, to url: URL) -> Signal<Bool, NoError> {
@@ -610,6 +628,11 @@ public enum EditVideoExport {
                     AVVideoAverageBitRateKey: quality.videoBitrate,
                     AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
                     AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC
+                ],
+                AVVideoColorPropertiesKey: [
+                    AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                    AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                    AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
                 ]
             ])
             videoInput.expectsMediaDataInRealTime = false

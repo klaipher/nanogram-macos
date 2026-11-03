@@ -115,7 +115,7 @@ public class StoryLayoutView : Control {
                 self.timerTime = CACurrentMediaTime()
                 self.timer = SwiftSignalKit.Timer(timeout: self.duration - status.timestamp, repeat: false, completion: { [weak self] in
                     self?.updateState(.finished)
-                }, queue: .mainQueue())
+                }, queue: .mainQueue(), leeway: .precise)
                 self.timer?.start()
             default:
                 self.timerTime = nil

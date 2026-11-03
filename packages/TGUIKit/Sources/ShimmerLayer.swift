@@ -219,6 +219,7 @@ private final class ShimmerEffectForegroundLayer: SimpleLayer {
         
         if !isStatic {
             animation.repeatCount = Float.infinity
+            animation.setDecorativeLoopFrameRate()
             animation.beginTime = 1.0
         }
         
@@ -498,6 +499,7 @@ public final class SilhouetteShimmerLayer: SimpleLayer {
         animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
         animation.duration = 1.5
         animation.repeatCount = Float.infinity
+        animation.setDecorativeLoopFrameRate()
         animation.beginTime = 1.0
         let k = Float(NSView.animationDurationFactor())
         if k != 0 && k != 1 {

@@ -62,7 +62,7 @@ public final class MediaPlayerView: View {
     
     private var videoNode: MediaPlayerViewDisplayView
     
-    private(set) var videoLayer: AVSampleBufferDisplayLayer?
+    public private(set) var videoLayer: AVSampleBufferDisplayLayer?
     private var videoLayerReadyForDisplayObserver: NSObjectProtocol?
     private var didNotifyVideoLayerReadyForDisplay: Bool = false
     public var hasSentFramesToDisplay: (() -> Void)?
@@ -233,7 +233,7 @@ public final class MediaPlayerView: View {
                                     strongSelf.startPolling()
                                 }
                             }
-                        }, queue: Queue.mainQueue())
+                        }, queue: Queue.mainQueue(), leeway: .precise)
                         strongSelf.timer?.start()
                     case .finished:
                         break

@@ -39,8 +39,17 @@ func clearSampleBufferLayerPoll() {
     let _ = pool.modify { _ in return [] }
 }
 
+private let maximumPooledSampleBufferLayers = 16
+
 public func takeSampleBufferLayer() -> SampleBufferLayer {
     var layer: AVSampleBufferDisplayLayer?
+    let _ = pool.modify { list in
+        var list = list
+        if !list.isEmpty {
+            layer = list.removeLast()
+        }
+        return list
+    }
     if layer == nil {
         layer = SampleBufferLayerImpl()
     }
@@ -48,6 +57,18 @@ public func takeSampleBufferLayer() -> SampleBufferLayer {
         Queue.mainQueue().async {
             layer.flushAndRemoveImage()
             layer.setAffineTransform(CGAffineTransform.identity)
+            layer.removeFromSuperlayer()
+            layer.controlTimebase = nil
+            layer.videoGravity = .resizeAspect
+            layer.opacity = 1
+            layer.isHidden = false
+            let _ = pool.modify { list in
+                var list = list
+                if list.count < maximumPooledSampleBufferLayers {
+                    list.append(layer)
+                }
+                return list
+            }
         }
     })
 }

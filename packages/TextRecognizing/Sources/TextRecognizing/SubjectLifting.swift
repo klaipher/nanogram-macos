@@ -61,8 +61,22 @@ public extension TextRecognizing {
             let extent = input.extent
             let dilated = input.applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: width]).cropped(to: extent)
             let border = CIImage(color: CIColor(red: 1, green: 1, blue: 1)).cropped(to: extent).applyingFilter("CIBlendWithAlphaMask", parameters: [kCIInputBackgroundImageKey: CIImage.empty(), kCIInputMaskImageKey: dilated])
+            return Subject.outlineContext(for: colorSpace).createCGImage(input.composited(over: border), from: extent)
+        }
+
+        private static let contextsLock = NSLock()
+        private static var contexts: [String: CIContext] = [:]
+
+        static func outlineContext(for colorSpace: CGColorSpace) -> CIContext {
+            let key = (colorSpace.name as String?) ?? "\(colorSpace)"
+            contextsLock.lock()
+            defer { contextsLock.unlock() }
+            if let context = contexts[key] {
+                return context
+            }
             let context = CIContext(options: [.workingColorSpace: colorSpace, .outputColorSpace: colorSpace])
-            return context.createCGImage(input.composited(over: border), from: extent)
+            contexts[key] = context
+            return context
         }
     }
 

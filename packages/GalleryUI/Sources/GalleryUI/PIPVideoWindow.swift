@@ -1,5 +1,6 @@
 import Cocoa
 import TGUIKit
+import NanogramRuntime
 import AVKit
 import SwiftSignalKit
 import TelegramMedia
@@ -343,22 +344,46 @@ fileprivate class ModernPictureInPictureVideoWindow: NSPanel {
 
 
 private var window: NSWindow?
+private var systemSession: AnyObject?
+private var systemSessionForcePaused = false
 
 
 public var hasPictureInPicture: Bool {
-    return window != nil
+    return window != nil || systemSession != nil
 }
 
 public func showPipVideo(control: PictureInPictureControl, viewer: GalleryViewer, item: MGalleryItem, origin: NSPoint, delegate:InteractionContentViewProtocol? = nil, contentInteractions:(any GalleryContentInteractions)? = nil, type: GalleryAppearType) {
     closePipVideo()
-    window = ModernPictureInPictureVideoWindow(control, item: item, viewer: viewer, origin: origin, delegate: delegate, contentInteractions: contentInteractions, type: type)
-    window?.makeKeyAndOrderFront(nil)
+    let showTelegramWindow = {
+        window = ModernPictureInPictureVideoWindow(control, item: item, viewer: viewer, origin: origin, delegate: delegate, contentInteractions: contentInteractions, type: type)
+        window?.makeKeyAndOrderFront(nil)
+    }
+    if #available(macOS 12.0, *), SystemPictureInPicture.isEnabled, let session = SystemPictureInPictureSession(control: control, viewer: viewer, item: item, origin: origin, delegate: delegate, contentInteractions: contentInteractions, type: type) {
+        systemSession = session
+        systemSessionForcePaused = false
+        session.fallback = { [weak session] in
+            if systemSession === session {
+                systemSession = nil
+            }
+            showTelegramWindow()
+        }
+        session.ended = { [weak session] in
+            if systemSession === session {
+                systemSession = nil
+            }
+        }
+        session.start()
+        return
+    }
+    showTelegramWindow()
 }
 
 
 public func exitPictureInPicture() {
     if let window = window as? ModernPictureInPictureVideoWindow {
         window.openGallery()
+    } else if #available(macOS 12.0, *), let session = systemSession as? SystemPictureInPictureSession {
+        session.openGallery()
     }
 }
 
@@ -368,6 +393,10 @@ public func pausepip() {
             window.control.pause()
             window.forcePaused = true
         }
+    } else if #available(macOS 12.0, *), let session = systemSession as? SystemPictureInPictureSession {
+        if session.pause() {
+            systemSessionForcePaused = true
+        }
     }
 }
 
@@ -375,6 +404,9 @@ public func playPipIfNeeded() {
     if let window = window as? ModernPictureInPictureVideoWindow, window.forcePaused, window.control.isPlaying()  {
         window.control.play()
         window.forcePaused = false
+    } else if #available(macOS 12.0, *), let session = systemSession as? SystemPictureInPictureSession, systemSessionForcePaused {
+        session.play()
+        systemSessionForcePaused = false
     }
 }
 
@@ -386,11 +418,16 @@ public func closePipVideo() {
         window.control.pause()
     }
     window = nil
-    
+    if #available(macOS 12.0, *), let session = systemSession as? SystemPictureInPictureSession {
+        systemSession = nil
+        session.close()
+    }
 }
 
 public func closePipVideo(accountId: AccountRecordId) {
     if let window = window as? ModernPictureInPictureVideoWindow, window.viewer.accountId == accountId {
+        closePipVideo()
+    } else if #available(macOS 12.0, *), let session = systemSession as? SystemPictureInPictureSession, session.viewer.accountId == accountId {
         closePipVideo()
     }
 }

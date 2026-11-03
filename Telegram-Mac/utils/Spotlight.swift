@@ -8,6 +8,8 @@ import TGUIKit
 import MurMurHash32
 import TelegramTheme
 import TelegramLinks
+import TelegramUtils
+import NanogramRuntime
 
 public enum SpotlightIdentifierSource : Equatable {
     case peerId(PeerId)
@@ -33,132 +35,70 @@ public struct SpotlightIdentifier : Hashable {
         return "accountId=\(recordId.int64)&source=\(source.stringValue)"
     }
 }
-@available(macOS 10.13, *)
-private func makeSearchItem(for peer: Peer, index: Int, accountPeer: Peer, accountId: AccountRecordId) -> SpotlightItem {
-    let key = SpotlightIdentifier(recordId: accountId, source: .peerId(peer.id))
-    let attributeSet = CSSearchableItemAttributeSet(itemContentType: kUTTypeData as String)
-    attributeSet.title = peer.displayTitle + " → \(accountPeer.addressName ?? accountPeer.displayTitle)"
-    attributeSet.contentDescription = "Popular contact in telegram"
-    attributeSet.thumbnailData = theme.icons.appUpdate.data
-    attributeSet.creator = "Telegram"
-    attributeSet.kind = "Contact"
-    
-    return .recentPeer(key, index, CSSearchableItem(uniqueIdentifier: key.stringValue, domainIdentifier: Bundle.main.bundleIdentifier!, attributeSet: attributeSet), peer)
-}
-
-private enum SpotlightItem : Identifiable, Comparable {
-    public static func == (lhs: SpotlightItem, rhs: SpotlightItem) -> Bool {
-        switch lhs {
-        case let .recentPeer(id, index, _, lhsPeer):
-            if case .recentPeer(id, index, _, let rhsPeer) = rhs {
-                return lhsPeer.isEqual(rhsPeer)
-            } else {
-                return false
-            }
-        }
-    }
-    
-    case recentPeer(SpotlightIdentifier, Int, CSSearchableItem, Peer)
-
-    public static func < (lhs: SpotlightItem, rhs: SpotlightItem) -> Bool {
-        return lhs.index < rhs.index
-    }
-    public var index: Int {
-        switch self {
-        case let .recentPeer(_, index, _, _):
-            return index
-        }
-    }
-    public var stableId: SpotlightIdentifier {
-        switch self {
-        case let .recentPeer(id, _, _, _):
-            return id
-        }
-    }
-    public var item:CSSearchableItem {
-        switch self {
-        case let .recentPeer(_, _, item, _):
-            return item
-        }
-    }
-}
-
-
-
 public final class SpotlightContext {
     public let engine: TelegramEngine
     private let disposable = MetaDisposable()
-    private var previousItems:[SpotlightItem] = []
-    public init(engine: TelegramEngine) {
+    private let peerIndex: SpotlightPeerIndex
+
+    public init(engine: TelegramEngine, isLocked: Bool) {
         self.engine = engine
-        if #available(macOS 10.12, *) {
-            let accountPeer = engine.account.postbox.loadedPeerWithId(engine.account.peerId)
-            
-            
-            let recently = engine.peers.recentlySearchedPeers() |> map {
-                $0.compactMap { $0.peer.chatMainPeer }
-            } |> distinctUntilChanged(isEqual: { previous, current -> Bool in
-                return previous.count == current.count
-            })
-            
-            let peers:Signal<[Peer], NoError> = combineLatest(recently, engine.peers.recentPeers() |> mapToSignal { recent in
-                switch recent {
-                case .disabled:
-                    return .single([])
-                case let .peers(peers):
-                    return .single(peers)
-                }
-            }) |> map {
-                $0 + $1
-            } |> distinctUntilChanged(isEqual: { previous, current -> Bool in
-                return previous.count == current.count
-            })
-            
-            
-            
-            let signal = combineLatest(queue: .mainQueue(), accountPeer, peers)
-            
-            
-            
-            disposable.set(signal.start(next: { [weak self] accountPeer, peers in
-                guard let `self` = self else {
-                    return
-                }
-                var items: [SpotlightItem] = []
-                for (i, peer) in peers.enumerated() {
-                    if #available(OSX 10.13, *) {
-                        items.append(makeSearchItem(for: peer, index: i, accountPeer: accountPeer, accountId: engine.account.id))
-                    } else {
-                        // Fallback on earlier versions
-                    }
-                }
-                
-                let (delete, insert, update) = mergeListsStableWithUpdates(leftList: self.previousItems, rightList: items)
-                
-                if !insert.isEmpty || !update.isEmpty {
-                    CSSearchableIndex.default().indexSearchableItems(insert.map { $0.1.item }, completionHandler: nil)
-                    CSSearchableIndex.default().indexSearchableItems(update.map { $0.1.item }, completionHandler: nil)
-                }
-                
-                var deleted: [SpotlightItem] = []
-                for index in delete.reversed() {
-                    deleted.append(self.previousItems.remove(at: index))
-                }
-                
-                self.previousItems = items
-                if !deleted.isEmpty {
-                    CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: deleted.map { $0.stableId.stringValue }, completionHandler: nil)
-                }
-            }))
+        let account = engine.account
+        let accountId = account.id
+        self.peerIndex = SpotlightPeerIndex(accountId: accountId.int64)
+        self.peerIndex.setLocked(isLocked)
+
+        let accountPeer = account.postbox.loadedPeerWithId(account.peerId)
+        let recently = engine.peers.recentlySearchedPeers() |> map {
+            $0.compactMap { $0.peer.chatMainPeer }
         }
-       
+        let recent: Signal<[Peer], NoError> = engine.peers.recentPeers() |> map { recent in
+            switch recent {
+            case .disabled:
+                return []
+            case let .peers(peers):
+                return peers
+            }
+        }
+        let peers: Signal<[Peer], NoError> = combineLatest(recently, recent) |> map { recently, recent in
+            var seen = Set<PeerId>()
+            return (recently + recent).filter { seen.insert($0.id).inserted }
+        } |> distinctUntilChanged(isEqual: { previous, current in
+            return previous.count == current.count && zip(previous, current).allSatisfy { $0.id == $1.id && $0.displayTitle == $1.displayTitle }
+        })
+
+        let entries: Signal<[SpotlightPeerEntry], NoError> = combineLatest(accountPeer, peers) |> mapToSignal { accountPeer, peers in
+            let accountTitle = accountPeer.addressName ?? accountPeer.displayTitle
+            let avatars: [Signal<Data?, NoError>] = peers.map { peer in
+                return peerAvatarImage(account: account, photo: .peer(peer, peer.smallProfileImage, peer.namePeerColor, peer.displayLetters, nil, nil), displayDimensions: NSMakeSize(64, 64), genCap: false)
+                    |> take(1)
+                    |> map { image, _ in
+                        return image.flatMap { NSBitmapImageRep(cgImage: $0).representation(using: .png, properties: [:]) }
+                    }
+            }
+            return combineLatest(avatars) |> map { avatars in
+                return zip(peers, avatars).map { peer, avatar in
+                    let key = SpotlightIdentifier(recordId: accountId, source: .peerId(peer.id))
+                    return SpotlightPeerEntry(peerId: peer.id.toInt64(), uniqueIdentifier: key.stringValue, title: peer.displayTitle, accountTitle: accountTitle, avatarPNG: avatar)
+                }
+            }
+        } |> deliverOnMainQueue
+
+        disposable.set(entries.start(next: { [weak self] entries in
+            self?.peerIndex.update(entries)
+        }))
     }
-    
+
+    public func setLocked(_ isLocked: Bool) {
+        peerIndex.setLocked(isLocked)
+    }
+
+    public func removeFromIndex() {
+        disposable.dispose()
+        peerIndex.removeAll()
+    }
+
     deinit {
         disposable.dispose()
-        if #available(OSX 10.12, *) {
-            CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: previousItems.map { $0.stableId.stringValue }, completionHandler: nil)
-        }
     }
 }
 

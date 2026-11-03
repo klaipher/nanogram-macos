@@ -231,7 +231,7 @@ fileprivate final class PeerMediaDatePinnedView : TableStickView {
             } else {
                 self.pillView.change(opacity: 0, animated: true, duration: 0.3)
             }
-        }, queue: Queue.mainQueue())
+        }, queue: Queue.mainQueue(), leeway: .precise)
         hideTimer = timer
         timer.start()
     }

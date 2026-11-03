@@ -135,7 +135,8 @@ static GLuint TGCreateTextureWithImage(CGImageRef image)
     CMVideoDimensions dimensions = CMVideoFormatDescriptionGetDimensions(inputFormatDescription);
     CGFloat minSide = MIN(dimensions.width, dimensions.height);
     CGFloat maxSide = MAX(dimensions.width, dimensions.height);
-    CGSize outputSize = CGSizeMake(minSide, minSide);
+    CGFloat outputSide = _outputSide > 0 ? MIN(minSide, (CGFloat)_outputSide) : minSide;
+    CGSize outputSize = CGSizeMake(outputSide, outputSide);
     
     _aspectRatio = minSide / maxSide;
     [self updateTextureVertices];
@@ -159,88 +160,7 @@ static GLuint TGCreateTextureWithImage(CGImageRef image)
 
 - (void)updateTextureVertices
 {
-    GLfloat centerOffset = (GLfloat)((1.0f - _aspectRatio) / 2.0f);
-    
-    switch (_orientation)
-    {
-        case AVCaptureVideoOrientationPortrait:
-            if (!_mirror)
-            {
-                _textureVertices[0] = centerOffset;
-                _textureVertices[1] = 1.0f;
-                _textureVertices[2] = centerOffset;
-                _textureVertices[3] = 0.0f;
-                _textureVertices[4] = (1.0f - centerOffset);
-                _textureVertices[5] = 1.0f;
-                _textureVertices[6] = (1.0f - centerOffset);
-                _textureVertices[7] = 0.0f;
-            }
-            else
-            {
-                _textureVertices[0] = centerOffset;
-                _textureVertices[1] = 0.0f;
-                _textureVertices[2] = (1.0f - centerOffset);
-                _textureVertices[3] = 0.0f;
-                _textureVertices[4] = centerOffset;
-                _textureVertices[5] = 1.0f;
-                _textureVertices[6] = (1.0f - centerOffset);
-                _textureVertices[7] = 1.0f;
-            }
-            break;
-            
-        case AVCaptureVideoOrientationLandscapeLeft:
-            if (!_mirror)
-            {
-                _textureVertices[0] = (1.0f - centerOffset);
-                _textureVertices[1] = 1.0f;
-                _textureVertices[2] = centerOffset;
-                _textureVertices[3] = 1.0f;
-                _textureVertices[4] = (1.0f - centerOffset);
-                _textureVertices[5] = 0.0f;
-                _textureVertices[6] = centerOffset;
-                _textureVertices[7] = 0.0f;
-            }
-            else
-            {
-                _textureVertices[0] = centerOffset;
-                _textureVertices[1] = 0.0f;
-                _textureVertices[2] = (1.0f - centerOffset);
-                _textureVertices[3] = 0.0f;
-                _textureVertices[4] = centerOffset;
-                _textureVertices[5] = 1.0f;
-                _textureVertices[6] = (1.0f - centerOffset);
-                _textureVertices[7] = 1.0f;
-            }
-            break;
-            
-        case AVCaptureVideoOrientationLandscapeRight:
-            if (!_mirror)
-            {
-                _textureVertices[0] = centerOffset;
-                _textureVertices[1] = 0.0f;
-                _textureVertices[2] = (1.0f - centerOffset);
-                _textureVertices[3] = 0.0f;
-                _textureVertices[4] = centerOffset;
-                _textureVertices[5] = 1.0f;
-                _textureVertices[6] = (1.0f - centerOffset);
-                _textureVertices[7] = 1.0f;
-            }
-            else
-            {
-                _textureVertices[0] = (1.0f - centerOffset);
-                _textureVertices[1] = 1.0f;
-                _textureVertices[2] = centerOffset;
-                _textureVertices[3] = 1.0f;
-                _textureVertices[4] = (1.0f - centerOffset);
-                _textureVertices[5] = 0.0f;
-                _textureVertices[6] = centerOffset;
-                _textureVertices[7] = 0.0f;
-            }
-            break;
-            
-        default:
-            break;
-    }
+    TGVideoCameraTextureVertices(_orientation, _mirror, _aspectRatio, _textureVertices);
 }
 
 - (void)reset
@@ -620,7 +540,13 @@ bail:
         (id)kCVPixelBufferWidthKey : @(width),
         (id)kCVPixelBufferHeightKey : @(height),
         (id)kCVPixelFormatOpenGLCompatibility : @true,
-        (id)kCVPixelBufferIOSurfacePropertiesKey : @{ }
+        (id)kCVPixelBufferIOSurfacePropertiesKey : @{ },
+        (id)kCVBufferPropagatedAttachmentsKey : @
+        {
+            (id)kCVImageBufferYCbCrMatrixKey : (id)kCVImageBufferYCbCrMatrix_ITU_R_709_2,
+            (id)kCVImageBufferColorPrimariesKey : (id)kCVImageBufferColorPrimaries_ITU_R_709_2,
+            (id)kCVImageBufferTransferFunctionKey : (id)kCVImageBufferTransferFunction_ITU_R_709_2
+        }
     };
     
     NSDictionary *pixelBufferPoolOptions = @{ (id)kCVPixelBufferPoolMinimumBufferCountKey : @(maxBufferCount) };

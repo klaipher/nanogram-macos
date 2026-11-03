@@ -66,6 +66,16 @@ NSArray<NSNumber *> * _Nonnull extractJPEGDataScans(NSData * _Nonnull data) {
     return result;
 }
 
+static _Atomic bool preservesWideGamut = false;
+
+void setJPEGPreservesWideGamut(bool preserves) {
+    preservesWideGamut = preserves;
+}
+
+bool jpegPreservesWideGamut(void) {
+    return preservesWideGamut;
+}
+
 NSData * _Nullable compressJPEGData(CGImageRef _Nonnull sourceImage, int quality) {
     int width = (int)(CGImageGetWidth(sourceImage));
     int height = (int)(CGImageGetHeight(sourceImage));
@@ -73,7 +83,23 @@ NSData * _Nullable compressJPEGData(CGImageRef _Nonnull sourceImage, int quality
     int targetBytesPerRow = ((4 * (int)width) + 15) & (~15);
     uint8_t *targetMemory = malloc((int)(targetBytesPerRow * height));
     
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGColorSpaceRef colorSpace = NULL;
+    CFDataRef iccProfile = NULL;
+    if (preservesWideGamut) {
+        CGColorSpaceRef sourceColorSpace = CGImageGetColorSpace(sourceImage);
+        if (sourceColorSpace != NULL && CGColorSpaceGetModel(sourceColorSpace) == kCGColorSpaceModelRGB && CGColorSpaceIsWideGamutRGB(sourceColorSpace)) {
+            iccProfile = CGColorSpaceCopyICCData(sourceColorSpace);
+            if (iccProfile != NULL) {
+                colorSpace = CGColorSpaceRetain(sourceColorSpace);
+            }
+        }
+        if (colorSpace == NULL) {
+            colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        }
+    }
+    if (colorSpace == NULL) {
+        colorSpace = CGColorSpaceCreateDeviceRGB();
+    }
     CGBitmapInfo bitmapInfo = kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Host;
     
     CGContextRef targetContext = CGBitmapContextCreate(targetMemory, width, height, 8, targetBytesPerRow, colorSpace, bitmapInfo);
@@ -109,6 +135,12 @@ NSData * _Nullable compressJPEGData(CGImageRef _Nonnull sourceImage, int quality
     jpeg_set_quality(&cinfo, quality, 1);
     jpeg_simple_progression(&cinfo);
     jpeg_start_compress(&cinfo, 1);
+    
+    if (iccProfile != NULL) {
+        jpeg_write_icc_profile(&cinfo, CFDataGetBytePtr(iccProfile), (unsigned int)CFDataGetLength(iccProfile));
+        CFRelease(iccProfile);
+        iccProfile = NULL;
+    }
     
     JSAMPROW rowPointer[1];
     while (cinfo.next_scanline < cinfo.image_height) {

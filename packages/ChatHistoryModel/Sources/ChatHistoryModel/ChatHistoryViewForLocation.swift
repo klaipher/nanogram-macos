@@ -528,7 +528,7 @@ private func extractAdditionalData(view: MessageHistoryView, chatLocation: ChatL
             }
         }
         
-        autoplayMedia = autoplayMedia.withUpdatedAutoplayPreloadVideos(autoplayMedia.preloadVideos && autodownloadSettings.automaticDownload && (autodownloadSettings.categories.video.fileSize ?? 0) >= 5 * 1024 * 1024)
+        autoplayMedia = autoplayMedia.withUpdatedAutoplayPreloadVideos(autoplayMedia.preloadVideos && autodownloadSettings.automaticDownload && (autodownloadSettings.categories.video.fileSize ?? 0) >= 5 * 1024 * 1024 && !autodownloadSettings.pausesLargeMediaDownloads(isSavingData: AutomaticDownloadDataSaving.shared.isSavingData))
 
         
         return (cachedData, cachedDataMessages, readStateData, limitsConfiguration, autoplayMedia, autodownloadSettings)

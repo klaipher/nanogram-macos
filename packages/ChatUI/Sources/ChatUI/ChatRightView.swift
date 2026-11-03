@@ -996,7 +996,7 @@ public class ChatRightView: View, ViewDisplayDelegate {
             if !self.canUpdateTooltip || !self.refreshTooltipCountdown() {
                 self.cancelTooltipTimer()
             }
-        }, queue: .mainQueue())
+        }, queue: .mainQueue(), leeway: .precise)
         tooltipTimer?.start()
     }
 

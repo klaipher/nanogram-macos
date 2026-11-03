@@ -81,6 +81,7 @@ public final class GCChatListIndicator : View {
         animation.timingFunctions = Array(repeating: CAMediaTimingFunction(name: .easeOut), count: 8)
         animation.duration = 0.4 * 8
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.isRemovedOnCompletion = false
         CATransaction.begin()
         CATransaction.setDisableActions(true)

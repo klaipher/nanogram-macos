@@ -264,7 +264,7 @@ public func SuspiciousRevokeModal(context: any AccountContextProtocol, session: 
             current.timeout = max(current.timeout - 1, 0)
             return current
         }
-    }, queue: .mainQueue())
+    }, queue: .mainQueue(), leeway: .precise)
     
     timer.start()
     

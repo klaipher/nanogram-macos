@@ -3728,6 +3728,7 @@ private final class ChatWalletTransferBadgeView: View {
                 rotation.toValue = Double.pi * 2
                 rotation.duration = duration
                 rotation.repeatCount = .infinity
+                rotation.setDecorativeLoopFrameRate()
                 rotation.timingFunction = CAMediaTimingFunction(name: .linear)
                 hand.add(rotation, forKey: "rotation")
             }

@@ -25,98 +25,123 @@ import FoundationUtils
 import ObjcUtils
 
 public final class GalleryRecognition {
+    static let dwell: Double = 1.0
+    private static var cleanedPostboxes = Set<String>()
+
     private let item: MGalleryPhotoItem
     private let disposable = MetaDisposable()
-    private let translateDisposable = MetaDisposable()
+    private let magnifyDisposable = MetaDisposable()
     private let subjectDisposable = MetaDisposable()
     private let loadedDisposable = MetaDisposable()
     private var isFullImageLoaded: Bool = false
-    
+
     public var openLink: ((String) -> Void)?
-    
-    private var result: AnyObject?
-    private var translation: AnyObject?
-    
-    public let view:NSView
+
+    public let view: NSView
+
     public init?(_ item: MGalleryItem) {
-        if let item = item as? MGalleryPhotoItem {
-            if let message = item.entry.message, message.isCopyProtected() {
-                return nil
-            }
-            self.item = item
-            if #available(macOS 10.15, *) {
-                self.view = TextRecognizing.ImageTextSelector(frame: .zero)
-            } else {
-                return nil
-            }
-        } else {
+        if let postbox = (item as? MGalleryPhotoItem)?.context.account.postbox {
+            GalleryRecognition.removeLegacyStore(postbox)
+        }
+        guard #available(macOS 13.0, *), LiveTextAnalyzer.isSupported, let item = item as? MGalleryPhotoItem else {
             return nil
         }
-        if #available(macOS 10.15, *) {
-            let postbox = item.context.account.postbox
-            let mediaId = item.entry.mediaId
-            let fullImageLoaded = item.path.get() |> take(1) |> map { _ in Void() }
-            let image: Signal<TextRecognizing.Result?, TextRecognizing.Error> = combineLatest(item.image.get(), item.magnify.get(), item.appearValue, fullImageLoaded) |> castError(TextRecognizing.Error.self) |> mapToSignal { image, magnify, visible, _ in
-                if magnify == 1, visible {
-                    switch image.value {
-                    case let .image(image, _):
-                        if let image = image {
-                            return TextRecognizing.recognize(image._cgImage!, postbox: postbox, stableId: mediaId) |> map(Optional.init)
-                        } else {
-                            return .single(nil)
-                        }
-                    default:
-                        return .single(nil)
-                    }
-                } else {
-                    return .single(nil)
-                }
-               
-            } |> deliverOnMainQueue
-            
-            disposable.set(image.start(next: { [weak self] result in
-                self?.applyResult(result)
-            }))
-            
-            loadedDisposable.set((fullImageLoaded |> deliverOnMainQueue).start(next: { [weak self] in
-                self?.isFullImageLoaded = true
-            }))
-            
-            selectorView.openBarcode = { [weak self] barcode in
-                self?.open(barcode)
+        if let message = item.entry.message, message.isCopyProtected() {
+            return nil
+        }
+        self.item = item
+        let liveTextView = LiveTextView(frame: .zero)
+        liveTextView.openLinkMenuTitle = strings().chatMessageOpenLink
+        self.view = liveTextView
+
+        let fullImageLoaded = item.path.get() |> take(1) |> map { _ in Void() }
+        let states: Signal<LiveTextSchedule.State<CGImage>, NoError> = combineLatest(item.image.get(), item.magnify.get(), item.appearValue, fullImageLoaded) |> map { image, magnify, visible, _ in
+            var cgImage: CGImage?
+            if case let .image(image, _) = image.value {
+                cgImage = image?._cgImage
             }
-            selectorView.barcodeMenu = { [weak self] barcode in
-                return self?.menu(for: barcode)
-            }
+            return LiveTextSchedule.State(image: cgImage, isEligible: magnify == 1 && visible)
+        }
+        let analysis = LiveTextSchedule.analysis(states: states, dwell: GalleryRecognition.dwell, queue: .concurrentDefaultQueue(), analyze: { image in
+            return LiveTextAnalyzer.shared.analyze(image)
+        }) |> deliverOnMainQueue
+
+        disposable.set(analysis.start(next: { [weak liveTextView] result in
+            liveTextView?.set(result)
+        }))
+
+        magnifyDisposable.set((item.magnify.get() |> deliverOnMainQueue).start(next: { [weak liveTextView] magnify in
+            liveTextView?.isActive = magnify == 1
+        }))
+
+        loadedDisposable.set((fullImageLoaded |> deliverOnMainQueue).start(next: { [weak self] in
+            self?.isFullImageLoaded = true
+        }))
+
+        liveTextView.openCode = { [weak self] code in
+            self?.open(code)
         }
     }
+
     deinit {
         disposable.dispose()
-        translateDisposable.dispose()
+        magnifyDisposable.dispose()
         subjectDisposable.dispose()
         loadedDisposable.dispose()
     }
-    
-    @available(macOS 10.15, *)
-    private func open(_ barcode: TextRecognizing.Result.Barcode) {
-        if let link = barcode.link {
+
+    private static func removeLegacyStore(_ postbox: Postbox) {
+        let basePath = postbox.mediaBox.basePath
+        guard !cleanedPostboxes.contains(basePath) else {
+            return
+        }
+        cleanedPostboxes.insert(basePath)
+        Queue.concurrentBackgroundQueue().async {
+            _ = LiveTextLegacyStore.removeFiles(mediaBoxBasePath: basePath)
+        }
+        let key = applicationSpecificPreferencesKey(LiveTextLegacyStore.preferencesKey)
+        _ = postbox.transaction { transaction -> Void in
+            if transaction.getPreferencesEntry(key: key) != nil {
+                transaction.updatePreferencesEntry(key: key, { _ in nil })
+            }
+        }.start()
+    }
+
+    @available(macOS 13.0, *)
+    private var liveTextView: LiveTextView {
+        return self.view as! LiveTextView
+    }
+
+    @available(macOS 13.0, *)
+    private func open(_ code: LiveTextCode) {
+        if let link = code.link {
             openLink?(link)
         } else {
-            copy(barcode.payload)
+            copy(code.payload)
         }
     }
-    
+
     private func copy(_ text: String) {
         copyToClipboard(text)
         if let window = view.window as? Window {
             showModalText(for: window, text: strings().contextAlertCopied)
         }
     }
-    
-    @available(macOS 10.15, *)
-    private func menu(for barcode: TextRecognizing.Result.Barcode) -> ContextMenu {
+
+    public func openCode(atWindow point: NSPoint) -> Bool {
+        guard #available(macOS 13.0, *), let code = liveTextView.code(atWindow: point) else {
+            return false
+        }
+        open(code)
+        return true
+    }
+
+    public func codeMenu(atWindow point: NSPoint) -> ContextMenu? {
+        guard #available(macOS 13.0, *), let code = liveTextView.code(atWindow: point) else {
+            return nil
+        }
         let menu = ContextMenu(presentation: .current(darkPalette), betterInside: true)
-        if let link = barcode.link {
+        if let link = code.link {
             menu.addItem(ContextMenuItem(strings().chatMessageOpenLink, handler: { [weak self] in
                 self?.openLink?(link)
             }, itemImage: MenuAnimation.menu_open_with.value))
@@ -125,12 +150,12 @@ public final class GalleryRecognition {
             }, itemImage: MenuAnimation.menu_copy_link.value))
         } else {
             menu.addItem(ContextMenuItem(strings().contextCopy, handler: { [weak self] in
-                self?.copy(barcode.payload)
+                self?.copy(code.payload)
             }, itemImage: MenuAnimation.menu_copy.value))
         }
         return menu
     }
-    
+
     public var canLiftSubject: Bool {
         if #available(macOS 14.0, *) {
             return isFullImageLoaded
@@ -141,7 +166,7 @@ public final class GalleryRecognition {
     
     @available(macOS 14.0, *)
     private func liftSubject(at windowPoint: NSPoint?, completion: @escaping (TextRecognizing.Subject) -> Void) {
-        let point = windowPoint.flatMap { selectorView.normalizedPoint(fromWindow: $0) }
+        let point = windowPoint.flatMap { liveTextView.normalizedPoint(fromWindow: $0) }
         let signal = item.image.get()
         |> take(1)
         |> mapToSignal { value -> Signal<TextRecognizing.Subject?, NoError> in
@@ -162,7 +187,7 @@ public final class GalleryRecognition {
                 return
             }
             if let subject {
-                self.selectorView.showLiftedSubject(subject.image, rect: subject.rect, completion: {
+                self.liveTextView.showLiftedSubject(subject.image, rect: subject.rect, completion: {
                     completion(subject)
                 })
             } else if let window = self.view.window as? Window {
@@ -226,155 +251,57 @@ public final class GalleryRecognition {
         }
         return path
     }
-    @available(macOS 10.15, *)
-    public func canTranslate() -> Bool {
-        guard let result = result as? TextRecognizing.Result else {
-            return false
-        }
-        
-        switch result {
-        case let .finish(_, text, _):
-            let text = text.map { $0.text }.joined(separator: "\n")
-            let fromLang = Translate.detectLanguage(for: text)
-            let toLang = item.context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
-            
-            if fromLang == nil || !toLang.contains(fromLang!) {
-                return true
-            }
-        default:
-            break
-        }
-        
-        return false
-        
-    }
-    
-    @available(macOS 10.15, *)
-    public func toggleTranslate(to: String) {
-        
-        if let result = result as? TextRecognizing.Result {
-            guard translation == nil else {
-                self.applyResult(result)
-                return
-            }
-            
-            switch result {
-            case let .finish(image, text, _):
-                var entities: [MessageTextEntity] = []
-                var length = 0
-                var currentText: String = ""
-                let toLang = Translate.normalizeLanguageCode(appAppearance.languageCode)
-                for text in text {
-                    entities.append(.init(range: length ..< length + text.text.length, type: .BlockQuote(isCollapsed: false)))
-                    currentText += text.text
-                    length += text.text.length
-                }
-                
-                let signal:Signal<(result: String, entities: [MessageTextEntity])?, TranslationError>
-                signal = item.context.engine.messages.translate(text: currentText, toLang: toLang, entities: entities) |> mapToSignal { value in
-                    if let value = value {
-                        return .single((result: value.0, entities: value.1.filter { value in
-                            switch value.type {
-                            case .BlockQuote:
-                                return true
-                            default:
-                                return false
-                            }
-                        }))
-                    } else {
-                        return .single(nil)
-                    }
-                } |> deliverOnMainQueue
-                
-                translateDisposable.set(signal.startStrict(next: { [weak self] translated in
-                    var texts: [TextRecognizing.TranslateResult.Value] = []
-                    var toRemove: [Int] = []
-                    var filtered = text
-                    if let result = translated {
-                        for (i, entity) in result.1.enumerated() {
-                            let t = result.0.nsstring.substring(with: NSMakeRange(entity.range.lowerBound, entity.range.upperBound - entity.range.lowerBound))
-                            let onlyText = !text[i].text.trimmingCharacters(in: CharacterSet.decimalDigits).isEmpty
-                            if text[i].text != t, onlyText {
-                                texts.append(.init(text: t, detected: text[i]))
-                            } else {
-                                toRemove.append(i)
-                            }
-                        }
-                    }
-                    for idx in toRemove.reversed() {
-                        filtered.remove(at: idx)
-                    }
-                    if translated == nil || translated?.result.isEmpty == true || translated?.1.isEmpty == true {
-                        self?.applyResult(result, translate: nil)
-                        return
-                    } else {
-                        self?.applyResult(result, translate: .success(translated: texts, original: .finish(image: image, text: filtered, barcodes: [])))
-                    }
-                }, error: { [weak self] _ in
-                    self?.applyResult(result)
-                }))
-            default:
-                break
-            }
-            self.applyResult(result, translate: .progress(result))
-        }
-    }
-    
-    public func hasTranslation() -> Bool {
-        return translation != nil
-    }
-    
-    
-    @available(macOS 10.15, *)
-    private func applyResult(_ result: TextRecognizing.Result?, translate: TextRecognizing.TranslateResult? = nil) {
-        self.result = result as AnyObject?
-        self.translation = translate as AnyObject?
-        
-        self.selectorView.set(result, translate: translate)
-        
-        if translate == nil {
-            self.translateDisposable.set(nil)
-        }
-    }
-    
-    @available(macOS 10.15, *)
-    private var selectorView: TextRecognizing.ImageTextSelector {
-        return self.view as! TextRecognizing.ImageTextSelector
-    }
-    
-    public var hasRecognition: Bool {
-        if #available(macOS 10.15, *) {
-            return self.selectorView.result != nil
-        } else {
-            return false
-        }
-       
-    }
-    public var hasSelectedText: Bool {
-        if #available(macOS 10.15, *) {
-            return self.selectorView.hasSelectedText
-        } else {
-            return false
-        }
-    }
-    public func cancelSelection() {
-        if #available(macOS 10.15, *) {
-            self.selectorView.cancelSelection()
-        }
-    }
-    
-    public func copySelectedText() -> Bool {
-        if #available(macOS 10.15, *) {
-            return self.selectorView.copySelectedText()
-        } else {
-            return false
-        }
-    }
-    public var selectedText: String? {
-        if #available(macOS 10.15, *) {
-            return self.selectorView.selectedText
-        } else {
+    public var transcript: String? {
+        guard #available(macOS 13.0, *) else {
             return nil
         }
+        let text = liveTextView.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
+    public func translationSource(doNotTranslate: Set<String>) -> (text: String, fromLang: String?)? {
+        guard let text = self.transcript else {
+            return nil
+        }
+        let fromLang = Translate.detectLanguage(for: text)
+        if let fromLang = fromLang, doNotTranslate.contains(fromLang) {
+            return nil
+        }
+        return (text: text, fromLang: fromLang)
+    }
+
+    public var hasRecognition: Bool {
+        guard #available(macOS 13.0, *) else {
+            return false
+        }
+        return liveTextView.isActive && liveTextView.hasContent
+    }
+
+    public var hasSelectedText: Bool {
+        guard #available(macOS 13.0, *) else {
+            return false
+        }
+        return liveTextView.hasSelectedText
+    }
+
+    public func cancelSelection() {
+        if #available(macOS 13.0, *) {
+            liveTextView.resetSelection()
+        }
+    }
+
+    public func copySelectedText() -> Bool {
+        guard let text = self.selectedText else {
+            return false
+        }
+        copyToClipboard(text)
+        return true
+    }
+
+    public var selectedText: String? {
+        guard #available(macOS 13.0, *) else {
+            return nil
+        }
+        return liveTextView.selectedText
     }
 }

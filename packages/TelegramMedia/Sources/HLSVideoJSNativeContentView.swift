@@ -198,6 +198,7 @@ private final class HLSJSServerSource: SharedHLSServerSource {
                     subscriber.putNext((partialFile, 0 ..< cachedData.length, Int(size)))
                     subscriber.putCompletion()
                 } else {
+                    TempBox.shared.dispose(partialFile)
                     #if DEBUG
                     print("Error writing cached file to disk")
                     #endif
@@ -208,6 +209,7 @@ private final class HLSJSServerSource: SharedHLSServerSource {
             
             // 2) Otherwise, we fetch from the network
             guard let fetchResource = postbox.mediaBox.fetchResource else {
+                TempBox.shared.dispose(partialFile)
                 return EmptyDisposable
             }
             
@@ -239,6 +241,9 @@ private final class HLSJSServerSource: SharedHLSServerSource {
                 partialPath: partialFile.path,
                 metaPath: metaFile.path
             ) else {
+                TempBox.shared.dispose(partialFile)
+                TempBox.shared.dispose(completeFile)
+                TempBox.shared.dispose(metaFile)
                 return EmptyDisposable
             }
             
@@ -316,13 +321,7 @@ public final class HLSQualitySet {
     public let playlistFiles: [Int: FileMediaReference]
     public let thumbnails: [Int: (file: FileMediaReference, fileMap: FileMediaReference)]
     
-    public init?(baseFile: FileMediaReference) {
-        
-        
-        func isNativeVideoCodecSupported(videoCodec: String) -> Bool {
-            return videoCodec == "h264" || videoCodec == "h265" || videoCodec == "avc" || videoCodec == "hevc"
-        }
-        
+    public init?(baseFile: FileMediaReference, isHardwareAv1Supported: Bool = internal_isHardwareAv1Supported) {
         var qualityFiles: [Int: FileMediaReference] = [:]
         var thumbnailFiles: [FileMediaReference] = []
         var thumbnailFileMaps: [Int: (mapFile: FileMediaReference, thumbnailFileId: Int64)] = [:]
@@ -352,7 +351,7 @@ public final class HLSQualitySet {
             } else {
                 for attribute in alternativeFile.attributes {
                     if case let .Video(_, size, _, _, _, videoCodec) = attribute {
-                        if let videoCodec, isNativeVideoCodecSupported(videoCodec: videoCodec) {
+                        if let videoCodec, HLSCodecSelection.isSupported(videoCodec: videoCodec, isHardwareAv1Supported: isHardwareAv1Supported) {
                             let key = Int(min(size.width, size.height))
                             if let currentFile = qualityFiles[key] {
                                 var currentCodec: String?
@@ -361,8 +360,7 @@ public final class HLSQualitySet {
                                         currentCodec = videoCodec
                                     }
                                 }
-                                if let currentCodec, (currentCodec == "av1" || currentCodec == "av01") {
-                                } else {
+                                if HLSCodecSelection.replaces(currentCodec: currentCodec, with: videoCodec) {
                                     qualityFiles[key] = baseFile.withMedia(alternativeFile)
                                 }
                             } else {
@@ -516,6 +514,15 @@ private final class SharedHLSVideoJSContext: NSObject {
                         completion: { [weak self] result in
                             guard let self else {
                                 return
+                            }
+                            var result = result
+                            if let data = result["responseData"] as? Data {
+                                if (params["responseType"] as? String) == "arraybuffer", self.jsContext?.supportsBinaryTransfer == true {
+                                    result.removeValue(forKey: "responseData")
+                                    result["responseDataId"] = Int(HLSJSBinaryStore.shared.put(data))
+                                } else {
+                                    result["responseData"] = data.base64EncodedString()
+                                }
                             }
                             let jsonResult = try! JSONSerialization.data(withJSONObject: result)
                             let jsonResultString = String(data: jsonResult, encoding: .utf8)!
@@ -742,11 +749,12 @@ private final class SharedHLSVideoJSContext: NSObject {
                 
                 completion([:])
             } else if (methodName == "appendBuffer") {
-                guard let base64Data = params["data"] as? String else {
-                    assertionFailure()
-                    return
-                }
-                guard let data = Data(base64Encoded: base64Data.data(using: .utf8)!) else {
+                let data: Data
+                if let dataId = params["dataId"] as? Int, let stored = HLSJSBinaryStore.shared.take(Int32(clamping: dataId)) {
+                    data = stored
+                } else if let base64Data = params["data"] as? String, let decoded = Data(base64Encoded: base64Data.data(using: .utf8)!) {
+                    data = decoded
+                } else {
                     assertionFailure()
                     return
                 }
@@ -909,7 +917,7 @@ private final class SharedHLSVideoJSContext: NSObject {
         completion([
             "status": 200,
             "statusText": "OK",
-            "responseData": data.base64EncodedString(),
+            "responseData": data,
             "responseHeaders": [
                 "Content-Type": contentType,
                 "Content-Length": "\(data.count)"
@@ -919,11 +927,13 @@ private final class SharedHLSVideoJSContext: NSObject {
     
     private static func sendResponseFileAndClose(id: Int, file: TempBoxFile, fileRange: Range<Int>, range: Range<Int>, totalSize: Int, completion: @escaping ([String: Any]) -> Void) {
         Queue.concurrentDefaultQueue().async {
-            if let data = try? Data(contentsOf: URL(fileURLWithPath: file.path), options: .mappedIfSafe).subdata(in: fileRange) {
+            let data = try? Data(contentsOf: URL(fileURLWithPath: file.path), options: .mappedIfSafe).subdata(in: fileRange)
+            TempBox.shared.dispose(file)
+            if let data {
                 completion([
                     "status": 200,
                     "statusText": "OK",
-                    "responseData": data.base64EncodedString(),
+                    "responseData": data,
                     "responseHeaders": [
                         "Content-Type": "application/octet-stream",
                         "Content-Range": "bytes \(range.lowerBound)-\(range.upperBound)/\(totalSize)",
@@ -1756,6 +1766,7 @@ private final class SourceBuffer {
             }
             combinedData.append(data)
             guard (try? combinedData.write(to: URL(fileURLWithPath: tempFile.path), options: .atomic)) != nil else {
+                TempBox.shared.dispose(tempFile)
                 Queue.mainQueue().async {
                     guard let strongSelf = self else {
                         completion(RangeSet())
@@ -1774,13 +1785,16 @@ private final class SourceBuffer {
             {
                 Queue.mainQueue().async {
                     guard let strongSelf = self else {
+                        TempBox.shared.dispose(tempFile)
                         completion(RangeSet())
                         return
                     }
                     if strongSelf.currentUpdateId != updateId {
+                        TempBox.shared.dispose(tempFile)
                         return
                     }
                     if fragmentInfo.duration.value == 0 {
+                        TempBox.shared.dispose(tempFile)
                         strongSelf.initializationData = data
                         completion(strongSelf.ranges)
                     } else {
@@ -1788,7 +1802,7 @@ private final class SourceBuffer {
                         let item = ChunkMediaPlayerPart(
                             startTime: fragmentInfo.startTime.seconds,
                             endTime: fragmentInfo.startTime.seconds + fragmentInfo.duration.seconds,
-                            content: ChunkMediaPlayerPart.TempFile(file: tempFile, ignoreAudioEditList: true),
+                            content: ChunkMediaPlayerPart.TempFile(file: tempFile, ignoreAudioEditList: true, deletesFileOnRelease: true),
                             codecName: videoCodecName,
                             offsetTime: 0
                         )
@@ -1801,6 +1815,7 @@ private final class SourceBuffer {
                 }
             } else {
                 assertionFailure()
+                TempBox.shared.dispose(tempFile)
                 Queue.mainQueue().async {
                     guard let strongSelf = self else {
                         completion(RangeSet())

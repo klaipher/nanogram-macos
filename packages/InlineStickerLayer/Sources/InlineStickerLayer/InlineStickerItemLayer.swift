@@ -10,6 +10,7 @@ import Accelerate
 import AppKit
 import TelegramMedia
 import TelegramMediaResources
+import NanogramRuntime
 #if SHARE
 import InlineStickersShare
 #else
@@ -36,9 +37,21 @@ open class InlineStickerLockLayer : SimpleLayer {
         lockedView.contents = image
     }
 
+    private weak var tiedLayer: InlineStickerItemLayer?
+    private let badgeGate = OneShotGate()
+
     open func tieToLayer(_ layer: InlineStickerItemLayer) {
+        if self.tiedLayer !== layer {
+            self.tiedLayer = layer
+            self.badgeGate.reset()
+        }
         layer.contentDidUpdate = { [weak self] image in
-            self?.applyBlur(color: theme.colors.background.darker(), image: image)
+            guard let self else {
+                return
+            }
+            self.badgeGate.run {
+                self.applyBlur(color: theme.colors.background.darker(), image: image)
+            }
         }
     }
 
@@ -141,10 +154,10 @@ private final class MultiTargetAnimationContext {
     private var context: AnimationPlayerContext!
     private var handlers:[Int: Handlers] = [:]
     final class Handlers {
-        let displayFrame:(CGImage?)->Void
+        let displayFrame:(RenderedFrame?)->Void
         let release:()->Void
         let updateState:(LottiePlayerState)->Void
-        init(displayFrame: @escaping(CGImage?)->Void, release:@escaping()->Void, updateState: @escaping(LottiePlayerState)->Void) {
+        init(displayFrame: @escaping(RenderedFrame?)->Void, release:@escaping()->Void, updateState: @escaping(LottiePlayerState)->Void) {
             self.displayFrame = displayFrame
             self.release = release
             self.updateState = updateState
@@ -167,10 +180,9 @@ private final class MultiTargetAnimationContext {
         }
 
         self.context = .init(animation, displayFrame: { frame, loop in
-            let image = frame.image
             lottieDispatchMain {
                 for (_, target) in handlers() {
-                    target.displayFrame(image)
+                    target.displayFrame(frame)
                 }
             }
 
@@ -221,7 +233,7 @@ private final class MultiTargetContextCache {
     private static var cache: [Key : MultiTargetAnimationContext] = [:]
 
 
-    static func create(_ animation: LottieAnimation, key: Key, displayFrame: @escaping(CGImage?)->Void, release:@escaping()->Void, updateState: @escaping(LottiePlayerState)->Void) -> Int {
+    static func create(_ animation: LottieAnimation, key: Key, displayFrame: @escaping(RenderedFrame?)->Void, release:@escaping()->Void, updateState: @escaping(LottiePlayerState)->Void) -> Int {
 
         assertOnMainThread()
 
@@ -667,8 +679,8 @@ public final class InlineStickerItemLayer : SimpleLayer {
 
             delayDisposable.set(delaySignal(MultiTargetContextCache.exists(key) || force || noDelayBeforeplay ? 0 : 0.1).start(completed: { [weak self] in
 
-                self?.contextToken = (MultiTargetContextCache.create(animation, key: key, displayFrame: { image in
-                    layer?.contents = image
+                self?.contextToken = (MultiTargetContextCache.create(animation, key: key, displayFrame: { frame in
+                    layer?.setLottieFrame(frame)
                     if layer?.isPreviousPreview == true {
                         layer?.animateContents()
                         layer?.isPreviousPreview = false
@@ -788,11 +800,8 @@ public final class InlineStickerItemLayer : SimpleLayer {
                 } |> deliverOnMainQueue).start(next: { [weak self] data in
                     if let data = data {
                         let maximumFps: Int = 30
-                        var cache: ASCachePurpose = .temporaryLZ4(.effect)
                         let colors = self?.getColors?(file) ?? []
-                        if !colors.isEmpty {
-                            cache = .none
-                        }
+                        let cache = inlineStickerCachePurpose(changesColorsLive: false)
                         let type: LottieAnimationType
                         if file.isWebm {
                             type = .webm

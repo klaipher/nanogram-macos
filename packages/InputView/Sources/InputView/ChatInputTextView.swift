@@ -377,6 +377,10 @@ open class ChatInputTextView: ScrollView, NSTextViewDelegate {
     
 
     @objc public func textDidChange(_ notification: Notification) {
+        let signpost = PerformanceSignposts.begin("composerTextDidChange")
+        defer {
+            PerformanceSignposts.end("composerTextDidChange", signpost)
+        }
         self.updatePlaceholder(animated: true)
 
         CATransaction.begin()

@@ -1438,15 +1438,10 @@ public class GalleryViewer: NSResponder {
                 }, itemImage: MenuAnimation.menu_copy_media.value))
             }
             
-            if let recognition = self.pager.recognition, self.pager.selectedText == nil {
-                if #available(macOS 10.15, *) {
-                    if recognition.canTranslate() {
-                        let text: String = !recognition.hasTranslation() ? strings().galleryTranslate : strings().galleryHideTranslation
-                        menu.addItem(ContextMenuItem.init(text, handler: { [weak recognition] in
-                            recognition?.toggleTranslate(to: appAppearance.languageCode)
-                        }, itemImage: MenuAnimation.menu_translate.value))
-                    }
-                }
+            if let recognition = self.pager.recognition, self.pager.selectedText == nil, item.entry.message?.isCopyProtected(cachedData: self.cachedPeerData) != true, let source = recognition.translationSource(doNotTranslate: context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])) {
+                menu.addItem(ContextMenuItem(strings().galleryTranslate, handler: {
+                    GalleryHooks.shared.showTranslate(context, source.fromLang, appAppearance.languageCode, source.text, window)
+                }, itemImage: MenuAnimation.menu_translate.value))
             }
             
             if let recognition = self.pager.recognition, recognition.canLiftSubject, self.pager.selectedText == nil, item.entry.isProtected == false, item.entry.message?.isCopyProtected(cachedData: self.cachedPeerData) != true {

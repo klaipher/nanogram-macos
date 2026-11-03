@@ -696,6 +696,7 @@ private final class StickerPackPanelRowView : TableRowView, ModalPreviewRowViewP
         animation.values = [-angle, angle, -angle]
         animation.duration = 0.4
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.timeOffset = Double.random(in: 0 ... 0.4)
         animation.isRemovedOnCompletion = false
         layer.add(animation, forKey: "shaking_rotation")

@@ -231,6 +231,7 @@ final class QrStudioToastView: View {
             rotation.fromValue = 0.0 as NSNumber
             rotation.toValue = (Double.pi * 2.0) as NSNumber
             rotation.repeatCount = Float.infinity
+            rotation.setDecorativeLoopFrameRate()
             rotation.timingFunction = CAMediaTimingFunction(name: .linear)
             self.progressLayer.add(rotation, forKey: "rotation")
         }

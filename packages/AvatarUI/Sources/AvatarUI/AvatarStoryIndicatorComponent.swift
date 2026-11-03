@@ -87,6 +87,7 @@ private final class ProgressLayer: SimpleLayer {
                 rotationAnimation.fromValue = NSNumber(value: Float(0.0))
                 rotationAnimation.toValue = NSNumber(value: Float(Double.pi * 2.0))
                 rotationAnimation.repeatCount = Float.infinity
+                rotationAnimation.setDecorativeLoopFrameRate()
                 rotationAnimation.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)
                 self.uploadProgressLayer.add(rotationAnimation, forKey: "rotation")
             }
@@ -103,6 +104,7 @@ private final class ProgressLayer: SimpleLayer {
                 rotationAnimation.fromValue = NSNumber(value: -.pi / 2.0)
                 rotationAnimation.toValue = NSNumber(value: -.pi / 2.0 + Double.pi * 2.0)
                 rotationAnimation.repeatCount = Float.infinity
+                rotationAnimation.setDecorativeLoopFrameRate()
                 rotationAnimation.timingFunction = CAMediaTimingFunction(name: CAMediaTimingFunctionName.linear)
                 self.indefiniteReplicatorLayer.add(rotationAnimation, forKey: "rotation")
             }
@@ -118,6 +120,7 @@ private final class ProgressLayer: SimpleLayer {
                 dashAnimation.timingFunction = CAMediaTimingFunction(name: .linear)
                 dashAnimation.duration = 2.5
                 dashAnimation.repeatCount = .infinity
+                dashAnimation.setDecorativeLoopFrameRate()
                 self.indefiniteDashLayer.add(dashAnimation, forKey: "dash")
             }
         }

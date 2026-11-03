@@ -13,6 +13,7 @@ import TelegramContextShare
 #else
 import PrivateCallScreen
 import TelegramContext
+import NanogramRuntime
 #endif
 
 
@@ -66,28 +67,19 @@ class SharedAccountContext {
    
     func isLite(_ key: LiteModeKey = .any) -> Bool {
         let mode = baseSettings.liteMode
-        if mode.enabled {
-            return true
-        }
-        if mode.lowBatteryPercent != 100 {
-            if batteryLevel <= Double(mode.lowBatteryPercent) {
-                return true
+        return LiteModePowerPolicy.isLite(enabled: mode.enabled, lowBatteryPercent: mode.lowBatteryPercent, keyEnabled: mode.isEnabled(key: key), power: powerState)
+    }
+
+    private(set) var powerState: PowerStateSnapshot = .unconstrained {
+        didSet {
+            if powerState != oldValue {
+                syncLiquidGlassWithLite()
             }
         }
-        
-        return !mode.isEnabled(key: key)
     }
+
+    private var powerStateMonitor: PowerStateMonitor?
     #endif
-
-    private(set) var batteryLevel: Double = 100 {
-        didSet {
-            #if !SHARE
-            syncLiquidGlassWithLite()
-            #endif
-        }
-    }
-
-    private var batteryLevelTimer: SwiftSignalKit.Timer?
 
     /// Keep `System.liquidGlass` in sync with the user's lite-mode prefs:
     /// the SDF compositor is heavy enough that the in-app "Disable Liquid
@@ -144,6 +136,17 @@ class SharedAccountContext {
 
     private var statusItem: NSStatusItem?
     private var isLocked = false
+    #if !SHARE
+    private var spotlights: [AccountRecordId: SpotlightContext] = [:]
+    private var spotlightLocked = false
+
+    func updateSpotlightLock(_ isLocked: Bool) {
+        self.spotlightLocked = isLocked
+        for spotlight in self.spotlights.values {
+            spotlight.setLocked(isLocked)
+        }
+    }
+    #endif
 
     
     func updateStatusBarImage(_ image: NSImage?) -> Void {
@@ -259,6 +262,7 @@ class SharedAccountContext {
             _ = self._baseSettings.swap(settings)
             self.updateStatusBar(settings.statusBar)
             forceUpdateStatusBarIconByDockTile(sharedContext: self)
+            self.powerStateMonitor?.setObservesBattery(settings.liteMode.lowBatteryPercent != LiteModePowerPolicy.automaticPowerSavingOff)
             self.syncLiquidGlassWithLite()
         })
         #endif
@@ -272,18 +276,14 @@ class SharedAccountContext {
         #endif
         
         
-        self.batteryLevelTimer = .init(timeout: 1 * 60, repeat: true, completion: {
-            let internalFinder = InternalFinder()
-            if let internalBattery = internalFinder.getInternalBattery() {
-                let batteryLevel = internalBattery.charge ?? 100
-                DispatchQueue.main.async {
-                    self.batteryLevel = batteryLevel
-                }
-            }
-        }, queue: .concurrentDefaultQueue())
-        
-        
-        self.batteryLevelTimer?.start()
+        #if !SHARE
+        let powerStateMonitor = PowerStateMonitor(onChange: { [weak self] state in
+            self?.powerState = state
+        })
+        self.powerStateMonitor = powerStateMonitor
+        self.powerState = powerStateMonitor.state
+        powerStateMonitor.setObservesBattery(self.baseSettings.liteMode.lowBatteryPercent != LiteModePowerPolicy.automaticPowerSavingOff)
+        #endif
         
 
         let differenceDisposable = MetaDisposable()
@@ -572,7 +572,7 @@ class SharedAccountContext {
         } |> deliverOnMainQueue
         
         #if !SHARE
-        var spotlights:[AccountRecordId : SpotlightContext] = [:]
+        SpotlightPeerIndex.removeItemsFromEarlierLaunches()
         
         _ = signal.start(next: { (primary, accounts, photos) in
             self.activeAccountsInfoValue = (primary, accounts)
@@ -582,11 +582,13 @@ class SharedAccountContext {
             
             #if !SHARE
             let activeAccountIds = Set(accounts.map { $0.account.id })
-            for accountId in Array(spotlights.keys) where !activeAccountIds.contains(accountId) {
-                spotlights.removeValue(forKey: accountId)
+            for accountId in Array(self.spotlights.keys) where !activeAccountIds.contains(accountId) {
+                self.spotlights.removeValue(forKey: accountId)?.removeFromIndex()
+                CommunicationNotifications.deleteDonations(accountId: accountId.int64)
             }
-            for info in accounts where spotlights[info.account.id]?.engine.account !== info.account {
-                spotlights[info.account.id] = SpotlightContext(engine: TelegramEngine(account: info.account))
+            for info in accounts where self.spotlights[info.account.id]?.engine.account !== info.account {
+                self.spotlights[info.account.id]?.removeFromIndex()
+                self.spotlights[info.account.id] = SpotlightContext(engine: TelegramEngine(account: info.account), isLocked: self.spotlightLocked)
             }
             #endif
         })
@@ -597,6 +599,20 @@ class SharedAccountContext {
         let _ = self.accountManager.transaction({ transaction -> Void in
             let _ = transaction.createAuth([.environment(AccountEnvironmentAttribute(environment: testingEnvironment ? .test : .production))])
         }).start()
+    }
+    
+    @discardableResult
+    func releaseAccountCaches() -> Int {
+        assert(Queue.mainQueue().isCurrent())
+        guard let value = self.activeAccountsValue else {
+            return 0
+        }
+        for (_, account, _) in value.accounts {
+            account.postbox.clearCaches()
+            account.viewTracker.pruneThrottleState()
+        }
+        value.currentAuth?.postbox.clearCaches()
+        return value.accounts.count + (value.currentAuth == nil ? 0 : 1)
     }
     
     private var launchActions:[AccountRecordId : LaunchNavigation] = [:]
@@ -804,10 +820,6 @@ class SharedAccountContext {
     }
     
     #endif
-    
-    deinit {
-        batteryLevelTimer?.invalidate()
-    }
     
 }
 

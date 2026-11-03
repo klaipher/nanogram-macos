@@ -919,6 +919,9 @@
 		D48F2B4F431948C6A001328C /* InactiveChannelsUI in Frameworks */ = {isa = PBXBuildFile; productRef = 3DB8EBB382994860A7329BE8 /* InactiveChannelsUI */; };
 		1ADD8BCCDC6049B68CE86BFE /* SimilarPeersHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4793112A0E44048B603D019 /* SimilarPeersHooksInstall.swift */; };
 		53C2655B791449A18A453BBD /* GroupsInCommonUI in Frameworks */ = {isa = PBXBuildFile; productRef = 8C849FFE3CF443CEAAFD9A65 /* GroupsInCommonUI */; };
+		5875210EBD9FFA506719ABF8 /* NanogramRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = B2559DC8F5AA2E8CF5AB4594 /* NanogramRuntime */; };
+		C16D4B29C22B1005E4C416A4 /* NanogramDebug in Frameworks */ = {isa = PBXBuildFile; productRef = 723DF3A6FCFCE5A6D3122659 /* NanogramDebug */; };
+		B0AA6A79E5CFBAC871841700 /* NanogramDebugUI in Frameworks */ = {isa = PBXBuildFile; productRef = E641802EBABC17DD4ED3C106 /* NanogramDebugUI */; };
 		5105D43394A54BCB8773E53C /* QrStudioUI in Frameworks */ = {isa = PBXBuildFile; productRef = 019B2BAFB79C48F1A4A5666E /* QrStudioUI */; };
 		7110771E0000000000000004 /* TLottie in Frameworks */ = {isa = PBXBuildFile; productRef = 7110771E0000000000000002 /* TLottie */; };
 		7110771E0000000000000005 /* TLottie in Frameworks */ = {isa = PBXBuildFile; productRef = 7110771E0000000000000003 /* TLottie */; };
@@ -937,6 +940,8 @@
 		1D27C94151414C919E7A2F0F /* GigagroupUI in Frameworks */ = {isa = PBXBuildFile; productRef = 5C4531D880544E818C4AFF4E /* GigagroupUI */; };
 		D453551864204E23863FAC17 /* GigagroupHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D6036148B646A3BC3017EF /* GigagroupHooksInstall.swift */; };
 		F3CBAE20B1934EA1A49621A3 /* DeveloperHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D9C86F158B54DAB8A40AD7B /* DeveloperHooksInstall.swift */; };
+		1E290C2FCD8BA932CE6B7961 /* ChatAppIntentsHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58E26B9CD13A45F2ABBB5E32 /* ChatAppIntentsHooksInstall.swift */; };
+		CDC8412BE55ED86989D7D161 /* ChatAppIntents in Frameworks */ = {isa = PBXBuildFile; productRef = D37706AE994F932F835FCDD8 /* ChatAppIntents */; };
 		73DCB846B74D4E12B9D080D1 /* AddTonBalanceUI in Frameworks */ = {isa = PBXBuildFile; productRef = E639FCC6788F471E9EBF7224 /* AddTonBalanceUI */; };
 		C73F81DAD9EA4DEAA40D4D5A /* AddTonBalanceHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC8D28ED05E0406EA99ADE81 /* AddTonBalanceHooksInstall.swift */; };
 		27D250170933476EAE79FFC3 /* BlockedPeersHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20DE02C52DFB4A898677E9F0 /* BlockedPeersHooksInstall.swift */; };
@@ -1956,6 +1961,8 @@
 		0F608853A24F468E98DBF2D8 /* InactiveChannelsUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = InactiveChannelsUI; path = packages/InactiveChannelsUI; sourceTree = "<group>"; };
 		C4793112A0E44048B603D019 /* SimilarPeersHooksInstall.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SimilarPeersHooksInstall.swift; sourceTree = "<group>"; };
 		2382F66FCB03472CB031B1D7 /* GroupsInCommonUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GroupsInCommonUI; path = packages/GroupsInCommonUI; sourceTree = "<group>"; };
+		7C382997AC2415CD7A3CA126 /* NanogramRuntime */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NanogramRuntime; path = packages/NanogramRuntime; sourceTree = "<group>"; };
+		8DC3018C19A5252AEF05E873 /* NanogramDebug */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NanogramDebug; path = packages/NanogramDebug; sourceTree = "<group>"; };
 		3735CDD1DC42418CBDF358F5 /* QrStudioUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QrStudioUI; path = packages/QrStudioUI; sourceTree = "<group>"; };
 		7110771E0000000000000001 /* TLottie */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TLottie; path = packages/TLottie; sourceTree = "<group>"; };
 		2314496AC5714CD1BDBAF6C8 /* CrashRecoveryUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CrashRecoveryUI; path = packages/CrashRecoveryUI; sourceTree = "<group>"; };
@@ -1973,6 +1980,8 @@
 		4DB610A299E3416B8BC2D01C /* GigagroupUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GigagroupUI; path = packages/GigagroupUI; sourceTree = "<group>"; };
 		11D6036148B646A3BC3017EF /* GigagroupHooksInstall.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GigagroupHooksInstall.swift; sourceTree = "<group>"; };
 		2D9C86F158B54DAB8A40AD7B /* DeveloperHooksInstall.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DeveloperHooksInstall.swift; sourceTree = "<group>"; };
+		58E26B9CD13A45F2ABBB5E32 /* ChatAppIntentsHooksInstall.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatAppIntentsHooksInstall.swift; sourceTree = "<group>"; };
+		6E7CC97E3AC376DB7732390D /* ChatAppIntents */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChatAppIntents; path = packages/ChatAppIntents; sourceTree = "<group>"; };
 		4BE3418BAB4E4B709EDBA013 /* AddTonBalanceUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AddTonBalanceUI; path = packages/AddTonBalanceUI; sourceTree = "<group>"; };
 		AC8D28ED05E0406EA99ADE81 /* AddTonBalanceHooksInstall.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AddTonBalanceHooksInstall.swift; sourceTree = "<group>"; };
 		20DE02C52DFB4A898677E9F0 /* BlockedPeersHooksInstall.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BlockedPeersHooksInstall.swift; sourceTree = "<group>"; };
@@ -2089,6 +2098,10 @@
 				07EDD2B662264351B2D102DE /* EditTagLabelUI in Frameworks */,
 				7BE4259A2C3D4D73BBBC2302 /* SelectCountryUI in Frameworks */,
 				53C2655B791449A18A453BBD /* GroupsInCommonUI in Frameworks */,
+				CDC8412BE55ED86989D7D161 /* ChatAppIntents in Frameworks */,
+				5875210EBD9FFA506719ABF8 /* NanogramRuntime in Frameworks */,
+				C16D4B29C22B1005E4C416A4 /* NanogramDebug in Frameworks */,
+				B0AA6A79E5CFBAC871841700 /* NanogramDebugUI in Frameworks */,
 				5105D43394A54BCB8773E53C /* QrStudioUI in Frameworks */,
 				B2011E3EB7D84C48A0B9509D /* CrashRecoveryUI in Frameworks */,
 				E9E2F04E0D564351A4C88842 /* CrashReports in Frameworks */,
@@ -2769,6 +2782,9 @@
 				F70986F290D0462F9CEF770F /* EditTagLabelUI */,
 				447E693028674930A9722A3F /* SelectCountryUI */,
 				2382F66FCB03472CB031B1D7 /* GroupsInCommonUI */,
+				6E7CC97E3AC376DB7732390D /* ChatAppIntents */,
+				7C382997AC2415CD7A3CA126 /* NanogramRuntime */,
+				8DC3018C19A5252AEF05E873 /* NanogramDebug */,
 				3735CDD1DC42418CBDF358F5 /* QrStudioUI */,
 				7110771E0000000000000001 /* TLottie */,
 				2314496AC5714CD1BDBAF6C8 /* CrashRecoveryUI */,
@@ -3444,6 +3460,7 @@
 				F716983756F5EC6C305F1A21 /* ComposeUIHooksInstall.swift */,
 				03C84FC453A9567B520444AA /* DataUsageHooksInstall.swift */,
 				2D9C86F158B54DAB8A40AD7B /* DeveloperHooksInstall.swift */,
+				58E26B9CD13A45F2ABBB5E32 /* ChatAppIntentsHooksInstall.swift */,
 				9A364BF3E2BFDAAD628EB2B1 /* EntertainmentUIHooksInstall.swift */,
 				02F9DF469350C395CCC5F2E1 /* FilePanelsHooksInstall.swift */,
 				3A4ACA93378645B98A874FD2 /* ForumSettingsHooksInstall.swift */,
@@ -3719,6 +3736,10 @@
 				7C9B791DE6E3430FADA989DF /* EditTagLabelUI */,
 				857E4375FE0F41E9A737B925 /* SelectCountryUI */,
 				8C849FFE3CF443CEAAFD9A65 /* GroupsInCommonUI */,
+				D37706AE994F932F835FCDD8 /* ChatAppIntents */,
+				B2559DC8F5AA2E8CF5AB4594 /* NanogramRuntime */,
+				723DF3A6FCFCE5A6D3122659 /* NanogramDebug */,
+				E641802EBABC17DD4ED3C106 /* NanogramDebugUI */,
 				019B2BAFB79C48F1A4A5666E /* QrStudioUI */,
 				7110771E0000000000000002 /* TLottie */,
 				A49FDE6EE2CE45CC94854F90 /* CrashRecoveryUI */,
@@ -4683,6 +4704,7 @@
 				132156DD341A4274A52C6C7E /* VerifyAgeHooksInstall.swift in Sources */,
 				D453551864204E23863FAC17 /* GigagroupHooksInstall.swift in Sources */,
 				F3CBAE20B1934EA1A49621A3 /* DeveloperHooksInstall.swift in Sources */,
+				1E290C2FCD8BA932CE6B7961 /* ChatAppIntentsHooksInstall.swift in Sources */,
 				C73F81DAD9EA4DEAA40D4D5A /* AddTonBalanceHooksInstall.swift in Sources */,
 				27D250170933476EAE79FFC3 /* BlockedPeersHooksInstall.swift in Sources */,
 				89BE8B9480B348639A3A59E3 /* StatisticsHooksInstall.swift in Sources */,
@@ -5960,6 +5982,22 @@
 		8C849FFE3CF443CEAAFD9A65 /* GroupsInCommonUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GroupsInCommonUI;
+		};
+		D37706AE994F932F835FCDD8 /* ChatAppIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChatAppIntents;
+		};
+		B2559DC8F5AA2E8CF5AB4594 /* NanogramRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NanogramRuntime;
+		};
+		723DF3A6FCFCE5A6D3122659 /* NanogramDebug */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NanogramDebug;
+		};
+		E641802EBABC17DD4ED3C106 /* NanogramDebugUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NanogramDebugUI;
 		};
 		019B2BAFB79C48F1A4A5666E /* QrStudioUI */ = {
 			isa = XCSwiftPackageProductDependency;

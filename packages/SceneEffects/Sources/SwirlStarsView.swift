@@ -72,6 +72,7 @@ public final class SwirlStarsView: NSView, PremiumDecorationProtocol {
         animation.timingFunction = CAMediaTimingFunction(name: .linear)
         animation.fillMode = .forwards
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         node.addAnimation(animation, forKey: "rotation")
         
         self.setupMovementAnimation()

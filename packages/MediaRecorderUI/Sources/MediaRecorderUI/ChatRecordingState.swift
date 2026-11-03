@@ -277,7 +277,7 @@ public final class ChatRecordingVideoState : ChatRecordingState {
     public init(context: (any AccountContextProtocol), liveUpload:Bool, autohold: Bool) {
         let id:Int64 = arc4random64()
         let path = temporaryMediaPath("video_message", "mp4")
-        self.pipeline = VideoRecorderPipeline(path: path, config: VideoMessageConfig.with(appConfiguration: context.appConfiguration), liveUploading: liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil)
+        self.pipeline = VideoRecorderPipeline(path: path, config: VideoMessageConfig.with(appConfiguration: context.appConfiguration), liveUploading: liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil, audioInputDeviceId: MediaRecorderHooks.shared.microphoneDeviceId(context))
         super.init(autohold: autohold)
     }
     
@@ -306,8 +306,9 @@ public final class ChatRecordingVideoState : ChatRecordingState {
     public override var data: Signal<[MediaSenderContainer], NoError> {
         let isOneTime = self.isOneTime
         let trimRange = self.pendingTrimRange
+        let side = self.pipeline.outputSide
         func container(path: String, duration: Int, id: Int64?) -> MediaSenderContainer {
-            return VideoMessageSenderContainer(path: path, duration: duration, size: CGSize(width: 200, height: 200), id: id, isOneTime: isOneTime)
+            return VideoMessageSenderContainer(path: path, duration: duration, size: CGSize(width: side, height: side), id: id, isOneTime: isOneTime)
         }
         return pipeline.statePromise.get() |> filter { state in
             switch state {
@@ -425,7 +426,7 @@ public final class ChatRecordingAudioState : ChatRecordingState {
         self.path = path
         let uploadManager:PreUploadManager? = liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil
         let dataItem = DataItem(path: path)
-        recorder = ManagedAudioRecorder(liveUploading: uploadManager, dataItem: dataItem)
+        recorder = ManagedAudioRecorder(liveUploading: uploadManager, dataItem: dataItem, inputDeviceUID: MediaRecorderHooks.shared.microphoneDeviceId(context))
         super.init(autohold: autohold)
     }
     

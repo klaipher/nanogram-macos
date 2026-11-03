@@ -56,7 +56,7 @@ final class ChatVideoProcessingTooltip : Control {
     func update(context: any AccountContextProtocol, source: Source, animated: Bool, complete: @escaping()->Void) -> NSSize {
                 
         self.timer?.invalidate()
-        self.timer = .init(timeout: 5, repeat: false, completion: complete, queue: .mainQueue())
+        self.timer = .init(timeout: 5, repeat: false, completion: complete, queue: .mainQueue(), leeway: .precise)
         self.timer?.start()
         
         

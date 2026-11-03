@@ -192,7 +192,7 @@ public final class OngoingCallThreadLocalContextQueueImpl: NSObject, OngoingCall
     public func scheduleBlock(_ f: @escaping () -> Void, after timeout: Double) -> GroupCallDisposable {
         let timer = SwiftSignalKit.Timer(timeout: timeout, repeat: false, completion: {
             f()
-        }, queue: self.queue)
+        }, queue: self.queue, leeway: .precise)
         timer.start()
         
         return GroupCallDisposable(block: {

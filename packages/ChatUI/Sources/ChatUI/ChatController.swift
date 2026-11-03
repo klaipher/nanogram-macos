@@ -36,6 +36,8 @@ import TelegramTheme
 import TelegramUtils
 import Strings
 import InputView
+import LocalAudioTranscription
+import NanogramRuntime
 
 
 private func calculateAdjustedPoint(for point: CGPoint,
@@ -2672,6 +2674,12 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     private let initialDataHandler:Promise<ChatHistoryCombinedInitialData> = Promise()
 
     let previousView = Atomic<ChatHistoryView?>(value: nil)
+    private let historyVisibility = ValuePromise<Bool>(true, ignoreRepeated: true)
+    private lazy var historyVisibilityObserver = WindowVisibilityObserver(onChange: { [weak self] visible in
+        self?.historyVisibility.set(visible)
+    })
+    private let historyAppliedOnce = Atomic<Bool>(value: false)
+    private let historySkippedWhileHidden = Atomic<Bool>(value: false)
 
     /// Stored on the controller (not a `viewDidLoad` local) so we can null
     /// its contents from `cleanup()` and release the held `Appearance`
@@ -4084,6 +4092,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         })
 
         let previousHistoryViewUpdateId = Atomic<Int?>(value: nil)
+        let historyAppliedOnce = self.historyAppliedOnce
+        let historySkippedWhileHidden = self.historySkippedWhileHidden
         let historyViewTransition = combineLatest(queue: queue,
                                                   historyViewUpdate,
                                                   appearanceSignal,
@@ -4099,8 +4109,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                                                   reactions,
                                                   historyUiState,
                                                   historyPeerView,
-                                                  recommendedChannels
-    ) |> mapToQueue { update, appearance, maxReadIndex, searchState, animatedEmojiStickers, messageEffects, savedMessageTags, customChannelDiscussionReadState, customThreadOutgoingReadState, updatingMedia, adMessages, reactions, uiState, peerView, recommendedChannels -> Signal<(TableUpdateTransition, MessageHistoryView?, ChatHistoryCombinedInitialData, Bool, ChatHistoryView), NoError> in
+                                                  recommendedChannels,
+                                                  historyVisibility.get()
+    ) |> mapToQueue { update, appearance, maxReadIndex, searchState, animatedEmojiStickers, messageEffects, savedMessageTags, customChannelDiscussionReadState, customThreadOutgoingReadState, updatingMedia, adMessages, reactions, uiState, peerView, recommendedChannels, isVisible -> Signal<(TableUpdateTransition, MessageHistoryView?, ChatHistoryCombinedInitialData, Bool, ChatHistoryView), NoError> in
                                     
             let pollAnswersLoading = uiState.pollAnswers
             let threadLoading = uiState.threadLoading
@@ -4148,6 +4159,16 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             default:
                 break
             }
+
+            var isPlainGenericUpdate = false
+            if case .Generic(type: .Generic) = updateType {
+                isPlainGenericUpdate = true
+            }
+            if !HistoryVisibilityGate.shouldApply(visible: isVisible, isPlainGenericUpdate: isPlainGenericUpdate, hasScrollPosition: scrollPosition != nil, appliedOnce: historyAppliedOnce.with { $0 }) {
+                _ = historySkippedWhileHidden.swap(true)
+                return .complete()
+            }
+            let catchesUpAfterHidden = isVisible && historySkippedWhileHidden.swap(false)
             
             
             // The stored Atomic is `Appearance?`; the only time it's nil is
@@ -4164,7 +4185,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 break
             }
             
-            let animationInterface: TableAnimationInterface = TableAnimationInterface(nextTransaction.isExutable && view?.laterId == nil, true, animatedRows)
+            let animationInterface: TableAnimationInterface? = catchesUpAfterHidden ? nil : TableAnimationInterface(nextTransaction.isExutable && view?.laterId == nil, true, animatedRows)
             let timeDifference = context.timeDifference
             let bigEmojiEnabled = context.sharedContext.baseSettings.bigEmoji
 
@@ -4225,7 +4246,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                         includeJoin = false
                     }
                     
-                    let entries = messageEntries(msgEntries, location: chatLocation, maxReadIndex: view.isAnchorOnlyWhileLoading ? nil : maxReadIndex, dayGrouping: customChatContents == nil, renderType: chatTheme.bubbled ? .bubble : .list, includeBottom: true, timeDifference: timeDifference, ranks: ranks, pollAnswersLoading: pollAnswersLoading, threadLoading: threadLoading, groupingPhotos: true, autoplayMedia: initialData.autoplayMedia, searchState: searchState, animatedEmojiStickers: bigEmojiEnabled ? animatedEmojiStickers : [:], topFixedMessages: topMessages, customChannelDiscussionReadState: customChannelDiscussionReadState, customThreadOutgoingReadState: customThreadOutgoingReadState, addRepliesHeader: peerId == repliesPeerId && view.earlierId == nil, addWelcomeMessagesHeader: customChatContents?.kind == .welcomeMessages, updatingMedia: updatingMedia, adMessage: ads.fixed, dynamicAdMessages: ads.opportunistic, chatTheme: chatTheme, reactions: reactions, transribeState: uiState.transribe, topicCreatorId: uiState.topicCreatorId, mediaRevealed: uiState.mediaRevealed, translate: uiState.translate, storyState: uiState.storyState, peerStoryStats: view.peerStoryStats, cachedData: peerView?.cachedData, peer: peer, holeLater: view.holeLater, holeEarlier: view.holeEarlier, recommendedChannels: recommendedChannels, includeJoin: includeJoin, earlierId: view.earlierId, laterId: view.laterId, automaticDownload: initialData.autodownloadSettings, savedMessageTags: savedMessageTags, contentSettings: context.contentSettings, codeSyntaxData: uiState.codeSyntaxes, messageEffects: messageEffects, factCheckRevealed: uiState.factCheck, solutionRevealed: uiState.solutionRevealed, quoteRevealed: uiState.quoteRevealed, detailsExpanded: uiState.detailsExpanded, peerStatus: uiState.peerStatus, commonGroups: uiState.commonGroups, monoforumState: uiState.monoforumState, accountPeerId: context.peerId, contentConfig: context.contentConfig, walletFiatRate: uiState.walletFiatRate).map { ChatWrappedEntry(appearance: AppearanceWrapperEntry(entry: $0, appearance: appearance), tag: view.tag) }
+                    let entries = PerformanceSignposts.interval("chatHistoryEntriesForView") { messageEntries(msgEntries, location: chatLocation, maxReadIndex: view.isAnchorOnlyWhileLoading ? nil : maxReadIndex, dayGrouping: customChatContents == nil, renderType: chatTheme.bubbled ? .bubble : .list, includeBottom: true, timeDifference: timeDifference, ranks: ranks, pollAnswersLoading: pollAnswersLoading, threadLoading: threadLoading, groupingPhotos: true, autoplayMedia: initialData.autoplayMedia, searchState: searchState, animatedEmojiStickers: bigEmojiEnabled ? animatedEmojiStickers : [:], topFixedMessages: topMessages, customChannelDiscussionReadState: customChannelDiscussionReadState, customThreadOutgoingReadState: customThreadOutgoingReadState, addRepliesHeader: peerId == repliesPeerId && view.earlierId == nil, addWelcomeMessagesHeader: customChatContents?.kind == .welcomeMessages, updatingMedia: updatingMedia, adMessage: ads.fixed, dynamicAdMessages: ads.opportunistic, chatTheme: chatTheme, reactions: reactions, transribeState: uiState.transribe, topicCreatorId: uiState.topicCreatorId, mediaRevealed: uiState.mediaRevealed, translate: uiState.translate, storyState: uiState.storyState, peerStoryStats: view.peerStoryStats, cachedData: peerView?.cachedData, peer: peer, holeLater: view.holeLater, holeEarlier: view.holeEarlier, recommendedChannels: recommendedChannels, includeJoin: includeJoin, earlierId: view.earlierId, laterId: view.laterId, automaticDownload: initialData.autodownloadSettings, savedMessageTags: savedMessageTags, contentSettings: context.contentSettings, codeSyntaxData: uiState.codeSyntaxes, messageEffects: messageEffects, factCheckRevealed: uiState.factCheck, solutionRevealed: uiState.solutionRevealed, quoteRevealed: uiState.quoteRevealed, detailsExpanded: uiState.detailsExpanded, peerStatus: uiState.peerStatus, commonGroups: uiState.commonGroups, monoforumState: uiState.monoforumState, accountPeerId: context.peerId, contentConfig: context.contentConfig, walletFiatRate: uiState.walletFiatRate) }.map { ChatWrappedEntry(appearance: AppearanceWrapperEntry(entry: $0, appearance: appearance), tag: view.tag) }
                     proccesedView = ChatHistoryView(originalView: view, filteredEntries: entries, theme: chatTheme)
                 }
             } else {
@@ -4241,6 +4262,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         let appliedTransition = historyViewTransition |> map { [weak self] transition, view, initialData, isLoading, proccesedView in
             self?.applyTransition(transition, initialData: initialData, isLoading: isLoading, processedView: proccesedView)
+            if !isLoading {
+                _ = historyAppliedOnce.swap(true)
+            }
         }
         
         
@@ -7245,6 +7269,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 }
             } else {
                 
+                func transcribeOnServer() {
                 let currentTime = Int32(Date().timeIntervalSince1970)
                 if !context.isPremium, message.audioTranscription == nil {
                     if let cooldownUntilTime = context.audioTranscriptionTrial.cooldownUntilTime, cooldownUntilTime > currentTime {
@@ -7287,6 +7312,37 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     }
                     
                 }), forKey: messageId)
+                }
+
+                if let file = message.media.first as? TelegramMediaFile, LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled, isPremium: context.isPremium, isVoice: file.isVoice, hasServerTranscription: message.audioTranscription != nil), let path = context.account.postbox.mediaBox.completedResourcePath(file.resource) {
+                    strongSelf.updateState { state in
+                        var state = state
+                        state.transribe[messageId] = .loading
+                        return state
+                    }
+                    let signal = LocalAudioTranscription.shared.transcribe(path: path, localeIdentifiers: LocalAudioTranscription.localeCandidates(appLanguage: appAppearance.languageCode))
+                    |> mapToSignal { text -> Signal<Bool, NoError> in
+                        guard let text = text else {
+                            return .single(false)
+                        }
+                        return context.engine.messages.storeLocallyTranscribedAudio(messageId: messageId, text: text, isFinal: true, error: nil) |> map { _ -> Bool in return true } |> then(.single(true))
+                    }
+                    |> deliverOnMainQueue
+                    strongSelf.transcribeDisposable.set(signal.start(next: { [weak strongSelf] success in
+                        guard let strongSelf = strongSelf else { return }
+                        if success {
+                            strongSelf.updateState { state in
+                                var state = state
+                                state.transribe[messageId] = .revealed(true)
+                                return state
+                            }
+                        } else {
+                            transcribeOnServer()
+                        }
+                    }), forKey: messageId)
+                } else {
+                    transcribeOnServer()
+                }
             }
 
         }
@@ -9795,6 +9851,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         }
     }
     
+    private var lastAppliedTransitionIsLoading: Bool?
+
     func applyTransition(_ transition:TableUpdateTransition, initialData:ChatHistoryCombinedInitialData, isLoading: Bool, processedView: ChatHistoryView) {
         
                 
@@ -9845,21 +9903,21 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         #if DEBUG
         let mergeProbe = ChatMergeProbe.begin(table: genericView.tableView, transition: transition)
         #endif
-        genericView.tableView.merge(with: transition, appearAnimated: appearAnimated)
+        let merged = genericView.tableView.merge(with: transition, appearAnimated: appearAnimated)
         #if DEBUG
         ChatMergeProbe.end(mergeProbe, transition: transition, visible: genericView.tableView.visibleRows(), table: genericView.tableView)
         #endif
         chatInteraction.voiceSendFlight?.tableDidUpdate()
         self.textSendFlight?.tableDidUpdate()
         chatInteraction.mediaSendFlight?.tableDidUpdate()
-        self.lastFloatingCollectKey = nil
-        collectFloatingPhotos(animated: animated && transition.state.isNone, currentAnimationRows: currentAnimationRows)
-
-        
-        self.genericView.tableView.notifyScrollHandlers()
-        
-                   
         let showsCachedAnchor = processedView.originalView?.isAnchorOnlyWhileLoading == true
+        let skipsViewWork = !merged && transition.isEmpty && lastAppliedTransitionIsLoading == isLoading
+        lastAppliedTransitionIsLoading = isLoading
+        if !skipsViewWork {
+            self.lastFloatingCollectKey = nil
+            collectFloatingPhotos(animated: animated && transition.state.isNone, currentAnimationRows: currentAnimationRows)
+            self.genericView.tableView.notifyScrollHandlers()
+        }
         genericView.change(state: isLoading && !showsCachedAnchor ? .progress : .visible, animated: processedView.originalView != nil)
         if !isLoading {
             self.historyTransitionApplied = true
@@ -9911,11 +9969,13 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         self.chatInteraction.invokeInitialAction(includeAuto: true, animated: false)
         
         
-        genericView.tableView.enumerateVisibleViews(with: { view in
-            if let view = view as? ChatRowView {
-                view.updateBackground(animated: transition.animated, item: view.item)
-            }
-        })
+        if !skipsViewWork {
+            genericView.tableView.enumerateVisibleViews(with: { view in
+                if let view = view as? ChatRowView {
+                    view.updateBackground(animated: transition.animated, item: view.item)
+                }
+            })
+        }
         
         
         
@@ -9957,7 +10017,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             }
         }
         
-        if !isLoading {
+        if !isLoading, !skipsViewWork {
             var items:[ChatRowItem] = []
             var animatedEmojiItems:[ChatRowItem] = []
             var effectItems:[ChatRowItem] = []
@@ -10797,6 +10857,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
+        historyVisibilityObserver.window = genericView.window
         isPushedGlobalBackground = true
         updateBubblesBackButton()
         

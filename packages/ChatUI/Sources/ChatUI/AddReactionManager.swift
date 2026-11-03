@@ -251,7 +251,7 @@ public final class ContextAddReactionsListView : View, StickerFramesCollector  {
                 } else {
                     self.cancelLargeHold()
                 }
-            }, queue: .mainQueue())
+            }, queue: .mainQueue(), leeway: .precise)
             largeHoldTimer?.start()
         }
 
@@ -417,6 +417,7 @@ public final class ContextAddReactionsListView : View, StickerFramesCollector  {
                 bounce.timingFunctions = [CAMediaTimingFunction(name: .easeInEaseOut), CAMediaTimingFunction(name: .easeInEaseOut)]
                 bounce.duration = 0.7
                 bounce.repeatCount = .infinity
+                bounce.setDecorativeLoopFrameRate()
                 bounce.isAdditive = true
                 bounce.beginTime = now + 0.25 + Double(i) * 0.08
                 bounce.fillMode = .backwards

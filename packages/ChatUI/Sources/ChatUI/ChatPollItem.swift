@@ -2086,7 +2086,7 @@ private final class PollView : Control {
             if resultsInTimer == nil {
                 resultsInTimer = SwiftSignalKit.Timer(timeout: 1.0, repeat: true, completion: { [weak self] in
                     self?.updateResultsIn()
-                }, queue: Queue.mainQueue())
+                }, queue: Queue.mainQueue(), leeway: .precise)
                 resultsInTimer?.start()
             }
         } else {

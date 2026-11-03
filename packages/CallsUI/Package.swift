@@ -13,6 +13,7 @@ let deps: [(String, String)] = [
     ("TelegramContext", "../TelegramContext"),
     ("TelegramUtils", "../TelegramUtils"),
     ("TelegramMedia", "../TelegramMedia"),
+    ("VoiceRecorderInput", "../VoiceRecorderInput"),
     ("TelegramMediaUtils", "../TelegramMediaUtils"),
     ("TelegramCallsCore", "../TelegramCallsCore"),
     ("PrivateCallScreen", "../PrivateCallScreen"),

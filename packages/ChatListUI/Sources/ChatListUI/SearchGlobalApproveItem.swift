@@ -102,7 +102,7 @@ public final class SearchGlobalApproveItem : GeneralRowItem {
                         self.refresh()
                     }
                     
-                }, queue: .mainQueue())
+                }, queue: .mainQueue(), leeway: .precise)
                 
                 self.remainingTimer?.start()
 

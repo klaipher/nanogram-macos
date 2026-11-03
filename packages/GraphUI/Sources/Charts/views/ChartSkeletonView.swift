@@ -85,6 +85,7 @@ public final class ChartSkeletonView: View {
         animation.toValue = shineVirtualWidth - originX
         animation.duration = shineDuration
         animation.repeatCount = .infinity
+        animation.setDecorativeLoopFrameRate()
         animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         animation.beginTime = floor(CACurrentMediaTime() / shineDuration) * shineDuration
         animation.isRemovedOnCompletion = false
