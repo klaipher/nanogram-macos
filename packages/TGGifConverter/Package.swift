@@ -22,6 +22,11 @@ let package = Package(
             name: "TGGifConverter",
             dependencies: [],
             path: ".",
+            exclude: ["Tests"],
             publicHeadersPath: "Sources/TGGifConverter"),
+        .testTarget(
+            name: "TGGifConverterTests",
+            dependencies: ["TGGifConverter"],
+            path: "Tests/TGGifConverterTests"),
     ]
 )

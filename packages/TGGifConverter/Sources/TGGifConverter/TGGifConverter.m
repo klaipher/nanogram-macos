@@ -25,11 +25,9 @@ static const int32_t FPS = 600;
     }
     
     size_t sourceWidth = bytes[6] + (bytes[7]<<8), sourceHeight = bytes[8] + (bytes[9]<<8);
-    //size_t sourceFrameCount = CGImageSourceGetCount(source);
-    __block size_t currentFrameNumber = 0;
-    __block Float64 totalFrameDelay = 0.f;
     
     if (sourceWidth <= 0 || sourceHeight <= 0) {
+        CFRelease(source);
         if(errorHandler != nil) {
             errorHandler();
         }
@@ -78,12 +76,16 @@ static const int32_t FPS = 600;
     videoWriterInput.expectsMediaDataInRealTime = YES;
     
     if (![videoWriter canAddInput: videoWriterInput]) {
-        
+        CFRelease(source);
+        if(errorHandler != nil) {
+            errorHandler();
+        }
+        return;
     }
     [videoWriter addInput: videoWriterInput];
     
     NSDictionary* attributes = @{
-                                 (NSString*)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32ARGB),
+                                 (NSString*)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA),
                                  (NSString*)kCVPixelBufferWidthKey : @(sourceWidth),
                                  (NSString*)kCVPixelBufferHeightKey : @(sourceHeight),
                                  (NSString*)kCVPixelBufferCGImageCompatibilityKey : @YES,
@@ -92,86 +94,98 @@ static const int32_t FPS = 600;
     
     AVAssetWriterInputPixelBufferAdaptor* adaptor = [AVAssetWriterInputPixelBufferAdaptor assetWriterInputPixelBufferAdaptorWithAssetWriterInput: videoWriterInput sourcePixelBufferAttributes: attributes];
     
-    [videoWriter startWriting];
-    [videoWriter startSessionAtSourceTime: CMTimeMakeWithSeconds(totalFrameDelay, FPS)];
-    
-    BOOL addedLastFrame = NO;
-    BOOL needAddSecondaryLastFrame = NO;
-    
-    while (!cancelHandler()) {
-        if(videoWriterInput.isReadyForMoreMediaData) {
-            NSDictionary* options = @{(NSString*)kCGImageSourceTypeIdentifierHint : (id)kUTTypeGIF};
-            CGImageRef imgRef = CGImageSourceCreateImageAtIndex(source, currentFrameNumber, (__bridge CFDictionaryRef)options);
-            
-            if (imgRef) {
-                CFDictionaryRef properties = CGImageSourceCopyPropertiesAtIndex(source, currentFrameNumber, NULL);
-                CFDictionaryRef gifProperties = CFDictionaryGetValue(properties, kCGImagePropertyGIFDictionary);
-                
-                if( gifProperties ) {
-                    CVPixelBufferRef pxBuffer = [self newBufferFrom: imgRef
-                                                withPixelBufferPool: adaptor.pixelBufferPool
-                                                      andAttributes: adaptor.sourcePixelBufferAttributes];
-                    if( pxBuffer) {
-                        
-                        float delayTime = [self frameDurationAtIndex:currentFrameNumber source:source];
-                       
-                        CMTime time = CMTimeMakeWithSeconds(totalFrameDelay, FPS);
-                        
-
-                       if( ![adaptor appendPixelBuffer: pxBuffer withPresentationTime: time] ) {
-                            CFRelease(properties);
-                            CGImageRelease(imgRef);
-                            CVBufferRelease(pxBuffer);
-                            break;
-                        }
-                        
-                        
-                        
-                        if(currentFrameNumber == totalFrameCount-1 && delayTime > 0.33) {
-                            needAddSecondaryLastFrame = YES;
-                        }
-                        
-                       
-                        
-                        totalFrameDelay += delayTime;
-                                               
-                        
-                        CVBufferRelease(pxBuffer);
-                    }
-                }
-                
-                if( properties ) CFRelease(properties);
-                CGImageRelease(imgRef);
-                
-                currentFrameNumber++;
-                
-                if(needAddSecondaryLastFrame && !addedLastFrame && currentFrameNumber == totalFrameCount) {
-                    currentFrameNumber--;
-                    addedLastFrame = YES;
-                }
-                
-                
-            }
-            else {
-                [videoWriterInput markAsFinished];
-                
-                void (^videoSaveFinished)(void) = ^{
-                    if(completionHandler != nil) {
-                        completionHandler([outFilePath path]);
-                    }
-                };
-                
-                [videoWriter finishWritingWithCompletionHandler:videoSaveFinished];
-                break;
-            }
+    if (![videoWriter startWriting]) {
+        CFRelease(source);
+        if(errorHandler != nil) {
+            errorHandler();
         }
-        else {
-            [NSThread sleepForTimeInterval:0.1];
+        return;
+    }
+    [videoWriter startSessionAtSourceTime: CMTimeMakeWithSeconds(0, FPS)];
+    
+    NSDictionary* options = @{(NSString*)kCGImageSourceTypeIdentifierHint : (id)kUTTypeGIF};
+    dispatch_queue_t queue = dispatch_queue_create("org.telegram.gif-converter", DISPATCH_QUEUE_SERIAL);
+    
+    __block size_t currentFrameNumber = 0;
+    __block Float64 totalFrameDelay = 0.f;
+    __block BOOL addedLastFrame = NO;
+    __block BOOL needAddSecondaryLastFrame = NO;
+    __block BOOL finished = NO;
+    
+    void (^stop)(BOOL) = ^(BOOL failed) {
+        finished = YES;
+        [videoWriterInput markAsFinished];
+        [videoWriter cancelWriting];
+        CFRelease(source);
+        if (failed && errorHandler != nil) {
+            errorHandler();
         }
     };
     
-    CFRelease(source);
-
+    [videoWriterInput requestMediaDataWhenReadyOnQueue:queue usingBlock:^{
+        while (!finished && videoWriterInput.isReadyForMoreMediaData) {
+            if (cancelHandler()) {
+                stop(NO);
+                return;
+            }
+            CGImageRef imgRef = CGImageSourceCreateImageAtIndex(source, currentFrameNumber, (__bridge CFDictionaryRef)options);
+            
+            if (!imgRef) {
+                finished = YES;
+                [videoWriterInput markAsFinished];
+                CFRelease(source);
+                [videoWriter finishWritingWithCompletionHandler:^{
+                    if (videoWriter.status == AVAssetWriterStatusCompleted) {
+                        if(completionHandler != nil) {
+                            completionHandler([outFilePath path]);
+                        }
+                    } else if(errorHandler != nil) {
+                        errorHandler();
+                    }
+                }];
+                return;
+            }
+            
+            CFDictionaryRef properties = CGImageSourceCopyPropertiesAtIndex(source, currentFrameNumber, NULL);
+            CFDictionaryRef gifProperties = properties ? CFDictionaryGetValue(properties, kCGImagePropertyGIFDictionary) : NULL;
+            BOOL appendFailed = NO;
+            
+            if( gifProperties ) {
+                CVPixelBufferRef pxBuffer = [self newBufferFrom: imgRef
+                                            withPixelBufferPool: adaptor.pixelBufferPool
+                                                  andAttributes: adaptor.sourcePixelBufferAttributes];
+                if( pxBuffer) {
+                    float delayTime = [self frameDurationAtIndex:currentFrameNumber source:source];
+                    CMTime time = CMTimeMakeWithSeconds(totalFrameDelay, FPS);
+                    
+                    if( ![adaptor appendPixelBuffer: pxBuffer withPresentationTime: time] ) {
+                        appendFailed = YES;
+                    } else {
+                        if(currentFrameNumber == totalFrameCount-1 && delayTime > 0.33) {
+                            needAddSecondaryLastFrame = YES;
+                        }
+                        totalFrameDelay += delayTime;
+                    }
+                    CVBufferRelease(pxBuffer);
+                }
+            }
+            
+            if( properties ) CFRelease(properties);
+            CGImageRelease(imgRef);
+            
+            if (appendFailed) {
+                stop(YES);
+                return;
+            }
+            
+            currentFrameNumber++;
+            
+            if(needAddSecondaryLastFrame && !addedLastFrame && currentFrameNumber == totalFrameCount) {
+                currentFrameNumber--;
+                addedLastFrame = YES;
+            }
+        }
+    }];
 };
 
 + (float)frameDurationAtIndex:(NSUInteger)index source:(CGImageSourceRef)source
@@ -216,7 +230,7 @@ static const int32_t FPS = 600;
     if( pixelBufferPool )
         status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelBufferPool, &pxBuffer);
     else {
-        status = CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32ARGB, (__bridge CFDictionaryRef)attributes, &pxBuffer);
+        status = CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef)attributes, &pxBuffer);
     }
     
     NSAssert(status == kCVReturnSuccess, @"Could not create a pixel buffer");
@@ -233,7 +247,7 @@ static const int32_t FPS = 600;
                                                  bpc,
                                                  bytesPerRow,
                                                  colorSpace,
-                                                 kCGImageAlphaNoneSkipFirst);
+                                                 kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little);
     NSAssert(context, @"Could not create a context");
     
     CGContextDrawImage(context, CGRectMake(0, 0, width, height), frame);
