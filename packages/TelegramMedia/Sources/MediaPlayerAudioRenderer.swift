@@ -98,14 +98,14 @@ private func rendererInputProcPlayer(refCon: UnsafeMutableRawPointer, ioActionFl
                     if !didSetRate {
                         context.state = .playing(rate: rate, didSetRate: true)
                         let masterClock: CMClockOrTimebase = CMTimebaseGetMaster(context.timebase)!
-                        CMTimebaseSetRateAndAnchorTime(context.timebase, rate: rate, anchorTime: CMTimeMake(value: sampleIndex, timescale: 44100), immediateMasterTime: CMSyncGetTime(masterClock))
+                        CMTimebaseSetRateAndAnchorTime(context.timebase, rate: rate, anchorTime: CMTimeMake(value: sampleIndex, timescale: mediaPlayerAudioTimescale), immediateMasterTime: CMSyncGetTime(masterClock))
                         updatedRate = context.updatedRate
                     } else {
                         context.renderTimestampTick += 1
                         if context.renderTimestampTick % 1000 == 0 {
-                            let delta = (Double(sampleIndex) / 44100.0) - CMTimeGetSeconds(CMTimebaseGetTime(context.timebase))
+                            let delta = (Double(sampleIndex) / Double(mediaPlayerAudioTimescale)) - CMTimeGetSeconds(CMTimebaseGetTime(context.timebase))
                             if delta > 0.01 {
-                                CMTimebaseSetTime(context.timebase, time: CMTimeMake(value: sampleIndex, timescale: 44100))
+                                CMTimebaseSetTime(context.timebase, time: CMTimeMake(value: sampleIndex, timescale: mediaPlayerAudioTimescale))
                                 updatedRate = context.updatedRate
                             }
                         }
@@ -620,7 +620,7 @@ private final class AudioPlayerRendererContext {
                                 if pts.value == Int64.min {
                                     bufferSampleIndex = self.bufferContext.with { $0.bufferMaxChannelSampleIndex }
                                 } else {
-                                    bufferSampleIndex = CMTimeConvertScale(pts, timescale: 44100, method: .roundAwayFromZero).value
+                                    bufferSampleIndex = CMTimeConvertScale(pts, timescale: mediaPlayerAudioTimescale, method: .roundAwayFromZero).value
                                 }
                                 
                                 let bytes = malloc(takeLength)!
@@ -694,9 +694,11 @@ private final class AudioPlayerRendererContext {
     }
 }
 
-private func audioRendererNativeStreamDescription() -> AudioStreamBasicDescription {
+let mediaPlayerAudioTimescale = CMTimeScale(MediaPlayerAudioFormat.sampleRate)
+
+func audioRendererNativeStreamDescription() -> AudioStreamBasicDescription {
     var canonicalBasicStreamDescription = AudioStreamBasicDescription()
-    canonicalBasicStreamDescription.mSampleRate = 44100.00
+    canonicalBasicStreamDescription.mSampleRate = Float64(MediaPlayerAudioFormat.sampleRate)
     canonicalBasicStreamDescription.mFormatID = kAudioFormatLinearPCM
     canonicalBasicStreamDescription.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked
     canonicalBasicStreamDescription.mFramesPerPacket = 1
