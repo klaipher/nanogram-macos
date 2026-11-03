@@ -151,13 +151,14 @@ def run(root: Path, use_cache: bool, runner: Runner) -> Summary:
             runner.restore(unit, entry, stamps[unit])
             if not runner.is_current(unit, stamps[unit]):
                 statuses[unit] = "build"
-    if any(status == "build" for unit, status in statuses.items() if unit != "tlottie"):
+    configured = any(status == "build" for unit, status in statuses.items() if unit != "tlottie")
+    if configured:
         runner.configure()
         stamps = runner.stamps()
         runner.write_stamp("tlottie", stamps["tlottie"])
     elif any(status != "current" for status in statuses.values()) or not runner.headers_synced():
         runner.sync_headers()
-    if statuses["tlottie"] == "build" or not runner.is_current("tlottie", stamps["tlottie"]):
+    if (statuses["tlottie"] == "build" and not configured) or not runner.is_current("tlottie", stamps["tlottie"]):
         runner.build_tlottie(stamps["tlottie"])
     keys = {unit: cache_key(stamp, rust) for unit, stamp in stamps.items()}
     if use_cache:

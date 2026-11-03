@@ -189,6 +189,12 @@ class CacheRunTests(unittest.TestCase):
         self.assertEqual(runner.names().count("configure"), 1)
         self.assertEqual((summary.restored, summary.built), (len(ALL) - 1, 1))
 
+    def test_configure_builds_tlottie_once(self):
+        runner = FakeRunner(current=(), cached=())
+        frameworks.run(Path("/root"), True, runner)
+        self.assertEqual(runner.names().count("configure"), 1)
+        self.assertNotIn("build_tlottie", runner.names())
+
     def test_tlottie_miss_alone_builds_only_tlottie(self):
         runner = FakeRunner(current=[u for u in ALL if u != "tlottie"], cached=())
         frameworks.run(Path("/root"), True, runner)
