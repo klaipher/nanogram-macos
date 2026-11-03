@@ -34,7 +34,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 
 ## perf: CPU, memory, battery, macOS and hardware
 
-### R2-1. Per-chat network and Postbox polls keep running while the chat window is hidden or occluded — `todo` (group: perf)
+### R2-1. Per-chat network and Postbox polls keep running while the chat window is hidden or occluded — `done (564afadc, e180fb3d)` (group: perf)
 
 - **Evidence**: `packages/ChatUI/Sources/ChatUI/ChatController.swift:9418-9438`: every open channel with a linked
   discussion group (and every thread) subscribes `viewTracker.polledChannel(peerId:)` for the controller's lifetime.
@@ -71,7 +71,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **Size**: M
 - **Confidence**: high
 
-### R2-2. The 10 s passcode-lock poll runs for every user and fans out to four subscribers; the presence re-check polls every 5 s while the display sleeps — `todo` (group: perf)
+### R2-2. The 10 s passcode-lock poll runs for every user and fans out to four subscribers; the presence re-check polls every 5 s while the display sleeps — `done (b9823a2b)` (group: perf)
 
 - **Evidence**: `Telegram-Mac/account/SharedNotificationManager.swift:279-307`:
   `.single(()) |> delay(10, queue: concurrentDefaultQueue) |> restart`, mapped to Bool, `filter`,
@@ -109,7 +109,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **Size**: S
 - **Confidence**: high
 
-### R2-3. Autoplay video, GIFs, round videos and video avatars are gated on key-window only, so they decode on another Space, under other windows and with the display asleep — `todo` (group: perf)
+### R2-3. Autoplay video, GIFs, round videos and video avatars are gated on key-window only, so they decode on another Space, under other windows and with the display asleep — `done (1dbe5649)` (group: perf)
 
 Merged from two reviewers (CPU and macOS areas).
 
@@ -144,7 +144,7 @@ Merged from two reviewers (CPU and macOS areas).
 - **Confidence**: high (Space and covered-window cases are documented AppKit behaviour; the display-sleep case needs
   the probe)
 
-### R2-4. Calls hold a NoDisplaySleep assertion for the whole call, audio-only and hidden included — `todo` (group: perf)
+### R2-4. Calls hold a NoDisplaySleep assertion for the whole call, audio-only and hidden included — `done (4ddcfe6a)` (group: perf)
 
 - **Evidence**: `packages/PrivateCallScreen/Sources/PeerCallScreen.swift:433-436`: `show()` always calls
   `disableScreenSleep()`; released only at call end (`:423`) or in deinit (`:511-516`). The assertion is
@@ -169,7 +169,7 @@ Merged from two reviewers (CPU and macOS areas).
 - **Size**: S
 - **Confidence**: high
 
-### R2-5. MediaPlayerView moves every frame through the main thread and polls readiness with a precise timer; feed `sampleBufferRenderer` from its queue as ChunkMediaPlayerV2 does — `todo` (group: perf)
+### R2-5. MediaPlayerView moves every frame through the main thread and polls readiness with a precise timer; feed `sampleBufferRenderer` from its queue as ChunkMediaPlayerV2 does — `dropped (deferred: moving MediaPlayerView's restoreState flush/attachment ordering onto the renderer queue needs a playback harness with real media to verify; not shipped untested; R2-3 already stops it while nothing can see it)` (group: perf)
 
 - **Evidence**: `packages/TelegramMedia/Sources/MediaPlayerView.swift:211-243` (`startPolling` on main; when the layer
   is not ready, a repeating main-queue `SwiftSignalKit.Timer(timeout: max(1/30, …), leeway: .precise)`, `:255-257`);
@@ -197,7 +197,7 @@ Merged from two reviewers (CPU and macOS areas).
 - **Size**: M
 - **Confidence**: medium
 
-### R2-6. ChunkMediaPlayerV2 runs a 60 Hz zero-tolerance main-thread Foundation.Timer for the whole time it plays — `todo` (group: perf)
+### R2-6. ChunkMediaPlayerV2 runs a 60 Hz zero-tolerance main-thread Foundation.Timer for the whole time it plays — `done (a395cd55)` (group: perf)
 
 - **Evidence**: `packages/TelegramMedia/Sources/ChunkMediaPlayerV2.swift:377-390`
   (`isFast = isPlaying || pendingSeek || pendingVideoFrame || !didSeekOnce` →
@@ -224,7 +224,7 @@ Merged from two reviewers (CPU and macOS areas).
 - **Size**: M
 - **Confidence**: medium
 
-### R2-7. Typing in any chat, loaded or not, re-runs the whole chat-list mapping, sort and diff — `todo` (group: perf)
+### R2-7. Typing in any chat, loaded or not, re-runs the whole chat-list mapping, sort and diff — `done (5d51bc60)` (group: perf)
 
 - **Evidence**: `packages/ChatListUI/Sources/ChatListUI/PeersListController.swift:2591-2668` (`allPeerInputActivities()`
   for every chat feeds `PeerListState.activities`); `ChatListController.swift:627-632` (the projection drops only
@@ -250,7 +250,7 @@ Merged from two reviewers (CPU and macOS areas).
 - **Size**: M
 - **Confidence**: medium
 
-### R2-8. The Settings tab is built at launch and keeps a 15-input pipeline live offscreen, including a 60 s notification-settings XPC poll — `todo` (group: perf)
+### R2-8. The Settings tab is built at launch and keeps a 15-input pipeline live offscreen, including a 60 s notification-settings XPC poll — `done (227e2822)` (group: perf)
 
 Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotification code is R2-15.
 
@@ -281,7 +281,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-9. Fixed-rate UI timers: auto-night re-checks every 60 s, slow mode updates the interface 5×/s, and gift-auction previews tick 10×/s and leak — `todo` (group: perf)
+### R2-9. Fixed-rate UI timers: auto-night re-checks every 60 s, slow mode updates the interface 5×/s, and gift-auction previews tick 10×/s and leak — `done (8368b117)` (group: perf)
 
 - **Evidence**: `Telegram-Mac/app/AppDelegate.swift:722-731`: with an auto-night schedule or system-based theme,
   `.single(()) |> then(.single(()) |> delay(60, queue: main) |> restart)`, then (`:733-803`) `EDSunriseSet` and an
@@ -310,7 +310,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-10. The small-group online counter makes two synchronous MTContext dispatches per member from the Postbox queue on every presence change — `todo` (group: perf)
+### R2-10. The small-group online counter makes two synchronous MTContext dispatches per member from the Postbox queue on every presence change — `done (b7d4a30c)` (group: perf)
 
 - **Evidence**: `packages/TelegramContext/Sources/TelegramContext/PeerChannelMemberCategoriesContextsManager.swift:285-294`:
   inside the `combinedView(.peerPresences(≤200 ids))` map, each presence evaluates
@@ -331,7 +331,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-11. Launch creates and prepares seven AVAudioPlayers on the main thread and drops them at once — `todo` (group: perf)
+### R2-11. Launch creates and prepares seven AVAudioPlayers on the main thread and drops them at once — `done (c8b1217a)` (group: perf)
 
 - **Evidence**: `Telegram-Mac/app/AppDelegate.swift:437-451`: `AVAudioPlayer(contentsOf:)` + `prepareToPlay()` for
   opening.m4a, five voip_* sounds and sent.caf in `applicationDidFinishLaunching`; each player is a local released at
@@ -349,7 +349,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium (the work is certain; the time is not measured)
 
-### R2-12. Long chat exports run with no ProcessInfo activity, so App Nap and idle sleep can stall them — `todo` (group: perf)
+### R2-12. Long chat exports run with no ProcessInfo activity, so App Nap and idle sleep can stall them — `done (a5cf5e12)` (group: perf)
 
 - **Evidence**: `packages/ChatExportUI/Sources/ChatExportUI/ChatExportManager.swift:81-95` (the export runs
   `run.run()` on its own queue with no `beginActivity`); `:568-588`, `:890-907` (semaphore waits polled every 0.2 s per
@@ -369,7 +369,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-13. Cold feature modules could be built `-Osize` — `todo` (group: perf)
+### R2-13. Cold feature modules could be built `-Osize` — `done (0fc5915d; size gain not measured)` (group: perf)
 
 - **Evidence**: upstream Release binary (`nanogram-macos-recon/dd-release/…`, arm64 `__text` 78.4 MB). Per-module
   `__text` from `nm`: WalletContext 2.48 MB, WalletUI 1.82, StarsUI 1.58, SettingsUI 1.23, StoriesUI 1.20,
