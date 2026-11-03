@@ -25,6 +25,7 @@ import ColorPalette
 import InAppSettings
 import FoundationUtils
 import ObjcUtils
+import NanogramRuntime
 
 fileprivate class PublicPhotoView : Control {
     private let avatar: AvatarControl = AvatarControl(font: .avatar(10))
@@ -359,6 +360,7 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
     private let _next: GalleryNavigationButton = GalleryNavigationButton()
     
     private var hasInited: Bool = false
+    private var hasDeferredRelease: Bool = false
     
     public var selectedItemChanged: ((@escaping(MGalleryItem) -> Void)->Void)!
     public var transition: ((@escaping(UpdateTransition<MGalleryItem>, MGalleryItem?) -> Void) -> Void)!
@@ -630,8 +632,12 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
     }
     
     private func releaseDistantItems(around index: Int) {
-        for (itemIndex, item) in self.items.enumerated() where abs(itemIndex - index) > 1 {
-            item.releaseResources()
+        let items = self.items
+        let hasPendingChanges = lockedTransition || !queuedTransitions.isEmpty
+        hasDeferredRelease = hasPendingChanges
+        let displayedIndex: Int? = items.isEmpty ? nil : controller.selectedIndex
+        for itemIndex in GalleryItemRelease.indicesToRelease(itemCount: items.count, around: index, displayedIndex: displayedIndex, hasPendingChanges: hasPendingChanges) {
+            items[itemIndex].releaseResources()
         }
     }
 
@@ -775,6 +781,9 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
             }
             if let item = selectedItem {
                 (controller.selectedViewController?.view as? GMagnifyView)?.updateStatus(item.status)
+            }
+            if hasDeferredRelease, !self.items.isEmpty {
+                releaseDistantItems(around: controller.selectedIndex)
             }
             afterTransaction?()
 
