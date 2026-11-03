@@ -54,6 +54,7 @@ import NanogramDebugUI
 import NanogramRuntime
 import Mozjpeg
 import Translate
+import LocalAudioTranscription
 
 //#if BETA || DEBUG
 //import Firebase
@@ -1415,6 +1416,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
             applyJPEGWideGamut()
         })
         settings.register(OnDeviceTranslation.legacyDebugOption)
+        settings.register(LocalAudioTranscription.debugOption)
         NanogramDebugMenu.install(openDeveloperScreen: { [weak self] in
             guard let context = self?.contextValue?.context, !context.isSupport else {
                 return false

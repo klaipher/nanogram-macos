@@ -3,13 +3,24 @@ import AVFoundation
 import Speech
 import OpusBinding
 import SwiftSignalKit
+import NanogramDebug
 
 public protocol LocalSpeechRecognizer: AnyObject {
     func transcribe(_ buffer: AVAudioPCMBuffer, localeIdentifier: String) async -> String?
 }
 
+public struct LabelledTranscription: Equatable {
+    public let text: String
+    public let label: String?
+
+    public init(text: String, label: String?) {
+        self.text = text
+        self.label = label
+    }
+}
+
 public final class LocalAudioTranscription {
-    public static let enabledKey = "nanogram.localVoiceTranscription"
+    public static let debugOption = NanogramDebugOption.toggle(id: "voice.onDeviceTranscription", section: "Voice", title: "Transcribe voice messages on this Mac", detail: "Non-Premium accounts transcribe voice messages with Apple's on-device speech recognition; results stay on this Mac and are labelled on-device. Off: Telegram's server (Premium or trial).", defaultValue: true)
 
     public static let shared = LocalAudioTranscription(recognizer: LocalAudioTranscription.systemRecognizer())
 
@@ -20,12 +31,28 @@ public final class LocalAudioTranscription {
     }
 
     public static var isEnabled: Bool {
-        get {
-            return UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true
+        return LocalAudioTranscription.isEnabled(in: NanogramDebugSettings.shared)
+    }
+
+    public static func isEnabled(in settings: NanogramDebugSettings) -> Bool {
+        if settings.isOverridden(LocalAudioTranscription.debugOption.id) {
+            return settings.bool(LocalAudioTranscription.debugOption.id)
         }
-        set {
-            UserDefaults.standard.set(newValue, forKey: enabledKey)
+        if case let .toggle(defaultValue) = LocalAudioTranscription.debugOption.kind {
+            return defaultValue
         }
+        return true
+    }
+
+    public static func onDeviceLabel(transcriptionId: Int64, isPending: Bool) -> String? {
+        if transcriptionId == 0 && !isPending {
+            return "on-device" //TODOLANG
+        }
+        return nil
+    }
+
+    public static func labelled(_ text: String, transcriptionId: Int64, isPending: Bool) -> LabelledTranscription {
+        return LabelledTranscription(text: text, label: LocalAudioTranscription.onDeviceLabel(transcriptionId: transcriptionId, isPending: isPending))
     }
 
     private static func systemRecognizer() -> LocalSpeechRecognizer? {
