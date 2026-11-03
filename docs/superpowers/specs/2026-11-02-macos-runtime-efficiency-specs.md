@@ -1853,6 +1853,8 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 
 Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug build at the macOS 15 target succeeds, the app opens its login window and stays up 60 s with no crash report. Details, rulings and owner steps are in `.superpowers/sdd/runtime/progress.md`; core commits are in `submodules/telegram-ios` (branch `nanogram-mac-runtime`), tgcalls commits in `submodules/tgcalls` (local branch `nanogram-mac-runtime`).
 
+Round-1 completion (2026-11-03, at f3cbd92): clean Debug build at the macOS 15 target succeeds with no integration fixes needed; the app ran 70 s in the isolated launch home with no crash report. Package suites touched this round pass (known pre-existing failures and one load-starved SSignalKit queue test are listed in the ledger).
+
 | Spec | Status | Commit |
 |---|---|---|
 | M1 | done | dd412d9 |
