@@ -7,22 +7,22 @@ import Postbox
 import TelegramMedia
 import TelegramMediaUtils
 import SystemPermissions
+import VoiceRecorderInput
 
 
-
-private let kOutputBus: UInt32 = 0
-private let kInputBus: UInt32 = 1
 
 private let queue = Queue(name: "micro-listen", qos: .background)
 
-private final class MicroListenerContextObject : RecoderContextRenderer {
+private final class MicroListenerContextObject {
     private let devicesDisposable = MetaDisposable()
     private let devices: DevicesContext
     private let accountManager: AccountManager<TelegramAccountManagerTypes>
     
     
     private var device: AVCaptureDevice?
-    private var sampleRate: Int32 = 0
+    private var engine: VoiceRecorderAudioEngine?
+    private var converter: VoiceRecorderInputConverter?
+    private var inputGeneration: Int = 0
 
     
     private var onSpeaking:((Float)->Void)?
@@ -39,11 +39,6 @@ private final class MicroListenerContextObject : RecoderContextRenderer {
             }
         }
     }
-    private let id: Int32
-    private let audioUnit = Atomic<AudioUnit?>(value: nil)
-
-    private var audioBuffer = Data()
-
     private var micLevelPeak: Int16 = 0
     private var micLevelPeakCount: Int = 0
 
@@ -53,15 +48,9 @@ private final class MicroListenerContextObject : RecoderContextRenderer {
         self.devices = devices
         self.queue = queue
         self.accountManager = accountManager
-        self.id = getNextRecorderContextId()
-        
-        addAudioRecorderContext(self.id, self)
-        addAudioUnitHolder(self.id, queue, self.audioUnit)
     }
     
     deinit {
-        removeAudioRecorderContext(self.id)
-        removeAudioUnitHolder(self.id)
         stop()
         devicesDisposable.dispose()
     }
@@ -98,121 +87,37 @@ private final class MicroListenerContextObject : RecoderContextRenderer {
             self.device = device
             
             
-            if let audioUnit = self.audioUnit.swap(nil) {
-                _ = AudioOutputUnitStop(audioUnit)
-                _ = AudioUnitUninitialize(audioUnit)
-                _ = AudioComponentInstanceDispose(audioUnit)
-            }
+            self.stopEngine()
             
-            var desc = AudioComponentDescription()
-            desc.componentType = kAudioUnitType_Output
-            desc.componentSubType = kAudioUnitSubType_HALOutput
-            desc.componentManufacturer = kAudioUnitManufacturer_Apple
-            guard let inputComponent = AudioComponentFindNext(nil, &desc) else {
+            let engine = VoiceRecorderAudioEngine(inputDeviceUID: device.uniqueID, voiceProcessing: false)
+            self.engine = engine
+            guard let converter = VoiceRecorderInputConverter(inputFormat: engine.inputFormat) else {
                 return
             }
-            var maybeAudioUnit: AudioUnit? = nil
-            AudioComponentInstanceNew(inputComponent, &maybeAudioUnit)
-            
-            guard let audioUnit = maybeAudioUnit else {
-                return
-            }
-            
-            var o: UInt32 = 1
-            guard AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &o, 4) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-            
-            var z: UInt32 = 0
-            guard AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &z, 4) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-                        
-            var deviceId:AudioDeviceID = AudioDeviceID()
-            var deviceIdRequest:AudioObjectPropertyAddress  = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMaster)
-            var deviceIdSize:UInt32 = UInt32(MemoryLayout<AudioDeviceID>.size)
-
-            guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &deviceIdRequest, 0, nil, &deviceIdSize, &deviceId) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-
-            guard AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, kOutputBus, &deviceId, UInt32(MemoryLayout<AudioDeviceID>.size)) == noErr else {
-                return
-            }
-    //
-            var deviceDataRequest:AudioObjectPropertyAddress =  AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyAvailableNominalSampleRates, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMaster)
-            var deviceDataSize:UInt32 = 0
-            guard AudioObjectGetPropertyDataSize(deviceId, &deviceDataRequest, 0, nil, &deviceDataSize) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-            let audioValueCount = deviceDataSize / UInt32(MemoryLayout<AudioValueRange>.size)
-            var table:[AudioValueRange] = Array<AudioValueRange>(repeating: AudioValueRange(), count: Int(audioValueCount))
-
-            guard AudioObjectGetPropertyData(deviceId, &deviceDataRequest, 0, nil, &deviceDataSize, &table) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-
-            
-            var inputSampleRate:AudioValueRange = table[0]
-            for i in 0 ..< Int(audioValueCount) {
-                if table[i].mMinimum == 48000 {
-                    inputSampleRate = table[i]
-                    break
-                }
-            }
-            deviceDataRequest.mSelector = kAudioDevicePropertyNominalSampleRate
-            guard AudioObjectSetPropertyData(deviceId, &deviceDataRequest, 0, nil, UInt32(MemoryLayout<AudioValueRange>.size), &inputSampleRate) == noErr else {
-                return
-            }
-            
-            var audioStreamDescription = audioRecorderNativeStreamDescription(inputSampleRate.mMinimum)
-            sampleRate = Int32(inputSampleRate.mMinimum)
-            guard AudioUnitSetProperty(audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &audioStreamDescription, UInt32(MemoryLayout<AudioStreamBasicDescription>.size)) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-            
-            guard AudioUnitSetProperty(audioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &audioStreamDescription, UInt32(MemoryLayout<AudioStreamBasicDescription>.size)) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-            
-            var callbackStruct = AURenderCallbackStruct()
-            callbackStruct.inputProc = rendererInputProc
-            callbackStruct.inputProcRefCon = UnsafeMutableRawPointer(bitPattern: intptr_t(self.id))
-            guard AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &callbackStruct, UInt32(MemoryLayout<AURenderCallbackStruct>.size)) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-            
-            var zero: UInt32 = 0
-            guard AudioUnitSetProperty(audioUnit, kAudioUnitProperty_ShouldAllocateBuffer, kAudioUnitScope_Output, 0, &zero, 4) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-            
-            guard AudioUnitInitialize(audioUnit) == noErr else {
-                AudioComponentInstanceDispose(audioUnit)
-                return
-            }
-            
-            _ = self.audioUnit.swap(audioUnit)
-
-            
-            self.audioUnit.with { audioUnit -> Void in
-                if let audioUnit = audioUnit {
-                    guard AudioOutputUnitStart(audioUnit) == noErr else {
-                        self.stop()
+            self.converter = converter
+            self.inputGeneration += 1
+            let generation = self.inputGeneration
+            let queue = self.queue
+            do {
+                try engine.start { [weak self] buffer in
+                    guard let copy = buffer.copy() as? AVAudioPCMBuffer else {
                         return
                     }
+                    queue.async {
+                        self?.processInput(copy, generation: generation)
+                    }
                 }
+            } catch {
+                self.stop()
             }
         }
+    }
+    
+    private func stopEngine() {
+        self.inputGeneration += 1
+        self.engine?.stop()
+        self.engine = nil
+        self.converter = nil
     }
     
     public func stop() {
@@ -222,83 +127,16 @@ private final class MicroListenerContextObject : RecoderContextRenderer {
         
         self.paused = true
         
-        if let audioUnit = self.audioUnit.swap(nil) {
-            _ = AudioOutputUnitStop(audioUnit)
-            _ = AudioUnitUninitialize(audioUnit)
-            _ = AudioComponentInstanceDispose(audioUnit)
-        }
-        removeAudioUnitHolder(self.id)
-
+        self.stopEngine()
     }
     
-    public func processAndDisposeAudioBuffer(_ buffer: AudioBuffer) {
+    private func processInput(_ buffer: AVAudioPCMBuffer, generation: Int) {
         assert(queue.isCurrent())
-        
-        var buffer = buffer
-        
-        if(sampleRate==16000){
-            let initialBuffer=malloc(Int(buffer.mDataByteSize+2));
-            memcpy(initialBuffer, buffer.mData, Int(buffer.mDataByteSize));
-            buffer.mData=realloc(buffer.mData, Int(buffer.mDataByteSize*3))
-            let values = initialBuffer!.assumingMemoryBound(to: Int16.self)
-            let resampled = buffer.mData!.assumingMemoryBound(to: Int16.self)
-            values[Int(buffer.mDataByteSize/2)]=values[Int(buffer.mDataByteSize/2)-1]
-            for i: Int in 0 ..< Int(buffer.mDataByteSize/2) {
-                resampled[i*3]=values[i]
-                resampled[i*3+1]=values[i]/3+values[i+1]/3*2
-                resampled[i*3+2]=values[i]/3*2+values[i+1]/3
-            }
-            free(initialBuffer)
-            buffer.mDataByteSize*=3
+        guard generation == self.inputGeneration, let converter = self.converter else {
+            return
         }
-        
-        defer {
-            free(buffer.mData)
-        }
-        
-        let millisecondsPerPacket = 60
-        let encoderPacketSizeInBytes = 16000 / 1000 * millisecondsPerPacket * 2
-        
-        let currentEncoderPacket = malloc(encoderPacketSizeInBytes)!
-        defer {
-            free(currentEncoderPacket)
-        }
-        
-        var bufferOffset = 0
-        
-        while true {
-            var currentEncoderPacketSize = 0
-            
-            while currentEncoderPacketSize < encoderPacketSizeInBytes {
-                if audioBuffer.count != 0 {
-                    let takenBytes = min(self.audioBuffer.count, encoderPacketSizeInBytes - currentEncoderPacketSize)
-                    if takenBytes != 0 {
-                        self.audioBuffer.withUnsafeBytes { (bytes: UnsafePointer<Int8>) -> Void in
-                            memcpy(currentEncoderPacket.advanced(by: currentEncoderPacketSize), bytes, takenBytes)
-                        }
-                        self.audioBuffer.replaceSubrange(0 ..< takenBytes, with: Data())
-                        currentEncoderPacketSize += takenBytes
-                    }
-                } else if bufferOffset < Int(buffer.mDataByteSize) {
-                    let takenBytes = min(Int(buffer.mDataByteSize) - bufferOffset, encoderPacketSizeInBytes - currentEncoderPacketSize)
-                    if takenBytes != 0 {
-                        self.audioBuffer.withUnsafeBytes { (bytes: UnsafePointer<Int8>) -> Void in
-                            memcpy(currentEncoderPacket.advanced(by: currentEncoderPacketSize), buffer.mData?.advanced(by: bufferOffset), takenBytes)
-                        }
-                        bufferOffset += takenBytes
-                        currentEncoderPacketSize += takenBytes
-                    }
-                } else {
-                    break
-                }
-            }
-            
-            if currentEncoderPacketSize < encoderPacketSizeInBytes {
-                self.audioBuffer.append(currentEncoderPacket.assumingMemoryBound(to: UInt8.self), count: currentEncoderPacketSize)
-                break
-            } else {
-                self.processWaveformPreview(samples: currentEncoderPacket.assumingMemoryBound(to: Int16.self), count: currentEncoderPacketSize / 2)
-            }
+        converter.convert(buffer) { samples, count in
+            self.processWaveformPreview(samples: samples, count: count)
         }
     }
 
