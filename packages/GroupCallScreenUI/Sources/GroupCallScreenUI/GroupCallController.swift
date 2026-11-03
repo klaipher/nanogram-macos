@@ -2058,9 +2058,7 @@ public final class GroupCallUIController : ViewController {
             }
             let state = value.0
             
-            if currentState == nil {
-                _ = strongSelf.screenSleep.disableScreenSleep()
-            }
+            strongSelf.screenSleep.update(needed: ScreenSleepAssertion.isNeeded(hasVisibleVideo: !state.activeVideoViews.isEmpty || state.isStream, isWindowVisible: state.isWindowVisible))
             strongSelf.applyUpdates(state, value.1, strongSelf.data.call, animated: animated.swap(true))
             strongSelf.readyOnce()
                         

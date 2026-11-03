@@ -8,7 +8,6 @@ import MetalEngine
 import AppKit
 import KeyboardKey
 import Localization
-import IOKit.pwr_mgt
 
 protocol CallViewUpdater {
     func updateState(_ state: PeerCallState, arguments: Arguments, transition: ContainedViewLayoutTransition)
@@ -368,6 +367,23 @@ public final class PeerCallScreen : ViewController {
         if self.isLoaded() {
             self.genericView.setWindowVisible(self.isHostedInTransition || self.screen.occlusionState.contains(.visible))
         }
+        self.updateScreenSleep()
+    }
+
+    private func updateScreenSleep() {
+        guard !self.callEnded, let state = self.previousState else {
+            self.screenSleep.update(needed: false)
+            return
+        }
+        var hasVideo = false
+        if case .active = state.externalState.remoteVideoState {
+            hasVideo = true
+        }
+        if case .active = state.externalState.videoState {
+            hasVideo = true
+        }
+        let isWindowVisible = self.screen.isVisible && self.screen.occlusionState.contains(.visible)
+        self.screenSleep.update(needed: ScreenSleepAssertion.isNeeded(hasVisibleVideo: hasVideo, isWindowVisible: isWindowVisible))
     }
     
     private func applyState(_ state: PeerCallState, arguments: Arguments, animated: Bool) {
@@ -420,7 +436,7 @@ public final class PeerCallScreen : ViewController {
                 self.isHostedInTransition = true
                 CallWindowTransition.dismiss(window: self.screen, content: self.view, source: self.transitionSource, cornerRadius: CallWindowTransition.windowCornerRadius)
             }
-            _ = self.enableScreenSleep()
+            self.callEnded = true
 
             self.onCompletion?()
             self.onCompletion = nil
@@ -428,13 +444,10 @@ public final class PeerCallScreen : ViewController {
         
         self.videoViewState = videoViewState
         self.previousState = state
+        self.updateScreenSleep()
     }
     
     public func show(source: CallWindowSource? = nil, animated: Bool = false) {
-        
-        _ = disableScreenSleep()
-        
-        
         if self.presentTransition != nil {
             return
         }
@@ -487,33 +500,15 @@ public final class PeerCallScreen : ViewController {
     }
     
     
-    private var assertionID: IOPMAssertionID = 0
-    private var success: IOReturn?
-    
-    private func disableScreenSleep() -> Bool? {
-        guard success == nil else { return nil }
-        success = IOPMAssertionCreateWithName( kIOPMAssertionTypeNoDisplaySleep as CFString,
-                                               IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                               "Phone Call" as CFString,
-                                               &assertionID )
-        return success == kIOReturnSuccess
-    }
-    
-    private func  enableScreenSleep() -> Bool {
-        if success != nil {
-            success = IOPMAssertionRelease(assertionID)
-            success = nil
-            return true
-        }
-        return false
-    }
-    
+    private let screenSleep = ScreenSleepAssertion(reason: "Video Call")
+    private var callEnded = false
+
     deinit {
         if let occlusionObserver = self.occlusionObserver {
             NotificationCenter.default.removeObserver(occlusionObserver)
         }
         actionsDisposable.dispose()
-        _ = enableScreenSleep()
+        self.screenSleep.enableScreenSleep()
     }
 }
 
