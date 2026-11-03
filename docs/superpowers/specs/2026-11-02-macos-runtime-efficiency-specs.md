@@ -179,7 +179,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: R22 (`9bc6231a`, `2398d68d`); the core ports as is, the trigger is Mac code.
 - **Perflab**: PostboxCacheLab already measures exactly this cache.
 
-### M6. Empty chat transitions never short-circuit, so the full merge and `applyTransition` tail run for no-op updates — `todo`, verified
+### M6. Empty chat transitions never short-circuit, so the full merge and `applyTransition` tail run for no-op updates — `done (a84a3c8)`, verified
 
 - **Evidence**: `packages/TGUIKit/Sources/TableView.swift:290-296` (`case none(TableAnimationInterface?)` in a
   synthesized `Equatable`); `TableAnimationInterface.swift:3` (`NSObject`, no `isEqual`, so identity);
@@ -294,7 +294,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **How to verify**: port iOS `ReadStateEchoTests` to a SwiftPM test on the pinned Postbox.
 - **iOS cross-ref**: `838d87e4`; ports as is.
 
-### M11. Lite mode ignores Low Power Mode and thermal state, and polls the battery every 60 s even when the threshold is off — `todo`, verified
+### M11. Lite mode ignores Low Power Mode and thermal state, and polls the battery every 60 s even when the threshold is off — `done (e48de99)`, verified
 
 - **Evidence**: `Telegram-Mac/account/SharedAccountContext.swift:66-79` (`isLite` checks the switch and
   `batteryLevel <= lowBatteryPercent` only; no `isLowPowerModeEnabled`/`thermalState` anywhere in Telegram-Mac,
@@ -319,7 +319,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **Perflab**: upstream #29 and #31e, listed, not fixed. `PowerLabs/Emitter/offscreen.swift` shows what lite gating
   saves per emitter.
 
-### M12. The chat list table does not skip AppKit's needs-display walk while scrolling — `todo`, verified
+### M12. The chat list table does not skip AppKit's needs-display walk while scrolling — `done (28b6e26)`, verified (A/B with the account not measured)
 
 - **Evidence**: `packages/TGUIKit/Sources/TGClipView.swift:24-47,264-268` (`skipsDisplayOnScroll`); only
   `ChatController.swift:483` and `PeerMediaPhotosController.swift:424` set it; the chat list's table
@@ -341,7 +341,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: none.
 - **Perflab**: `-PerfLabClipNoDisplay 1` exists for exactly this.
 
-### M13. The premium-lock badge rebuilds and cancels its blur pipeline on every emoji frame — `todo`, verified
+### M13. The premium-lock badge rebuilds and cancels its blur pipeline on every emoji frame — `done (cdb8e5f)`, verified
 
 - **Evidence**: `InlineStickerItemLayer.swift:452-457` (`contents` didSet calls `contentDidUpdate` every frame);
   `:39-43` (the lock layer's `tieToLayer` calls `applyBlur` each time); `:45-121` (a signal with
@@ -359,7 +359,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   identical badge image.
 - **iOS cross-ref**: `a349a378` (badge made once with the frame, off main); the idea ports.
 
-### M14. Each incoming message while the chat is at the bottom forces a synchronous whole-window display pass — `todo`, verified (needs measurement first)
+### M14. Each incoming message while the chat is at the bottom forces a synchronous whole-window display pass — `done (f20014e)`, verified (Time Profiler with the account not run)
 
 - **Evidence**: `packages/TGUIKit/Sources/TableAnimationInterface.swift:79-90`: with the user at the bottom, after
   making the new row views it calls `table.layoutSubtreeIfNeeded()` then `table.window?.displayIfNeeded()`;
@@ -520,7 +520,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   repo; the Mac submodule pin does not have it).
 - **Perflab**: not fixed upstream (#1 only covered `suspendAwareDelay`). IdleWakeupTests is the harness upstream used.
 
-### M22. Chat history and the chat list are rebuilt and merged on main while the window is hidden, minimized, closed to the Dock or occluded — `todo`, verified
+### M22. Chat history and the chat list are rebuilt and merged on main while the window is hidden, minimized, closed to the Dock or occluded — `done (47580f4)`, verified
 
 - **Evidence**: `packages/ChatUI/Sources/ChatUI/ChatController.swift:4087-4101` (15-input `combineLatest`, no
   visibility input), `:4235-4247` (prepare off main, then `applyTransition` on main: merge, floating photos, scroll
@@ -554,7 +554,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: the idea of R21 ("pause views of invisible screens", `todo` on iOS) and R12; new Mac code.
 - **Perflab**: upstream power-audit #8, listed, not fixed. ChatMergeProbe and ChatListStoriesLab can host it.
 
-### M23. The 5 s presence heartbeat re-sets 4 promises per account forever and undoes the display-sleep network pause — `todo`, verified
+### M23. The 5 s presence heartbeat re-sets 4 promises per account forever and undoes the display-sleep network pause — `done (6bbcf5e)`, verified
 
 - **Evidence**: `Telegram-Mac/app/AppDelegate.swift:1309-1312` (repeating 5 s main-queue timer, no gating);
   `:1328-1335` (each tick `presentAccountStatus.set(.single(isOnline) |> then(… delay(50) …) |> restart)`, replacing
@@ -1025,7 +1025,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   and watch the signal in the Debug log on the login screen.
 - **Confidence**: medium.
 
-### H8. Messages read on another device keep their banners: `clearNotifies(by:)` removes pending requests, not delivered notifications — `todo`
+### H8. Messages read on another device keep their banners: `clearNotifies(by:)` removes pending requests, not delivered notifications — `done (0760adc)`
 
 - **Evidence**: `Telegram-Mac/utils/UNUserNotifications.swift:362-375` collects delivered identifiers, then calls
   `removePendingNotificationRequests`. Every request is added with `trigger: nil` (`:327`), so none is ever pending. The caller is
@@ -1038,7 +1038,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   userInfo keys from the Debug app's login screen, call `clearNotifies(by:)`, and check `getDeliveredNotifications`.
 - **Confidence**: high.
 
-### H9. The Spotlight index goes stale and leaks logged-out accounts' contacts; every item shows the app-update icon — `todo`
+### H9. The Spotlight index goes stale and leaks logged-out accounts' contacts; every item shows the app-update icon — `done (8f7c6e5)`
 
 - **Evidence**: `Telegram-Mac/utils/Spotlight.swift:37-47`: `kUTTypeData`, `thumbnailData = theme.icons.appUpdate`, and one domain (the bundle id)
   for all accounts. `:94-110`: both `distinctUntilChanged` closures compare only `count`. `:128-151` diffs against an in-memory list that is empty
@@ -1347,7 +1347,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   Postbox-transaction count per viewed photo (PostboxCacheLab pattern).
 - **Confidence**: medium.
 
-### H24. Notifications use an avatar attachment and a single app stack; post communication notifications (`INSendMessageIntent`) with per-chat threads (iOS `397ac282`) — `todo`
+### H24. Notifications use an avatar attachment and a single app stack; post communication notifications (`INSendMessageIntent`) with per-chat threads (iOS `397ac282`) — `partial (0eb0950): code done; needs the Communication Notifications capability + entitlement (owner step); the < 10.14 NSUserNotificationCenter path is kept while the shipped deployment target is 10.13`
 
 - **Evidence**: `Telegram-Mac/utils/UNUserNotifications.swift:285-330` (no `threadIdentifier`, `interruptionLevel` or intent) and `:388-405` (each avatar is written as
   `tiffRepresentation(using: .jpeg, factor: 1)`, TIFF data in a `.jpeg` file, into a new `globallyUniqueString` temp folder per notification that is never removed).
