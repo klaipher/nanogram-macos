@@ -213,6 +213,56 @@ class CacheKeyTests(unittest.TestCase):
         self.assertRegex(fwcache.cache_key(STAMP, RUST), r"^[0-9a-f]{64}$")
 
 
+class ToolchainTests(unittest.TestCase):
+    CORE = "core-xprojects/rust-toolchain.toml"
+    ENGINE = "submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml"
+
+    def toolchain_root(self, tmp, core_extra=""):
+        root = Path(tmp)
+        write(root, self.CORE, f'[toolchain]\nchannel = "1.99.1"\n{core_extra}')
+        write(root, self.ENGINE, '[toolchain]\nchannel = "1.80.0"\n')
+        return root
+
+    def rust_of(self, root):
+        result = mock.Mock(returncode=0, stdout="rustc 1.99.1 (abc 2026-09-01)\n")
+        with mock.patch.object(fwcache, "rustup_path", return_value="/bin/rustup"), \
+                mock.patch.object(fwcache.subprocess, "run", return_value=result) as run:
+            return fwcache.pinned_rust(root), run
+
+    def test_pinned_channel_reads_the_core_toolchain_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.toolchain_root(tmp)
+            self.assertEqual(fwcache.pinned_channel(root), "1.99.1")
+            rust, run = self.rust_of(root)
+            self.assertEqual(run.call_args.args[0][2], "1.99.1")
+            self.assertTrue(rust.startswith("rustc 1.99.1 (abc 2026-09-01)"), rust)
+
+    def test_only_core_pin_change_changes_every_rust_key(self):
+        rust_stamps = {"wallet-engine": STAMP, "mtproto-engine": STAMP.replace("lib=", "lib=m"),
+                       "tlottie": "lib=tlottie\nrust=x\n"}
+        other = "lib=OpenSSL\nxcode=Xcode 27.2\n"
+        with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:
+            before, _ = self.rust_of(self.toolchain_root(one))
+            after, _ = self.rust_of(self.toolchain_root(two, 'components = ["rustfmt"]\n'))
+        self.assertNotEqual(before, after)
+        for unit, stamp in rust_stamps.items():
+            self.assertNotEqual(fwcache.cache_key(stamp, before), fwcache.cache_key(stamp, after), unit)
+        self.assertEqual(fwcache.cache_key(other, before), fwcache.cache_key(other, after))
+
+    def test_engine_toolchain_file_does_not_change_the_key(self):
+        with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:
+            before, _ = self.rust_of(self.toolchain_root(one))
+            root = self.toolchain_root(two)
+            write(root, self.ENGINE, '[toolchain]\nchannel = "1.81.0"\n')
+            after, _ = self.rust_of(root)
+        self.assertEqual(before, after)
+
+    def test_missing_core_toolchain_file_is_missing_rust(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rust, _ = self.rust_of(Path(tmp))
+        self.assertEqual(rust, fwcache.MISSING_RUST)
+
+
 class StampTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -228,6 +278,14 @@ class StampTests(unittest.TestCase):
             self.assertNotIn(str(Path.home()), stamp, unit)
             self.assertIn("archs=arm64\n", stamp)
             self.assertIn("deployment=15.0\n", stamp)
+
+    def test_tlottie_stamp_carries_the_toolchain_fingerprint(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(config, "CACHE_DIR", Path(tmp)):
+            stamps = fwcache.local_stamps(config.ROOT, fwcache.stamp_environment())
+        rust = fwcache.pinned_rust(config.ROOT)
+        self.assertIn(f"rust={rust}\n", stamps["tlottie"])
+        if rust != fwcache.MISSING_RUST:
+            self.assertIn(f"toolchain={fwcache.toolchain_fingerprint(config.ROOT)}", stamps["tlottie"])
 
     def test_tlottie_stamp_carries_pinned_rust_and_inputs(self):
         tlottie = self.stamps["tlottie"]

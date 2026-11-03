@@ -313,8 +313,11 @@ Each library is one of:
 
 The cache key is the sha256 of upstream's stamp (Xcode build, `deployment=`, `archs=`, the git tree of each input
 plus a hash of uncommitted changes, the stamps of the libraries it depends on) with the `rust=` line replaced by
-the pinned toolchain's `rustc -V` (`rust-toolchain.toml` of mtproto-engine), not whatever `cargo` is first on
-`PATH`. tlottie gets the same kind of stamp (`core-xprojects/tlottie/build/.nanogram-stamp`). An entry holds only
+the pinned toolchain's `rustc -V` plus a fingerprint of `core-xprojects/rust-toolchain.toml` (the one pin for all
+three Rust libraries), not whatever `cargo` is first on `PATH`. tlottie gets the same kind of stamp
+(`core-xprojects/tlottie/build/.nanogram-stamp`). Without the pinned toolchain (`rust=missing`) the three Rust
+libraries are neither restored from nor stored in the cache. An entry evicted or broken between planning and
+restoring is built instead. An entry holds only
 what the app build and dependent library builds read: the required outputs, their `include/` trees, the headers
 `sync-headers.sh` copies, and the two Rust xcframeworks (about 190 MB for all 13; the build directories are 1.7 GB).
 The cache keeps the most recently used entries up to 3 GB (`NANOGRAM_FRAMEWORK_CACHE_MAX_GB`).

@@ -90,11 +90,14 @@ class RustScriptTests(unittest.TestCase):
 
 
 class FakeRunner:
-    def __init__(self, current=(), cached=(), stamps=None):
+    def __init__(self, current=(), cached=(), stamps=None, rust="rustc 1"):
         self.stamps_by_unit = stamps or {unit: f"stamp of {unit}\n" for unit in fwcache.UNITS}
         self.current = set(current)
         self.broken = set()
-        self.cached = {fwcache.cache_key(self.stamps_by_unit[u], "rustc 1") for u in cached}
+        self.evicted = set()
+        self.failing = set()
+        self.rust_line = rust
+        self.cached = {fwcache.cache_key(self.stamps_by_unit[u], rust) for u in cached}
         self.calls = []
 
     def prepare(self):
@@ -104,18 +107,24 @@ class FakeRunner:
         return dict(self.stamps_by_unit)
 
     def rust(self):
-        return "rustc 1"
+        return self.rust_line
 
     def is_current(self, unit, stamp):
         return unit in self.current
 
     def find(self, key):
+        if key in self.evicted:
+            self.evicted.discard(key)
+            self.cached.discard(key)
+            return fwcache.Entry(key, "?", Path("/cache") / key, 1, 0.0)
         if key in self.cached:
             return fwcache.Entry(key, "?", Path("/cache") / key, 1, 0.0)
         return None
 
     def restore(self, unit, entry, stamp):
         self.calls.append(("restore", unit))
+        if unit in self.failing:
+            raise config.ConfigError(f"cache entry for {unit} has no files")
         if unit not in self.broken:
             self.current.add(unit)
 
@@ -188,6 +197,34 @@ class CacheRunTests(unittest.TestCase):
         summary = frameworks.run(Path("/root"), True, runner)
         self.assertEqual(runner.names().count("configure"), 1)
         self.assertEqual((summary.restored, summary.built), (len(ALL) - 1, 1))
+
+    def test_entry_evicted_after_planning_gets_built(self):
+        runner = FakeRunner(current=(), cached=ALL)
+        runner.evicted = {fwcache.cache_key(runner.stamps_by_unit["webrtc"], "rustc 1")}
+        summary = frameworks.run(Path("/root"), True, runner)
+        self.assertNotIn(("restore", "webrtc"), runner.calls)
+        self.assertEqual(runner.names().count("configure"), 1)
+        self.assertEqual((summary.restored, summary.built), (len(ALL) - 1, 1))
+
+    def test_failed_restore_gets_built(self):
+        runner = FakeRunner(current=(), cached=ALL)
+        runner.failing = {"OpenSSL"}
+        summary = frameworks.run(Path("/root"), True, runner)
+        self.assertEqual(runner.names().count("configure"), 1)
+        self.assertEqual((summary.restored, summary.built), (len(ALL) - 1, 1))
+
+    def test_missing_rust_never_restores_or_stores_rust_units(self):
+        rust_units = set(fwcache.RUST_UNITS)
+        runner = FakeRunner(current=(), cached=ALL, rust=fwcache.MISSING_RUST)
+        statuses = frameworks.plan(runner.stamps(), runner.is_current, runner.find, fwcache.MISSING_RUST, True)
+        self.assertEqual({u for u, s in statuses.items() if s == "build"}, rust_units)
+        runner.cached = set()
+        frameworks.run(Path("/root"), True, runner)
+        restored = {c[1] for c in runner.calls if c[0] == "restore"}
+        stored = {c[1] for c in runner.calls if c[0] == "store"}
+        self.assertFalse(restored & rust_units, restored)
+        self.assertFalse(stored & rust_units, stored)
+        self.assertEqual(stored, set(ALL) - rust_units)
 
     def test_configure_builds_tlottie_once(self):
         runner = FakeRunner(current=(), cached=())

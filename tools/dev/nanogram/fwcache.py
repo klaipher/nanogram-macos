@@ -28,7 +28,9 @@ EXTRA_OUTPUTS: dict[str, str] = {
     "wallet-engine": "packages/WalletEngine/wallet_engineFFI.xcframework",
     "mtproto-engine": "submodules/telegram-ios/submodules/MTProtoRustEngine/MTProtoEngineFFI.xcframework",
 }
-TOOLCHAIN_FILE = "submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml"
+TOOLCHAIN_FILE = "core-xprojects/rust-toolchain.toml"
+RUST_UNITS: tuple[str, ...] = ("wallet-engine", "mtproto-engine", "tlottie")
+MISSING_RUST = "missing"
 TLOTTIE_BUILD = "core-xprojects/tlottie/build"
 TLOTTIE_LIBRARY = f"{TLOTTIE_BUILD}/libtlottie.a"
 KEY_SCHEMA = "nanogram-fwcache=1\n"
@@ -80,6 +82,10 @@ def pinned_channel(root: Path) -> str:
     return match.group(1)
 
 
+def toolchain_fingerprint(root: Path) -> str:
+    return hashlib.sha256((Path(root) / TOOLCHAIN_FILE).read_bytes()).hexdigest()[:16]
+
+
 def rustup_path() -> str | None:
     bundled = config.RUSTUP_BIN / "rustup"
     return str(bundled) if bundled.exists() else shutil.which("rustup")
@@ -88,13 +94,21 @@ def rustup_path() -> str | None:
 def pinned_rust(root: Path) -> str:
     rustup = rustup_path()
     if rustup is None:
-        return "missing"
+        return MISSING_RUST
     try:
         channel = pinned_channel(root)
+        fingerprint = toolchain_fingerprint(root)
         result = subprocess.run([rustup, "run", channel, "rustc", "-V"], capture_output=True, text=True, check=False)
     except (OSError, config.ConfigError):
-        return "missing"
-    return result.stdout.strip() if result.returncode == 0 and result.stdout.strip() else "missing"
+        return MISSING_RUST
+    version = result.stdout.strip()
+    if result.returncode != 0 or not version:
+        return MISSING_RUST
+    return f"{version} toolchain={fingerprint}"
+
+
+def cacheable(unit: str, rust: str) -> bool:
+    return rust != MISSING_RUST or unit not in RUST_UNITS
 
 
 def xcode_version_line() -> str:

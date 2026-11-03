@@ -125,12 +125,12 @@ class Summary:
 
 def plan(stamps: dict[str, str], is_current: Callable[[str, str], bool], find: Callable[[str], Entry | None],
          rust: str, use_cache: bool) -> dict[str, Status]:
-    from .fwcache import cache_key
+    from .fwcache import cache_key, cacheable
     statuses: dict[str, Status] = {}
     for unit, stamp in stamps.items():
         if is_current(unit, stamp):
             statuses[unit] = "current"
-        elif use_cache and find(cache_key(stamp, rust)) is not None:
+        elif use_cache and cacheable(unit, rust) and find(cache_key(stamp, rust)) is not None:
             statuses[unit] = "restore"
         else:
             statuses[unit] = "build"
@@ -138,7 +138,7 @@ def plan(stamps: dict[str, str], is_current: Callable[[str, str], bool], find: C
 
 
 def run(root: Path, use_cache: bool, runner: Runner) -> Summary:
-    from .fwcache import UNITS, cache_key
+    from .fwcache import UNITS, cache_key, cacheable
     started = time.monotonic()
     runner.prepare()
     stamps = runner.stamps()
@@ -147,8 +147,14 @@ def run(root: Path, use_cache: bool, runner: Runner) -> Summary:
     for unit in UNITS:
         if statuses[unit] == "restore":
             entry = runner.find(cache_key(stamps[unit], rust))
-            assert entry is not None
-            runner.restore(unit, entry, stamps[unit])
+            if entry is None:
+                statuses[unit] = "build"
+                continue
+            try:
+                runner.restore(unit, entry, stamps[unit])
+            except (OSError, config.ConfigError, subprocess.CalledProcessError):
+                statuses[unit] = "build"
+                continue
             if not runner.is_current(unit, stamps[unit]):
                 statuses[unit] = "build"
     configured = any(status == "build" for unit, status in statuses.items() if unit != "tlottie")
@@ -163,7 +169,7 @@ def run(root: Path, use_cache: bool, runner: Runner) -> Summary:
     keys = {unit: cache_key(stamp, rust) for unit, stamp in stamps.items()}
     if use_cache:
         for unit in UNITS:
-            if runner.find(keys[unit]) is None and runner.is_current(unit, stamps[unit]):
+            if cacheable(unit, rust) and runner.find(keys[unit]) is None and runner.is_current(unit, stamps[unit]):
                 runner.store(unit, keys[unit], stamps[unit])
         runner.prune(set(keys.values()))
     counts = {status: sum(1 for s in statuses.values() if s == status) for status in ("current", "restore", "build")}
