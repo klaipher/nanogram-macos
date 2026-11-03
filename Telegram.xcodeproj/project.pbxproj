@@ -918,6 +918,7 @@
 		D48F2B4F431948C6A001328C /* InactiveChannelsUI in Frameworks */ = {isa = PBXBuildFile; productRef = 3DB8EBB382994860A7329BE8 /* InactiveChannelsUI */; };
 		1ADD8BCCDC6049B68CE86BFE /* SimilarPeersHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4793112A0E44048B603D019 /* SimilarPeersHooksInstall.swift */; };
 		53C2655B791449A18A453BBD /* GroupsInCommonUI in Frameworks */ = {isa = PBXBuildFile; productRef = 8C849FFE3CF443CEAAFD9A65 /* GroupsInCommonUI */; };
+		5875210EBD9FFA506719ABF8 /* NanogramRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = B2559DC8F5AA2E8CF5AB4594 /* NanogramRuntime */; };
 		C16D4B29C22B1005E4C416A4 /* NanogramDebug in Frameworks */ = {isa = PBXBuildFile; productRef = 723DF3A6FCFCE5A6D3122659 /* NanogramDebug */; };
 		B0AA6A79E5CFBAC871841700 /* NanogramDebugUI in Frameworks */ = {isa = PBXBuildFile; productRef = E641802EBABC17DD4ED3C106 /* NanogramDebugUI */; };
 		5105D43394A54BCB8773E53C /* QrStudioUI in Frameworks */ = {isa = PBXBuildFile; productRef = 019B2BAFB79C48F1A4A5666E /* QrStudioUI */; };
@@ -1955,6 +1956,7 @@
 		0F608853A24F468E98DBF2D8 /* InactiveChannelsUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = InactiveChannelsUI; path = packages/InactiveChannelsUI; sourceTree = "<group>"; };
 		C4793112A0E44048B603D019 /* SimilarPeersHooksInstall.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SimilarPeersHooksInstall.swift; sourceTree = "<group>"; };
 		2382F66FCB03472CB031B1D7 /* GroupsInCommonUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GroupsInCommonUI; path = packages/GroupsInCommonUI; sourceTree = "<group>"; };
+		7C382997AC2415CD7A3CA126 /* NanogramRuntime */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NanogramRuntime; path = packages/NanogramRuntime; sourceTree = "<group>"; };
 		8DC3018C19A5252AEF05E873 /* NanogramDebug */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NanogramDebug; path = packages/NanogramDebug; sourceTree = "<group>"; };
 		3735CDD1DC42418CBDF358F5 /* QrStudioUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QrStudioUI; path = packages/QrStudioUI; sourceTree = "<group>"; };
 		7110771E0000000000000001 /* TLottie */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TLottie; path = packages/TLottie; sourceTree = "<group>"; };
@@ -2088,6 +2090,7 @@
 				07EDD2B662264351B2D102DE /* EditTagLabelUI in Frameworks */,
 				7BE4259A2C3D4D73BBBC2302 /* SelectCountryUI in Frameworks */,
 				53C2655B791449A18A453BBD /* GroupsInCommonUI in Frameworks */,
+				5875210EBD9FFA506719ABF8 /* NanogramRuntime in Frameworks */,
 				C16D4B29C22B1005E4C416A4 /* NanogramDebug in Frameworks */,
 				B0AA6A79E5CFBAC871841700 /* NanogramDebugUI in Frameworks */,
 				5105D43394A54BCB8773E53C /* QrStudioUI in Frameworks */,
@@ -2769,6 +2772,7 @@
 				F70986F290D0462F9CEF770F /* EditTagLabelUI */,
 				447E693028674930A9722A3F /* SelectCountryUI */,
 				2382F66FCB03472CB031B1D7 /* GroupsInCommonUI */,
+				7C382997AC2415CD7A3CA126 /* NanogramRuntime */,
 				8DC3018C19A5252AEF05E873 /* NanogramDebug */,
 				3735CDD1DC42418CBDF358F5 /* QrStudioUI */,
 				7110771E0000000000000001 /* TLottie */,
@@ -3718,6 +3722,7 @@
 				7C9B791DE6E3430FADA989DF /* EditTagLabelUI */,
 				857E4375FE0F41E9A737B925 /* SelectCountryUI */,
 				8C849FFE3CF443CEAAFD9A65 /* GroupsInCommonUI */,
+				B2559DC8F5AA2E8CF5AB4594 /* NanogramRuntime */,
 				723DF3A6FCFCE5A6D3122659 /* NanogramDebug */,
 				E641802EBABC17DD4ED3C106 /* NanogramDebugUI */,
 				019B2BAFB79C48F1A4A5666E /* QrStudioUI */,
@@ -5959,6 +5964,10 @@
 		8C849FFE3CF443CEAAFD9A65 /* GroupsInCommonUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GroupsInCommonUI;
+		};
+		B2559DC8F5AA2E8CF5AB4594 /* NanogramRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NanogramRuntime;
 		};
 		723DF3A6FCFCE5A6D3122659 /* NanogramDebug */ = {
 			isa = XCSwiftPackageProductDependency;
