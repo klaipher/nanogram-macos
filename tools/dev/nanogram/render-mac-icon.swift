@@ -5,7 +5,7 @@
 // - Telegram-Mac/Assets.xcassets/AppIcon.appiconset/Logo_*.png (the icon before macOS 26, which uses
 //   Telegram-Mac/AppIcon.icon) and TelegramShare/icon.icns, from NanogramComet.svg (the dark Comet);
 // - packages/NanogramAppIcons/Sources/NanogramAppIcons/Icons/<Name>.icns, every icon of the app icon picker
-//   (up to 512 px: the Dock draws at most 256 pt at 2x);
+//   (16 to 1024 px, so Finder's large icon view, Gallery and Quick Look stay sharp);
 // - Telegram-Mac/Assets.xcassets/StatusIcon.imageset (the menu bar glyph) and Icon_TelegramLogin.imageset
 //   (the share extension's sign-in logo).
 // Port of the iOS fork's AlternateIconSources/render.swift: QuickLook (WebKit) rasterises the full-bleed SVG,
@@ -52,7 +52,6 @@ let iconsetFiles: [(file: String, pixels: Int)] = [
     ("icon_128x128", 128), ("icon_128x128@2x", 256), ("icon_256x256", 256), ("icon_256x256@2x", 512),
     ("icon_512x512", 512), ("icon_512x512@2x", 1024),
 ]
-let pickerIconsetFiles = iconsetFiles.filter { $0.pixels < 1024 }
 let statusIconFiles: [(file: String, pixels: Int)] = [("StatusIcon", 16), ("StatusIcon@2x", 32)]
 let shareLoginFiles: [(file: String, pixels: Int)] = [("TelegramIcon", 80), ("TelegramIcon@2x", 160)]
 
@@ -162,7 +161,7 @@ let svgs = attempt("listing sources") { try FileManager.default.contentsOfDirect
 for svg in svgs {
     let name = svg.deletingPathExtension().lastPathComponent
     let artwork = rasterize(svg, into: temp)
-    writeIcns(artwork, sizes: pickerIconsetFiles, to: pickerIcons.appendingPathComponent("\(name).icns"), temp: temp)
+    writeIcns(artwork, sizes: iconsetFiles, to: pickerIcons.appendingPathComponent("\(name).icns"), temp: temp)
     if name == defaultIconName {
         for icon in appIconFiles {
             writeMacIcon(artwork, pixels: icon.pixels, to: appIconSet.appendingPathComponent("\(icon.file).png"))

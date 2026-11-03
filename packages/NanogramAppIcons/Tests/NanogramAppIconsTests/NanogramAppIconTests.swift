@@ -54,11 +54,11 @@ final class NanogramAppIconTests: XCTestCase {
         XCTAssertNil(NanogramAppIcon.migratedStoredName(nil))
     }
 
-    func testEveryIconShipsAMacIconUpTo512Pixels() throws {
+    func testEveryIconShipsAMacIconUpTo1024Pixels() throws {
         for icon in NanogramAppIcon.all {
             let image = try XCTUnwrap(icon.image(), icon.name)
             let widths = Set(image.representations.map(\.pixelsWide))
-            XCTAssertEqual(widths, [16, 32, 64, 128, 256, 512], icon.name)
+            XCTAssertEqual(widths, [16, 32, 64, 128, 256, 512, 1024], icon.name)
         }
     }
 }
