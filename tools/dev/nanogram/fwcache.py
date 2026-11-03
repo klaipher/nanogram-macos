@@ -7,13 +7,18 @@ writes the checkout's own stamp so scripts/configure_frameworks.sh skips the lib
 """
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Mapping
+import time
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from . import config, frameworks
@@ -28,6 +33,10 @@ TLOTTIE_BUILD = "core-xprojects/tlottie/build"
 TLOTTIE_LIBRARY = f"{TLOTTIE_BUILD}/libtlottie.a"
 KEY_SCHEMA = "nanogram-fwcache=1\n"
 RUST_LINE = re.compile(r"(?m)^rust=.*$")
+META_SCHEMA = 1
+PARTIAL_MAX_AGE = 3600
+COPY_CHUNK = 400
+DEFAULT_MAX_GB = 3
 PAIR_SOURCE = re.compile(r'^\s*"\$\{SCRIPT_DIR\}/\.\./([^,"]+),', re.MULTILINE)
 
 STAMPS_SCRIPT = r"""
@@ -212,3 +221,147 @@ def cached_files(root: Path, unit: str, outputs: Mapping[str, list[Path]] | None
     if unit in EXTRA_OUTPUTS and (root / EXTRA_OUTPUTS[unit]).is_dir():
         files.update(_files_below(root / EXTRA_OUTPUTS[unit]))
     return sorted(p.relative_to(root) for p in files if p.is_file())
+
+
+@dataclass(frozen=True)
+class Entry:
+    key: str
+    unit: str
+    path: Path
+    size: int
+    last_used: float
+
+
+def cache_root() -> Path:
+    return Path(config.CACHE_DIR) / "frameworks"
+
+
+def max_bytes() -> int:
+    return int(float(os.environ.get("NANOGRAM_FRAMEWORK_CACHE_MAX_GB", DEFAULT_MAX_GB)) * 1024**3)
+
+
+@contextlib.contextmanager
+def cache_lock(mode: int) -> Iterator[None]:
+    root = cache_root()
+    root.mkdir(parents=True, exist_ok=True)
+    with open(root / ".lock", "a") as handle:
+        fcntl.flock(handle, mode)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def _entry(path: Path) -> Entry | None:
+    meta_path = path / "meta.json"
+    try:
+        meta = json.loads(meta_path.read_text())
+        return Entry(meta["key"], meta["unit"], path, int(meta["size"]), meta_path.stat().st_mtime)
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def lookup(key: str) -> Entry | None:
+    return _entry(cache_root() / key)
+
+
+def _clone(sources: list[Path], destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for start in range(0, len(sources), COPY_CHUNK):
+        chunk = [str(p) for p in sources[start:start + COPY_CHUNK]]
+        if subprocess.run(["cp", "-c", "-p", *chunk, str(destination)], capture_output=True).returncode != 0:
+            subprocess.run(["cp", "-p", *chunk, str(destination)], check=True, capture_output=True)
+
+
+def _clone_tree(source: Path, parent: Path) -> None:
+    parent.mkdir(parents=True, exist_ok=True)
+    if subprocess.run(["cp", "-c", "-R", "-p", str(source), str(parent)], capture_output=True).returncode != 0:
+        subprocess.run(["cp", "-R", "-p", str(source), str(parent)], check=True, capture_output=True)
+
+
+def store(root: Path, unit: str, key: str, stamp: str) -> Entry:
+    root = Path(root)
+    with cache_lock(fcntl.LOCK_EX):
+        existing = lookup(key)
+        if existing is not None:
+            return existing
+        final = cache_root() / key
+        partial = cache_root() / f"{key}.partial-{os.getpid()}"
+        shutil.rmtree(partial, ignore_errors=True)
+        shutil.rmtree(final, ignore_errors=True)
+        files = cached_files(root, unit)
+        if not files:
+            raise config.ConfigError(f"{unit} has no outputs to cache in {root}")
+        by_dir: dict[Path, list[Path]] = {}
+        for rel in files:
+            by_dir.setdefault(rel.parent, []).append(root / rel)
+        for rel_dir, sources in sorted(by_dir.items()):
+            _clone(sources, partial / "tree" / rel_dir)
+        size = sum((root / rel).stat().st_size for rel in files)
+        meta = {"schema": META_SCHEMA, "unit": unit, "key": key, "stamp": stamp, "created": time.time(), "size": size}
+        (partial / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
+        os.rename(partial, final)
+        entry = lookup(key)
+        assert entry is not None
+        return entry
+
+
+def _remove_outputs(root: Path, unit: str) -> None:
+    shutil.rmtree(build_dir(root, unit), ignore_errors=True)
+    if unit in EXTRA_OUTPUTS:
+        shutil.rmtree(Path(root) / EXTRA_OUTPUTS[unit], ignore_errors=True)
+
+
+def restore(root: Path, unit: str, entry: Entry, local_stamp: str) -> None:
+    root = Path(root)
+    with cache_lock(fcntl.LOCK_SH):
+        tree = entry.path / "tree"
+        if not tree.is_dir():
+            raise config.ConfigError(f"cache entry {entry.path} has no files; run tg frameworks --no-cache")
+        _remove_outputs(root, unit)
+        for top in sorted(tree.iterdir()):
+            _clone_tree(top, root)
+        stamp = stamp_file(root, unit)
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(local_stamp)
+        os.utime(entry.path / "meta.json")
+
+
+def entries() -> list[Entry]:
+    root = cache_root()
+    if not root.is_dir():
+        return []
+    found = [_entry(path) for path in root.iterdir() if path.is_dir() and ".partial-" not in path.name]
+    return sorted((e for e in found if e is not None), key=lambda e: e.last_used)
+
+
+def cache_size() -> int:
+    return sum(e.size for e in entries())
+
+
+def prune(limit: int, keep: set[str]) -> list[Entry]:
+    root = cache_root()
+    if not root.is_dir():
+        return []
+    evicted: list[Entry] = []
+    with cache_lock(fcntl.LOCK_EX):
+        now = time.time()
+        for path in root.iterdir():
+            if not path.is_dir():
+                continue
+            if ".partial-" in path.name:
+                if now - path.stat().st_mtime > PARTIAL_MAX_AGE:
+                    shutil.rmtree(path, ignore_errors=True)
+            elif _entry(path) is None:
+                shutil.rmtree(path, ignore_errors=True)
+        current = entries()
+        total = sum(e.size for e in current)
+        for entry in current:
+            if total <= limit:
+                break
+            if entry.key in keep:
+                continue
+            shutil.rmtree(entry.path, ignore_errors=True)
+            total -= entry.size
+            evicted.append(entry)
+    return evicted

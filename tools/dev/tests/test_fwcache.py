@@ -52,6 +52,144 @@ def wallet_root(root: Path) -> Path:
     return root
 
 
+def _store_in_child(cache_dir, root, key, queue):
+    config.CACHE_DIR = Path(cache_dir)
+    entry = fwcache.store(Path(root), "wallet-engine", key, STAMP)
+    queue.put(str(entry.path))
+
+
+def _restore_in_child(cache_dir, root, key, holding, released):
+    config.CACHE_DIR = Path(cache_dir)
+    with fwcache.cache_lock(fwcache.fcntl.LOCK_SH):
+        holding.set()
+        time.sleep(1.5)
+        fwcache.restore(Path(root), "wallet-engine", fwcache.lookup(key), STAMP)
+        released.set()
+
+
+class StoreRestoreTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.cache = base / "cache"
+        self.a = wallet_root(base / "a")
+        self.b = base / "b"
+        self.b.mkdir()
+        patcher = mock.patch.object(config, "CACHE_DIR", self.cache)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self.tmp.cleanup)
+
+    def stored(self, key="k1"):
+        return fwcache.store(self.a, "wallet-engine", key, STAMP)
+
+    def test_restore_layout_is_exact(self):
+        entry = self.stored()
+        fwcache.restore(self.b, "wallet-engine", entry, STAMP)
+        restored = files_below(self.b) - {"core-xprojects/wallet-engine/build/.framework-stamp"}
+        self.assertEqual(restored, set(WALLET_FILES))
+        for rel in WALLET_FILES:
+            self.assertEqual((self.b / rel).read_text(), f"content of {rel}")
+        self.assertEqual(sorted(os.listdir(self.b)), ["core-xprojects", "packages"])
+        self.assertEqual(os.listdir(self.b / "core-xprojects"), ["wallet-engine"])
+        self.assertEqual(os.listdir(self.b / "core-xprojects/wallet-engine"), ["build"])
+        self.assertEqual(os.listdir(self.b / "packages/WalletEngine"), ["wallet_engineFFI.xcframework"])
+
+    def test_restore_replaces_stale_outputs(self):
+        entry = self.stored()
+        write(self.b, "core-xprojects/wallet-engine/build/old.a")
+        write(self.b, "packages/WalletEngine/wallet_engineFFI.xcframework/old/x.a")
+        write(self.b, "packages/WalletEngine/Package.swift", "keep")
+        fwcache.restore(self.b, "wallet-engine", entry, STAMP)
+        self.assertFalse((self.b / "core-xprojects/wallet-engine/build/old.a").exists())
+        self.assertFalse((self.b / "packages/WalletEngine/wallet_engineFFI.xcframework/old").exists())
+        self.assertEqual((self.b / "packages/WalletEngine/Package.swift").read_text(), "keep")
+
+    def test_restore_writes_local_stamp(self):
+        entry = self.stored()
+        fwcache.restore(self.b, "wallet-engine", entry, "local stamp\n")
+        self.assertEqual((self.b / "core-xprojects/wallet-engine/build/.framework-stamp").read_text(), "local stamp\n")
+
+    def test_lookup(self):
+        self.assertIsNone(fwcache.lookup("k1"))
+        entry = self.stored()
+        found = fwcache.lookup("k1")
+        self.assertEqual((found.key, found.unit, found.path), ("k1", "wallet-engine", entry.path))
+        self.assertGreater(found.size, 0)
+
+    def test_store_existing_key_is_noop(self):
+        first = self.stored()
+        second = self.stored()
+        self.assertEqual(first.path, second.path)
+        self.assertEqual([p.name for p in fwcache.cache_root().iterdir() if ".partial-" in p.name], [])
+
+    def test_concurrent_store_same_key(self):
+        ctx = multiprocessing.get_context("spawn")
+        queue = ctx.Queue()
+        children = [ctx.Process(target=_store_in_child, args=(str(self.cache), str(self.a), "k1", queue))
+                    for _ in range(2)]
+        for child in children:
+            child.start()
+        for child in children:
+            child.join(60)
+            self.assertEqual(child.exitcode, 0)
+        paths = {queue.get(timeout=5), queue.get(timeout=5)}
+        self.assertEqual(paths, {str(self.cache / "frameworks" / "k1")})
+        names = [p.name for p in fwcache.cache_root().iterdir() if not p.name.startswith(".")]
+        self.assertEqual(names, ["k1"])
+
+    def _aged(self, key, age):
+        entry = fwcache.store(self.a, "wallet-engine", key, STAMP)
+        stamp = time.time() - age
+        os.utime(entry.path / "meta.json", (stamp, stamp))
+        return entry
+
+    def test_prune_evicts_lru_but_keeps_current(self):
+        oldest = self._aged("k1", 300)
+        middle = self._aged("k2", 200)
+        newest = self._aged("k3", 100)
+        evicted = fwcache.prune(oldest.size + newest.size, keep={"k1"})
+        self.assertEqual([e.key for e in evicted], ["k2"])
+        self.assertTrue(oldest.path.exists())
+        self.assertFalse(middle.path.exists())
+        self.assertTrue(newest.path.exists())
+
+    def test_prune_removes_stale_partials(self):
+        root = fwcache.cache_root()
+        root.mkdir(parents=True)
+        stale = root / "x.partial-1"
+        fresh = root / "y.partial-2"
+        broken = root / "z"
+        for path in (stale, fresh, broken):
+            write(path, "tree/f")
+        old = time.time() - 7200
+        os.utime(stale, (old, old))
+        fwcache.prune(10**12, keep=set())
+        self.assertFalse(stale.exists())
+        self.assertTrue(fresh.exists())
+        self.assertFalse(broken.exists())
+
+    def test_prune_skips_entry_being_restored(self):
+        self.stored()
+        ctx = multiprocessing.get_context("spawn")
+        holding, released = ctx.Event(), ctx.Event()
+        child = ctx.Process(target=_restore_in_child, args=(str(self.cache), str(self.b), "k1", holding, released))
+        child.start()
+        self.assertTrue(holding.wait(30))
+        evicted = fwcache.prune(0, keep=set())
+        self.assertTrue(released.is_set())
+        child.join(30)
+        self.assertEqual(child.exitcode, 0)
+        self.assertEqual([e.key for e in evicted], ["k1"])
+        self.assertTrue(set(WALLET_FILES) <= files_below(self.b))
+
+    def test_max_bytes(self):
+        with mock.patch.dict(os.environ, {"NANOGRAM_FRAMEWORK_CACHE_MAX_GB": "2"}):
+            self.assertEqual(fwcache.max_bytes(), 2 * 1024**3)
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(fwcache.max_bytes(), 3 * 1024**3)
+
+
 class CacheKeyTests(unittest.TestCase):
     def test_key_ignores_cargo_on_path(self):
         other = STAMP.replace("cargo 1.91.1 (ea2d97820 2025-10-10)", "cargo 1.99.1 (aaaaaaaaa 2026-09-01)")
