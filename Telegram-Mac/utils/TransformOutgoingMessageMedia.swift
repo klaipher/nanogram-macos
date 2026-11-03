@@ -70,19 +70,20 @@ public func transformOutgoingMessageMedia(postbox: Postbox, network: Network, re
                             }
                         }
                         
-                        try? FileManager.default.createSymbolicLink(atPath: data.0.path, withDestinationPath: thumbedFile)
+                        if resource == nil {
+                            try? FileManager.default.removeItem(atPath: thumbedFile)
+                            try? FileManager.default.createSymbolicLink(atPath: thumbedFile, withDestinationPath: data.0.path)
+                        }
                         
                         if file.mimeType.hasPrefix("image/") {
                             
-                            if let thumbData = try? Data(contentsOf: URL(fileURLWithPath: thumbedFile)) {
-                                let options = NSMutableDictionary()
-                                options.setValue(320 as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
-                                options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailFromImageAlways as String)
-                                options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailWithTransform as String)
+                            let options = NSMutableDictionary()
+                            options.setValue(320 as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
+                            options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailFromImageAlways as String)
+                            options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailWithTransform as String)
 
-                                if let imageSource = CGImageSourceCreateWithData(thumbData as CFData, nil) {
-                                    thumbImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options)
-                                }
+                            if let imageSource = CGImageSourceCreateWithURL(URL(fileURLWithPath: thumbedFile) as CFURL, nil) {
+                                thumbImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options)
                             }
                            
                             
@@ -117,8 +118,9 @@ public func transformOutgoingMessageMedia(postbox: Postbox, network: Network, re
                                     let thumbnailResource = LocalFileMediaResource(fileId: arc4random64(), isSecretRelated: false)
                                     postbox.mediaBox.storeResourceData(thumbnailResource.id, data: mutableData as Data)
                                     subscriber.putNext(AnyMediaReference.standalone(media: file.withUpdatedSize(Int64(size ?? 0)).withUpdatedPreviewRepresentations([TelegramMediaImageRepresentation(dimensions: PixelDimensions(image.size), resource: thumbnailResource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: false)])))
+                                    subscriber.putCompletion()
                                     
-                                     return EmptyDisposable
+                                    return EmptyDisposable
                                 }
                             }
                         
@@ -129,7 +131,7 @@ public func transformOutgoingMessageMedia(postbox: Postbox, network: Network, re
                         
                         
                         return EmptyDisposable
-                    } |> runOn( opportunistic ? Queue.mainQueue() : Queue.concurrentDefaultQueue())
+                    } |> runOn(Queue.concurrentDefaultQueue())
                 } else if opportunistic {
                     return .single(nil)
                 } else {
