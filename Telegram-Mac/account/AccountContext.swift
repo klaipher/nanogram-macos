@@ -398,6 +398,7 @@ final class AccountContext {
     private let applyThemeDisposable = MetaDisposable()
     private let cloudThemeObserver = MetaDisposable()
     private let freeSpaceDisposable = MetaDisposable()
+    private let cacheReleaserDisposable = MetaDisposable()
     private let prefDisposable = DisposableSet()
     private let reindexCacheDisposable = MetaDisposable()
     private let shouldReindexCacheDisposable = MetaDisposable()
@@ -895,6 +896,11 @@ final class AccountContext {
         let isLocked = (NSApp.delegate as? AppDelegate)?.passlock ?? .single(false)
         
         
+        let inlinePacksContext = self.inlinePacksContext
+        cacheReleaserDisposable.set(sharedContext.addAccountCacheReleaser({ [weak inlinePacksContext] in
+            inlinePacksContext?.purgeUnused()
+        }))
+        
         freeSpaceDisposable.set(combineLatest(queue: .mainQueue(), freeSpaceSignal, isKeyWindow, isLocked).start(next: { [weak self] space, isKeyWindow, locked in
             
             
@@ -1099,6 +1105,7 @@ final class AccountContext {
         applyThemeDisposable.dispose()
         cloudThemeObserver.dispose()
         freeSpaceDisposable.dispose()
+        cacheReleaserDisposable.dispose()
         premiumDisposable.dispose()
         globalLocationDisposable.dispose()
         reindexCacheDisposable.dispose()

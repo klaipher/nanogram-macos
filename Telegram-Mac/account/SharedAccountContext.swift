@@ -601,9 +601,24 @@ class SharedAccountContext {
         }).start()
     }
     
+    private let accountCacheReleasers = Bag<() -> Void>()
+    
+    func addAccountCacheReleaser(_ release: @escaping () -> Void) -> Disposable {
+        assert(Queue.mainQueue().isCurrent())
+        let index = self.accountCacheReleasers.add(release)
+        return ActionDisposable { [weak self] in
+            Queue.mainQueue().async {
+                self?.accountCacheReleasers.remove(index)
+            }
+        }
+    }
+    
     @discardableResult
     func releaseAccountCaches() -> Int {
         assert(Queue.mainQueue().isCurrent())
+        for release in self.accountCacheReleasers.copyItems() {
+            release()
+        }
         guard let value = self.activeAccountsValue else {
             return 0
         }

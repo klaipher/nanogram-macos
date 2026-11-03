@@ -32,5 +32,9 @@ let package = Package(
             ],
             path: "Sources/InlineStickersShare",
             swiftSettings: [.define("SHARE")]),
+        .testTarget(
+            name: "InlineStickersTests",
+            dependencies: ["InlineStickers"],
+            path: "Tests/InlineStickersTests"),
     ]
 )
