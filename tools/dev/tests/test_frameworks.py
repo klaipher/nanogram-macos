@@ -93,6 +93,7 @@ class FakeRunner:
     def __init__(self, current=(), cached=(), stamps=None):
         self.stamps_by_unit = stamps or {unit: f"stamp of {unit}\n" for unit in fwcache.UNITS}
         self.current = set(current)
+        self.broken = set()
         self.cached = {fwcache.cache_key(self.stamps_by_unit[u], "rustc 1") for u in cached}
         self.calls = []
 
@@ -115,7 +116,8 @@ class FakeRunner:
 
     def restore(self, unit, entry, stamp):
         self.calls.append(("restore", unit))
-        self.current.add(unit)
+        if unit not in self.broken:
+            self.current.add(unit)
 
     def configure(self):
         self.calls.append(("configure",))
@@ -179,6 +181,13 @@ class CacheRunTests(unittest.TestCase):
         self.assertLess(runner.names().index("configure"), runner.names().index("store"))
         self.assertNotIn("build_tlottie", runner.names())
         self.assertEqual(summary.built, 1)
+
+    def test_restore_that_is_not_current_gets_built(self):
+        runner = FakeRunner(current=(), cached=ALL)
+        runner.broken = {"wallet-engine"}
+        summary = frameworks.run(Path("/root"), True, runner)
+        self.assertEqual(runner.names().count("configure"), 1)
+        self.assertEqual((summary.restored, summary.built), (len(ALL) - 1, 1))
 
     def test_tlottie_miss_alone_builds_only_tlottie(self):
         runner = FakeRunner(current=[u for u in ALL if u != "tlottie"], cached=())

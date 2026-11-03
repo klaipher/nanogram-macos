@@ -149,6 +149,8 @@ def run(root: Path, use_cache: bool, runner: Runner) -> Summary:
             entry = runner.find(cache_key(stamps[unit], rust))
             assert entry is not None
             runner.restore(unit, entry, stamps[unit])
+            if not runner.is_current(unit, stamps[unit]):
+                statuses[unit] = "build"
     if any(status == "build" for unit, status in statuses.items() if unit != "tlottie"):
         runner.configure()
         stamps = runner.stamps()
