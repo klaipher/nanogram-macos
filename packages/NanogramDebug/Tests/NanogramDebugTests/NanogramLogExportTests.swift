@@ -111,6 +111,7 @@ final class NanogramLogExportTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: recent.path))
     }
 
+    @MainActor
     func testGateIgnoresRepeatedStarts() {
         let gate = NanogramLogExportGate()
         XCTAssertTrue(gate.begin())

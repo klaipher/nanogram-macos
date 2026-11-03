@@ -1,7 +1,7 @@
 import Foundation
 import SwiftSignalKit
 
-public struct CrashReport: Equatable {
+public struct CrashReport: Equatable, Sendable {
     public let url: URL
     public let date: Date
     public let incidentId: String

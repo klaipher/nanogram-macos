@@ -73,6 +73,7 @@ final class NanogramDebugMenuTests: XCTestCase {
         controller.close()
     }
 
+    @MainActor
     func testWindowListsEveryLogExport() {
         let controller = NanogramDebugWindowController(settings: makeSettings().0)
         XCTAssertEqual(NanogramLogExportKind.allCases.compactMap { controller.logButton(for: $0)?.title }, ["Send App Logs…", "Send Call Logs…", "Send Crash Reports…", "Send MetricKit Reports…"])

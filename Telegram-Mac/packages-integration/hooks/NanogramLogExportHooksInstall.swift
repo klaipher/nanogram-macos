@@ -16,9 +16,9 @@ let nanogramCrashReportStore = CrashReportStore(handledKey: "crashReports.handle
 
 private final class NanogramLogShareObject: ShareObject {
     private let files: [URL]
-    private let sent: (Bool) -> Void
+    private let sent: @MainActor @Sendable (Bool) -> Void
 
-    init(_ context: AccountContext, files: [URL], sent: @escaping (Bool) -> Void) {
+    init(_ context: AccountContext, files: [URL], sent: @escaping @MainActor @Sendable (Bool) -> Void) {
         self.files = files
         self.sent = sent
         super.init(context)
@@ -52,13 +52,21 @@ private final class NanogramLogShareObject: ShareObject {
         |> take(1)
         |> deliverOnMainQueue
         |> beforeNext { results in
-            sent(results.allSatisfy { ids in ids.contains(where: { $0 != nil }) })
+            let delivered = results.allSatisfy { ids in ids.contains(where: { $0 != nil }) }
+            DispatchQueue.main.async {
+                sent(delivered)
+            }
         }
         |> ignoreValues
         |> castError(String.self)
     }
 }
 
+private final class NanogramLogExportProgress: @unchecked Sendable {
+    let done = ValuePromise<Bool>(false, ignoreRepeated: true)
+}
+
+@MainActor
 private func currentLogExportContext() -> AccountContext? {
     guard let context = appDelegate?.currentContext, !context.isSupport else {
         return nil
@@ -66,6 +74,7 @@ private func currentLogExportContext() -> AccountContext? {
     return context
 }
 
+@MainActor
 private func nanogramLogCollector(_ kind: NanogramLogExportKind) -> NanogramLogCollector {
     switch kind {
     case .appLogs:
@@ -108,10 +117,10 @@ func installNanogramLogExportHooks() {
         guard let window = window as? Window else {
             return {}
         }
-        let done = ValuePromise<Bool>(false, ignoreRepeated: true)
-        _ = showModalProgress(signal: done.get() |> filter { $0 } |> take(1), for: window).start()
+        let progress = NanogramLogExportProgress()
+        _ = showModalProgress(signal: progress.done.get() |> filter { $0 } |> take(1), for: window).start()
         return {
-            done.set(true)
+            progress.done.set(true)
         }
     }, showMessage: { window, text in
         if let window = window as? Window {

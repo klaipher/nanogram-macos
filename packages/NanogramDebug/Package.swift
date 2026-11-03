@@ -21,7 +21,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "NanogramDebug", path: "Sources/NanogramDebug", swiftSettings: nanogramSwiftSettings),
-        .target(name: "NanogramLogExport", dependencies: [.product(name: "Zip", package: "Zip")], path: "Sources/NanogramLogExport", swiftSettings: appKitSwiftSettings),
+        .target(name: "NanogramLogExport", dependencies: [.product(name: "Zip", package: "Zip")], path: "Sources/NanogramLogExport", swiftSettings: nanogramSwiftSettings),
         .target(name: "NanogramDebugUI", dependencies: ["NanogramDebug", "NanogramLogExport"], path: "Sources/NanogramDebugUI", swiftSettings: appKitSwiftSettings),
         .testTarget(name: "NanogramDebugTests", dependencies: ["NanogramDebug", "NanogramDebugUI", "NanogramLogExport"], path: "Tests/NanogramDebugTests", swiftSettings: appKitSwiftSettings),
     ],

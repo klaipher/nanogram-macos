@@ -9,7 +9,6 @@ public final class NanogramDebugWindowController: NSWindowController {
     private let stack = NSStackView()
     private var logButtons: [NanogramLogExportKind: NSButton] = [:]
     private let logProgress = NSProgressIndicator()
-    private var gateObserver: NSObjectProtocol?
 
     public init(settings: NanogramDebugSettings = .shared) {
         self.settings = settings
@@ -28,16 +27,8 @@ public final class NanogramDebugWindowController: NSWindowController {
                 }
             }
         }
-        self.gateObserver = NotificationCenter.default.addObserver(forName: NanogramLogExportGate.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.refreshLogControls()
-        }
+        NotificationCenter.default.addObserver(self, selector: #selector(logExportGateDidChange(_:)), name: NanogramLogExportGate.didChangeNotification, object: nil)
         window.center()
-    }
-
-    deinit {
-        if let gateObserver = self.gateObserver {
-            NotificationCenter.default.removeObserver(gateObserver)
-        }
     }
 
     required init?(coder: NSCoder) {
@@ -136,6 +127,10 @@ public final class NanogramDebugWindowController: NSWindowController {
         } else {
             self.logProgress.stopAnimation(nil)
         }
+    }
+
+    @objc private func logExportGateDidChange(_ notification: Notification) {
+        self.refreshLogControls()
     }
 
     @objc private func sendLogs(_ sender: NSButton) {

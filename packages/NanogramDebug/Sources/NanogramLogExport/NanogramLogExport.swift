@@ -1,15 +1,15 @@
 import AppKit
 
-public typealias NanogramLogCollector = () -> [URL]
+public typealias NanogramLogCollector = @Sendable () -> [URL]
 
-public struct NanogramLogExportHooks {
-    public var collect: (NanogramLogExportKind) -> NanogramLogCollector
-    public var canSendInApp: () -> Bool
-    public var sendToChat: (_ files: [URL], _ window: NSWindow?, _ completion: @escaping (Bool) -> Void) -> Void
-    public var showProgress: (NSWindow?) -> () -> Void
-    public var showMessage: (NSWindow?, String) -> Void
+public struct NanogramLogExportHooks: Sendable {
+    public var collect: @MainActor @Sendable (NanogramLogExportKind) -> NanogramLogCollector
+    public var canSendInApp: @MainActor @Sendable () -> Bool
+    public var sendToChat: @MainActor @Sendable (_ files: [URL], _ window: NSWindow?, _ completion: @escaping @MainActor @Sendable (Bool) -> Void) -> Void
+    public var showProgress: @MainActor @Sendable (NSWindow?) -> @MainActor @Sendable () -> Void
+    public var showMessage: @MainActor @Sendable (NSWindow?, String) -> Void
 
-    public init(collect: @escaping (NanogramLogExportKind) -> NanogramLogCollector, canSendInApp: @escaping () -> Bool, sendToChat: @escaping (_ files: [URL], _ window: NSWindow?, _ completion: @escaping (Bool) -> Void) -> Void, showProgress: @escaping (NSWindow?) -> () -> Void, showMessage: @escaping (NSWindow?, String) -> Void) {
+    public init(collect: @escaping @MainActor @Sendable (NanogramLogExportKind) -> NanogramLogCollector, canSendInApp: @escaping @MainActor @Sendable () -> Bool, sendToChat: @escaping @MainActor @Sendable (_ files: [URL], _ window: NSWindow?, _ completion: @escaping @MainActor @Sendable (Bool) -> Void) -> Void, showProgress: @escaping @MainActor @Sendable (NSWindow?) -> @MainActor @Sendable () -> Void, showMessage: @escaping @MainActor @Sendable (NSWindow?, String) -> Void) {
         self.collect = collect
         self.canSendInApp = canSendInApp
         self.sendToChat = sendToChat
@@ -17,7 +17,7 @@ public struct NanogramLogExportHooks {
         self.showMessage = showMessage
     }
 
-    private static var installed: NanogramLogExportHooks?
+    nonisolated(unsafe) private static var installed: NanogramLogExportHooks?
 
     public static var shared: NanogramLogExportHooks {
         return installed ?? .standalone
@@ -48,15 +48,30 @@ public struct NanogramLogExportHooks {
 }
 
 public enum NanogramLogExport {
-    private static let prepareQueue = DispatchQueue(label: "org.nanogram.log-export", qos: .userInitiated)
-    private static var activeSharingDelegates: [NanogramLogSharingDelegate] = []
+    public static func present(kind: NanogramLogExportKind, window: NSWindow?, anchor: NSView? = nil, collect: NanogramLogCollector? = nil, onDestinationChosen: (@MainActor @Sendable () -> Void)? = nil) {
+        DispatchQueue.main.async {
+            NanogramLogExportFlow.present(kind: kind, window: window, anchor: anchor, collect: collect, onDestinationChosen: onDestinationChosen)
+        }
+    }
 
+    @MainActor
     public static var isRunning: Bool {
         return NanogramLogExportGate.shared.isRunning
     }
+}
 
-    public static func present(kind: NanogramLogExportKind, window: NSWindow?, anchor: NSView? = nil, collect: NanogramLogCollector? = nil, onDestinationChosen: (() -> Void)? = nil) {
-        precondition(Thread.isMainThread)
+private enum NanogramLogExportOutcome: Sendable {
+    case files([URL])
+    case nothing
+    case failed(String)
+}
+
+@MainActor
+private enum NanogramLogExportFlow {
+    nonisolated private static let workQueue = DispatchQueue(label: "org.nanogram.log-export", qos: .userInitiated)
+    private static var activeSharingDelegates: [NanogramLogSharingDelegate] = []
+
+    static func present(kind: NanogramLogExportKind, window: NSWindow?, anchor: NSView?, collect: NanogramLogCollector?, onDestinationChosen: (@MainActor @Sendable () -> Void)?) {
         if NanogramLogExportGate.shared.isRunning {
             NSSound.beep()
             return
@@ -87,7 +102,7 @@ public enum NanogramLogExport {
         if let anchor = anchor, anchor.window != nil {
             let y = anchor.isFlipped ? anchor.bounds.height + 4 : -4
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: y), in: anchor)
-        } else if let contentView = window?.contentView, let window = window {
+        } else if let window = window, let contentView = window.contentView {
             let point = contentView.convert(window.mouseLocationOutsideOfEventStream, from: nil)
             menu.popUp(positioning: nil, at: point, in: contentView)
         } else {
@@ -95,52 +110,56 @@ public enum NanogramLogExport {
         }
     }
 
-    static func perform(spec: NanogramLogExportSpec, destination: NanogramLogExportDestination, collect: @escaping NanogramLogCollector, window: NSWindow?, anchor: NSView?) {
+    private static func perform(spec: NanogramLogExportSpec, destination: NanogramLogExportDestination, collect: @escaping NanogramLogCollector, window: NSWindow?, anchor: NSView?) {
         let gate = NanogramLogExportGate.shared
         guard gate.begin() else {
             NSSound.beep()
             return
         }
-        let hooks = NanogramLogExportHooks.shared
-        let hideProgress = hooks.showProgress(window)
-        prepareQueue.async {
-            let root = NanogramLogExportFiles.defaultRoot()
-            NanogramLogExportFiles.prune(root: root)
-            let result: Result<[URL], Error>
-            do {
-                let directory = try NanogramLogExportFiles.makeDirectory(root: root)
-                let files = try NanogramLogExportFiles.prepare(spec: spec, sources: collect(), in: directory)
-                if files.isEmpty {
-                    try? FileManager.default.removeItem(at: directory)
-                }
-                result = .success(files)
-            } catch {
-                result = .failure(error)
-            }
+        let hideProgress = NanogramLogExportHooks.shared.showProgress(window)
+        workQueue.async {
+            let outcome = prepare(spec: spec, collect: collect)
             DispatchQueue.main.async {
                 hideProgress()
-                switch result {
-                case let .success(files) where !files.isEmpty:
+                let showMessage = NanogramLogExportHooks.shared.showMessage
+                switch outcome {
+                case let .files(files):
                     deliver(files, spec: spec, destination: destination, window: window, anchor: anchor, finish: {
                         gate.end()
                     })
-                case .success:
+                case .nothing:
                     gate.end()
-                    hooks.showMessage(window, "There are no \(spec.what.lowercased()) to send.")
-                case let .failure(error):
+                    showMessage(window, "There are no \(spec.what.lowercased()) to send.")
+                case let .failed(reason):
                     gate.end()
-                    hooks.showMessage(window, "Could not prepare \(spec.what.lowercased()): \(error.localizedDescription)")
+                    showMessage(window, "Could not prepare \(spec.what.lowercased()): \(reason)")
                 }
             }
         }
     }
 
-    private static func deliver(_ files: [URL], spec: NanogramLogExportSpec, destination: NanogramLogExportDestination, window: NSWindow?, anchor: NSView?, finish: @escaping () -> Void) {
+    nonisolated private static func prepare(spec: NanogramLogExportSpec, collect: NanogramLogCollector) -> NanogramLogExportOutcome {
+        let root = NanogramLogExportFiles.defaultRoot()
+        NanogramLogExportFiles.prune(root: root)
+        do {
+            let directory = try NanogramLogExportFiles.makeDirectory(root: root)
+            let files = try NanogramLogExportFiles.prepare(spec: spec, sources: collect(), in: directory)
+            if files.isEmpty {
+                try? FileManager.default.removeItem(at: directory)
+                return .nothing
+            }
+            return .files(files)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    private static func deliver(_ files: [URL], spec: NanogramLogExportSpec, destination: NanogramLogExportDestination, window: NSWindow?, anchor: NSView?, finish: @escaping @MainActor () -> Void) {
         let hooks = NanogramLogExportHooks.shared
         switch destination {
         case .nanogram:
             hooks.sendToChat(files, window, { sent in
-                hooks.showMessage(window, sent ? "\(spec.what) sent." : "Could not send \(spec.what.lowercased()).")
+                NanogramLogExportHooks.shared.showMessage(window, sent ? "\(spec.what) sent." : "Could not send \(spec.what.lowercased()).")
             })
             finish()
         case .email:
@@ -148,11 +167,10 @@ public enum NanogramLogExport {
                 service.subject = spec.subject
                 service.delegate = retainedDelegate(spec: spec, window: window, success: "\(spec.what) attached to a new email.")
                 service.perform(withItems: files)
-                finish()
             } else {
                 showPicker(files, spec: spec, window: window, anchor: anchor)
-                finish()
             }
+            finish()
         case .otherApps:
             showPicker(files, spec: spec, window: window, anchor: anchor)
             finish()
@@ -180,12 +198,12 @@ public enum NanogramLogExport {
             let point = contentView.convert(window.mouseLocationOutsideOfEventStream, from: nil)
             picker.show(relativeTo: NSRect(x: point.x, y: point.y, width: 1, height: 1), of: contentView, preferredEdge: .minY)
         } else {
-            delegate.release?()
+            delegate.finish()
             NSWorkspace.shared.activateFileViewerSelecting(files)
         }
     }
 
-    private static func saveToFolder(_ files: [URL], spec: NanogramLogExportSpec, window: NSWindow?, finish: @escaping () -> Void) {
+    private static func saveToFolder(_ files: [URL], spec: NanogramLogExportSpec, window: NSWindow?, finish: @escaping @MainActor () -> Void) {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -193,35 +211,23 @@ public enum NanogramLogExport {
         panel.allowsMultipleSelection = false
         panel.prompt = "Save"
         panel.message = "Choose a folder for \(spec.what.lowercased())."
-        let completion: (NSApplication.ModalResponse) -> Void = { response in
+        let completion: @MainActor (NSApplication.ModalResponse) -> Void = { response in
             guard response == .OK, let folder = panel.url else {
                 finish()
                 return
             }
-            prepareQueue.async {
-                var saved: [URL] = []
-                var failure: Error?
-                for file in files {
-                    let target = folder.appendingPathComponent(file.lastPathComponent)
-                    do {
-                        if FileManager.default.fileExists(atPath: target.path) {
-                            try FileManager.default.removeItem(at: target)
-                        }
-                        try FileManager.default.copyItem(at: file, to: target)
-                        saved.append(target)
-                    } catch {
-                        failure = error
-                    }
-                }
+            workQueue.async {
+                let result = copy(files, to: folder)
                 DispatchQueue.main.async {
                     finish()
-                    if let failure = failure {
-                        NanogramLogExportHooks.shared.showMessage(window, "Could not save \(spec.what.lowercased()): \(failure.localizedDescription)")
+                    let showMessage = NanogramLogExportHooks.shared.showMessage
+                    if let failure = result.failure {
+                        showMessage(window, "Could not save \(spec.what.lowercased()): \(failure)")
                     } else {
-                        NanogramLogExportHooks.shared.showMessage(window, "\(spec.what) saved to \(folder.lastPathComponent).")
+                        showMessage(window, "\(spec.what) saved to \(folder.lastPathComponent).")
                     }
-                    if !saved.isEmpty {
-                        NSWorkspace.shared.activateFileViewerSelecting(saved)
+                    if !result.saved.isEmpty {
+                        NSWorkspace.shared.activateFileViewerSelecting(result.saved)
                     }
                 }
             }
@@ -232,12 +238,31 @@ public enum NanogramLogExport {
             completion(panel.runModal())
         }
     }
+
+    nonisolated private static func copy(_ files: [URL], to folder: URL) -> (saved: [URL], failure: String?) {
+        var saved: [URL] = []
+        var failure: String?
+        for file in files {
+            let target = folder.appendingPathComponent(file.lastPathComponent)
+            do {
+                if FileManager.default.fileExists(atPath: target.path) {
+                    try FileManager.default.removeItem(at: target)
+                }
+                try FileManager.default.copyItem(at: file, to: target)
+                saved.append(target)
+            } catch {
+                failure = error.localizedDescription
+            }
+        }
+        return (saved, failure)
+    }
 }
 
+@MainActor
 private final class NanogramLogMenuHandler: NSObject {
-    private let action: () -> Void
+    private let action: @MainActor () -> Void
 
-    init(_ action: @escaping () -> Void) {
+    init(_ action: @escaping @MainActor () -> Void) {
         self.action = action
     }
 
@@ -246,16 +271,23 @@ private final class NanogramLogMenuHandler: NSObject {
     }
 }
 
-private final class NanogramLogSharingDelegate: NSObject, NSSharingServicePickerDelegate, NSSharingServiceDelegate {
+@MainActor
+private final class NanogramLogSharingDelegate: NSObject, @preconcurrency NSSharingServicePickerDelegate, NSSharingServiceDelegate {
     private let spec: NanogramLogExportSpec
     private weak var window: NSWindow?
     private let success: String
-    var release: (() -> Void)?
+    var release: (@MainActor () -> Void)?
 
     init(spec: NanogramLogExportSpec, window: NSWindow?, success: String) {
         self.spec = spec
         self.window = window
         self.success = success
+    }
+
+    func finish() {
+        let release = self.release
+        self.release = nil
+        release?()
     }
 
     func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, delegateFor sharingService: NSSharingService) -> NSSharingServiceDelegate? {
@@ -279,11 +311,5 @@ private final class NanogramLogSharingDelegate: NSObject, NSSharingServicePicker
             NanogramLogExportHooks.shared.showMessage(self.window, "Could not share \(self.spec.what.lowercased()): \(error.localizedDescription)")
         }
         self.finish()
-    }
-
-    private func finish() {
-        let release = self.release
-        self.release = nil
-        release?()
     }
 }

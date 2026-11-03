@@ -1,18 +1,18 @@
 import Foundation
 
-public enum NanogramLogExportKind: String, CaseIterable, Equatable {
+public enum NanogramLogExportKind: String, CaseIterable, Equatable, Sendable {
     case appLogs
     case callLogs
     case crashReports
     case metricKit
 }
 
-public enum NanogramLogExportPackaging: Equatable {
+public enum NanogramLogExportPackaging: Equatable, Sendable {
     case archive
     case separateFiles
 }
 
-public enum NanogramLogExportDestination: CaseIterable, Equatable {
+public enum NanogramLogExportDestination: CaseIterable, Equatable, Sendable {
     case nanogram
     case email
     case otherApps
@@ -36,7 +36,7 @@ public func nanogramLogExportDestinations(canSendInApp: Bool) -> [NanogramLogExp
     return NanogramLogExportDestination.allCases.filter { $0 != .nanogram || canSendInApp }
 }
 
-public struct NanogramLogExportSpec: Equatable {
+public struct NanogramLogExportSpec: Equatable, Sendable {
     public let kind: NanogramLogExportKind
     public let what: String
     public let subject: String
@@ -89,9 +89,10 @@ public struct NanogramLogExportSpec: Equatable {
     }
 }
 
+@MainActor
 public final class NanogramLogExportGate {
     public static let shared = NanogramLogExportGate()
-    public static let didChangeNotification = Notification.Name("NanogramLogExportGateDidChange")
+    nonisolated public static let didChangeNotification = Notification.Name("NanogramLogExportGateDidChange")
 
     public private(set) var isRunning = false
 
