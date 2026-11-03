@@ -619,6 +619,9 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                                 continue
                             }
                         }
+                        if !ChatFocusFolderMembership.shared.allows(account: account, peer: message.peers[message.id.peerId], peerId: message.id.peerId) {
+                            continue
+                        }
                         
                         if message.author?.id != account.peerId || message.wasScheduled {
                             if !self.shouldPresent(accountId: account.id, wasScheduled: message.wasScheduled) {
