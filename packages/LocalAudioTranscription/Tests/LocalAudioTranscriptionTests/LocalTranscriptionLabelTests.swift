@@ -33,14 +33,9 @@ final class LocalTranscriptionLabelTests: XCTestCase {
         XCTAssertTrue(LocalAudioTranscription.isEnabled(in: settings))
     }
 
-    func testOnlyFinishedLocalResultsAreLabelledOnDevice() {
-        XCTAssertEqual(LocalAudioTranscription.onDeviceLabel(transcriptionId: 0, isPending: false), "on-device")
-        XCTAssertNil(LocalAudioTranscription.onDeviceLabel(transcriptionId: 0, isPending: true))
-        XCTAssertNil(LocalAudioTranscription.onDeviceLabel(transcriptionId: 5_123_456_789, isPending: false))
-    }
-
-    func testLabelledTextKeepsTheTranscriptionAndAddsTheLabelOnItsOwnLine() {
-        XCTAssertEqual(LocalAudioTranscription.labelled("Hello there", transcriptionId: 0, isPending: false), LabelledTranscription(text: "Hello there", label: "on-device"))
-        XCTAssertEqual(LocalAudioTranscription.labelled("Hello there", transcriptionId: 77, isPending: false), LabelledTranscription(text: "Hello there", label: nil))
+    func testOnlyFinishedLocalResultsAreMarkedOnDevice() {
+        XCTAssertTrue(LocalAudioTranscription.isOnDevice(transcriptionId: 0, isPending: false))
+        XCTAssertFalse(LocalAudioTranscription.isOnDevice(transcriptionId: 0, isPending: true))
+        XCTAssertFalse(LocalAudioTranscription.isOnDevice(transcriptionId: 5_123_456_789, isPending: false))
     }
 }

@@ -5,21 +5,12 @@ import OpusBinding
 import SwiftSignalKit
 import NanogramDebug
 
-public protocol LocalSpeechRecognizer: AnyObject {
+public protocol LocalSpeechRecognizer: AnyObject, Sendable {
     func transcribe(_ buffer: AVAudioPCMBuffer, localeIdentifier: String) async -> String?
 }
 
-public struct LabelledTranscription: Equatable {
-    public let text: String
-    public let label: String?
 
-    public init(text: String, label: String?) {
-        self.text = text
-        self.label = label
-    }
-}
-
-public final class LocalAudioTranscription {
+public final class LocalAudioTranscription: @unchecked Sendable {
     public static let debugOption = NanogramDebugOption.toggle(id: "voice.onDeviceTranscription", section: "Voice", title: "Transcribe voice messages on this Mac", detail: "Non-Premium accounts transcribe voice messages with Apple's on-device speech recognition; results stay on this Mac and are labelled on-device. Off: Telegram's server (Premium or trial).", defaultValue: true)
 
     public static let shared = LocalAudioTranscription(recognizer: LocalAudioTranscription.systemRecognizer())
@@ -44,15 +35,8 @@ public final class LocalAudioTranscription {
         return true
     }
 
-    public static func onDeviceLabel(transcriptionId: Int64, isPending: Bool) -> String? {
-        if transcriptionId == 0 && !isPending {
-            return "on-device" //TODOLANG
-        }
-        return nil
-    }
-
-    public static func labelled(_ text: String, transcriptionId: Int64, isPending: Bool) -> LabelledTranscription {
-        return LabelledTranscription(text: text, label: LocalAudioTranscription.onDeviceLabel(transcriptionId: transcriptionId, isPending: isPending))
+    public static func isOnDevice(transcriptionId: Int64, isPending: Bool) -> Bool {
+        return transcriptionId == 0 && !isPending
     }
 
     private static func systemRecognizer() -> LocalSpeechRecognizer? {
@@ -109,6 +93,7 @@ public final class LocalAudioTranscription {
             return .single(nil)
         }
         return Signal { subscriber in
+            let output = TranscriptionOutput(subscriber)
             let task = Task.detached(priority: .userInitiated) {
                 var result: String?
                 if let buffer = LocalAudioTranscription.decodeVoiceNote(path: path) {
@@ -123,14 +108,26 @@ public final class LocalAudioTranscription {
                     }
                 }
                 if !Task.isCancelled {
-                    subscriber.putNext(result)
-                    subscriber.putCompletion()
+                    output.finish(result)
                 }
             }
             return ActionDisposable {
                 task.cancel()
             }
         }
+    }
+}
+
+private final class TranscriptionOutput: @unchecked Sendable {
+    private let subscriber: Subscriber<String?, NoError>
+
+    init(_ subscriber: Subscriber<String?, NoError>) {
+        self.subscriber = subscriber
+    }
+
+    func finish(_ result: String?) {
+        self.subscriber.putNext(result)
+        self.subscriber.putCompletion()
     }
 }
 
@@ -212,7 +209,7 @@ public final class OnDeviceSpeechRecognizer: LocalSpeechRecognizer {
 @available(macOS 26.0, *)
 public final class SpeechAnalyzerRecognizer: LocalSpeechRecognizer {
     private static let installLock = NSLock()
-    private static var installing: Set<String> = []
+    nonisolated(unsafe) private static var installing: Set<String> = []
 
     private let installsMissingAssets: Bool
 

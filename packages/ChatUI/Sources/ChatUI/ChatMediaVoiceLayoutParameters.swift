@@ -51,9 +51,11 @@ public class ChatMediaVoiceLayoutParameters : ChatMediaLayoutParameters {
         public let isTranslateLoading: Bool
         public let fontColor: NSColor
         public let backgroundColor: NSColor
-        public init(state: TranscribeState, text: FoldingTextLayout?, isPending: Bool, isTranslateLoading: Bool = false, fontColor: NSColor, backgroundColor: NSColor) {
+        public let footer: TextViewLayout?
+        public init(state: TranscribeState, text: FoldingTextLayout?, footer: TextViewLayout? = nil, isPending: Bool, isTranslateLoading: Bool = false, fontColor: NSColor, backgroundColor: NSColor) {
             self.state = state
             self.text = text
+            self.footer = footer
             self.isPending = isPending
             self.isTranslateLoading = isTranslateLoading
             self.fontColor = fontColor
@@ -61,6 +63,7 @@ public class ChatMediaVoiceLayoutParameters : ChatMediaLayoutParameters {
         }
 
         public let dotsSize: NSSize = NSMakeSize(18, 18)
+        public static let footerSpacing: CGFloat = 2
 
         public func makeSize(_ width: CGFloat) -> NSSize? {
             switch state {
@@ -83,6 +86,10 @@ public class ChatMediaVoiceLayoutParameters : ChatMediaLayoutParameters {
                             if line.frame.maxX + dotsSize.width > width {
                                 size.height += 10
                             }
+                        }
+                        if let footer = footer {
+                            footer.measure(width: width)
+                            size.height += TranscribeData.footerSpacing + footer.layoutSize.height
                         }
                         self.size = size
                     } else {

@@ -79,7 +79,7 @@ public class ChatVoiceRowItem: ChatMediaItem {
 
 
                 var transcribed: String?
-                var onDeviceLabel: String?
+                var isOnDevice = false
                 switch state {
                 case let .revealed(success):
                     if !success {
@@ -90,7 +90,7 @@ public class ChatVoiceRowItem: ChatMediaItem {
                             transcribed = translatedText
                         } else if let result = entry.message?.audioTranscription, !result.text.isEmpty {
                             transcribed = result.text
-                            onDeviceLabel = LocalAudioTranscription.onDeviceLabel(transcriptionId: result.id, isPending: result.isPending)
+                            isOnDevice = LocalAudioTranscription.isOnDevice(transcriptionId: result.id, isPending: result.isPending)
                         }
                     }
                 case .loading:
@@ -99,12 +99,10 @@ public class ChatVoiceRowItem: ChatMediaItem {
                     break
                 }
 
+                let footerLayout: TextViewLayout? = isOnDevice ? TextViewLayout(.initialize(string: strings().chatVoiceTranscriptionOnDevice, color: theme.chat.grayText(isIncoming, object.renderType == .bubble), font: .normal(theme.fontSize - 2)), maximumNumberOfLines: 1) : nil
                 let textLayout: FoldingTextLayout?
                 if let transcribed = transcribed {
                     let caption = NSMutableAttributedString(attributedString: .initialize(string: transcribed, color: transcribtedColor, font: .normal(theme.fontSize)))
-                    if let onDeviceLabel = onDeviceLabel {
-                        caption.append(.initialize(string: "\n" + onDeviceLabel, color: theme.chat.grayText(isIncoming, object.renderType == .bubble), font: .normal(theme.fontSize - 2)))
-                    }
 
                     textLayout = FoldingTextLayout.make(caption, context: context, revealed: Set(), takeLayout: { attr in
                         TextViewLayout(attr, alignment: .left, selectText: theme.chat.selectText(isIncoming, object.renderType == .bubble), strokeLinks: object.renderType == .bubble, alwaysStaticItems: true, disableTooltips: false, mayItems: !message.isCopyProtected(cachedData: chatInteraction.presentation.cachedData))
@@ -114,7 +112,7 @@ public class ChatVoiceRowItem: ChatMediaItem {
                     textLayout = nil
                 }
 
-                parameters.transcribeData = .init(state: .state(state), text: textLayout, isPending: pending, isTranslateLoading: isTranslateLoading, fontColor: transcribtedColor, backgroundColor: bgColor)
+                parameters.transcribeData = .init(state: .state(state), text: textLayout, footer: footerLayout, isPending: pending, isTranslateLoading: isTranslateLoading, fontColor: transcribtedColor, backgroundColor: bgColor)
             } else if message.audioTranscription != nil {
                 parameters.transcribeData = .init(state: .state(.collapsed(true)), text: nil, isPending: false, fontColor: transcribtedColor, backgroundColor: bgColor)
             } else {

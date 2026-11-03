@@ -7,7 +7,7 @@ import SwiftSignalKit
 import VoiceRecorderInput
 @testable import LocalAudioTranscription
 
-private final class FakeRecognizer: LocalSpeechRecognizer {
+private final class FakeRecognizer: LocalSpeechRecognizer, @unchecked Sendable {
     var available: Set<String>
     var requests: [(locale: String, frames: AVAudioFrameCount, rate: Double)] = []
 

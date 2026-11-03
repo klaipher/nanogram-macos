@@ -5434,6 +5434,8 @@ public final class L10n {
   public static var chatVoiceSingleClose: String  { return L10n.tr("Localizable", "Chat.Voice.Single.Close") }
   /// Delete and Close
   public static var chatVoiceSingleDeleteAndClose: String  { return L10n.tr("Localizable", "Chat.Voice.Single.DeleteAndClose") }
+  /// on-device
+  public static var chatVoiceTranscriptionOnDevice: String  { return L10n.tr("Localizable", "Chat.Voice.Transcription.OnDevice") }
   /// No speech detected
   public static var chatVoiceTransribeError: String  { return L10n.tr("Localizable", "Chat.Voice.Transribe.Error") }
   /// Join

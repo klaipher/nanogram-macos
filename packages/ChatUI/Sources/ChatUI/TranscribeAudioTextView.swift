@@ -20,6 +20,7 @@ import InputTextView
 
 public final class TranscribeAudioTextView : View {
     private let textView = FoldingTextView(frame: .zero)
+    private var footerView: TextView?
     private var lottiePlayer: LottiePlayerView?
     public required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -34,6 +35,9 @@ public final class TranscribeAudioTextView : View {
 
     public func updateLayout(size: NSSize, transition: ContainedViewLayoutTransition) {
         transition.updateFrame(view: textView, frame: textView.frame.size.bounds)
+        if let footerView = footerView {
+            transition.updateFrame(view: footerView, frame: CGRect(origin: NSMakePoint(0, textView.frame.maxY + ChatMediaVoiceLayoutParameters.TranscribeData.footerSpacing), size: footerView.frame.size))
+        }
         updateDots(size: size, transition: transition)
     }
 
@@ -54,6 +58,26 @@ public final class TranscribeAudioTextView : View {
     public func update(data: ChatMediaVoiceLayoutParameters.TranscribeData, animated: Bool) {
         if let textLayout = data.text {
             textView.update(layout: textLayout, animated: animated, appendingAnimationView: data.isPending ? lottiePlayer : nil)
+        }
+
+        if let footer = data.footer {
+            let current: TextView
+            if let view = footerView {
+                current = view
+            } else {
+                current = TextView()
+                current.userInteractionEnabled = false
+                current.isSelectable = false
+                self.footerView = current
+                addSubview(current)
+                if animated {
+                    current.layer?.animateAlpha(from: 0, to: 1, duration: 0.2)
+                }
+            }
+            current.update(footer)
+        } else if let view = footerView {
+            self.footerView = nil
+            performSubviewRemoval(view, animated: animated)
         }
 
         let size = data.dotsSize

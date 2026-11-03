@@ -1,6 +1,10 @@
-// swift-tools-version:5.5
+// swift-tools-version:6.2
 
 import PackageDescription
+
+let nanogramSwiftSettings: [SwiftSetting] = [
+    .treatAllWarnings(as: .error),
+]
 
 let package = Package(
     name: "LocalAudioTranscription",
@@ -22,7 +26,8 @@ let package = Package(
                 .product(name: "OpusBinding", package: "OpusBinding", condition: nil),
                 .product(name: "NanogramDebug", package: "NanogramDebug", condition: nil),
             ],
-            path: "Sources/LocalAudioTranscription"),
+            path: "Sources/LocalAudioTranscription",
+            swiftSettings: nanogramSwiftSettings),
         .testTarget(
             name: "LocalAudioTranscriptionTests",
             dependencies: [
@@ -30,6 +35,8 @@ let package = Package(
                 .product(name: "VoiceRecorderInput", package: "VoiceRecorderInput"),
                 .product(name: "NanogramDebug", package: "NanogramDebug"),
             ],
-            path: "Tests/LocalAudioTranscriptionTests"),
-    ]
+            path: "Tests/LocalAudioTranscriptionTests",
+            linkerSettings: [.unsafeFlags(["-L", "../../core-xprojects/libopus/build/libopus/lib", "-lopus"])]),
+    ],
+    swiftLanguageModes: [.v6]
 )
