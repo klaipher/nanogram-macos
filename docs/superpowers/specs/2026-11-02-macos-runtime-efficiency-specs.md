@@ -1873,7 +1873,7 @@ Round-1 completion (2026-11-03, at f3cbd92): clean Debug build at the macOS 15 t
 | M14 | done | f20014e |
 | M15 | stage 1 | — |
 | M16 | done | core 09ee786 |
-| M17 | stage 1 | — |
+| M17 | done (stage 1) | release.py SWIFT_ENFORCE_EXCLUSIVE_ACCESS=off for Release, buildcheck --release |
 | M18 | done | 1becb21 |
 | M19 | stage 1 | — |
 | M20 | dropped | 2184207 (lab) |
@@ -1883,11 +1883,11 @@ Round-1 completion (2026-11-03, at f3cbd92): clean Debug build at the macOS 15 t
 | M24 | done | core 5751188 |
 | M25 | done | cb8d0f1, 43bfbab |
 | M26 | done | f4e1837, core 19875d3 |
-| M27 | done | 25b7f7a, core d6c3ef8 (FFmpeg rebuild pending for the VT patch) |
+| M27 | done | 25b7f7a, core d6c3ef8; integration: patch carried into ffmpeg-9.0.2 (core 179bd8d3, identical to iOS 019e8379) and FFmpeg rebuilt (R2-25) |
 | M28 | done | core 0ff4315 |
 | M29 | done | ee9a00f, f55b999 |
 | M30 | done | b78cfaf |
-| M31 | done | 311fe98 |
+| M31 | done | 311fe98 (generator); stage 1 wires ORDER_FILE for Release once Telegram-Mac/OrderFiles/Telegram.order is committed (none yet) |
 | M32 | done | b89a08b |
 | H1 | done | da40434 |
 | H2 | done | f4bb74b, core 1e9c875 |
@@ -1912,7 +1912,7 @@ Round-1 completion (2026-11-03, at f3cbd92): clean Debug build at the macOS 15 t
 | H21 | done | cff6487 |
 | H22 | done | 9ad344d |
 | H23 | done | ac06da6 |
-| H24 | partial | 0eb0950 |
+| H24 | partial | 0eb0950; integration: entitlement in the App Store set (Nanogram-MAS.entitlements), not yet in the direct edition |
 | H25 | partial | b0fbff2, fba12dc |
 | H26 | done (Debug switch, off) | d28fbeb |
 | H27 | done | 02d4e35, 4e1b17f |
