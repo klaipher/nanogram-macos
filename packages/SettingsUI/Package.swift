@@ -21,6 +21,7 @@ let deps: [(String, String)] = [
     ("InputView", "../InputView"),
     ("KeyboardKey", "../KeyboardKey"),
     ("LocalAnimations", "../LocalAnimations"),
+    ("NanogramAppIcons", "../NanogramAppIcons"),
     ("Localization", "../Localization"),
     ("PhoneNumberUtils", "../PhoneNumberUtils"),
     ("PremiumStatusUI", "../PremiumStatusUI"),

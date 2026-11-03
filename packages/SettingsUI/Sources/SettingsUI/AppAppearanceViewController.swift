@@ -21,6 +21,7 @@ import TelegramLinks
 import ChatHistoryModel
 import FilePanels
 import WallpaperUI
+import NanogramAppIcons
 
 public func generateSingleColorImage(size: CGSize, color: NSColor) -> CGImage? {
     return generateImage(size, contextGenerator: { size, context in
@@ -302,8 +303,8 @@ private final class AppAppearanceViewArguments {
     public let toggleDarkMode:(Bool)->Void
     public let toggleRevealThemes:()->Void
     public let userNameColor:()->Void
-    public let selectAppIcon:(TelegramApplicationIcons.Icon)->Void
-    public init(context: any AccountContextProtocol, togglePalette: @escaping(InstallThemeSource)->Void, toggleBubbles: @escaping(Bool)->Void, toggleFontSize: @escaping(CGFloat)->Void, selectAccentColor: @escaping(AppearanceAccentColor?)->Void, selectChatBackground:@escaping()->Void, openAutoNightSettings:@escaping()->Void, removeTheme:@escaping(TelegramTheme)->Void, editTheme: @escaping(TelegramTheme)->Void, shareTheme:@escaping(TelegramTheme)->Void, shareLocal:@escaping(ColorPalette)->Void, toggleDarkMode: @escaping(Bool)->Void, toggleRevealThemes:@escaping()->Void, userNameColor:@escaping()->Void, selectAppIcon:@escaping(TelegramApplicationIcons.Icon)->Void) {
+    public let selectAppIcon:(NanogramAppIcon)->Void
+    public init(context: any AccountContextProtocol, togglePalette: @escaping(InstallThemeSource)->Void, toggleBubbles: @escaping(Bool)->Void, toggleFontSize: @escaping(CGFloat)->Void, selectAccentColor: @escaping(AppearanceAccentColor?)->Void, selectChatBackground:@escaping()->Void, openAutoNightSettings:@escaping()->Void, removeTheme:@escaping(TelegramTheme)->Void, editTheme: @escaping(TelegramTheme)->Void, shareTheme:@escaping(TelegramTheme)->Void, shareLocal:@escaping(ColorPalette)->Void, toggleDarkMode: @escaping(Bool)->Void, toggleRevealThemes:@escaping()->Void, userNameColor:@escaping()->Void, selectAppIcon:@escaping(NanogramAppIcon)->Void) {
         self.context = context
         self.togglePalette = togglePalette
         self.toggleBubbles = toggleBubbles
@@ -338,7 +339,7 @@ private let _id_name_color = InputDataIdentifier("_id_name_color")
 
 private let _id_dock_icon = InputDataIdentifier("_id_dock_icon")
 
-private func appAppearanceEntries(appearance: Appearance, state: State, settings: ThemePaletteSettings, cloudThemes: [TelegramTheme], generated:  CloudThemesCachedData, autoNightSettings: AutoNightThemePreferences, animatedEmojiStickers: [String: StickerPackItem], dockIcons: TelegramApplicationIcons, dockSettings: DockSettings, arguments: AppAppearanceViewArguments) -> [InputDataEntry] {
+private func appAppearanceEntries(appearance: Appearance, state: State, settings: ThemePaletteSettings, cloudThemes: [TelegramTheme], generated:  CloudThemesCachedData, autoNightSettings: AutoNightThemePreferences, animatedEmojiStickers: [String: StickerPackItem], dockSettings: DockSettings, arguments: AppAppearanceViewArguments) -> [InputDataEntry] {
     
     var entries:[InputDataEntry] = []
     var sectionId: Int32 = 0
@@ -556,16 +557,17 @@ private func appAppearanceEntries(appearance: Appearance, state: State, settings
     
     #if BETA || STABLE
     
-    if !dockIcons.icons.isEmpty {
+    do {
+        let dockIcons = NanogramAppIcon.all
         struct DockTuple : Equatable {
-            let icons: TelegramApplicationIcons
+            let icons: [NanogramAppIcon]
             let settings: DockSettings
         }
         let dockTuple = DockTuple(icons: dockIcons, settings: dockSettings)
         entries.append(.desc(sectionId: sectionId, index: index, text: .plain(strings().appearanceSettingsDockIcon), data: .init(viewType: .textTopItem)))
         index += 1
         entries.append(InputDataEntry.custom(sectionId: sectionId, index: index, value: .none, identifier: _id_dock_icon, equatable: InputDataEquatable(dockTuple), comparable: nil, item: { initialSize, stableId in
-            return DockIconRowItem(initialSize, stableId: stableId, viewType: .singleItem, context: arguments.context, dockIcons: dockIcons.icons, selected: dockTuple.settings.iconSelected, action: arguments.selectAppIcon)
+            return DockIconRowItem(initialSize, stableId: stableId, viewType: .singleItem, context: arguments.context, dockIcons: dockTuple.icons, selected: dockTuple.settings.iconSelected, action: arguments.selectAppIcon)
         }))
         index += 1
         
@@ -778,14 +780,8 @@ public func AppAppearanceViewController(context: any AccountContextProtocol, foc
     }, userNameColor: {
         context.bindings.rootNavigation().push(SettingsHooks.shared.makeSelectColorController(context, context.myPeer!))
     }, selectAppIcon: { icon in
-        
-        if icon.isPremium, !context.isPremium {
-            SettingsNavigationHooks.shared.showPremiumBoarding(context, .settings, false, context.window, nil)
-            return
-        }
-        
         _ = updateDockSettings(accountManager: context.sharedContext.accountManager, { settings in
-            return settings.withUpdatedIcon(icon.file.fileName)
+            return settings.withUpdatedIcon(icon.storedName)
         }).startStandalone()
     })
     
@@ -809,8 +805,8 @@ public func AppAppearanceViewController(context: any AccountContextProtocol, foc
             }
     } |> deliverOnMainQueue
     
-    let signal:Signal<InputDataSignalValue, NoError> = combineLatest(queue: prepareQueue, themeUnmodifiedSettings(accountManager: context.sharedContext.accountManager), SettingsHooks.shared.cloudThemes(context), nightSettings, appearanceSignal, animatedEmojiStickers, statePromise.get(), context.engine.resources.applicationIcons(), dockSettings(accountManager: context.sharedContext.accountManager)) |> map { themeSettings, themes, autoNightSettings, appearance, animatedEmojiStickers, state, dockIcons, dockSettings in
-        return appAppearanceEntries(appearance: appearance, state: state, settings: themeSettings, cloudThemes: themes.themes.reversed(), generated: themes, autoNightSettings: autoNightSettings, animatedEmojiStickers: animatedEmojiStickers, dockIcons: dockIcons, dockSettings: dockSettings, arguments: arguments)
+    let signal:Signal<InputDataSignalValue, NoError> = combineLatest(queue: prepareQueue, themeUnmodifiedSettings(accountManager: context.sharedContext.accountManager), SettingsHooks.shared.cloudThemes(context), nightSettings, appearanceSignal, animatedEmojiStickers, statePromise.get(), dockSettings(accountManager: context.sharedContext.accountManager)) |> map { themeSettings, themes, autoNightSettings, appearance, animatedEmojiStickers, state, dockSettings in
+        return appAppearanceEntries(appearance: appearance, state: state, settings: themeSettings, cloudThemes: themes.themes.reversed(), generated: themes, autoNightSettings: autoNightSettings, animatedEmojiStickers: animatedEmojiStickers, dockSettings: dockSettings, arguments: arguments)
     }
     |> map { entries in
          return InputDataSignalValue(entries: entries, animated: true)

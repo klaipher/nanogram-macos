@@ -16,7 +16,7 @@ let deps: [(String, String)] = [
     ("QuickSwitcher", "../QuickSwitcher"),
     ("SettingsUI", "../SettingsUI"),
     ("StickerSettingsUI", "../StickerSettingsUI"),
-    ("PremiumUI", "../PremiumUI"),
+    ("NanogramAppIcons", "../NanogramAppIcons"),
 ]
 
 let package = Package(

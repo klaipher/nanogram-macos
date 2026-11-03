@@ -553,7 +553,7 @@ final class AccountContext {
         self.cachedGroupCallContexts = AccountGroupCallContextCacheImpl()
         self.networkStatusManager = NetworkStatusManager(account: account, window: window, sharedContext: sharedContext)
         self.reactions = Reactions(engine)
-        self.dockControl = DockControl(engine, accountManager: sharedContext.accountManager)
+        self.dockControl = DockControl(accountManager: sharedContext.accountManager)
         self.starsContext = engine.payments.peerStarsContext()
         self.tonContext = engine.payments.peerTonContext()
         self.starsSubscriptionsContext = engine.payments.peerStarsSubscriptionsContext(starsContext: self.starsContext)
@@ -969,8 +969,6 @@ final class AccountContext {
         actionsDisposable.add((contentSettingsConfiguration(network: account.network) |> deliverOnMainQueue).startStandalone(next: { [weak self] settings in
             self?.contentConfig = settings
         }))
-
-        actionsDisposable.add(requestApplicationIcons(engine: engine).start())
     }
     #endif
 

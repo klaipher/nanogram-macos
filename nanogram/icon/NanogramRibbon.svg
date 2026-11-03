@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="motion-2-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#ECECEF"/>
+    </linearGradient>
+    <linearGradient id="motion-2-d" gradientUnits="userSpaceOnUse" x1="387.0" y1="404.0" x2="637.0" y2="620.0">
+      <stop offset="0" stop-color="#0838A8"/>
+      <stop offset="0.2" stop-color="#1A66F5"/>
+      <stop offset="0.5" stop-color="#3F87FF"/>
+      <stop offset="0.8" stop-color="#1A66F5"/>
+      <stop offset="1" stop-color="#0838A8"/>
+    </linearGradient>
+    <linearGradient id="motion-2-sl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2A2A2E"/>
+      <stop offset="0.5" stop-color="#0A0A0B"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+    <linearGradient id="motion-2-sr" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000000"/>
+      <stop offset="0.5" stop-color="#0A0A0B"/>
+      <stop offset="1" stop-color="#2A2A2E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#motion-2-bg)"/>
+  <g transform="matrix(1 0 -0.15838 1 81.09 0)">
+    <path d="M318.0,776.0 L318.0,248.0 L456.0,560.1 L456.0,776.0 Z" fill="url(#motion-2-sl)"/>
+    <path d="M568.0,463.9 L568.0,248.0 L706.0,248.0 L706.0,776.0 Z" fill="url(#motion-2-sr)"/>
+    <path d="M318.0,248.0 L568.0,463.9 L706.0,776.0 L456.0,560.1 Z" fill="url(#motion-2-d)"/>
+  </g>
+</svg>

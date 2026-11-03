@@ -222,7 +222,14 @@ app that ships a `.metal` file.
   `appName` (TelegramUtils) is "Nanogram" under `NANOGRAM`, which renames window titles, alerts and About.
 - Icon: the dark Comet. `Telegram-Mac/AppIcon.icon` (macOS 26+) is the iOS fork's `Nanogram.icon`; the
   pre-26 PNGs in `AppIcon.appiconset` and `TelegramShare/icon.icns` are rendered from `nanogram/icon/NanogramComet.svg`
-  by `swift tools/dev/nanogram/render-mac-icon.swift` (re-run after changing the SVG).
+  by `swift tools/dev/nanogram/render-mac-icon.swift` (re-run after changing any SVG there). The same script
+  renders the menu bar glyph (`StatusIcon`), the share extension's sign-in logo (`Icon_TelegramLogin`) and the
+  App Icon picker's icons.
+- App Icon picker (Settings > Appearance): the iOS fork's 14 icons in its order, Comet first and default
+  (`NanogramAppIcon.all`, package `NanogramAppIcons`, which bundles one `.icns` per icon). Upstream downloaded
+  Telegram's icons from the `macos_app_icons` channel; that request is gone. The choice is `DockSettings.iconSelected`
+  (nil for Comet); `DockControl` resets a stored name that is not a Nanogram icon (a Telegram icon picked before)
+  to Comet and applies the choice to the Dock and the bundle's Finder icon.
 - Under `NANOGRAM`: no crash-report bot (`macos_stable_updater_bot`; the chat-list crash card is hidden), no
   MTProto updater channel (the internal updater source is never chosen), App Store links go to our app
   (id6829268176), crash recovery's website button opens our releases page. No Telegram Sparkle feed in either
