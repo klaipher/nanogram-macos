@@ -138,17 +138,19 @@ public struct AutomaticMediaDownloadSettings: Codable, Equatable {
     public let automaticDownload: Bool
     public let downloadFolder: String
     public let automaticSaveDownloadedFiles: Bool
+    public let respectLowDataMode: Bool
     public static var defaultSettings: AutomaticMediaDownloadSettings {
         let categories = AutomaticMediaDownloadCategories(photo: AutomaticMediaDownloadCategoryPeers(privateChats: true, groupChats: true, channels: true, fileSize: nil), video: AutomaticMediaDownloadCategoryPeers(privateChats: true, groupChats: true, channels: true, fileSize: 10 * 1024 * 1024), files: AutomaticMediaDownloadCategoryPeers(privateChats: false, groupChats: false, channels: false, fileSize: 10 * 1024 * 1024))
         return AutomaticMediaDownloadSettings(categories: categories, automaticDownload: true, downloadFolder: "~/Downloads/".nsstring.expandingTildeInPath, automaticSaveDownloadedFiles: false)
     }
 
     
-    init(categories: AutomaticMediaDownloadCategories, automaticDownload: Bool, downloadFolder: String, automaticSaveDownloadedFiles: Bool) {
+    init(categories: AutomaticMediaDownloadCategories, automaticDownload: Bool, downloadFolder: String, automaticSaveDownloadedFiles: Bool, respectLowDataMode: Bool = true) {
         self.categories = categories
         self.automaticDownload = automaticDownload
         self.downloadFolder = downloadFolder
         self.automaticSaveDownloadedFiles = automaticSaveDownloadedFiles
+        self.respectLowDataMode = respectLowDataMode
     }
     
     public init(from decoder: Decoder) throws {
@@ -157,6 +159,7 @@ public struct AutomaticMediaDownloadSettings: Codable, Equatable {
         self.automaticDownload = try container.decode(Bool.self, forKey: "a")
         self.downloadFolder = try container.decodeIfPresent(String.self, forKey: "d") ?? AutomaticMediaDownloadSettings.defaultSettings.downloadFolder
         self.automaticSaveDownloadedFiles = try container.decode(Bool.self, forKey: "ad")
+        self.respectLowDataMode = try container.decodeIfPresent(Bool.self, forKey: "ldm") ?? true
     
     }
     
@@ -167,23 +170,28 @@ public struct AutomaticMediaDownloadSettings: Codable, Equatable {
         try container.encode(self.automaticDownload, forKey: "a")
         try container.encode(self.downloadFolder, forKey: "d")
         try container.encode(self.automaticSaveDownloadedFiles, forKey: "ad")
+        try container.encode(self.respectLowDataMode, forKey: "ldm")
         
     }
     
     public static func ==(lhs: AutomaticMediaDownloadSettings, rhs: AutomaticMediaDownloadSettings) -> Bool {
-        return lhs.categories == rhs.categories && lhs.automaticDownload == rhs.automaticDownload && lhs.downloadFolder == rhs.downloadFolder && lhs.automaticSaveDownloadedFiles == rhs.automaticSaveDownloadedFiles
+        return lhs.categories == rhs.categories && lhs.automaticDownload == rhs.automaticDownload && lhs.downloadFolder == rhs.downloadFolder && lhs.automaticSaveDownloadedFiles == rhs.automaticSaveDownloadedFiles && lhs.respectLowDataMode == rhs.respectLowDataMode
     }
     
     public func withUpdatedCategories(_ categories: AutomaticMediaDownloadCategories) -> AutomaticMediaDownloadSettings {
-        return AutomaticMediaDownloadSettings(categories: categories, automaticDownload: automaticDownload, downloadFolder: self.downloadFolder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles)
+        return AutomaticMediaDownloadSettings(categories: categories, automaticDownload: automaticDownload, downloadFolder: self.downloadFolder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles, respectLowDataMode: self.respectLowDataMode)
     }
     
     public func withUpdatedAutomaticDownload(_ automaticDownload: Bool) -> AutomaticMediaDownloadSettings {
-        return AutomaticMediaDownloadSettings(categories: categories, automaticDownload: automaticDownload, downloadFolder: self.downloadFolder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles)
+        return AutomaticMediaDownloadSettings(categories: categories, automaticDownload: automaticDownload, downloadFolder: self.downloadFolder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles, respectLowDataMode: self.respectLowDataMode)
+    }
+    
+    public func withUpdatedRespectLowDataMode(_ respectLowDataMode: Bool) -> AutomaticMediaDownloadSettings {
+        return AutomaticMediaDownloadSettings(categories: self.categories, automaticDownload: self.automaticDownload, downloadFolder: self.downloadFolder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles, respectLowDataMode: respectLowDataMode)
     }
     
     public func withUpdatedDownloadFolder(_ folder: String) -> AutomaticMediaDownloadSettings {
-        return AutomaticMediaDownloadSettings(categories: categories, automaticDownload: automaticDownload, downloadFolder: folder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles)
+        return AutomaticMediaDownloadSettings(categories: categories, automaticDownload: automaticDownload, downloadFolder: folder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles, respectLowDataMode: self.respectLowDataMode)
     }
     
 }

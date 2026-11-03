@@ -155,7 +155,8 @@ private final class DataAndStorageControllerArguments {
     public let openProxySettings:()->Void
     public let toggleSensitiveContent:(Bool)->Void
     public let openExportTelegramData:()->Void
-    public init(openStorageUsage: @escaping () -> Void, openNetworkUsage: @escaping () -> Void, openCategorySettings: @escaping(AutomaticMediaDownloadCategoryPeers, String) -> Void, toggleAutomaticDownload:@escaping(Bool) -> Void, resetDownloadSettings:@escaping()->Void, selectDownloadFolder: @escaping() -> Void, toggleAutoplayGifs: @escaping(Bool) -> Void, toggleAutoplayVideos:@escaping(Bool) -> Void, toggleAutoplaySoundOnHover:@escaping(Bool) -> Void, openProxySettings: @escaping()->Void, toggleSensitiveContent:@escaping(Bool)->Void, openExportTelegramData:@escaping()->Void) {
+    public let toggleRespectLowDataMode:(Bool)->Void
+    public init(openStorageUsage: @escaping () -> Void, openNetworkUsage: @escaping () -> Void, openCategorySettings: @escaping(AutomaticMediaDownloadCategoryPeers, String) -> Void, toggleAutomaticDownload:@escaping(Bool) -> Void, resetDownloadSettings:@escaping()->Void, selectDownloadFolder: @escaping() -> Void, toggleAutoplayGifs: @escaping(Bool) -> Void, toggleAutoplayVideos:@escaping(Bool) -> Void, toggleAutoplaySoundOnHover:@escaping(Bool) -> Void, openProxySettings: @escaping()->Void, toggleSensitiveContent:@escaping(Bool)->Void, openExportTelegramData:@escaping()->Void, toggleRespectLowDataMode:@escaping(Bool)->Void) {
         self.openStorageUsage = openStorageUsage
         self.openNetworkUsage = openNetworkUsage
         self.openCategorySettings = openCategorySettings
@@ -168,6 +169,7 @@ private final class DataAndStorageControllerArguments {
         self.openProxySettings = openProxySettings
         self.toggleSensitiveContent = toggleSensitiveContent
         self.openExportTelegramData = openExportTelegramData
+        self.toggleRespectLowDataMode = toggleRespectLowDataMode
     }
 }
 
@@ -183,6 +185,7 @@ private enum DataAndStorageEntry: TableItemListNodeEntry {
     case voice(Int32, AutomaticMediaDownloadCategoryPeers, Bool, viewType: GeneralViewType)
     case instantVideo(Int32, AutomaticMediaDownloadCategoryPeers, Bool, viewType: GeneralViewType)
     case gifs(Int32, AutomaticMediaDownloadCategoryPeers, Bool, viewType: GeneralViewType)
+    case respectLowDataMode(Int32, Bool, Bool, viewType: GeneralViewType)
     
     case autoplayHeader(Int32, viewType: GeneralViewType)
     case autoplayGifs(Int32, Bool, viewType: GeneralViewType)
@@ -247,6 +250,8 @@ private enum DataAndStorageEntry: TableItemListNodeEntry {
             return 21
         case .exportDataInfo:
             return 22
+        case .respectLowDataMode:
+            return 23
         case let .sectionId(sectionId):
             return (sectionId + 1) * 1000 - sectionId
         }
@@ -274,6 +279,8 @@ private enum DataAndStorageEntry: TableItemListNodeEntry {
             return (sectionId * 1000) + stableId
         case let .gifs(sectionId, _, _, _):
             return (sectionId * 1000) + stableId
+        case let .respectLowDataMode(sectionId, _, _, _):
+            return (sectionId * 1000) + 7
         case let .resetDownloadSettings(sectionId, _, _):
             return (sectionId * 1000) + stableId
         case let .autoplayHeader(sectionId, _):
@@ -361,6 +368,10 @@ private enum DataAndStorageEntry: TableItemListNodeEntry {
         case let .gifs(_, category, enabled, viewType):
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().dataAndStorageAutomaticDownloadGIFs, type: .next, viewType: viewType, action: {
                 arguments.openCategorySettings(category, strings().dataAndStorageAutomaticDownloadGIFs)
+            }, enabled: enabled)
+        case let .respectLowDataMode(_, value, enabled, viewType):
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: "Respect Low Data Mode", description: "Videos and files don't download automatically on Low Data Mode networks and Personal Hotspot", type: .switchable(value), viewType: viewType, action: {
+                arguments.toggleRespectLowDataMode(!value)
             }, enabled: enabled)
         case let .resetDownloadSettings(_, enabled, viewType):
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().dataAndStorageAutomaticDownloadReset, nameStyle: ControlStyle(font: .normal(.title), foregroundColor: theme.colors.accent), type: .none, viewType: viewType, action: {
@@ -450,6 +461,7 @@ private func entries(state: State, data: DataAndStorageData, proxy: ProxySetting
     entries.append(.photos(sectionId, data.automaticMediaDownloadSettings.categories.photo, data.automaticMediaDownloadSettings.automaticDownload, viewType: .innerItem))
     entries.append(.videos(sectionId, data.automaticMediaDownloadSettings.categories.video, data.automaticMediaDownloadSettings.automaticDownload, data.automaticMediaDownloadSettings.categories.video.fileSize, viewType: .innerItem))
     entries.append(.files(sectionId, data.automaticMediaDownloadSettings.categories.files, data.automaticMediaDownloadSettings.automaticDownload, data.automaticMediaDownloadSettings.categories.files.fileSize, viewType: .innerItem))
+    entries.append(.respectLowDataMode(sectionId, data.automaticMediaDownloadSettings.respectLowDataMode, data.automaticMediaDownloadSettings.automaticDownload, viewType: .innerItem))
     entries.append(.resetDownloadSettings(sectionId, data.automaticMediaDownloadSettings != AutomaticMediaDownloadSettings.defaultSettings, viewType: .lastItem))
     
     entries.append(.sectionId(sectionId))
@@ -712,6 +724,10 @@ open class DataAndStorageViewController<Context: AccountContextProtocol>: TableV
             }
         }, openExportTelegramData: {
             FeatureNavigationHooks.shared.showFullExportModal(context)
+        }, toggleRespectLowDataMode: { enabled in
+            _ = updateMediaDownloadSettingsInteractively(postbox: context.account.postbox, { current -> AutomaticMediaDownloadSettings in
+                return current.withUpdatedRespectLowDataMode(enabled)
+            }).start()
         })
 
         let proxy:Signal<ProxySettings, NoError> = proxySettings(accountManager: context.sharedContext.accountManager)

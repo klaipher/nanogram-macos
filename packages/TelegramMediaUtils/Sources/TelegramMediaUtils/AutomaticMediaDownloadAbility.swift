@@ -7,11 +7,13 @@ import InAppSettings
 
 public extension AutomaticMediaDownloadSettings {
     
-    func isDownloable(_ message: Message, index: Int? = nil) -> Bool {
+    func isDownloable(_ message: Message, index: Int? = nil, isSavingData: Bool = AutomaticDownloadDataSaving.shared.isSavingData) -> Bool {
         
         if !automaticDownload {
             return false
         }
+        
+        let pausesLargeMedia = self.pausesLargeMediaDownloads(isSavingData: isSavingData)
         
         
         func ability(_ category: AutomaticMediaDownloadCategoryPeers, _ peer: Peer) -> Bool {
@@ -30,6 +32,10 @@ public extension AutomaticMediaDownloadSettings {
             let dangerExts = "action app bin command csh osx workflow terminal url caction mpkg pkg xhtm webarchive"
             
             if let ext = media.fileName?.nsstring.pathExtension.lowercased(), dangerExts.components(separatedBy: " ").contains(ext) {
+                return false
+            }
+            
+            if pausesLargeMedia && !media.isVoice {
                 return false
             }
             
