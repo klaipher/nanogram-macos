@@ -1,8 +1,15 @@
 import XCTest
 @testable import ChatAppIntents
 
-private final class FakeSource: ChatIntentsDataSource {
-    var isLocked = false
+private final class FakeSource: ChatIntentsDataSource, @unchecked Sendable {
+    var locked = false
+    var lockReadsOffMain = 0
+    var isLocked: Bool {
+        if !Thread.isMainThread {
+            self.lockReadsOffMain += 1
+        }
+        return self.locked
+    }
     var chats: [ChatIntentRecord] = []
     var folders: [ChatIntentFolder] = []
     var opened: [ChatIntentRecord.ID] = []
@@ -72,9 +79,23 @@ final class ChatAppIntentsTests: XCTestCase {
         XCTAssertEqual(byId.map { $0.accountTitle }, ["Home"])
     }
 
+    func testTheLockStateIsReadOnTheMainActorFromAPoolThread() async {
+        let source = self.source()
+        let logic = ChatIntentsLogic(source: { source })
+        let suggested = await Task.detached {
+            return await logic.suggested()
+        }.value
+        let open = await Task.detached {
+            return await logic.open(ChatIntentRecord.ID(accountId: 1, peerId: 10))
+        }.value
+        XCTAssertEqual(suggested.count, 3)
+        XCTAssertEqual(open, .done)
+        XCTAssertEqual(source.lockReadsOffMain, 0)
+    }
+
     func testNothingIsExposedWhilePasscodeLocked() async {
         let source = self.source()
-        source.isLocked = true
+        source.locked = true
         let logic = ChatIntentsLogic(source: { source })
         let suggested = await logic.suggested()
         let found = await logic.search("ali")
@@ -142,7 +163,6 @@ final class ChatAppIntentsTests: XCTestCase {
 #if canImport(AppIntents)
 import AppIntents
 
-@available(macOS 13.0, *)
 final class ChatEntityQueryTests: XCTestCase {
     private var source: FakeSource!
 
@@ -166,13 +186,13 @@ final class ChatEntityQueryTests: XCTestCase {
         XCTAssertEqual(matched.map { $0.title }, ["Alice"])
         let byId = try await query.entities(for: ["1:10", "bad"])
         XCTAssertEqual(byId.map { $0.accountTitle }, ["Work"])
-        self.source.isLocked = true
+        self.source.locked = true
         let locked = try await query.suggestedEntities()
         XCTAssertTrue(locked.isEmpty)
     }
 
     func testFocusFilterIntentStoresTheChoice() async throws {
-        var intent = ChatFocusFilterIntent()
+        let intent = ChatFocusFilterIntent()
         intent.accounts = [ChatAccountEntity(ChatIntentAccount(id: 2, title: "Home"))]
         intent.folders = [ChatFolderEntity(ChatIntentFolder(id: .init(accountId: 1, folderId: 3), title: "Family", accountTitle: "Work"))]
         _ = try await intent.perform()

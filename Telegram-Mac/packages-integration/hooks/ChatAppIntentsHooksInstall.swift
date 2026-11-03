@@ -22,14 +22,6 @@ struct ChatAppShortcuts: AppShortcutsProvider {
 }
 #endif
 
-private func onMain<T>(_ f: () -> T) -> T {
-    if Thread.isMainThread {
-        return f()
-    } else {
-        return DispatchQueue.main.sync(execute: f)
-    }
-}
-
 private func firstValue<T>(_ signal: Signal<T, NoError>) async -> T? {
     return await withCheckedContinuation { continuation in
         let lock = NSLock()
@@ -51,25 +43,24 @@ private func firstValue<T>(_ signal: Signal<T, NoError>) async -> T? {
     }
 }
 
+@MainActor
 private func accountContexts() -> [AccountContext] {
-    return onMain {
-        var result: [AccountContext] = []
-        appDelegate?.enumerateAccountContexts { context in
-            result.append(context)
-        }
-        return result
+    var result: [AccountContext] = []
+    appDelegate?.enumerateAccountContexts { context in
+        result.append(context)
     }
+    return result
 }
 
+@MainActor
 private func accountContext(_ accountId: Int64) -> AccountContext? {
     return accountContexts().first(where: { $0.account.id.int64 == accountId })
 }
 
 private final class AppChatIntentsDataSource: ChatIntentsDataSource {
+    @MainActor
     var isLocked: Bool {
-        return onMain {
-            return appDelegate?.sharedApplicationContextValue?.notificationManager._lockedValue.passcodeLock ?? true
-        }
+        return appDelegate?.sharedApplicationContextValue?.notificationManager._lockedValue.passcodeLock ?? true
     }
 
     private func accountTitle(_ context: AccountContext) async -> String {
@@ -86,7 +77,7 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
 
     func recentChats(limit: Int) async -> [ChatIntentRecord] {
         var result: [ChatIntentRecord] = []
-        for context in accountContexts() {
+        for context in await accountContexts() {
             let title = await self.accountTitle(context)
             if let list = await firstValue(context.engine.messages.chatList(group: .root, count: limit)) {
                 for item in list.items.reversed() {
@@ -101,7 +92,7 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
 
     func searchChats(query: String, limit: Int) async -> [ChatIntentRecord] {
         var result: [ChatIntentRecord] = []
-        for context in accountContexts() {
+        for context in await accountContexts() {
             let title = await self.accountTitle(context)
             if let peers = await firstValue(context.engine.contacts.searchLocalPeers(query: query)) {
                 for peer in peers {
@@ -117,7 +108,7 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
     func chats(ids: [ChatIntentRecord.ID]) async -> [ChatIntentRecord] {
         var result: [ChatIntentRecord] = []
         for id in ids {
-            guard let context = accountContext(id.accountId) else {
+            guard let context = await accountContext(id.accountId) else {
                 continue
             }
             let title = await self.accountTitle(context)
@@ -131,7 +122,7 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
 
     func allFolders() async -> [ChatIntentFolder] {
         var result: [ChatIntentFolder] = []
-        for context in accountContexts() {
+        for context in await accountContexts() {
             let title = await self.accountTitle(context)
             let filters = await firstValue(context.engine.peers.currentChatListFilters()) ?? []
             for filter in filters {
@@ -145,7 +136,7 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
 
     func allAccounts() async -> [ChatIntentAccount] {
         var result: [ChatIntentAccount] = []
-        for context in accountContexts() {
+        for context in await accountContexts() {
             result.append(ChatIntentAccount(id: context.account.id.int64, title: await self.accountTitle(context)))
         }
         return result
@@ -168,7 +159,7 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
     }
 
     func sendMessage(_ text: String, to id: ChatIntentRecord.ID) async -> Bool {
-        guard let context = accountContext(id.accountId) else {
+        guard let context = await accountContext(id.accountId) else {
             return false
         }
         let message = EnqueueMessage.message(text: text, attributes: [], inlineStickers: [:], mediaReference: nil, threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])
@@ -204,7 +195,9 @@ final class AppChatFocusFolders {
         if let account = appDelegate?.sharedApplicationContextValue?.notificationManager.activeAccounts.accounts.first(where: { $0.0.int64 == accountId })?.1 {
             return account
         }
-        return accountContext(accountId)?.account
+        return MainActor.assumeIsolated {
+            return accountContext(accountId)?.account
+        }
     }
 
     private static func rules(_ filter: ChatListFilter) -> ChatFocusFolderRules? {

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ChatFocusFolderCategories: OptionSet, Equatable {
+public struct ChatFocusFolderCategories: OptionSet, Equatable, Sendable {
     public let rawValue: Int32
 
     public init(rawValue: Int32) {
@@ -14,7 +14,7 @@ public struct ChatFocusFolderCategories: OptionSet, Equatable {
     public static let bots = ChatFocusFolderCategories(rawValue: 1 << 4)
 }
 
-public struct ChatFocusFolderRules: Equatable {
+public struct ChatFocusFolderRules: Equatable, Sendable {
     public let id: Int32
     public let includePeerIds: Set<Int64>
     public let excludePeerIds: Set<Int64>
@@ -34,8 +34,8 @@ public struct ChatFocusFolderRules: Equatable {
     }
 }
 
-public struct ChatFocusChat: Equatable {
-    public enum Kind: Equatable {
+public struct ChatFocusChat: Equatable, Sendable {
+    public enum Kind: Equatable, Sendable {
         case user(isContact: Bool)
         case bot
         case group
@@ -94,7 +94,7 @@ public enum ChatFocusFolderMatcher {
     }
 }
 
-public final class ChatFocusFolderMembership {
+public final class ChatFocusFolderMembership: @unchecked Sendable {
     private let store: ChatFocusFilterStore
     private let requestFolders: (Int64) -> Void
     private let lock = NSLock()

@@ -2,14 +2,12 @@ import Foundation
 #if canImport(AppIntents)
 import AppIntents
 
-@available(macOS 14.0, *)
 public struct ChatAppIntentsPackage: AppIntentsPackage {
 }
 
-@available(macOS 13.0, *)
 public struct ChatEntity: AppEntity {
-    public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Chat"
-    public static var defaultQuery = ChatEntityQuery()
+    public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Chat"
+    public static let defaultQuery = ChatEntityQuery()
 
     public var id: String
     public var title: String
@@ -26,7 +24,6 @@ public struct ChatEntity: AppEntity {
     }
 }
 
-@available(macOS 13.0, *)
 public struct ChatEntityQuery: EntityStringQuery {
     public init() {
     }
@@ -44,10 +41,9 @@ public struct ChatEntityQuery: EntityStringQuery {
     }
 }
 
-@available(macOS 13.0, *)
 public struct ChatAccountEntity: AppEntity {
-    public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Account"
-    public static var defaultQuery = ChatAccountEntityQuery()
+    public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Account"
+    public static let defaultQuery = ChatAccountEntityQuery()
 
     public var id: String
     public var title: String
@@ -62,7 +58,6 @@ public struct ChatAccountEntity: AppEntity {
     }
 }
 
-@available(macOS 13.0, *)
 public struct ChatAccountEntityQuery: EntityQuery {
     public init() {
     }
@@ -76,10 +71,9 @@ public struct ChatAccountEntityQuery: EntityQuery {
     }
 }
 
-@available(macOS 13.0, *)
 public struct ChatFolderEntity: AppEntity {
-    public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Folder"
-    public static var defaultQuery = ChatFolderEntityQuery()
+    public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Folder"
+    public static let defaultQuery = ChatFolderEntityQuery()
 
     public var id: String
     public var title: String
@@ -96,7 +90,6 @@ public struct ChatFolderEntity: AppEntity {
     }
 }
 
-@available(macOS 13.0, *)
 public struct ChatFolderEntityQuery: EntityQuery {
     public init() {
     }
@@ -110,7 +103,6 @@ public struct ChatFolderEntityQuery: EntityQuery {
     }
 }
 
-@available(macOS 13.0, *)
 public enum ChatIntentError: Error, CustomLocalizedStringResourceConvertible {
     case locked
     case unavailable
@@ -146,11 +138,10 @@ public enum ChatIntentError: Error, CustomLocalizedStringResourceConvertible {
     }
 }
 
-@available(macOS 13.0, *)
 public struct OpenChatIntent: AppIntent {
-    public static var title: LocalizedStringResource = "Open Chat"
-    public static var description = IntentDescription("Opens a Telegram chat.")
-    public static var openAppWhenRun: Bool = true
+    public static let title: LocalizedStringResource = "Open Chat"
+    public static let description = IntentDescription("Opens a Telegram chat.")
+    public static let openAppWhenRun: Bool = true
 
     @Parameter(title: "Chat")
     public var chat: ChatEntity
@@ -170,10 +161,9 @@ public struct OpenChatIntent: AppIntent {
     }
 }
 
-@available(macOS 13.0, *)
 public struct SendMessageIntent: AppIntent {
-    public static var title: LocalizedStringResource = "Send Message"
-    public static var description = IntentDescription("Sends a text message to a Telegram chat after you confirm it.")
+    public static let title: LocalizedStringResource = "Send Message"
+    public static let description = IntentDescription("Sends a text message to a Telegram chat after you confirm it.")
 
     @Parameter(title: "Chat")
     public var chat: ChatEntity
@@ -193,7 +183,7 @@ public struct SendMessageIntent: AppIntent {
         guard let id = ChatIntentRecord.ID(string: self.chat.id) else {
             throw ChatIntentError.failed
         }
-        try await self.requestConfirmation(result: .result(dialog: "Send “\(self.text)” to \(self.chat.title)?"), confirmationActionName: .send)
+        try await self.requestConfirmation(actionName: .send, dialog: "Send “\(self.text)” to \(self.chat.title)?")
         if let error = ChatIntentError(await ChatIntentsBridge.logic.send(self.text, to: id)) {
             throw error
         }
@@ -201,10 +191,9 @@ public struct SendMessageIntent: AppIntent {
     }
 }
 
-@available(macOS 13.0, *)
 public struct ChatFocusFilterIntent: SetFocusFilterIntent {
-    public static var title: LocalizedStringResource = "Set Nanogram Notifications"
-    public static var description: IntentDescription? = IntentDescription("Only notify about chats in the chosen accounts or folders while this Focus is on.")
+    public static let title: LocalizedStringResource = "Set Nanogram Notifications"
+    public static let description: IntentDescription? = IntentDescription("Only notify about chats in the chosen accounts or folders while this Focus is on.")
 
     @Parameter(title: "Accounts")
     public var accounts: [ChatAccountEntity]?
