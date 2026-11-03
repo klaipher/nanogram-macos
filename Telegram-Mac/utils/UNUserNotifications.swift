@@ -6,6 +6,7 @@ import Postbox
 import TGUIKit
 import ApiCredentials
 import AppKit
+import NanogramRuntime
 
 
 
@@ -339,41 +340,31 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
         })
     }
     
+    private var deliveredClearer: DeliveredNotificationClearer<MessageId> {
+        return DeliveredNotificationClearer(center: UNUserNotificationCenter.current(), key: { userInfo in
+            return getNotificationMessageId(userInfo: userInfo, for: "reply")
+        })
+    }
+
     override func clearNotifies(_ peerId:PeerId, maxId:MessageId) {
+        let clearer = self.deliveredClearer
         queue.async {
-            let manager = UNUserNotificationCenter.current()
-            manager.getDeliveredNotifications(completionHandler: { notifications in
-                for notification in notifications {
-                    let userInfo = notification.request.content.userInfo
-                    if let notificationMessageId = getNotificationMessageId(userInfo: userInfo, for: "reply") {
-                        let timestamp = userInfo["timestamp"] as? Int32 ?? 0
-                        if notificationMessageId.peerId == peerId, notificationMessageId <= maxId {
-                            manager.removeDeliveredNotifications(withIdentifiers: [notification.request.identifier])
-                        } else if timestamp == 0 || timestamp + 24 * 60 * 60 < Int32(Date().timeIntervalSince1970) {
-                            manager.removeDeliveredNotifications(withIdentifiers: [notification.request.identifier])
-                        }
-                    }
+            let now = Int32(Date().timeIntervalSince1970)
+            clearer.remove(where: { notificationMessageId, userInfo in
+                let timestamp = userInfo["timestamp"] as? Int32 ?? 0
+                if notificationMessageId.peerId == peerId, notificationMessageId <= maxId {
+                    return true
                 }
+                return timestamp == 0 || timestamp + 24 * 60 * 60 < now
             })
         }
     }
 
 
     override func clearNotifies(by msgIds: [MessageId]) {
+        let clearer = self.deliveredClearer
         queue.async {
-             UNUserNotificationCenter.current().getDeliveredNotifications(completionHandler: { notifications in
-                var remove: Set<String> = Set()
-                for notification in notifications {
-                    if let notificationMessageId = getNotificationMessageId(userInfo: notification.request.content.userInfo, for: "reply") {
-                        for msgId in msgIds {
-                            if notificationMessageId == msgId {
-                                remove.insert(notification.request.identifier)
-                            }
-                        }
-                    }
-                }
-                UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: Array(remove))
-            })
+            clearer.remove(matching: Set(msgIds))
         }
     }
 }
