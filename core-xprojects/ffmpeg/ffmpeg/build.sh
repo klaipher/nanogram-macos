@@ -29,7 +29,7 @@ LIBOPUS_PATH="${BUILD_DIR}../../libopus/build/libopus"
 LIBVPX_PATH="${BUILD_DIR}../../libvpx/build/libvpx"
 LIBDAV1D_PATH="${BUILD_DIR}../../dav1d/build/dav1d"
 
-FF_VERSION="8.1.2"
+FF_VERSION="9.0.2"
 if [ ! -r "$SOURCE_DIR/ffmpeg-$FF_VERSION" ]; then
 	DETECTED_SOURCES=`find "$SOURCE_DIR" -maxdepth 1 -type d -name 'ffmpeg-*'`
 	if [ `echo "$DETECTED_SOURCES" | grep -c .` -eq 1 ]; then
@@ -112,10 +112,6 @@ then
 		else
 		    PLATFORM="MacOSX"
 		    CFLAGS="$CFLAGS -mmacosx-version-min=$DEPLOYMENT_TARGET"
-		    if [ "$ARCH" = "arm64" ]
-		    then
-		        EXPORT="GASPP_FIX_XCODE5=1"
-		    fi
 		fi
 
 		XCRUN_SDK=`echo $PLATFORM | tr '[:upper:]' '[:lower:]'`
@@ -123,7 +119,7 @@ then
 
 		if [ "$ARCH" = "arm64" ]
 		then
-		    AS="$GAS_PREPROCESSOR_PATH -arch aarch64 -- $CC"
+		    AS="$CC"
 		else
 		    AS="$GAS_PREPROCESSOR_PATH -- $CC"
 		fi

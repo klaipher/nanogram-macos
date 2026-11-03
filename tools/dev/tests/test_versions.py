@@ -70,6 +70,17 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertTrue((CORE / "libwebp" / "libwebp-1.6.0.tar.gz").is_file())
         self.assertFalse((CORE / "libwebp" / "libwebp-master.zip").exists())
 
+    def test_ffmpeg(self):
+        sources = TG_IOS / "submodules" / "ffmpeg" / "Sources" / "FFMpeg"
+        self.assertEqual(read(sources / "ffmpeg-9.0.2" / "VERSION").strip(), "9.0.2")
+        self.assertFalse((sources / "ffmpeg-8.1.2").exists())
+        self.assertIn('FF_VERSION="9.0.2"', read(CORE / "ffmpeg" / "ffmpeg" / "build.sh"))
+
+    def test_ffmpeg_assembles_arm64_with_clang_keeping_i8mm(self):
+        script = read(CORE / "ffmpeg" / "ffmpeg" / "build.sh")
+        self.assertIn('AS="$CC"', script)
+        self.assertNotIn("GASPP_FIX_XCODE5", script)
+
 
 if __name__ == "__main__":
     unittest.main()
