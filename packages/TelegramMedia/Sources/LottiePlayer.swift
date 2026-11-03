@@ -606,7 +606,7 @@ private final class RendererState  {
     }
     
     func renderFrame(at frame: Int32) -> RenderedFrame? {
-        let rendered = container?.render(at: frame, frames: frames, previousFrame: previousFrame)
+        let rendered = PerformanceSignposts.interval("lottieRenderFrame") { container?.render(at: frame, frames: frames, previousFrame: previousFrame) }
         return rendered
     }
     

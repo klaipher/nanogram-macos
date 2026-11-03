@@ -43,6 +43,7 @@ import StoriesUI
 import ChatListUI
 import WalletContext
 import CrashRecoveryUI
+import CrashReports
 import StarsUI
 #if DEBUG
 import PerfLab
@@ -321,6 +322,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
 
         installInvalidFrameDetector()
         memoryPressureMonitor = MemoryPressureMonitor()
+        if #available(macOS 12.0, *) {
+            MetricReportCollector.shared.start()
+        }
         Queue.concurrentBackgroundQueue().async {
             migrateWallpapersToEightBitChannels()
         }

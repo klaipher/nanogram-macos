@@ -585,13 +585,13 @@ fileprivate func prepareEntries(from:[AppearanceWrapperEntry<UIChatListEntry>]?,
         }
         
         
-        let (deleted,inserted,updated) = proccessEntries(from, right: to, { entry -> TableRowItem in
+        let (deleted,inserted,updated) = PerformanceSignposts.interval("chatListPrepareEntries") { proccessEntries(from, right: to, { entry -> TableRowItem in
             let item = makeItem(entry)
             if type(of: item) == ChatListRowItem.self {
                 item.premeasuredWidth = initialSize.width
             }
             return item
-        })
+        }) }
         
         let animated = animated
         let nState = scrollState ?? (animated ? .none(nil) : .saveVisible(.lower, false))
