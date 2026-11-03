@@ -29,6 +29,7 @@ import SecureIdUtils
 import FoundationUtils
 import ObjcUtils
 import InputDataUI
+import NanogramRuntime
 
 public final class GalleryInteractions {
     public var dismiss:(NSEvent)->KeyHandlerResult = { _ in return .rejected}
@@ -247,6 +248,7 @@ public class GalleryViewer: NSResponder {
     private let ready = Promise<Bool>()
     private var didSetReady = false
     private var presentationGeneration = 0
+    private weak var keyWindowBeforePresentation: NSWindow?
     
     private let disposable = MetaDisposable()
     private let readyDispose = MetaDisposable()
@@ -1660,6 +1662,9 @@ public class GalleryViewer: NSResponder {
         NotificationCenter.default.addObserver(self, selector: #selector(windowDidBecomeKey), name: NSWindow.didBecomeKeyNotification, object: window)
         NotificationCenter.default.addObserver(self, selector: #selector(windowDidResignKey), name: NSWindow.didResignKeyNotification, object: window)
         context.window.resignFirstResponder()
+        if let keyWindow = NSApp.keyWindow, keyWindow !== self.window {
+            keyWindowBeforePresentation = keyWindow
+        }
         self.window.makeKeyAndOrderFront(nil)
         //window.makeFirstResponder(self)
         //closePipVideo()
@@ -1719,6 +1724,7 @@ public class GalleryViewer: NSResponder {
         readyDispose.set(nil)
         didSetReady = false
         NotificationCenter.default.removeObserver(self)
+        returnKeyWindow()
         if animated {
             let presentationGeneration = self.presentationGeneration
             backgroundView._change(opacity: 0, animated: true)
@@ -1760,6 +1766,13 @@ public class GalleryViewer: NSResponder {
         
     }
     
+    private func returnKeyWindow() {
+        guard window.isKeyWindow else {
+            return
+        }
+        KeyWindowHandoff.restore(previous: keyWindowBeforePresentation, fallback: context.window, overlay: window, makeKey: { $0.makeKey() })
+    }
+
     deinit {
         clean()
     }
