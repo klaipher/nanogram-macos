@@ -165,7 +165,14 @@ public final class SharedDisplayLinkDriver {
         public func invalidate() {
             if self.isValid {
                 self.isValid = false
-                self.driver.requestUpdate()
+                if Thread.isMainThread {
+                    self.driver.requestUpdate()
+                } else {
+                    let driver = self.driver
+                    DispatchQueue.main.async {
+                        driver.requestUpdate()
+                    }
+                }
             }
         }
     }
