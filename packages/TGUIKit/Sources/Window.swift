@@ -1065,7 +1065,12 @@ open class Window: NSWindow {
     
     public func windowImageShot() -> CGImage? {
         if windowNumber >= 0 {
-            return CGWindowListCreateImage(CGRect.null, [.optionIncludingWindow], CGWindowID(windowNumber), [.boundsIgnoreFraming])
+            guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else {
+                return nil
+            }
+            typealias Fn = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+            let create = unsafeBitCast(symbol, to: Fn.self)
+            return create(CGRect.null, CGWindowListOption.optionIncludingWindow.rawValue, CGWindowID(windowNumber), CGWindowImageOption.boundsIgnoreFraming.rawValue)?.takeRetainedValue()
         } else {
             return nil
         }
