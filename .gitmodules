@@ -3,7 +3,8 @@
 	url = https://github.com/sparkle-project/Sparkle
 [submodule "submodules/telegram-ios"]
 	path = submodules/telegram-ios
-	url = https://github.com/TelegramMessenger/Telegram-iOS
+	url = https://github.com/klaipher/Telegram-iOS
+	branch = nanogram-mac
 [submodule "submodules/rlottie"]
 	path = submodules/rlottie
 	url = https://github.com/klaipher/rlottie
