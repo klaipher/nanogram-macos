@@ -1,5 +1,6 @@
 import Cocoa
 import SettingsUI
+import NanogramDebugUI
 
 func installDeveloperUIHooks() {
     DeveloperHooks.install(DeveloperHooks(
@@ -10,6 +11,9 @@ func installDeveloperUIHooks() {
         },
         toggleForceRLottieBackend: {
             LottieBackend.forceRLottie = !LottieBackend.forceRLottie
+        },
+        openNanogramSwitches: {
+            NanogramDebugMenu.showSwitches()
         }
     ))
 }

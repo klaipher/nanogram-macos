@@ -119,6 +119,7 @@ private let _id_accessibility_audit = InputDataIdentifier("_id_accessibility_aud
 private let _id_force_rlottie = InputDataIdentifier("_id_force_rlottie")
 private let _id_clear_database = InputDataIdentifier("_id_clear_database")
 private let _id_clear_database_and_cache = InputDataIdentifier("_id_clear_database_and_cache")
+private let _id_nanogram_switches = InputDataIdentifier("_id_nanogram_switches")
 
 
 private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
@@ -129,6 +130,17 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
 
     entries.append(.sectionId(sectionId, type: .normal))
     sectionId += 1
+
+    if DeveloperHooks.isInstalled, let openNanogramSwitches = DeveloperHooks.shared.openNanogramSwitches {
+        entries.append(.desc(sectionId: sectionId, index: index, text: .plain("NANOGRAM"), data: .init(viewType: .textTopItem)))
+        index += 1
+
+        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_nanogram_switches, data: InputDataGeneralData(name: "Debug Switches…", color: theme.colors.text, type: .next, viewType: .singleItem, action: openNanogramSwitches)))
+        index += 1
+
+        entries.append(.sectionId(sectionId, type: .normal))
+        sectionId += 1
+    }
 
     entries.append(.desc(sectionId: sectionId, index: index, text: .plain("ACCOUNTS"), data: .init(viewType: .textTopItem)))
     index += 1

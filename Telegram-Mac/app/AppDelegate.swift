@@ -48,6 +48,8 @@ import StarsUI
 import PerfLab
 #endif
 import SettingsUI
+import NanogramDebug
+import NanogramDebugUI
 
 //#if BETA || DEBUG
 //import Firebase
@@ -1370,6 +1372,29 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         }
         #endif
         installServicesMenu()
+        installNanogramDebugMenu()
+    }
+
+    private var nanogramDebugObservations: [NanogramDebugObservation] = []
+
+    private func installNanogramDebugMenu() {
+        let settings = NanogramDebugSettings.shared
+        settings.register(.choice(id: "display.maxFrameRate", section: "Display", title: "Frame-rate cap", detail: "Caps the shared display link that drives app animations.", options: [NanogramDebugChoice(id: "off", title: "Off"), NanogramDebugChoice(id: "60", title: "60 Hz"), NanogramDebugChoice(id: "30", title: "30 Hz")], defaultValue: "off"))
+        let applyFrameRateCap = {
+            SharedDisplayLinkDriver.shared.maximumFramesPerSecondLimit = settings.choice("display.maxFrameRate").flatMap { Int($0) }
+        }
+        applyFrameRateCap()
+        nanogramDebugObservations.append(settings.observe("display.maxFrameRate") { _ in
+            applyFrameRateCap()
+        })
+        NanogramDebugMenu.install(openDeveloperScreen: { [weak self] in
+            guard let context = self?.contextValue?.context, !context.isSupport else {
+                return false
+            }
+            context.window.makeKeyAndOrderFront(nil)
+            context.bindings.rootNavigation().push(DeveloperViewController(context: context))
+            return true
+        })
     }
 
     private func installServicesMenu() {
