@@ -30,5 +30,12 @@ let package = Package(
                 .product(name: "TelegramTheme", package: "TelegramTheme", condition: nil),
             ],
             path: "Sources/ExternalVideoUtils"),
+        .testTarget(
+            name: "ExternalVideoUtilsTests",
+            dependencies: [
+                "ExternalVideoUtils",
+                .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
+            ],
+            path: "Tests/ExternalVideoUtilsTests"),
     ]
 )

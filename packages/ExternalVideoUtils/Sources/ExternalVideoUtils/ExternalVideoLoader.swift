@@ -18,7 +18,7 @@ public final class ExternalVideo : Equatable {
     public let quality:NSSize
     public let stream:String
     public let date: TimeInterval
-    fileprivate init(dimensions:NSSize, stream:String, quality:NSSize, date: TimeInterval) {
+    init(dimensions:NSSize, stream:String, quality:NSSize, date: TimeInterval) {
         self.dimensions = dimensions
         self.stream = stream
         self.quality = quality
@@ -95,16 +95,77 @@ public class ExternalVideoLoader {
     
     
     public func status(for content:TelegramMediaWebpageLoadedContent) -> Signal<ExternalVideoStatus?, Void> {
+        return self.status(forKey: content.displayUrl)
+    }
+    
+    var statusContextCount: Int {
+        var count = 0
+        self.statusQueue.sync {
+            count = self.statusContexts.count
+        }
+        return count
+    }
+    
+    var cachedVideoCount: Int {
+        var count = 0
+        self.statusQueue.sync {
+            count = self.dataContexts.count
+        }
+        return count
+    }
+    
+    func store(video: ExternalVideo, forKey key: String) {
+        self.statusQueue.sync {
+            self.storeVideo(video, for: WrappedExternalVideoId(key))
+        }
+    }
+    
+    private static let videoLifetime: TimeInterval = 30 * 60
+    
+    private func isFresh(_ video: ExternalVideo) -> Bool {
+        return Date().timeIntervalSince1970 - ExternalVideoLoader.videoLifetime < video.date
+    }
+    
+    private func storeVideo(_ video: ExternalVideo, for id: WrappedExternalVideoId) {
+        self.dataContexts = self.dataContexts.filter { self.isFresh($0.value) }
+        self.dataContexts[id] = video
+    }
+    
+    private func freshVideo(for id: WrappedExternalVideoId) -> ExternalVideo? {
+        guard let video = self.dataContexts[id] else {
+            return nil
+        }
+        if self.isFresh(video) {
+            return video
+        }
+        self.dataContexts.removeValue(forKey: id)
+        return nil
+    }
+    
+    private func removeStatusContextIfUnused(_ id: WrappedExternalVideoId) {
+        guard let context = self.statusContexts[id], context.subscribers.isEmpty else {
+            return
+        }
+        if self.cancelTokensYT[id] != nil || self.cancelTokensVimeo[id] != nil {
+            return
+        }
+        self.statusContexts.removeValue(forKey: id)
+    }
+    
+    func status(forKey key: String) -> Signal<ExternalVideoStatus?, Void> {
         return Signal { subscriber in
             let disposable = MetaDisposable()
             self.statusQueue.async {
                 
                 let statusContext: ExternalVideoStatusContext
-                if let current = self.statusContexts[WrappedExternalVideoId(content.displayUrl)] {
+                if let current = self.statusContexts[WrappedExternalVideoId(key)] {
                     statusContext = current
                 } else {
                     statusContext = ExternalVideoStatusContext()
-                    self.statusContexts[WrappedExternalVideoId(content.displayUrl)] = statusContext
+                    if let video = self.freshVideo(for: WrappedExternalVideoId(key)) {
+                        statusContext.status = .loaded(video)
+                    }
+                    self.statusContexts[WrappedExternalVideoId(key)] = statusContext
                 }
                 
                 let index = statusContext.subscribers.add({ status in
@@ -117,9 +178,10 @@ public class ExternalVideoLoader {
                 
                 disposable.set(ActionDisposable {
                     self.statusQueue.async {
-                        if let current = self.statusContexts[WrappedExternalVideoId(content.displayUrl)] {
+                        if let current = self.statusContexts[WrappedExternalVideoId(key)] {
                             current.subscribers.remove(index)
                         }
+                        self.removeStatusContextIfUnused(WrappedExternalVideoId(key))
                     }
                 })
             }
@@ -145,7 +207,7 @@ public class ExternalVideoLoader {
             let disposable:MetaDisposable = MetaDisposable()
             
             self.statusQueue.async {
-                if let video = self.dataContexts[WrappedExternalVideoId(embed)], Date().timeIntervalSince1970 - 30 * 60 < video.date  {
+                if let video = self.freshVideo(for: WrappedExternalVideoId(embed)) {
                     subscriber.putNext(video)
                     subscriber.putCompletion()
                 } else if let statusContext = self.statusContexts[WrappedExternalVideoId(embed)], statusContext.status != nil {
@@ -183,9 +245,10 @@ public class ExternalVideoLoader {
                                     stream = url.absoluteString
                                 }
                                 if let quality = quality, let stream = stream {
-                                    externalVideo = ExternalVideo(dimensions: NSMakeSize(1280, 720), stream: stream, quality: quality, date: Date().timeIntervalSince1970)
-                                    self.dataContexts[WrappedExternalVideoId(embed)] = externalVideo!
-                                    status = .loaded(externalVideo!)
+                                    let video = ExternalVideo(dimensions: NSMakeSize(1280, 720), stream: stream, quality: quality, date: Date().timeIntervalSince1970)
+                                    externalVideo = video
+                                    self.storeVideo(video, for: WrappedExternalVideoId(embed))
+                                    status = .loaded(video)
                                 } else {
                                     status = .fail
                                 }
@@ -225,6 +288,7 @@ public class ExternalVideoLoader {
                                 }
                             }
                         }
+                        self.removeStatusContextIfUnused(WrappedExternalVideoId(embed))
                     }
                 })
             }
@@ -243,7 +307,7 @@ public class ExternalVideoLoader {
                 
                 var canceled:Bool = false
                 
-                if let video = self.dataContexts[WrappedExternalVideoId(embed)], Date().timeIntervalSince1970 - 30 * 60 < video.date {
+                if let video = self.freshVideo(for: WrappedExternalVideoId(embed)) {
                     subscriber.putNext(video)
                     subscriber.putCompletion()
                 } else if self.cancelTokensVimeo[WrappedExternalVideoId(embed)] == nil  {
@@ -268,9 +332,10 @@ public class ExternalVideoLoader {
                                     let quality:NSSize = NSMakeSize(1280, 720)
                                     let stream:String? = video.highestQualityStreamURL()?.absoluteString
                                     if let stream = stream {
-                                        externalVideo = ExternalVideo(dimensions: NSMakeSize(1280, 720), stream: stream, quality: quality, date: Date().timeIntervalSince1970)
-                                        self.dataContexts[WrappedExternalVideoId(embed)] = externalVideo!
-                                        status = .loaded(externalVideo!)
+                                        let video = ExternalVideo(dimensions: NSMakeSize(1280, 720), stream: stream, quality: quality, date: Date().timeIntervalSince1970)
+                                        externalVideo = video
+                                        self.storeVideo(video, for: WrappedExternalVideoId(embed))
+                                        status = .loaded(video)
                                     } else {
                                         status = .fail
                                     }
@@ -308,6 +373,7 @@ public class ExternalVideoLoader {
                                 }
                             }
                         }
+                        self.removeStatusContextIfUnused(WrappedExternalVideoId(embed))
                     }
                 })
             }
