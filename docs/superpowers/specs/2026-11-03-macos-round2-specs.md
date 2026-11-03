@@ -392,7 +392,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 
 ## modern: modern APIs and dead code
 
-### R2-14. StoreKit 1 InAppPurchaseManager runs in builds that can never sell anything — `todo` (group: modern)
+### R2-14. StoreKit 1 InAppPurchaseManager runs in builds that can never sell anything — `done (aa2f8a48; NoopInAppPurchaseManager unless APP_STORE; no unit test: the package needs TelegramCore and an engine)` (group: modern)
 
 - **Evidence**: `Telegram-Mac/account/AccountContext.swift:231` (`lazy var inAppPurchaseManager … =
   InAppPurchaseManager(engine:)`, no `#if`; `:632-638` read the products only under `#if APP_STORE`).
@@ -419,7 +419,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-15. The dead NSUserNotificationCenter path kept by H24 for a 10.13 target the fork no longer has — `todo` (group: modern)
+### R2-15. The dead NSUserNotificationCenter path kept by H24 for a 10.13 target the fork no longer has — `done (cf6564b9)` (group: modern)
 
 - **Evidence**: round-1 H24 keeps the < 10.14 path "while the shipped deployment target is 10.13";
   `stage1:nanogram/Nanogram.xcconfig:5` sets `MACOSX_DEPLOYMENT_TARGET = 15.0` for every target.
@@ -436,7 +436,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-16. H17 kept a dead CVDisplayLink fallback behind `#available(macOS 14)` — `todo` (group: modern)
+### R2-16. H17 kept a dead CVDisplayLink fallback behind `#available(macOS 14)` — `done (3b62caf2)` (group: modern)
 
 - **Evidence**: `packages/TGUIKit/Sources/SharedDisplayLinkSource.swift:82-88` (`ScreenDisplayLinkSource()` on 14+,
   else `LegacyDisplayLinkSource()`), `:158-246` (LegacyDisplayLinkSource, CVDisplayLink); `DisplayLinkAnimator.swift:31-110`
@@ -454,7 +454,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-17. New fork-owned packages use tools 5.5, Swift 5 and a 10.13 floor, against stage 1's NanogramKit convention — `todo` (group: modern)
+### R2-17. New fork-owned packages use tools 5.5, Swift 5 and a 10.13 floor, against stage 1's NanogramKit convention — `partial (c0ab3100 ChatAppIntents at 15 + Swift 6; 5039642a LocalAudioTranscription, 7fec9f07 NanogramDebug, VoiceRecorderInput, VP9Hardware in Swift 6 at 10.13 because upstream 10.13 packages depend on them and SwiftPM rejects a higher-floor dependency; NanogramDebugUI stays Swift 5 for its synchronous app callers; NanogramRuntime pending; lint tools/dev/tests/test_fork_packages.py)` (group: modern)
 
 - **Evidence**: runtime-branch packages NanogramRuntime, ChatAppIntents, LocalAudioTranscription, NanogramDebug and
   VoiceRecorderInput: `swift-tools-version:5.5`, `.macOS(.v10_13)`; VP9Hardware: tools 6.0, `.v10_13`.
@@ -479,7 +479,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: M
 - **Confidence**: high
 
-### R2-18. The App Intents data source blocks Swift-concurrency threads with `DispatchQueue.main.sync` — `todo` (group: modern)
+### R2-18. The App Intents data source blocks Swift-concurrency threads with `DispatchQueue.main.sync` — `done (c0ab3100)` (group: modern)
 
 - **Evidence**: `Telegram-Mac/packages-integration/hooks/ChatAppIntentsHooksInstall.swift:25-31` (`onMain` uses
   `DispatchQueue.main.sync` off main), used by `accountContexts()` and `isLocked`.
@@ -497,7 +497,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-19. GIF→MP4 on send runs the encoder in real-time mode and sleeps 100 ms on every back-pressure — `todo` (group: modern)
+### R2-19. GIF→MP4 on send runs the encoder in real-time mode and sleeps 100 ms on every back-pressure — `partial (fbcf564e; requestMediaDataWhenReady, BGRA, error path; expectsMediaDataInRealTime kept YES: offline mode measured 1.0-2.0 s vs 0.21-0.54 s for 300 frames)` (group: modern)
 
 - **Evidence**: `packages/TGGifConverter/Sources/TGGifConverter/TGGifConverter.m:78`
   (`expectsMediaDataInRealTime = YES` for an offline source); `:101-170` loop with `[NSThread sleepForTimeInterval:0.1]`
@@ -518,7 +518,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-20. The Lottie frame-cache map is wrapped in a deprecated, non-secure keyed archive around a plist — `todo` (group: modern)
+### R2-20. The Lottie frame-cache map is wrapped in a deprecated, non-secure keyed archive around a plist — `done (cb16b9f3)` (group: modern)
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottieBufferCompressor.swift:178-185` (`PropertyListEncoder().encode(map)`
   then `NSKeyedArchiver.archiveRootObject(data, toFile:)`); `:305` (`NSKeyedUnarchiver.unarchiveObject(withFile:)`,
@@ -539,7 +539,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-21. Theme switches snapshot the window through the obsoleted `CGWindowListCreateImage` via `dlsym` — `todo` (group: modern)
+### R2-21. Theme switches snapshot the window through the obsoleted `CGWindowListCreateImage` via `dlsym` — `done (ba583d5a; visual check of the fade over Metal/video layers still to do)` (group: modern)
 
 - **Evidence**: `packages/TGUIKit/Sources/Window.swift:1066-1077` (`windowImageShot()` via
   `dlsym(RTLD_DEFAULT, "CGWindowListCreateImage")`, integration commit `6fe2eb17`); the only caller is
@@ -556,7 +556,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-22. Dead code and a dead resource that go as whole-file or one-line deletions — `todo` (group: modern)
+### R2-22. Dead code and a dead resource that go as whole-file or one-line deletions — `done (92019618; the optional MainMenu.xib SUUpdater cleanup not done)` (group: modern)
 
 - **Evidence**: `packages/StatisticsUI/Sources/StatisticsUI/ChannelStatisticsController.swift` (the only WebKit1
   `WebView`, never instantiated; the only reference is the typealias at
@@ -580,7 +580,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-23. The video editor grabs a 1920 px still frame with zero tolerance on the main thread — `todo` (group: modern)
+### R2-23. The video editor grabs a 1920 px still frame with zero tolerance on the main thread — `done (81a7044a)` (group: modern)
 
 - **Evidence**: `packages/ImageCanvasUI/Sources/ImageCanvasUI/EditVideoController.swift:380-387` (`still(at:)`:
   `AVAssetImageGenerator`, zero tolerance, `maximumSize` 1920, synchronous `copyCGImage(at:actualTime:)`, deprecated
@@ -597,7 +597,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-24. Deprecation backlog at the 15.0 floor: triage instead of bulk migration — `todo` (group: modern)
+### R2-24. Deprecation backlog at the 15.0 floor: triage instead of bulk migration — `partial (02d835c1 per-package deprecation gate, active after the next clean tg warnings --update; fork-file migrations through R2-14..R2-23; AVSampleBufferDisplayLayer renderer move left to R2-5's player work)` (group: modern)
 
 - **Evidence**: `stage1:build-output/warnings-build.log` (clean Debug, 2026-11-03 01:29, before the Sparkle 2 commit
   and without the runtime branch): 637 unique deprecated/obsoleted warnings. Largest groups: synchronous AVAsset
