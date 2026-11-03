@@ -1,6 +1,6 @@
 import Foundation
 import AVFoundation
-import SwiftSignalKit
+@preconcurrency import SwiftSignalKit
 
 enum EditVideoStill {
     static func generate(asset: AVAsset, at time: CMTime, maximumSide: CGFloat) -> Signal<CGImage?, NoError> {
