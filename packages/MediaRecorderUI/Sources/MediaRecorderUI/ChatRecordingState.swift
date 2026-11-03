@@ -277,7 +277,7 @@ public final class ChatRecordingVideoState : ChatRecordingState {
     public init(context: (any AccountContextProtocol), liveUpload:Bool, autohold: Bool) {
         let id:Int64 = arc4random64()
         let path = temporaryMediaPath("video_message", "mp4")
-        self.pipeline = VideoRecorderPipeline(path: path, config: VideoMessageConfig.with(appConfiguration: context.appConfiguration), liveUploading: liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil)
+        self.pipeline = VideoRecorderPipeline(path: path, config: VideoMessageConfig.with(appConfiguration: context.appConfiguration), liveUploading: liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil, audioInputDeviceId: MediaRecorderHooks.shared.microphoneDeviceId(context))
         super.init(autohold: autohold)
     }
     

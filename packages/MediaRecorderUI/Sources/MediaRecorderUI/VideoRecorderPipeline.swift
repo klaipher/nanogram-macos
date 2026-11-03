@@ -158,7 +158,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     public static let videoMessageMaxDuration: Double = 60
 
     private var liveUploading: PreUploadManager?
-    public init(path: String, config: VideoMessageConfig, liveUploading: PreUploadManager?) {
+    public init(path: String, config: VideoMessageConfig, liveUploading: PreUploadManager?, audioInputDeviceId: String? = nil) {
         self.path = path
         let url = URL(fileURLWithPath: path)
         self.url = url
@@ -200,7 +200,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             
         let videoDevice = videoDevices.filter({ $0.isConnected && !$0.isSuspended }).first(where: { $0.position == .front || $0.position == .unspecified })
         
-        let audioDevice = audioDevices.first(where: { $0.isConnected && !$0.isSuspended})
+        let audioDevice = audioDevices.first(where: { $0.uniqueID == audioInputDeviceId && $0.isConnected && !$0.isSuspended }) ?? audioDevices.first(where: { $0.isConnected && !$0.isSuspended})
 
 
         if let videoDevice = videoDevice {

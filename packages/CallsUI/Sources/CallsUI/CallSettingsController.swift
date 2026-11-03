@@ -24,8 +24,10 @@ public final class CallSettingsArguments {
     public let toggleOutputAudioDevice:(String?)->Void
     public let toggleInputVideoDevice:(String?)->Void
     public let finishCall:()->Void
-    public init(sharedContext: any SharedAccountContextProtocol, toggleInputAudioDevice: @escaping(String?)->Void, toggleOutputAudioDevice:@escaping(String?)->Void, toggleInputVideoDevice:@escaping(String?)->Void, finishCall:@escaping()->Void) {
+    public let toggleBuiltInMicrophoneWithBluetooth:()->Void
+    public init(sharedContext: any SharedAccountContextProtocol, toggleInputAudioDevice: @escaping(String?)->Void, toggleOutputAudioDevice:@escaping(String?)->Void, toggleInputVideoDevice:@escaping(String?)->Void, finishCall:@escaping()->Void, toggleBuiltInMicrophoneWithBluetooth: @escaping()->Void = {}) {
         self.sharedContext = sharedContext
+        self.toggleBuiltInMicrophoneWithBluetooth = toggleBuiltInMicrophoneWithBluetooth
         self.toggleInputAudioDevice = toggleInputAudioDevice
         self.toggleOutputAudioDevice = toggleOutputAudioDevice
         self.toggleInputVideoDevice = toggleInputVideoDevice
@@ -38,6 +40,7 @@ private let _id_camera = InputDataIdentifier("_id_camera")
 private let _id_input_audio = InputDataIdentifier("_id_input_audio")
 private let _id_output_audio = InputDataIdentifier("_id_output_audio")
 private let _id_micro = InputDataIdentifier("_id_micro")
+private let _id_builtin_micro_with_bluetooth = InputDataIdentifier("_id_builtin_micro_with_bluetooth")
 
 private func callSettingsEntries(settings: VoiceCallSettings, devices: IODevices, arguments: CallSettingsArguments, theme: TelegramPresentationTheme) -> [InputDataEntry] {
     var entries:[InputDataEntry] = []
@@ -126,6 +129,17 @@ private func callSettingsEntries(settings: VoiceCallSettings, devices: IODevices
     
     entries.append(.sectionId(sectionId, type: .normal))
     sectionId += 1
+    
+    //TODOLANG
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_builtin_micro_with_bluetooth, data: .init(name: "Use the Mac's microphone with Bluetooth headphones", color: theme.colors.text, type: .switchable(settings.builtInMicrophoneWithBluetooth), viewType: .singleItem, action: arguments.toggleBuiltInMicrophoneWithBluetooth, theme: customTheme)))
+    index += 1
+    
+    //TODOLANG
+    entries.append(.desc(sectionId: sectionId, index: index, text: .plain("When the microphone is Default and AirPods or other Bluetooth headphones are connected, calls, voice messages and video messages record from the Mac's microphone, so the headphones keep playing in high quality."), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+    index += 1
+    
+    entries.append(.sectionId(sectionId, type: .normal))
+    sectionId += 1
        
     entries.append(.desc(sectionId: sectionId, index: index, text: .plain(strings().voiceChatSettingsOutput), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
     index += 1
@@ -168,6 +182,10 @@ public func CallSettingsController(sharedContext: any SharedAccountContextProtoc
         }).start()
     }, finishCall: {
         
+    }, toggleBuiltInMicrophoneWithBluetooth: {
+        _ = updateVoiceCallSettingsSettingsInteractively(accountManager: sharedContext.accountManager, {
+            $0.withUpdatedBuiltInMicrophoneWithBluetooth(!$0.builtInMicrophoneWithBluetooth)
+        }).start()
     })
     
     let signal = combineLatest(voiceCallSettings(sharedContext.accountManager), devicesContext.signal) |> map { settings, devices in
