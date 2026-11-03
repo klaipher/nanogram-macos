@@ -281,12 +281,7 @@ final class ManagedAudioRecorderContext {
             return
         }
         
-        if let encoderState = self.encoderState {
-            guard self.oggWriter.resume(with: self.dataItem, encoderState: encoderState) else {
-                return
-            }
-            self.encoderState = nil
-        }
+        self.encoderState = nil
         self.recordingStateUpdateTimestamp = nil
         self.start()
     }
