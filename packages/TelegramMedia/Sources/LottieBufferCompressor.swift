@@ -555,30 +555,64 @@ private final class CacheRemovable {
     }
     
     private func clean() {
-        
-        let fileURLs = try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: TRLotData.directory), includingPropertiesForKeys: nil, options: .skipsHiddenFiles )
-        if let fileURLs = fileURLs {
-            for url in fileURLs {
-                let path = url.path
-                let name = path.nsstring.lastPathComponent
-                if let index = name.range(of: "-lt", options: .backwards) {
-                    let tail = String(name[index.upperBound...])
-                    if let until = tail.range(of: "-") {
-                        if let liveTime = TimeInterval(tail[..<until.lowerBound]) {
-                            if let createdAt = FileManager.default.modificationDateForFileAtPath(path: path), createdAt.timeIntervalSince1970 + liveTime < Date().timeIntervalSince1970 {
-                                try? FileManager.default.removeItem(at: url)
-                            }
-                            continue
-                        }
-                    }
-                }
-                try? FileManager.default.removeItem(at: url)
-            }
-        }
-        
-        
+        cleanLottieCache(directory: TRLotData.directory, now: Date(), byteBudget: lottieCacheByteBudget)
     }
     
+}
+
+let lottieCacheByteBudget: Int64 = 512 * 1024 * 1024
+
+private struct LottieCacheEntry {
+    var urls: [URL] = []
+    var bytes: Int64 = 0
+    var modified: Date = .distantPast
+}
+
+func cleanLottieCache(directory: String, now: Date, byteBudget: Int64) {
+    let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+    guard let fileURLs = try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: directory), includingPropertiesForKeys: keys, options: .skipsHiddenFiles) else {
+        return
+    }
+    var entries: [String: LottieCacheEntry] = [:]
+    for url in fileURLs {
+        let name = url.lastPathComponent
+        guard let index = name.range(of: "-lt", options: .backwards) else {
+            try? FileManager.default.removeItem(at: url)
+            continue
+        }
+        let tail = name[index.upperBound...]
+        guard let until = tail.range(of: "-"), let liveTime = TimeInterval(tail[..<until.lowerBound]) else {
+            try? FileManager.default.removeItem(at: url)
+            continue
+        }
+        let values = try? url.resourceValues(forKeys: Set(keys))
+        guard let modified = values?.contentModificationDate else {
+            continue
+        }
+        if modified.timeIntervalSince1970 + liveTime < now.timeIntervalSince1970 {
+            try? FileManager.default.removeItem(at: url)
+            continue
+        }
+        let group = String(name[..<until.upperBound])
+        var entry = entries[group] ?? LottieCacheEntry()
+        entry.urls.append(url)
+        entry.bytes += Int64(values?.fileSize ?? 0)
+        entry.modified = max(entry.modified, modified)
+        entries[group] = entry
+    }
+    var total = entries.values.reduce(Int64(0)) { $0 + $1.bytes }
+    guard total > byteBudget else {
+        return
+    }
+    for entry in entries.values.sorted(by: { $0.modified < $1.modified }) {
+        if total <= byteBudget {
+            break
+        }
+        for url in entry.urls {
+            try? FileManager.default.removeItem(at: url)
+        }
+        total -= entry.bytes
+    }
 }
 private let cleaner = CacheRemovable()
 

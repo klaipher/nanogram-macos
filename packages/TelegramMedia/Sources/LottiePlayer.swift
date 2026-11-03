@@ -1144,7 +1144,7 @@ public final class AnimationPlayerContext {
 
 
 public enum ASLiveTime : Int {
-    case chat = 3_600
+    case chat = 604_800
     case thumb = 259200
     case effect = 241_920 // 7 days
 }
