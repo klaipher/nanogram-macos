@@ -235,7 +235,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 - **iOS cross-ref**: iOS `f1b056ef` (tinted template emoji on the cached YUVA path); the idea ports, the code does not.
 - **Perflab**: InlineEmojiLayerLab / InlinePlaybackLab hosts drive real tinted animations without an account.
 
-### M8. Cached video emoji and stickers still open FFmpeg, probe the stream and allocate a VP9 decoder each time they start — `partial (9734759): lazy decoder on a finished cache done; iOS 019e8379 probe skip not ported (SoftwareVideoSource is the media group's)`, verified
+### M8. Cached video emoji and stickers still open FFmpeg, probe the stream and allocate a VP9 decoder each time they start — `done (9734759, 0e20f68; core 867d5c5)`, verified
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottiePlayer.swift:1800-1812` (`.webm` always builds
   `SoftwareVideoSource`, while the `.lottie` branch at `:1778` skips its bridge when `fileSupplyment.isFinished`);
@@ -691,7 +691,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   recovery, torn-map rejection, direct readers see unflushed chunks); the 2,000-write benchmark.
 - **iOS cross-ref**: `41e7cd8d`, `13bb846e`; iOS CLAUDE.md "Media I/O invariants".
 
-### M29. The Lottie frame cache stores whole frames with LZFSE, and chat-sticker caches expire after 1 hour — `partial (ee9a00f): LZ4 writer + v71 done; the 1 h chat lifetime is unchanged (needs a byte budget)`, verified
+### M29. The Lottie frame cache stores whole frames with LZFSE, and chat-sticker caches expire after 1 hour — `done (ee9a00f, f55b999): LZ4 writer + v71; chat lifetime 7 days under a 512 MB budget`, verified
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottieBufferCompressor.swift:9` (`enableDifference = false`),
   `:459-466` (LZFSE encode of each full frame), `:507-511` (LZFSE decode per displayed frame), `:41` (`version = 70`);
@@ -976,7 +976,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
 - **How to verify**: a unit test on bundled `.webp` stickers comparing old and new output with `compare_rgba.py`, plus a micro-benchmark of time and peak allocation.
 - **Confidence**: high.
 
-### H5. Every GIF opens its own VideoToolbox session; use software below 320 px and a 16-session budget (iOS `c2c22996`, extends M27) — `partial (28d0503): budget + 320 px threshold done; software skip_loop_filter not wired (SoftwareVideoSource is being changed by the media group for M27)`
+### H5. Every GIF opens its own VideoToolbox session; use software below 320 px and a 16-session budget (iOS `c2c22996`, extends M27) — `done (28d0503, 8edbc7e; core 1aef8d8, 54151f1)`
 
 - **Evidence**: `packages/TelegramMedia/Sources/SoftwareVideoLayerFrameManager.swift:16` (`usesHardwareDecoding = true`) and `:95`
   (hardware for every non-WebM GIF, with no size check and no cap). iOS `c2c22996` measured CPU per frame on the Mac host, software → VideoToolbox:
@@ -1715,7 +1715,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `918a6467` (supersampling when the camera is more than 2× the output), CameraNeo `RoundVideoLanczosScaler`, `93c4de0e`. Do it with or after H21.
 - **Confidence**: high.
 
-### Q11. Edited or compressed video sends: HDR (HLG/Dolby Vision) clips come out flat and washed out, and the downscale is plain bilinear — `done (2be3958)`
+### Q11. Edited or compressed video sends: HDR (HLG/Dolby Vision) clips come out flat and washed out, and the downscale is plain bilinear — `done (2be3958, cc4584b)`
 
 - **Evidence**: `packages/ImageCanvasUI/Sources/ImageCanvasUI/EditVideoExport.swift:312` (a `CIContext` with NSNull working and output colour spaces). `:428-437`
   (`AVMutableVideoComposition(applyingCIFiltersWithHandler:)` with `colorPrimaries`/`colorTransferFunction`/`colorYCbCrMatrix` left nil, so the source's are propagated).
@@ -1862,7 +1862,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | M5 | done | 934ac65, core d985e78 |
 | M6 | done | a84a3c8 |
 | M7 | done | b93d09d |
-| M8 | partial | 9734759 |
+| M8 | done | 9734759, 0e20f68; core 867d5c5 |
 | M9 | done | core 0319e83 |
 | M10 | done | core 10e47fe |
 | M11 | done | e48de99 |
@@ -1883,7 +1883,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | M26 | done | f4e1837, core 19875d3 |
 | M27 | done | 25b7f7a, core d6c3ef8 (FFmpeg rebuild pending for the VT patch) |
 | M28 | done | core 0ff4315 |
-| M29 | partial | ee9a00f |
+| M29 | done | ee9a00f, f55b999 |
 | M30 | done | b78cfaf |
 | M31 | done | 311fe98 |
 | M32 | deferred (ruling) | — |
@@ -1891,7 +1891,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | H2 | done | f4bb74b, core 1e9c875 |
 | H3 | done | core a001272 |
 | H4 | done | 2a53b7c |
-| H5 | partial | 28d0503 |
+| H5 | done | 28d0503, 8edbc7e; core 1aef8d8, 54151f1 |
 | H6 | done | 9c174f7 |
 | H7 | done | 957d823, core 036e94f |
 | H8 | done | 0760adc |
@@ -1925,7 +1925,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | Q8 | done | dab5e38, f51c974; Debug Settings switch, off |
 | Q9 | done | 85d4081, b78de4d; option off by default |
 | Q10 | done | ddfa750 |
-| Q11 | done | 2be3958 |
+| Q11 | done | 2be3958, cc4584b |
 | Q12 | done | fa42c17, 107ee55 |
 | Q13 | done | 3afe194 core |
 | Q14 | partial | 221326e |
