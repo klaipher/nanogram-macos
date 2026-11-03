@@ -77,6 +77,7 @@ def build_environment(timing_log: Path, base: dict[str, str] | None = None) -> d
         env[key] = settings[key]
     env["XCODE_XCCONFIG_FILE"] = str(XCCONFIG)
     env["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
+    env.setdefault("MAKEFLAGS", f"-j{os.cpu_count()}")
     env["BUILD_TIMING_LOG"] = str(timing_log)
     env["PATH"] = f"{config.RUSTUP_BIN}:{env.get('PATH', '/usr/bin:/bin')}"
     return env

@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import tempfile
@@ -63,6 +64,14 @@ class BuildEnvironmentTests(unittest.TestCase):
         self.assertEqual(env["CMAKE_POLICY_VERSION_MINIMUM"], "3.5")
         self.assertEqual(env["BUILD_TIMING_LOG"], "/tmp/timing.tsv")
 
+    def test_makes_run_in_parallel(self):
+        env = frameworks.build_environment(Path("/tmp/timing.tsv"), base={})
+        self.assertEqual(env["MAKEFLAGS"], f"-j{os.cpu_count()}")
+
+    def test_callers_makeflags_win(self):
+        env = frameworks.build_environment(Path("/tmp/timing.tsv"), base={"MAKEFLAGS": "-j2"})
+        self.assertEqual(env["MAKEFLAGS"], "-j2")
+
     def test_conditional_settings_are_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:
             xcconfig = Path(tmp) / "a.xcconfig"
@@ -84,6 +93,38 @@ class RustScriptTests(unittest.TestCase):
                 self.assertIn("env -u MACOSX_DEPLOYMENT_TARGET", line, f"{script}: {line.strip()}")
             self.assertNotIn("DEPLOYMENT_TARGET=", text, script)
             self.assertNotIn("x86_64", text, script)
+
+
+class NativeBuildFlagTests(unittest.TestCase):
+    def script(self, path):
+        return (config.ROOT / path).read_text()
+
+    def test_ffmpeg_builds_no_muxers_encoders_or_network(self):
+        text = self.script("core-xprojects/ffmpeg/ffmpeg/build.sh")
+        self.assertNotIn("--enable-muxer", text)
+        self.assertNotIn("--enable-encoder", text)
+        self.assertNotRegex(text, r"--enable-(demuxer|parser)=[^ ]*libopus")
+        for flag in ("network", "securetransport", "bzlib", "iconv", "appkit", "avfoundation", "coreimage", "metal", "sdl2"):
+            self.assertIn(f"--disable-{flag}", text)
+
+    def test_openssl_configure_drops_unused_algorithms(self):
+        text = self.script("core-xprojects/openssl/OpenSSLEncryption/build.sh")
+        configure = text[text.index("./Configure"):text.index("--prefix=", text.index("./Configure"))]
+        for option in ("no-quic", "no-engine", "no-legacy", "no-autoload-config", "no-sm4", "no-ml-dsa", "no-ssl3"):
+            self.assertIn(option, configure)
+        for kept in ("no-srtp", "no-dtls", "no-ec ", "no-chacha", "no-poly1305", "no-dh "):
+            self.assertNotIn(kept, configure)
+
+    def test_webrtc_stays_below_the_macos_15_screen_capture_obsoletions(self):
+        text = self.script("core-xprojects/webrtc/webrtc/build.sh")
+        self.assertIn("-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0", text)
+
+    def test_tlottie_aborts_on_panic(self):
+        self.assertIn("--config 'profile.release.panic=\"abort\"'", self.script("core-xprojects/tlottie/build.sh"))
+
+    def test_wallet_engine_builds_only_its_staticlib(self):
+        text = self.script("core-xprojects/wallet-engine/wallet-engine/build.sh")
+        self.assertRegex(text, r'"\$CARGO_BIN" rustc \\\n\s+--package wallet-engine \\\n\s+--lib \\\n\s+--crate-type staticlib')
 
 
 if __name__ == "__main__":
