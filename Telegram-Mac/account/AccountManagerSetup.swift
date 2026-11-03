@@ -6,6 +6,12 @@ import BuildConfig
 import WalletContext
 #endif
 
+#if NANOGRAM_MAS
+let isAppStoreEdition = true
+#else
+let isAppStoreEdition = false
+#endif
+
 let unscopedWalletPasscodeCredentialManagedKey = "wallet.passcodeCredentialManaged"
 
 var walletPasscodeCredentialManagedKey: String {
@@ -18,29 +24,18 @@ var walletPasscodeCredentialManagedKey: String {
 #if !SHARE
 @available(macOS 10.15, *)
 private func migrateWalletKeychainScopeIfNeeded(basePath: String, isFreshInstallation: Bool) {
-    guard PasscodeEnvironment.shared.keychainScope != nil else {
-        return
+    let step = PasscodeKeychainScope.migrateOnce(dataDirectory: (basePath as NSString).deletingLastPathComponent, isFreshInstallation: isFreshInstallation, markerExists: { FileManager.default.fileExists(atPath: $0) }, writeMarker: { _ = FileManager.default.createFile(atPath: $0, contents: Data()) }, migrate: { legacyItemsBelongToThisApp in
+        migrateWalletKeychainScope(legacyItemsBelongToThisApp: legacyItemsBelongToThisApp)
+    }, unscopedCredentialManaged: {
+        UserDefaults.standard.bool(forKey: unscopedWalletPasscodeCredentialManagedKey)
+    })
+    Logger.shared.log("KeychainScope", "migration: \(step)")
+    if step.requiresExistingCredential {
+        PasscodeCredentialStore.shared.requireExistingCredential()
     }
-    let marker = ((basePath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("keychain-scope-v1")
-    if FileManager.default.fileExists(atPath: marker) {
-        return
+    if step.carriesManagedFlagOver, UserDefaults.standard.bool(forKey: unscopedWalletPasscodeCredentialManagedKey) {
+        UserDefaults.standard.set(true, forKey: walletPasscodeCredentialManagedKey)
     }
-    if !isFreshInstallation {
-        let migration = migrateWalletKeychainScope(onlyItemsOwnedByThisApp: PasscodeEnvironment.shared.keychainScope != "debug")
-        Logger.shared.log("KeychainScope", "migration: \(migration)")
-        switch migration {
-        case .keychainLocked, .failed:
-            PasscodeCredentialStore.shared.requireExistingCredential()
-            return
-        case .migrated:
-            if UserDefaults.standard.bool(forKey: unscopedWalletPasscodeCredentialManagedKey) {
-                UserDefaults.standard.set(true, forKey: walletPasscodeCredentialManagedKey)
-            }
-        case .nothingToMigrate:
-            break
-        }
-    }
-    FileManager.default.createFile(atPath: marker, contents: Data())
 }
 #endif
 

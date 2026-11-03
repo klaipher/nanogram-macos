@@ -2031,7 +2031,7 @@ public class WebpageModalController: ModalViewController, WKNavigationDelegate, 
                 let secQuery: NSMutableDictionary = [
                     kSecClass: kSecClassGenericPassword,
                     kSecAttrAccessControl: sacObject!,
-                    kSecAttrService: "TelegramMiniApp",
+                    kSecAttrService: WebAppKeychainNames.biometryTokenService,
                     kSecAttrAccount: "bot_id_\(botPeer.id.toInt64())"
                 ];
                 
@@ -2069,7 +2069,7 @@ public class WebpageModalController: ModalViewController, WKNavigationDelegate, 
                 kSecAttrAccessControl: sacObject!,
                 kSecReturnData: true,
                 kSecMatchLimit: kSecMatchLimitOne,
-                kSecAttrService: "TelegramMiniApp",
+                kSecAttrService: WebAppKeychainNames.biometryTokenService,
                 kSecAttrAccount: "bot_id_\(botPeer.id.toInt64())"
             ];
             

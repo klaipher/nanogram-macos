@@ -33,14 +33,14 @@ public final class WebAppSecureStorage {
         return [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: identifier,
-            kSecAttrService as String: "TMASecureStorage"
+            kSecAttrService as String: WebAppKeychainNames.secureStorageService
         ]
     }
     
     static private func countKeys(uuid: String, botId: EnginePeer.Id) -> Int {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "TMASecureStorage",
+            kSecAttrService as String: WebAppKeychainNames.secureStorageService,
             kSecMatchLimit as String: kSecMatchLimitAll,
             kSecReturnAttributes as String: true
         ]
@@ -187,7 +187,7 @@ public final class WebAppSecureStorage {
         |> mapToSignal { toUuid in
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: "TMASecureStorage",
+                kSecAttrService as String: WebAppKeychainNames.secureStorageService,
                 kSecMatchLimit as String: kSecMatchLimitAll,
                 kSecReturnAttributes as String: true
                 // Don't include kSecReturnData here!
@@ -209,7 +209,7 @@ public final class WebAppSecureStorage {
                     // Step 2: Fetch the value data
                     let dataQuery: [String: Any] = [
                         kSecClass as String: kSecClassGenericPassword,
-                        kSecAttrService as String: "TMASecureStorage",
+                        kSecAttrService as String: WebAppKeychainNames.secureStorageService,
                         kSecAttrAccount as String: account,
                         kSecReturnData as String: true,
                         kSecMatchLimit as String: kSecMatchLimitOne
@@ -229,7 +229,7 @@ public final class WebAppSecureStorage {
                     let newKeyQuery: [String: Any] = [
                         kSecClass as String: kSecClassGenericPassword,
                         kSecAttrAccount as String: newKeyIdentifier,
-                        kSecAttrService as String: "TMASecureStorage",
+                        kSecAttrService as String: WebAppKeychainNames.secureStorageService,
                         kSecValueData as String: data,
                         kSecAttrAccessible as String: kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
                     ]
@@ -253,7 +253,7 @@ public final class WebAppSecureStorage {
     private static func getAllStoredKeys(botId: EnginePeer.Id, key: String) -> [ExistingKey] {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "TMASecureStorage",
+            kSecAttrService as String: WebAppKeychainNames.secureStorageService,
             kSecMatchLimit as String: kSecMatchLimitAll,
             kSecReturnAttributes as String: true
             // Don't request data here!
@@ -275,7 +275,7 @@ public final class WebAppSecureStorage {
                     // SECOND STEP: Query data for each item
                     let dataQuery: [String: Any] = [
                         kSecClass as String: kSecClassGenericPassword,
-                        kSecAttrService as String: "TMASecureStorage",
+                        kSecAttrService as String: WebAppKeychainNames.secureStorageService,
                         kSecAttrAccount as String: account,
                         kSecReturnData as String: true,
                         kSecMatchLimit as String: kSecMatchLimitOne
@@ -319,7 +319,7 @@ public final class WebAppSecureStorage {
     public static func clearStorage(uuid: String, botId: EnginePeer.Id) -> Signal<Never, WebAppSecureStorage.Error> {
         let serviceQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "TMASecureStorage",
+            kSecAttrService as String: WebAppKeychainNames.secureStorageService,
             kSecMatchLimit as String: kSecMatchLimitAll,
             kSecReturnAttributes as String: true
         ]
@@ -334,7 +334,7 @@ public final class WebAppSecureStorage {
                     let deleteQuery: [String: Any] = [
                         kSecClass as String: kSecClassGenericPassword,
                         kSecAttrAccount as String: account,
-                        kSecAttrService as String: "TMASecureStorage"
+                        kSecAttrService as String: WebAppKeychainNames.secureStorageService
                     ]
                     
                     SecItemDelete(deleteQuery as CFDictionary)

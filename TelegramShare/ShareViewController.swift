@@ -36,7 +36,7 @@ class ShareViewController: NSViewController {
         guard let containerUrl = ApiEnvironment.containerURL else {
             return
         }
-        try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: ApiEnvironment.group, processRole: .appExtension, keychainScope: PasscodeKeychainScope.channelScope(prefix: ApiEnvironment.prefix)))
+        try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: ApiEnvironment.group, processRole: .appExtension, keychainScope: PasscodeKeychainScope.channelScope(prefix: ApiEnvironment.prefix, isAppStoreEdition: isAppStoreEdition)))
         initializeAccountManagement()
 
         
