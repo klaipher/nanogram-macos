@@ -622,7 +622,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 
 ## libs: external libraries
 
-### R2-25. Stage 1's FFmpeg 9.0.2 bump drops M27's VideoToolbox patch, so the merge silently undoes M27's FFmpeg half — `todo` (group: libs)
+### R2-25. Stage 1's FFmpeg 9.0.2 bump drops M27's VideoToolbox patch, so the merge silently undoes M27's FFmpeg half — `done` (group: libs)
+
+- **Status**: done: the stage-1/runtime merge already carries M27's patch in ffmpeg-9.0.2 (2 `Local patch (Nanogram)` hunks, lavc 63 headers); FFmpeg rebuilt with this round's flags and FFMpegVideoToolboxAttachmentTests, FFMpegFileReaderPixelBufferReuseTests, FFMpegHardwareFallbackTests pass.
 
 - **Evidence**: runtime: `submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg/ffmpeg-8.1.2/libavcodec/videotoolbox.c`
   carries two "Local patch (Nanogram)" hunks (core `d6c3ef8`, M27). Stage 1: `stage1:core-xprojects/ffmpeg/ffmpeg/build.sh`
@@ -644,7 +646,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-26. Software video decode, AV1 included, is single-threaded because no codec context sets `thread_count` — `todo` (group: libs)
+### R2-26. Software video decode, AV1 included, is single-threaded because no codec context sets `thread_count` — `partial` (group: libs)
+
+- **Status**: partial: AV1 at 1280x720 and above gets min(cores, 8) dav1d threads in FFMpegFileReader, FFMpegMediaFrameSourceContext and UniversalSoftwareVideoSource (core 3afbf70868, FFMpegSoftwareDecodeThreadsTests); H.264/HEVC scrub previews keep one thread (frame threading delays output in their lockstep decode), and there is no AV1 fixture or encoder on this machine for a DecodeBench fps A/B.
 
 - **Evidence**: `ffmpeg-8.1.2/libavcodec/options_table.h:215` ("threads" default 1, 0 = auto);
   `libavcodec/libdav1d.c:215,238` (`s.n_threads = FFMIN(c->thread_count, DAV1D_MAX_THREADS)`, so dav1d gets 1 thread);
@@ -667,7 +671,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-27. FFmpeg is configured with components the Mac never uses and two component names that do not exist — `todo` (group: libs)
+### R2-27. FFmpeg is configured with components the Mac never uses and two component names that do not exist — `done` (group: libs)
+
+- **Status**: done: muxers, encoders, bogus libopus names and the autodetected network/SecureTransport/bzlib/iconv/AppKit/AVFoundation/CoreImage/Metal/SDL2 glue are off (8559624b); libavformat.a 1469 -> 901 KB, no ff_*_muxer symbols, CONFIG_NETWORK 0; the app links.
 
 - **Evidence**: `stage1:core-xprojects/ffmpeg/ffmpeg/build.sh:64` `--enable-encoder=libvpx_vp9,aac_at`, `:68`
   `--enable-muxer=mp4,matroska,mpegts`; their only users (FFMpegVideoWriter, FFMpegLiveMuxer, FFMpegOpusTrimmer,
@@ -688,7 +694,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-28. Native library builds run serial makes, OpenSSL's feature list is dead code, and two libraries clone from GitHub on every rebuild — `todo` (group: libs)
+### R2-28. Native library builds run serial makes, OpenSSL's feature list is dead code, and two libraries clone from GitHub on every rebuild — `partial` (group: libs)
+
+- **Status**: partial: parallel makes through MAKEFLAGS from tg frameworks and a curated OpenSSL Configure list (8559624b; libcrypto.a 8677 -> 6766 KB, libssl.a 1610 -> 1049 KB, no ossl_ml_dsa); tg_owt stays at 14.0 because its desktop_capture sources fail to build at 15.0 (CGDisplayCreateImage/CGDisplayStream* obsoleted); tarball vendoring dropped (the OpenSSL 3.5.9 tarball is 53 MB, over GitHub's 50 MB warning) and the pinned shallow clones keep their commit checks; the dead OpenSSL flag arrays stay to keep the upstream script's diff small.
 
 - **Evidence**: `stage1:build-output/frameworks-timing.tsv` (OpenSSL 129 s; run1 197 s) and the reviewer's run1 TSV
   (OpenH264 59 s, libopus 43 s, libvpx 40 s). Serial `make` without `-j`: `stage1:core-xprojects/openssl/OpenSSLEncryption/build.sh:153`,
@@ -713,7 +721,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-29. Group calls run RNNoise every 10 ms even with noise suppression off; the non-48 kHz path allocates per frame and drops its output — `todo` (group: libs)
+### R2-29. Group calls run RNNoise every 10 ms even with noise suppression off; the non-48 kHz path allocates per frame and drops its output — `done` (group: libs)
+
+- **Status**: done: tgcalls a598e27: NS off skips RNNoise (~550 us per 10 ms frame here) and drives the speaking state from an adaptive peak detector (84-96% agreement with RNNoise's VAD on synthesized speech plus noise); non-48 kHz capture resamples with kept PushSincResamplers and writes the result back; tests/group_audio host tests.
 
 - **Evidence**: `submodules/tgcalls/tgcalls/group/GroupInstanceCustomImpl.cpp:772-779`: `rnnoise_process_frame` runs
   whenever `sourcePeak ≥ 0.01`, only for `vadProbability`; the denoised samples are copied only if `isEnabled`.
@@ -734,7 +744,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-30. WebRTC's debug-log threshold is `LS_INFO` in release for 1:1 calls, so every INFO line is formatted and does a CFPreferences lookup — `todo` (group: libs)
+### R2-30. WebRTC's debug-log threshold is `LS_INFO` in release for 1:1 calls, so every INFO line is formatted and does a CFPreferences lookup — `done` (group: libs)
+
+- **Status**: done: tgcalls 013adcb: configureDebugLogging sets LS_NONE outside DEBUG for every instance type; INFO with no sink 580 ns -> 1.3 ns per line; tests/log_sink covers release and DEBUG.
 
 - **Evidence**: `submodules/tgcalls/tgcalls/v2/InstanceV2Impl.cpp:2261-2266` (`LogToDebug(LS_INFO)` outside DEBUG),
   `InstanceImpl.cpp:30`, `v2/InstanceV2ReferenceImpl.cpp:1647`; the group path already uses `LS_NONE` in release
@@ -754,7 +766,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-31. Rust profiles: tlottie alone unwinds, and wallet-engine builds crate types nobody links — `todo` (group: libs)
+### R2-31. Rust profiles: tlottie alone unwinds, and wallet-engine builds crate types nobody links — `done` (group: libs)
+
+- **Status**: done: 8559624b: tlottie panic=abort (__eh_frame 133736 -> 103656 bytes), wallet-engine `cargo rustc --lib --crate-type staticlib`; the app links.
 
 - **Evidence**: `stage1:core-xprojects/tlottie/build.sh:57-66` (`cargo rustc --release --crate-type staticlib --config
   'profile.release.lto=false'`, no panic setting); `stage1:submodules/tlottie/Cargo.toml` `[profile.release]` has no
@@ -776,7 +790,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-32. Sparkle checks hourly and again on every emission of the network-settings preference — `todo` (group: libs)
+### R2-32. Sparkle checks hourly and again on every emission of the network-settings preference — `done` (group: libs)
+
+- **Status**: done: updater_resetWithUpdaterSource checks only when Sparkle's lastUpdateCheckDate is a day old (UpdateCheckSchedule, NanogramKit tests: five emissions -> one check); interval one day (assigned in code so installs that persisted 3600 migrate); opening the update screen checks immediately.
 
 - **Evidence**: `stage1:Telegram-Mac/updater/NanogramUpdater.swift:241-244` (`updater.start()`, then
   `updateCheckInterval = 60 * 60`, persisted), `:253-263` (`check()` → `checkForUpdatesInBackground()`);
@@ -797,7 +813,9 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-33. Profile-guided optimization for tlottie, the one hot native library where a profile needs no account — `todo` (group: libs)
+### R2-33. Profile-guided optimization for tlottie, the one hot native library where a profile needs no account — `dropped` (group: libs)
+
+- **Status**: dropped: not cheap: needs rustup llvm-tools, an instrumented tlottie-cli render harness over the .tgs corpus, a pinned .profdata and a bench to prove the estimated 5-15%; left for a later round.
 
 - **Evidence**: `stage1:core-xprojects/tlottie/build.sh:57-66` (no `-Cprofile-use`); `CLANG_USE_OPTIMIZATION_PROFILE = NO`
   in the project. `stage1:submodules/tlottie/Cargo.toml` has a `tlottie-cli` bin (feature `cli`); ~377 bundled `.tgs`
