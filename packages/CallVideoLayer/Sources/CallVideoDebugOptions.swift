@@ -36,14 +36,16 @@ public enum CallVideoDebugOptions {
         TGCallsRuntimeOptionsBridge.setNativeDecodeFormatEnabled(settings.bool(CallVideoDebugOptions.nativeDecodeFormat.id))
         TGCallsRuntimeOptionsBridge.setLivestreamHardwareDecodeEnabled(settings.bool(CallVideoDebugOptions.livestreamHardwareDecode.id))
         TGCallsRuntimeOptionsBridge.setScreencastHardwareEncoderEnabled(settings.bool(CallVideoDebugOptions.screencastHardwareEncoder.id))
+        CallAudioDebugOptions.applyNativeOptions(from: settings)
     }
 
     public static func install(in settings: NanogramDebugSettings = NanogramDebugSettings.shared) -> [NanogramDebugObservation] {
-        for option in CallVideoDebugOptions.all {
+        let options = CallVideoDebugOptions.all + CallAudioDebugOptions.all
+        for option in options {
             settings.register(option)
         }
         CallVideoDebugOptions.applyNativeOptions(from: settings)
-        return CallVideoDebugOptions.all.map { option in
+        return options.map { option in
             settings.observe(option.id) { settings in
                 CallVideoDebugOptions.applyNativeOptions(from: settings)
             }
