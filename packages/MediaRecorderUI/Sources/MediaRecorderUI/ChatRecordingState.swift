@@ -426,7 +426,7 @@ public final class ChatRecordingAudioState : ChatRecordingState {
         self.path = path
         let uploadManager:PreUploadManager? = liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil
         let dataItem = DataItem(path: path)
-        recorder = ManagedAudioRecorder(liveUploading: uploadManager, dataItem: dataItem)
+        recorder = ManagedAudioRecorder(liveUploading: uploadManager, dataItem: dataItem, inputDeviceUID: MediaRecorderHooks.shared.microphoneDeviceId(context))
         super.init(autohold: autohold)
     }
     
