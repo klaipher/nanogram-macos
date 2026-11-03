@@ -978,10 +978,12 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                     return EmptyDisposable
                                 } |> runOn(.mainQueue())
                                 let optimizeDatabase = windowIsKey |> mapToSignal { windowIsKey -> Signal<Never, NoError> in
-                                    if windowIsKey {
+                                    if windowIsKey || !DatabaseMaintenanceGate.allowsVacuum(userIdle: Double(SystemIdleTime())) {
                                         return .complete()
                                     }
-                                    return account.postbox.optimizeStorageIfNeeded() |> ignoreValues
+                                    return account.postbox.optimizeStorageIfNeeded(maxLiveBytes: DatabaseMaintenanceGate.maximumLiveBytes, shouldProceed: {
+                                        return DatabaseMaintenanceGate.allowsVacuum(userIdle: Double(SystemIdleTime()))
+                                    }) |> ignoreValues
                                 }
                                 let _ = (account.rescanCaches() |> then(optimizeDatabase)).start(completed: done)
                             }

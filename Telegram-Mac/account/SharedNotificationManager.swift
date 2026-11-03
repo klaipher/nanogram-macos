@@ -130,6 +130,29 @@ final class SharedNotificationBindings {
 }
 
 
+private final class PasslockSleepObserver: NSObject {
+    private let monitor: PasslockMonitor
+
+    init(monitor: PasslockMonitor) {
+        self.monitor = monitor
+        super.init()
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.willSleep), name: NSWorkspace.willSleepNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.didWake), name: NSWorkspace.didWakeNotification, object: nil)
+    }
+
+    func invalidate() {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    @objc private func willSleep() {
+        self.monitor.systemWillSleep()
+    }
+
+    @objc private func didWake() {
+        self.monitor.systemDidWake()
+    }
+}
+
 final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelegate {
 
     private let screenLocked:Promise<LockNotificationsData> = Promise(LockNotificationsData())
@@ -296,27 +319,34 @@ final class SharedNotificationManager : NSObject, NSUserNotificationCenterDelega
                 return .single(false)
             }
             return Signal { subscriber in
-                let timer = Atomic<SwiftSignalKit.Timer?>(value: nil)
-                var check: (() -> Void)?
-                check = {
-                    let now = Int32(Date().timeIntervalSince1970)
-                    let idle = Double(SystemIdleTime())
-                    let resignedAt = self?.resignTimestamp
-                    if PasslockSchedule.shouldLock(timeout: timeout, idle: idle, resignedAt: resignedAt, now: now) {
-                        subscriber.putNext(true)
-                        return
+                let monitor = PasslockMonitor(timeout: timeout, wallClock: {
+                    return Date().timeIntervalSince1970
+                }, idleTime: {
+                    return Double(SystemIdleTime())
+                }, resignedAt: {
+                    return self?.resignTimestamp
+                }, schedule: { delay, fire in
+                    let timer = SwiftSignalKit.Timer(timeout: delay, repeat: false, completion: fire, queue: .mainQueue())
+                    timer.start()
+                    return {
+                        timer.invalidate()
                     }
-                    let next = SwiftSignalKit.Timer(timeout: PasslockSchedule.nextCheck(timeout: timeout, idle: idle, resignedAt: resignedAt, now: now), repeat: false, completion: {
-                        check?()
-                    }, queue: .mainQueue())
-                    timer.swap(next)?.invalidate()
-                    next.start()
-                }
+                }, lock: {
+                    subscriber.putNext(true)
+                })
+                let observer = PasslockSleepObserver(monitor: monitor)
                 subscriber.putNext(false)
-                check?()
+                monitor.start()
+                let stop = {
+                    observer.invalidate()
+                    monitor.stop()
+                }
                 return ActionDisposable {
-                    timer.swap(nil)?.invalidate()
-                    check = nil
+                    if Queue.mainQueue().isCurrent() {
+                        stop()
+                    } else {
+                        Queue.mainQueue().async(stop)
+                    }
                 }
             } |> runOn(.mainQueue())
         }
