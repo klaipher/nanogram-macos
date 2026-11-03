@@ -2,6 +2,16 @@
 
 Nanogram for macOS releases, newest first.
 
+## 13.1.0 (202611031753) — 2026-11-03 — App Store edition (TestFlight)
+
+Source: `release/13.1.0-mas-fix` @ 46ec34af (on top of 0b897ed5 / the 13.1.0 direct release) · core `mac/core` @ a1f42cdb0d · tgcalls `nanogram-mac` @ a598e27.
+Artifact: `Nanogram.pkg` (Apple Distribution), uploaded to TestFlight, processing state VALID. Replaces TestFlight build 202611031654, which Apple rejected.
+- ITMS-90284 fix: the 11 SwiftPM resource bundles in `Contents/Resources` (QrStudioUI, PrivateCallScreen, CallVideoLayer, SwiftMath, ImageCanvasUI, DustLayer, MetalEngine, CubeUI, DataUsageUI, SceneEffects, WalletUI) were archived with an Apple Development signature that the app-store-connect export does not re-sign. `release.py` `unsign_resource_bundles()` strips `_CodeSignature` from Mach-O-free resource bundles after archiving, so the app signature covers them. `check_exported_app()` now fails the build on any nested code not signed Apple Distribution / Developer ID (YGTMYL879P) or any bundled Apple system font. 7 tests in `tools/dev/tests/test_release.py`.
+- ITMS-91182 fix: `SFCompactRounded-Semibold.otf` removed from the app and share extension, with its Xcode build entries and the `ATSApplicationFontsPath`/`UIAppFonts` keys. The pre-10.15 fallback branches that used it (`TGFont.avatar`, `roundTimer`, QrStudio username font) are gone; the macOS 15+ paths were already in use, so nothing looks different.
+- Verification: `altool --validate-app` passes, the only signed code is `Nanogram.app` and `TelegramShare.appex` (Apple Distribution), `codesign --verify --deep --strict` passes, and no SF fonts are bundled.
+- Ported to `nanogram/integration` as 26273e70.
+- What to Test: "First Mac TestFlight build of Nanogram 13.1.0: lighter on battery and memory, faster video/GIFs/stickers, smoother chat list, tidier storage, lighter calls, on-device voice transcription; fixes from the 13.1.0 direct release."
+
 ## 13.1.0 (202611031630) — 2026-11-03
 
 Source: `nanogram/integration` @ ae0e6b0a · core `klaipher/nanogram` `mac/core` @ a1f42cdb0d · tgcalls `klaipher/tgcalls` `nanogram-mac` @ a598e27 · tg_owt c31956f2.
