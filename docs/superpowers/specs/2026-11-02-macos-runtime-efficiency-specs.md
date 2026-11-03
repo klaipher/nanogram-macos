@@ -747,7 +747,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 
 ## Design changes (L)
 
-### M32. Every animated frame is a freshly allocated, copied `CGImage`; use pooled IOSurfaces — `partial: deferred, nothing changed — the IOSurface ring needs the onscreen PowerLabs harness (sysmon WindowServer CPU, VM Tracker, P3 captures) on an awake display; the dead metalSupport path is left for the same change`, verified (medium confidence)
+### M32. Every animated frame is a freshly allocated, copied `CGImage`; use pooled IOSurfaces — `done (b89a08b): pooled IOSurface frames with leases, no fps cap; onscreen WindowServer/VM/P3 measurement pending (display asleep)`, verified (medium confidence)
 
 - **Evidence**: `packages/TelegramMedia/Sources/LottiePlayer.swift:1584` (rlottie renders into a new
   `Data(count:)` per frame; cache hits decode into a fresh buffer, `LottieBufferCompressor.swift:507-520`);
@@ -1886,7 +1886,7 @@ Runtime branch `nanogram/runtime` after integration (2026-11-03): clean Debug bu
 | M29 | done | ee9a00f, f55b999 |
 | M30 | done | b78cfaf |
 | M31 | done | 311fe98 |
-| M32 | deferred (ruling) | — |
+| M32 | done | b89a08b |
 | H1 | done | da40434 |
 | H2 | done | f4bb74b, core 1e9c875 |
 | H3 | done | core a001272 |
