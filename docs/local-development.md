@@ -232,6 +232,47 @@ What we changed in the build scripts:
 Upstream's universal run also failed twice in the wallet engine (the Rust host proc-macro bug above) before a
 manual workaround; the arm64 run built every library on the first try (webrtc after the 14.0 fix).
 
+## Disk and caches
+
+Every build file outside the checkout lives under one cache root, `~/.cache/nanogram-macos`
+(`NANOGRAM_CACHE_DIR`). `tg prune --dry-run` lists each top-level entry with its kind, size, owner checkout, last
+use and what `tg prune` would do; `tg doctor` warns when the root is over its cap.
+
+| Location | Created by | Cap | Cleaned by |
+|---|---|---|---|
+| `frameworks/<key>/` | `tg frameworks` (native-library cache, one entry per library and content) | 3 GB, least recently used first (`NANOGRAM_FRAMEWORK_CACHE_MAX_GB`) | `tg frameworks` after each run, `tg prune` |
+| `DerivedData` (checkout `nanogram-macos`), `DerivedData-<suffix>` (checkout `nanogram-macos-<suffix>`) | `tg build`; `NANOGRAM_DERIVED_DATA` overrides | whole root | `tg clean` (`Build/`), `tg clean --all` (all of it), `tg prune` (checkout gone, unused 7 days, or over the cap) |
+| `tmp/frameworks-<pid>/` | upstream's `configure_frameworks.sh` (per-library DerivedData, deleted when the script exits normally) | — | `tg prune` after 6 hours |
+| `spm-*/`, `swiftpm/` | `swift build --scratch-path` runs outside the checkout | whole root | `tg prune` (unused 7 days, or over the cap) |
+| `CompilationCache/` | Debug compilation caching, if enabled | whole root | `tg prune`, only when over the cap, last |
+| everything else (`bin/`, `build-*.lock`, keys, tools, logs) | tools and workflows | — | never removed |
+
+`tg prune` keeps the whole root under 40 GB (`NANOGRAM_CACHE_MAX_GB`, or `--max-gb N`): first it removes DerivedData
+whose checkout no longer exists and build caches unused for 7 days, then, while still over the cap, the least
+recently used SwiftPM scratch directories, then DerivedData, then the compilation cache. It never removes the current
+checkout's DerivedData, anything whose checkout holds its build lock (`build-<checkout>.lock`, taken by `buildlock`),
+anything used in the last 2 hours, or anything outside the cache root. `tg clean` refuses to run while this
+checkout's build lock is held, so do not run it under `buildlock`.
+
+The checkout itself holds only the native libraries' outputs (`core-xprojects/*/build`, the two Rust xcframeworks,
+the generated `SharedHeaders`); after a restore from the cache they are APFS clones of the cache entries.
+
+Measured 2026-11-03 (shared Mac; load average in brackets, 10 cores, so wall times are upper bounds and CPU
+seconds are the comparable number):
+
+| What | Result |
+|---|---|
+| Native libraries, `--no-cache`, from no build directories | 1,522 s wall, 1,698 user + 460 sys CPU s (load 147→58); stage 1 measured 777 s on an idle Mac. Per library: OpenH264 41, OpenSSL 270, libopus 114, libvpx 197, mozjpeg 19, libwebp 81, dav1d 16, ffmpeg 194, webrtc 363, tde2e 103, wallet-engine 63, mtproto-engine 21, tlottie 17 s |
+| Native libraries restored from a warm cache, from no build directories, xcframeworks or `SharedHeaders` | 20 s wall, 8 CPU s (load 168) |
+| Native libraries, everything current | 3–6 s wall (load 58–189) |
+| Build directories + Rust xcframeworks after a full build | 1.65 GB in the checkout |
+| One full cache set (13 entries) | 192 MB; a restored checkout's copies are clones of it |
+| `DerivedData-stage2` after a clean debug build | 6.1 GB (stage 2 baseline; Build 4.1, ModuleCache 1.5, SDK explicit modules 0.5) |
+| `tg prune --dry-run` on this Mac | 65.0 GB under the cache root (cap 40): four DerivedData (27.2 GB, all kept: current or a build running), 12 SwiftPM scratch directories (34.6 GB; 10 of them, 22.0 GB, would go over the cap; 2 used in the last 2 hours kept), `tgios-work` and other files kept |
+
+Owner action: exclude `~/.cache/nanogram-macos` and the checkouts from ESET Endpoint Security's on-access scanning;
+its `scand` process was among the top CPU users during every measured build.
+
 ## Keeping up with upstream
 
 `upstream` holds Telegram's real history (`telegram/master`, no snapshot commits), so our merges have proper
