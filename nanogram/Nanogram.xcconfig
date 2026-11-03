@@ -55,9 +55,9 @@ CODE_SIGN_STYLE = Manual
 CODE_SIGN_IDENTITY = Apple Development
 PROVISIONING_PROFILE_SPECIFIER =
 
-// Telegram's unused Firebase config (FirebaseApp.configure() is commented out upstream);
-// editions add their own exclusions through NANOGRAM_EDITION_EXCLUDED_FILES.
-EXCLUDED_SOURCE_FILE_NAMES = $(inherited) GoogleService-Info.plist $(NANOGRAM_EDITION_EXCLUDED_FILES)
+// Telegram's unused Firebase config (FirebaseApp.configure() is commented out upstream) and the OCR model
+// ocr_nn.bin (no macOS reader since runtime H12); editions add their own exclusions through NANOGRAM_EDITION_EXCLUDED_FILES.
+EXCLUDED_SOURCE_FILE_NAMES = $(inherited) GoogleService-Info.plist ocr_nn.bin $(NANOGRAM_EDITION_EXCLUDED_FILES)
 
 // Branding: the app is Nanogram.app/Contents/MacOS/Nanogram. Its Swift module stays "Telegram": the
 // MainMenu.xib files and ObjC bridging refer to it by that name.

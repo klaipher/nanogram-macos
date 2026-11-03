@@ -17,7 +17,6 @@ typealias RecentSessionsController = SessionsUI.RecentSessionsController<Account
 typealias WebSessionsController = SessionsUI.WebSessionsController<AccountContext>
 typealias SecretChatKeyViewController = PeerInfoUI.SecretChatKeyViewController<AccountContext>
 typealias BlockedPeersViewController = SettingsUI.BlockedPeersViewController<AccountContext>
-typealias ChannelStatisticsController = StatisticsUI.ChannelStatisticsController<AccountContext>
 typealias DownloadSettingsViewController = DataUsageUI.DownloadSettingsViewController<AccountContext>
 typealias LinkInvationController = InviteLinksUI.LinkInvationController<AccountContext>
 typealias PrivacyAndSecurityViewController = SettingsUI.PrivacyAndSecurityViewController<AccountContext>
