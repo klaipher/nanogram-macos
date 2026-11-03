@@ -97,6 +97,12 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn('#define SQLITE_VERSION        "3.54.1"', read(sources / "PublicHeaders" / "sqlcipher" / "sqlite3.h"))
         self.assertIn("#define CIPHER_VERSION_NUMBER 4.20.0", read(sources / "Sources" / "sqlite3.c"))
 
+    def test_tde2e(self):
+        self.assertEqual(gitlink(TG_IOS, "third-party/td/td"), "0e88653dcbf4e44c73cb655a05b58cd749a91169")
+        cmake = TG_IOS / "third-party" / "td" / "td" / "CMakeLists.txt"
+        if cmake.is_file():
+            self.assertRegex(read(cmake), r"project\(TDLib VERSION 1\.8\.69 ")
+
 
 if __name__ == "__main__":
     unittest.main()
