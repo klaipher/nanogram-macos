@@ -169,9 +169,26 @@ final class LegacyDisplayLinkSource: SharedDisplayLinkSource {
         }
     }
 
-    var maximumFramesPerSecond: Int {
+    private let measureRefreshRate: (CGDirectDisplayID) -> Int
+    private var refreshRates: [CGDirectDisplayID: Int] = [:]
+    private var screenParametersObserver: NSObjectProtocol?
+
+    init(measureRefreshRate: @escaping (CGDirectDisplayID) -> Int = LegacyDisplayLinkSource.nominalRefreshRate) {
+        self.measureRefreshRate = measureRefreshRate
+        self.screenParametersObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: nil, using: { [weak self] _ in
+            self?.refreshRates.removeAll()
+        })
+    }
+
+    deinit {
+        if let observer = self.screenParametersObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    static func nominalRefreshRate(_ displayID: CGDirectDisplayID) -> Int {
         var link: CVDisplayLink?
-        guard CVDisplayLinkCreateWithCGDisplay(self.displayID, &link) == kCVReturnSuccess, let link = link else {
+        guard CVDisplayLinkCreateWithCGDisplay(displayID, &link) == kCVReturnSuccess, let link = link else {
             return 60
         }
         let period = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link)
@@ -181,9 +198,22 @@ final class LegacyDisplayLinkSource: SharedDisplayLinkSource {
         return max(1, Int((Double(period.timeScale) / Double(period.timeValue)).rounded()))
     }
 
+    var maximumFramesPerSecond: Int {
+        if let cached = self.refreshRates[self.displayID] {
+            return cached
+        }
+        let value = self.measureRefreshRate(self.displayID)
+        self.refreshRates[self.displayID] = value
+        return value
+    }
+
     func setScreen(_ screen: NSScreen?) {
-        self.displayID = (screen ?? NSScreen.main)?.displayLinkDisplayID ?? CGMainDisplayID()
-        self.link?.setDisplay(self.displayID)
+        self.setDisplayID((screen ?? NSScreen.main)?.displayLinkDisplayID ?? CGMainDisplayID())
+    }
+
+    func setDisplayID(_ displayID: CGDirectDisplayID) {
+        self.displayID = displayID
+        self.link?.setDisplay(displayID)
     }
 
     func apply(_ plan: DisplayLinkRatePlan) {
