@@ -487,7 +487,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 
 ## Medium changes (M)
 
-### M21. SwiftSignalKit timers have zero leeway, so no timer, `delay` or `timeout` can be coalesced — `todo`, verified
+### M21. SwiftSignalKit timers have zero leeway, so no timer, `delay` or `timeout` can be coalesced — `done (770513f, core 1140dbe)`, verified
 
 - **Evidence**: `submodules/telegram-ios/submodules/SSignalKit/SwiftSignalKit2/Source/Timer.swift:52-58`
   (`schedule(deadline:repeating:)`/`schedule(deadline:)`, no leeway); `Signal_Timing.swift` (`delay`, `timeout` built
@@ -1009,7 +1009,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   renditions appear needs the Debug account.
 - **Confidence**: medium (code path verified; server-side availability not).
 
-### H7. Auto-download ignores Low Data Mode and expensive (tethered) networks; use `NWPath.isConstrained/isExpensive` (iOS `3d30de4c`) — `todo`
+### H7. Auto-download ignores Low Data Mode and expensive (tethered) networks; use `NWPath.isConstrained/isExpensive` (iOS `3d30de4c`) — `done (957d823, core 036e94f)`
 
 - **Evidence**: `packages/TelegramMediaUtils/Sources/TelegramMediaUtils/AutomaticMediaDownloadAbility.swift:10-14` (only the global flag and
   per-peer categories) and `packages/InAppSettings/Sources/InAppSettings/AutomaticMediaDownloadCategoryPeers.swift:136-143,206-207`. There is no
