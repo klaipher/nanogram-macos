@@ -63,6 +63,13 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn("-b v2.7.0 ", script)
         self.assertIn("1bca62311e447fd9c39fc93de2c4b96cd5ce971c", script)
 
+    def test_libwebp(self):
+        script = read(CORE / "libwebp" / "libwebp" / "build-cmake.sh")
+        self.assertIn('SOURCE_ARCHIVE="$SRC_DIR/libwebp-1.6.0.tar.gz"', script)
+        self.assertIn("e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564", script)
+        self.assertTrue((CORE / "libwebp" / "libwebp-1.6.0.tar.gz").is_file())
+        self.assertFalse((CORE / "libwebp" / "libwebp-master.zip").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

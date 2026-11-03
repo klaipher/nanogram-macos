@@ -29,8 +29,11 @@ CROSS_TOP_MAC="$(xcode-select -p)/Platforms/MacOSX.platform"
 CROSS_SDK_MAC="MacOSX.sdk"
 
 
-SOURCE_DIR="$OUT_DIR/libwebp-master"
-SOURCE_ARCHIVE="$SRC_DIR/libwebp-master.zip"
+SOURCE_DIR="$OUT_DIR/libwebp-1.6.0"
+SOURCE_ARCHIVE="$SRC_DIR/libwebp-1.6.0.tar.gz"
+SOURCE_SHA256="e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564"
+
+echo "$SOURCE_SHA256  $SOURCE_ARCHIVE" | shasum -a 256 -c -
 
 rm -rf "$SOURCE_DIR"
 
@@ -48,7 +51,7 @@ mkdir libwebp
 for ARCH in $ARCHS
 do
 
-export CFLAGS="-Wall -arch $ARCH -mmacosx-version-min=10.11 -funwind-tables"
+export CFLAGS="-Wall -arch $ARCH -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -funwind-tables"
 
 mkdir $ARCH
 cd $ARCH
@@ -66,7 +69,7 @@ fi
 
 echo "set(CMAKE_C_COMPILER $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang)" >> toolchain.cmake
 
-cmake -G"Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_OSX_SYSROOT=${MACOS_SYSROOT[0]} $COMMON_ARGS ../libwebp-master
+cmake -G"Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_OSX_SYSROOT=${MACOS_SYSROOT[0]} -DCMAKE_BUILD_TYPE=Release $COMMON_ARGS ../libwebp-1.6.0
 make
 
 cd ..
