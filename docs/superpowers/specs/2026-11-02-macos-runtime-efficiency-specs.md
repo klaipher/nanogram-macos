@@ -1535,7 +1535,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `0650eac5` (upstream 13.1.2).
 - **Confidence**: high.
 
-### Q2. Pausing and resuming a voice note breaks the Ogg stream (second BOS page, page numbers restart), which clicks at the join and makes trim fail — `partial: OpusBinding stream continuity (b23b004 core); recorder resume waits for H16`
+### Q2. Pausing and resuming a voice note breaks the Ogg stream (second BOS page, page numbers restart), which clicks at the join and makes trim fail — `done (b23b004 core, 36315cc)`
 
 - **Evidence**: `packages/TelegramMedia/Sources/AudioRecorder.swift:595` (`pause()` stores `oggWriter.pause()`) and `:608-613` (`resume()` calls
   `oggWriter.resume(with:encoderState:)` on the same live writer). In `OpusBinding/Sources/opusenc/opusenc.m:647-655,712-765`, `restoreState` calls `[self cleanup]`, creates a new
@@ -1647,7 +1647,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: iOS has the same P3 tag, so the fix can be shared back.
 - **Confidence**: medium.
 
-### Q8. Photo sends are flattened to DeviceRGB with no ICC profile, so Display P3 photos and screenshots lose their wide-gamut colours — `partial: JPEG ICC path behind setJPEGPreservesWideGamut, off (dab5e38); Debug Settings toggle pending NanogramDebug`
+### Q8. Photo sends are flattened to DeviceRGB with no ICC profile, so Display P3 photos and screenshots lose their wide-gamut colours — `done (dab5e38, f51c974; Debug Settings switch, off)`
 
 - **Evidence**: `submodules/Mozjpeg/Sources/Mozjpeg.m:76-87` draws the source into `CGColorSpaceCreateDeviceRGB()` and writes no ICC marker. Every non-GIF/WebP send goes through it
   (`ChatHistoryModel/SenderController.swift:373-392`, `TelegramMediaUtils/MediaUtils.swift:1850-1858`). `jpeg_write_icc_profile` is in the bundled `jpeglib.h:1030`.
@@ -1664,7 +1664,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 
 ### Medium (M)
 
-### Q9. AirPods and Bluetooth headsets: notes, circles and calls always open the headset mic, dropping the AirPods to HFP; honour the chosen mic and offer the Mac's built-in mic — `partial: policy, setting, calls and circles (85d4081); voice notes wait for H16`
+### Q9. AirPods and Bluetooth headsets: notes, circles and calls always open the headset mic, dropping the AirPods to HFP; honour the chosen mic and offer the Mac's built-in mic — `done (85d4081, b78de4d; option off by default)`
 
 - **Evidence**: there is no macOS opt-in (see the intro). The voice recorder always binds the system default input (`packages/TelegramMedia/Sources/AudioRecorder.swift:457-466`), and it has an
   upsampler written for the 16/24 kHz HFP rates (`:720-741`, covered by H16). Round video uses `AVCaptureDevice.default(for: .audio)`
@@ -1732,7 +1732,7 @@ The conventions are the same as for the H-specs: paths are relative to `src/`, `
 - **iOS cross-ref**: `7d600b48` (export tags).
 - **Confidence**: medium (code verified; the tone-map behaviour of the CI-handler composition is to be confirmed by the harness).
 
-### Q12. The voice recorder never reacts to device or rate changes and fails silently, so an AirPods switch mid-note can give an empty, cut or wrong-pitch note (extends H16) — `partial: circles (fa42c17); voice recorder waits for H16`
+### Q12. The voice recorder never reacts to device or rate changes and fails silently, so an AirPods switch mid-note can give an empty, cut or wrong-pitch note (extends H16) — `done (fa42c17, 107ee55)`
 
 - **Evidence**: `packages/TelegramMedia/Sources/AudioRecorder.swift:429` publishes `.recording` before any audio setup. `:466-468,493-495` return without disposing the unit or changing the state,
   and `:435-449,461-464,499-528` also return silently. `:470-498` picks the rate before `AudioOutputUnitStart` (`:541`), and Bluetooth headsets change rate when input IO starts.
