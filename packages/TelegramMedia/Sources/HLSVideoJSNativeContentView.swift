@@ -515,6 +515,15 @@ private final class SharedHLSVideoJSContext: NSObject {
                             guard let self else {
                                 return
                             }
+                            var result = result
+                            if let data = result["responseData"] as? Data {
+                                if (params["responseType"] as? String) == "arraybuffer", self.jsContext?.supportsBinaryTransfer == true {
+                                    result.removeValue(forKey: "responseData")
+                                    result["responseDataId"] = Int(HLSJSBinaryStore.shared.put(data))
+                                } else {
+                                    result["responseData"] = data.base64EncodedString()
+                                }
+                            }
                             let jsonResult = try! JSONSerialization.data(withJSONObject: result)
                             let jsonResultString = String(data: jsonResult, encoding: .utf8)!
                             self.jsContext?.evaluateJavaScript("window.bridgeInvokeCallback(\(callbackId), \(jsonResultString));")
@@ -740,11 +749,12 @@ private final class SharedHLSVideoJSContext: NSObject {
                 
                 completion([:])
             } else if (methodName == "appendBuffer") {
-                guard let base64Data = params["data"] as? String else {
-                    assertionFailure()
-                    return
-                }
-                guard let data = Data(base64Encoded: base64Data.data(using: .utf8)!) else {
+                let data: Data
+                if let dataId = params["dataId"] as? Int, let stored = HLSJSBinaryStore.shared.take(Int32(clamping: dataId)) {
+                    data = stored
+                } else if let base64Data = params["data"] as? String, let decoded = Data(base64Encoded: base64Data.data(using: .utf8)!) {
+                    data = decoded
+                } else {
                     assertionFailure()
                     return
                 }
@@ -907,7 +917,7 @@ private final class SharedHLSVideoJSContext: NSObject {
         completion([
             "status": 200,
             "statusText": "OK",
-            "responseData": data.base64EncodedString(),
+            "responseData": data,
             "responseHeaders": [
                 "Content-Type": contentType,
                 "Content-Length": "\(data.count)"
@@ -923,7 +933,7 @@ private final class SharedHLSVideoJSContext: NSObject {
                 completion([
                     "status": 200,
                     "statusText": "OK",
-                    "responseData": data.base64EncodedString(),
+                    "responseData": data,
                     "responseHeaders": [
                         "Content-Type": "application/octet-stream",
                         "Content-Range": "bytes \(range.lowerBound)-\(range.upperBound)/\(totalSize)",
