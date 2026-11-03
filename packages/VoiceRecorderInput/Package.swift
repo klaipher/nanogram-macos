@@ -1,6 +1,10 @@
-// swift-tools-version:5.5
+// swift-tools-version:6.2
 
 import PackageDescription
+
+let nanogramSwiftSettings: [SwiftSetting] = [
+    .treatAllWarnings(as: .error),
+]
 
 let package = Package(
     name: "VoiceRecorderInput",
@@ -15,13 +19,17 @@ let package = Package(
         .target(
             name: "VoiceRecorderInput",
             dependencies: [],
-            path: "Sources/VoiceRecorderInput"),
+            path: "Sources/VoiceRecorderInput",
+            swiftSettings: nanogramSwiftSettings),
         .testTarget(
             name: "VoiceRecorderInputTests",
             dependencies: [
                 "VoiceRecorderInput",
                 .product(name: "OpusBinding", package: "OpusBinding"),
             ],
-            path: "Tests/VoiceRecorderInputTests"),
-    ]
+            path: "Tests/VoiceRecorderInputTests",
+            swiftSettings: nanogramSwiftSettings,
+            linkerSettings: [.unsafeFlags(["-L", "../../core-xprojects/libopus/build/libopus/lib", "-lopus"])]),
+    ],
+    swiftLanguageModes: [.v6]
 )

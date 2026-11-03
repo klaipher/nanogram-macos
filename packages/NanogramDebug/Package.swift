@@ -1,6 +1,13 @@
-// swift-tools-version:5.5
+// swift-tools-version:6.2
 
 import PackageDescription
+
+let nanogramSwiftSettings: [SwiftSetting] = [
+    .treatAllWarnings(as: .error),
+]
+let appKitSwiftSettings: [SwiftSetting] = [
+    .swiftLanguageMode(.v5),
+]
 
 let package = Package(
     name: "NanogramDebug",
@@ -10,8 +17,9 @@ let package = Package(
         .library(name: "NanogramDebugUI", targets: ["NanogramDebugUI"]),
     ],
     targets: [
-        .target(name: "NanogramDebug", path: "Sources/NanogramDebug"),
-        .target(name: "NanogramDebugUI", dependencies: ["NanogramDebug"], path: "Sources/NanogramDebugUI"),
-        .testTarget(name: "NanogramDebugTests", dependencies: ["NanogramDebug", "NanogramDebugUI"], path: "Tests/NanogramDebugTests"),
-    ]
+        .target(name: "NanogramDebug", path: "Sources/NanogramDebug", swiftSettings: nanogramSwiftSettings),
+        .target(name: "NanogramDebugUI", dependencies: ["NanogramDebug"], path: "Sources/NanogramDebugUI", swiftSettings: appKitSwiftSettings),
+        .testTarget(name: "NanogramDebugTests", dependencies: ["NanogramDebug", "NanogramDebugUI"], path: "Tests/NanogramDebugTests", swiftSettings: appKitSwiftSettings),
+    ],
+    swiftLanguageModes: [.v6]
 )

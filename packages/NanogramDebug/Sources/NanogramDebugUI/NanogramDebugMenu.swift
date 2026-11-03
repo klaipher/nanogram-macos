@@ -5,7 +5,7 @@ public final class NanogramDebugMenu: NSObject {
     public static let itemTitle = "Debug Settings…"
     private static let itemIdentifier = NSUserInterfaceItemIdentifier("nanogram.debugSettings")
 
-    private static var installed: NanogramDebugMenu?
+    nonisolated(unsafe) private static var installed: NanogramDebugMenu?
 
     private let settings: NanogramDebugSettings
     private let openDeveloperScreen: () -> Bool

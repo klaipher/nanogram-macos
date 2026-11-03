@@ -1,6 +1,6 @@
 import Foundation
 
-public struct NanogramDebugChoice: Equatable {
+public struct NanogramDebugChoice: Equatable, Sendable {
     public let id: String
     public let title: String
 
@@ -10,8 +10,8 @@ public struct NanogramDebugChoice: Equatable {
     }
 }
 
-public struct NanogramDebugOption: Equatable {
-    public enum Kind: Equatable {
+public struct NanogramDebugOption: Equatable, Sendable {
+    public enum Kind: Equatable, Sendable {
         case toggle(defaultValue: Bool)
         case choice(options: [NanogramDebugChoice], defaultValue: String)
     }
@@ -41,7 +41,7 @@ public struct NanogramDebugOption: Equatable {
     }
 }
 
-public struct NanogramDebugSection: Equatable {
+public struct NanogramDebugSection: Equatable, Sendable {
     public let title: String
     public let options: [NanogramDebugOption]
 }
@@ -64,7 +64,7 @@ public final class NanogramDebugObservation {
     }
 }
 
-public final class NanogramDebugSettings {
+public final class NanogramDebugSettings: @unchecked Sendable {
     public static let shared = NanogramDebugSettings(defaults: .standard)
     public static let didChangeNotification = Notification.Name("NanogramDebugSettingsDidChange")
     public static let optionIdKey = "id"

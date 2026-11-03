@@ -6,7 +6,7 @@ public enum VoiceRecorderAudioEngineError: Error {
     case unsupportedFormat
 }
 
-public final class VoiceRecorderAudioEngine {
+public final class VoiceRecorderAudioEngine: @unchecked Sendable {
     private var engine: AVAudioEngine
     private let makeEngine: () -> AVAudioEngine
     private let resolveDevice: (String) -> AudioDeviceID?

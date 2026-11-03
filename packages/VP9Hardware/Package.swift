@@ -1,6 +1,10 @@
-// swift-tools-version:6.0
+// swift-tools-version:6.2
 
 import PackageDescription
+
+let nanogramSwiftSettings: [SwiftSetting] = [
+    .treatAllWarnings(as: .error),
+]
 
 let package = Package(
     name: "VP9Hardware",
@@ -16,6 +20,7 @@ let package = Package(
             name: "VP9Hardware",
             dependencies: [.product(name: "YuvConversion", package: "YuvConversion")],
             path: "Sources/VP9Hardware",
+            swiftSettings: nanogramSwiftSettings,
             linkerSettings: [
                 .linkedFramework("VideoToolbox"),
                 .linkedFramework("CoreMedia"),
@@ -26,6 +31,8 @@ let package = Package(
             name: "VP9HardwareTests",
             dependencies: ["VP9Hardware"],
             path: "Tests/VP9HardwareTests",
-            resources: [.copy("Resources")]),
-    ]
+            resources: [.copy("Resources")],
+            swiftSettings: nanogramSwiftSettings),
+    ],
+    swiftLanguageModes: [.v6]
 )
