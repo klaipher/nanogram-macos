@@ -7,6 +7,7 @@ import Postbox
 import InAppSettings
 import InputView
 import ObjcUtils
+import FoundationUtils
 
 
 private final class Container : Control {
@@ -695,7 +696,7 @@ class ShareObject {
                             })
                             if k != total {
                                 attachments[i].loadItem(forTypeIdentifier: kUTTypeImage as String, options: nil, completionHandler: { (coding, error) in
-                                    if let data = (coding as? NSImage)?.tiffRepresentation {
+                                    if let image = coding as? NSImage, let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil), let data = ShareAttachmentMedia.downsampledJPEG(image: cgImage) {
                                         signals.append(self.sendMedia(nil, data, to:peerId, threadId: threadId))
                                         k += 1
                                         requestIfNeeded()
@@ -715,53 +716,25 @@ class ShareObject {
     
     private func prepareMedia(_ path: URL?, _ pasteData: Data? = nil) -> Signal<StandaloneMedia, NoError> {
         return Signal { subscriber in
-            
-            let data = pasteData ?? (path != nil ? try? Data(contentsOf: path!) : nil)
-            
-            if let data = data {
-                var forceImage: Bool = false
-                if let _ = NSImage(data: data) {
-                    if let path = path {
-                        let mimeType = MIMEType(path.path)
-                        if mimeType.hasPrefix("image/") && !mimeType.hasSuffix("gif") {
-                            forceImage = true
-                        }
-                    } else {
-                        forceImage = true
+            if let path = path {
+                let mimeType = MIMEType(path.path)
+                let isStillImage = mimeType.hasPrefix("image/") && !mimeType.hasSuffix("gif") && ShareAttachmentMedia.imageType(ofFileAt: path) != nil
+                if isStillImage {
+                    if let data = ShareAttachmentMedia.downsampledJPEG(fileAt: path) {
+                        subscriber.putNext(StandaloneMedia.image(data))
                     }
+                } else if let data = ShareAttachmentMedia.fileData(at: path) {
+                    subscriber.putNext(StandaloneMedia.file(data: data, mimeType: mimeType, attributes: [.FileName(fileName: path.path.nsstring.lastPathComponent)]))
                 }
-                
-                if forceImage {
-                    let options = NSMutableDictionary()
-                    options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailWithTransform as String)
-                    options.setValue(1280 as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
-                    options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailFromImageAlways as String)
-                    
-                    if let imageSource = CGImageSourceCreateWithData(data as CFData, nil) {
-                        let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options)
-                        if let image = image, let data = NSImage(cgImage: image, size: image.backingSize).tiffRepresentation(using: .jpeg, factor: 0.83) {
-                            let imageRep = NSBitmapImageRep(data: data)
-                            if let data = imageRep?.representation(using: .jpeg, properties: [:]) {
-                                subscriber.putNext(StandaloneMedia.image(data))
-                            }
-                        }
+            } else if let data = pasteData {
+                if ShareAttachmentMedia.imageType(of: data) != nil {
+                    if let data = ShareAttachmentMedia.downsampledJPEG(data: data) {
+                        subscriber.putNext(StandaloneMedia.image(data))
                     }
-
                 } else {
-                    var mimeType: String = "application/octet-stream"
-                    let fileName: String
-                    if let path = path {
-                        mimeType = MIMEType(path.path)
-                        fileName = path.path.nsstring.lastPathComponent
-                    } else {
-                        fileName = "Unnamed.file"
-                    }
-                    
-                    subscriber.putNext(StandaloneMedia.file(data: data, mimeType: mimeType, attributes: [.FileName(fileName: fileName)]))
+                    subscriber.putNext(StandaloneMedia.file(data: data, mimeType: "application/octet-stream", attributes: [.FileName(fileName: "Unnamed.file")]))
                 }
-                
             }
-            
             subscriber.putCompletion()
             return EmptyDisposable
         } |> runOn(queue)

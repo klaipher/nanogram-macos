@@ -21,5 +21,9 @@ let package = Package(
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
                 .product(name: "Strings", package: "Strings", condition: nil)
             ]),
+        .testTarget(
+            name: "FoundationUtilsTests",
+            dependencies: ["FoundationUtils"],
+            path: "Tests/FoundationUtilsTests"),
     ]
 )
