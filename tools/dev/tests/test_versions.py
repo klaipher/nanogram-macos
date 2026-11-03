@@ -146,6 +146,29 @@ class PinnedVersionsTests(unittest.TestCase):
     def test_boost_regex(self):
         self.assertEqual(gitlink(ROOT, "submodules/regex"), "7760ef2a61d643c1770026f0392b440bdfb5687d")
 
+    def test_sparkle_2(self):
+        self.assertEqual(gitlink(ROOT, "submodules/Sparkle"), "ab7d71291238df6e0492143b120c9b696a35f603")
+        self.assertIn("url = https://github.com/sparkle-project/Sparkle\n", read(ROOT / ".gitmodules"))
+        direct = read(ROOT / "nanogram" / "editions" / "direct.xcconfig")
+        for setting in ("SPARKLE_BUILD_LEGACY_SUUPDATER = 0", "SPARKLE_BUILD_LEGACY_DSA_SUPPORT = 0",
+                        "SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE = 0", "SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE = 0"):
+            self.assertIn(setting, direct)
+        upstream = read(ROOT / "Telegram-Mac" / "updater" / "AppUpdateViewController.swift")
+        self.assertTrue(upstream.startswith("#if !APP_STORE && !NANOGRAM\n"), "Sparkle 1 updater must be compiled out")
+        self.assertTrue(read(ROOT / "Telegram-Mac" / "updater" / "NanogramUpdater.swift").startswith("#if NANOGRAM && !NANOGRAM_MAS\n"))
+
+    def test_built_direct_app_embeds_sparkle_2_without_the_legacy_updater(self):
+        framework = ROOT / "build-output" / "apps" / "Debug-direct" / "Nanogram.app" / "Contents" / "Frameworks" / "Sparkle.framework"
+        if not framework.is_dir():
+            self.skipTest("no direct build in build-output/apps/Debug-direct")
+        import plistlib
+        info = plistlib.loads((framework / "Resources" / "Info.plist").read_bytes())
+        self.assertEqual(info["CFBundleShortVersionString"], "2.10.1")
+        symbols = subprocess.run(["nm", "-gU", str(framework / "Sparkle")], capture_output=True, text=True).stdout
+        self.assertIn("_OBJC_CLASS_$_SPUUpdater", symbols)
+        self.assertNotIn("_OBJC_CLASS_$_SUUpdater", symbols)
+        self.assertFalse((framework / "Versions" / "B" / "XPCServices").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

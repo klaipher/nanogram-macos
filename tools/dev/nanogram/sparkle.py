@@ -1,10 +1,10 @@
 """Sparkle EdDSA (ed25519) keys and update signatures for the direct edition.
 
-Upstream's Sparkle 1.21 keeps its key in the login Keychain (its generate_keys/sign_update tools take no key
-file), so we use Sparkle's own vendored ed25519 code through a small helper (sparkle_ed25519.c) built into
-~/.cache/nanogram-macos. The private key is a 32-byte RFC 8032 seed, stored base64 in
+We use Sparkle's own vendored ed25519 code (Sparkle 2: Vendor/ed25519-sparkle, the same upstream commit
+Sparkle 1.21 vendored) through a small helper (sparkle_ed25519.c) built into ~/.cache/nanogram-macos, so no
+Keychain is involved. The private key is a 32-byte RFC 8032 seed, stored base64 in
 ~/.config/nanogram-macos/sparkle_ed25519 (dir 0700, file 0600) — the format Sparkle 2's
-`sign_update --ed-key-file` reads, should we move to Sparkle 2. Secrets reach the helper on stdin only and are
+`sign_update --ed-key-file` reads. Secrets reach the helper on stdin only and are
 never printed: the CLI prints the public key and appcast signatures.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ from nanogram import config
 KEY_FILE = config.mac_config() / "sparkle_ed25519"
 FEED_URL = "https://github.com/klaipher/nanogram-releases/releases/latest/download/appcast.xml"
 HELPER_SOURCE = Path(__file__).with_name("sparkle_ed25519.c")
-ED25519_DIR = config.ROOT / "submodules" / "Sparkle" / "ed25519" / "src"
+ED25519_DIR = config.ROOT / "submodules" / "Sparkle" / "Vendor" / "ed25519-sparkle" / "src"
 ED25519_SOURCES = ("fe.c", "ge.c", "keypair.c", "sc.c", "sha512.c", "sign.c", "verify.c")
 
 __all__ = ["KEY_FILE", "FEED_URL", "SparkleError", "ensure_keys", "public_key", "sign", "verify"]

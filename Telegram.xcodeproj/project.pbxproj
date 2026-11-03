@@ -715,6 +715,7 @@
 		9F18908F2237E95400665EF5 /* VideoToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C250BA931E6E84880057CD96 /* VideoToolbox.framework */; };
 		9F21F65D20B5A9C900332C85 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F21F65C20B5A9C900332C85 /* MapKit.framework */; };
 		9F3D5F6322044D8700CB0CAA /* AppUpdateViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F3D5F6222044D8700CB0CAA /* AppUpdateViewController.swift */; };
+		4E414E4F5469ECD8583860F2 /* NanogramUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E414E4F4DEB0B66E576C999 /* NanogramUpdater.swift */; };
 		9F3EAB4520A5ED2F003FE7E3 /* ocr_nn.bin in Resources */ = {isa = PBXBuildFile; fileRef = 9F3EAB3F20A5ED2F003FE7E3 /* ocr_nn.bin */; };
 		9F4EEF8421D4F59C002C3B33 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F4EEF8321D4F59C002C3B33 /* Accelerate.framework */; };
 		9F7B740F2229618E006610E4 /* SharedWakeupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7B740E2229618E006610E4 /* SharedWakeupManager.swift */; };
@@ -1711,6 +1712,7 @@
 		9F147F7B2231543800D71BD1 /* PeerUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeerUtils.swift; sourceTree = "<group>"; };
 		9F21F65C20B5A9C900332C85 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		9F3D5F6222044D8700CB0CAA /* AppUpdateViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateViewController.swift; sourceTree = "<group>"; };
+		4E414E4F4DEB0B66E576C999 /* NanogramUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanogramUpdater.swift; sourceTree = "<group>"; };
 		9F3EAB3F20A5ED2F003FE7E3 /* ocr_nn.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = ocr_nn.bin; sourceTree = "<group>"; };
 		9F4EEF8321D4F59C002C3B33 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		9F52E74E2074C12B0048791C /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
@@ -2979,6 +2981,7 @@
 			isa = PBXGroup;
 			children = (
 				9F3D5F6222044D8700CB0CAA /* AppUpdateViewController.swift */,
+				4E414E4F4DEB0B66E576C999 /* NanogramUpdater.swift */,
 			);
 			path = updater;
 			sourceTree = "<group>";
@@ -4738,6 +4741,7 @@
 				9F7B741122296FD7006610E4 /* SharedNotificationManager.swift in Sources */,
 				9F7B740F2229618E006610E4 /* SharedWakeupManager.swift in Sources */,
 				9F3D5F6322044D8700CB0CAA /* AppUpdateViewController.swift in Sources */,
+				4E414E4F5469ECD8583860F2 /* NanogramUpdater.swift in Sources */,
 				C2303E8A1D9A76D800098E12 /* MainViewController.swift in Sources */,
 				7110771E0000000000000007 /* LottieBackend.swift in Sources */,
 			);

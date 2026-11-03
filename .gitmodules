@@ -1,6 +1,6 @@
 [submodule "submodules/Sparkle"]
 	path = submodules/Sparkle
-	url = https://github.com/macosswift/sparkle
+	url = https://github.com/sparkle-project/Sparkle
 [submodule "submodules/telegram-ios"]
 	path = submodules/telegram-ios
 	url = https://github.com/TelegramMessenger/Telegram-iOS

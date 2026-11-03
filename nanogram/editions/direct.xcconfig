@@ -13,6 +13,15 @@ ENABLE_HARDENED_RUNTIME = YES
 SFEED_URL = https:/$()/github.com/klaipher/nanogram-releases/releases/latest/download/appcast.xml
 // EdDSA public key for the update signatures (Info.plist SUPublicEDKey). The private key is
 // ~/.config/nanogram-macos/sparkle_ed25519, never in the repo; tools/dev/tg sparkle-key prints this value.
-// Sparkle 1.21 checks EdDSA only; no DSA key (upstream's dsa_pub.pem is Telegram's).
+// EdDSA only; no DSA key (upstream's dsa_pub.pem is Telegram's).
 SPARKLE_ED_PUBLIC_KEY = F39QGJIjAKTk9EwQkYB2NE3UxjbGFA0zCTuUIdT1WH0=
 DSA_PEM_FILE =
+
+// Sparkle 2 (submodules/Sparkle, built from source). Telegram-Mac/updater/NanogramUpdater.swift drives an
+// SPUUpdater with its own user driver, so the legacy SUUpdater class (instantiated by MainMenu.xib, which would
+// start a second updater with Sparkle's standard UI) and DSA support are not built; the XPC services are for
+// sandboxed apps only.
+SPARKLE_BUILD_LEGACY_SUUPDATER = 0
+SPARKLE_BUILD_LEGACY_DSA_SUPPORT = 0
+SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE = 0
+SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE = 0

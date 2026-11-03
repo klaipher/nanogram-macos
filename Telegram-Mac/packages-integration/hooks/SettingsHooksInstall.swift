@@ -358,7 +358,11 @@ func installSettingsUIHooks() {
             case let .loading(_, current, total):
                 text = "\(Int(Float(current) / Float(total) * 100))%"
             case let .readyToInstall(item), let .unarchiving(item):
+                #if NANOGRAM
+                text = "\(item.displayVersionString).\(item.versionString)"
+                #else
                 text = "\(item.displayVersionString!).\(item.versionString!)"
+                #endif
             case .uptodate:
                 text = "" //strings().accountViewControllerDescUpdated
             case .failed:

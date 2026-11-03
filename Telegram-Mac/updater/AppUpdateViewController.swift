@@ -1,4 +1,4 @@
-#if !APP_STORE && !NANOGRAM_MAS
+#if !APP_STORE && !NANOGRAM
 
 import Cocoa
 import TGUIKit
