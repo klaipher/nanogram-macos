@@ -133,6 +133,13 @@ class PinnedVersionsTests(unittest.TestCase):
         for commit in ("020feec5c040fdae2cf752c2c2be62ddde7c236d", "557e0e3d7d72f80278938f01e4d31bfd036278ba"):
             self.assertTrue(is_ancestor(owt, commit, pin), f"tg_owt {pin} does not contain {commit}")
 
+    def test_rlottie_has_the_klaipher_fork_fixes(self):
+        rlottie = ROOT / "submodules" / "rlottie"
+        pin = gitlink(ROOT, "submodules/rlottie")
+        for commit in ("0742a4898e8fea1a88379033f26f6765a6c901f7", "e0221d3ee344f467c0aa8f34c23a95f836b3c223"):
+            self.assertTrue(is_ancestor(rlottie, commit, pin), f"rlottie {pin} does not contain {commit}")
+        self.assertIn("url = https://github.com/klaipher/rlottie", read(ROOT / ".gitmodules"))
+
 
 if __name__ == "__main__":
     unittest.main()
