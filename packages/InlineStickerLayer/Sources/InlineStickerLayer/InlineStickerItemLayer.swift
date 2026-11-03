@@ -10,6 +10,7 @@ import Accelerate
 import AppKit
 import TelegramMedia
 import TelegramMediaResources
+import NanogramRuntime
 #if SHARE
 import InlineStickersShare
 #else
@@ -36,9 +37,21 @@ open class InlineStickerLockLayer : SimpleLayer {
         lockedView.contents = image
     }
 
+    private weak var tiedLayer: InlineStickerItemLayer?
+    private let badgeGate = OneShotGate()
+
     open func tieToLayer(_ layer: InlineStickerItemLayer) {
+        if self.tiedLayer !== layer {
+            self.tiedLayer = layer
+            self.badgeGate.reset()
+        }
         layer.contentDidUpdate = { [weak self] image in
-            self?.applyBlur(color: theme.colors.background.darker(), image: image)
+            guard let self else {
+                return
+            }
+            self.badgeGate.run {
+                self.applyBlur(color: theme.colors.background.darker(), image: image)
+            }
         }
     }
 

@@ -12,6 +12,7 @@ let deps: [(String, String)] = [
     ("TelegramTheme", "../TelegramTheme"),
     ("TelegramContext", "../TelegramContext"),
     ("ColorPalette", "../ColorPalette"),
+    ("NanogramRuntime", "../NanogramRuntime"),
     ("LokiRng", "../../submodules/telegram-ios/submodules/Utils/LokiRng"),
 ]
 
