@@ -26,7 +26,7 @@ private func migrateWalletKeychainScopeIfNeeded(basePath: String, isFreshInstall
         return
     }
     if !isFreshInstallation {
-        let migration = migrateWalletKeychainScope()
+        let migration = migrateWalletKeychainScope(onlyItemsOwnedByThisApp: PasscodeEnvironment.shared.keychainScope != "debug")
         Logger.shared.log("KeychainScope", "migration: \(migration)")
         switch migration {
         case .keychainLocked, .failed:
