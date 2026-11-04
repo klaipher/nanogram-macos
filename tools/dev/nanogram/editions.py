@@ -61,6 +61,9 @@ class AppFacts:
     sparkle_public_key: str = ""
     sparkle_xpc_services: list[str] = field(default_factory=list)
     info: dict = field(default_factory=dict)
+    decoder_present: bool = False
+    decoder_entitlements: dict = field(default_factory=dict)
+    decoder_hardened_runtime: bool = True
 
 
 def _entitlements(bundle: Path) -> dict:
@@ -99,6 +102,7 @@ def inspect_app(app: Path) -> AppFacts:
     with (app / "Contents" / "Info.plist").open("rb") as handle:
         info = plistlib.load(handle)
     extensions = sorted((app / "Contents" / "PlugIns").glob("*.appex"))
+    decoders = sorted((app / "Contents" / "XPCServices").glob("NanogramDecoder.xpc"))
     symbols = sorted({f"{binary.name}: {s}" for binary in _executables(app) for s in _sparkle_references(binary)})
     return AppFacts(
         bundle_id=info.get("CFBundleIdentifier", ""),
@@ -112,6 +116,9 @@ def inspect_app(app: Path) -> AppFacts:
         sparkle_public_key=info.get("SUPublicEDKey", ""),
         sparkle_xpc_services=_sparkle_xpc_services(app),
         info=info,
+        decoder_present=bool(decoders),
+        decoder_entitlements=_entitlements(decoders[0]) if decoders else {},
+        decoder_hardened_runtime=_hardened_runtime(decoders[0]) if decoders else True,
     )
 
 
@@ -120,6 +127,21 @@ def _is_ed25519_public_key(value: str) -> bool:
         return len(base64.b64decode(value, validate=True)) == 32
     except (binascii.Error, ValueError):
         return False
+
+
+DECODER_FORBIDDEN_PREFIXES = ("com.apple.security.network.", "com.apple.security.files.", "com.apple.security.temporary-exception",
+                              "com.apple.security.device.", "com.apple.security.personal-information.")
+
+
+def _check_decoder_service(facts: AppFacts) -> list[str]:
+    problems = []
+    if facts.decoder_entitlements.get(SANDBOX) is not True:
+        problems.append("decoder service is not sandboxed")
+    problems += [f"decoder service has the entitlement {key}" for key in sorted(facts.decoder_entitlements)
+                 if key.startswith(DECODER_FORBIDDEN_PREFIXES)]
+    if not facts.decoder_hardened_runtime:
+        problems.append("decoder service is not signed with the hardened runtime")
+    return problems
 
 
 def check_edition(facts: AppFacts, edition: str) -> list[str]:
@@ -134,6 +156,8 @@ def check_edition(facts: AppFacts, edition: str) -> list[str]:
         problems.append(f"share extension is missing the app group {APP_GROUP}")
     if facts.extension_entitlements.get(SANDBOX) is not True:
         problems.append("share extension is not sandboxed")
+    if facts.decoder_present:
+        problems += _check_decoder_service(facts)
     sandboxed = facts.entitlements.get(SANDBOX) is True
     if edition == "mas":
         if not sandboxed:

@@ -415,7 +415,14 @@ private func fetchCachedAnimatedStickerRepresentation(account: Account, resource
                     image = decoder.preview(size: representation.size, backingScale: 2)
                 } else {
                     let targetPixelSize = CGSize(width: representation.size.width * 2, height: representation.size.height * 2)
-                    image = WebPCreateImageFittingPixelSize(data, targetPixelSize) ?? convertFromWebP(data)?._cgImage ?? NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                    switch StickerImageDecodeHooks.installed?.decodeFitting(data, targetPixelSize) ?? .notHandled {
+                    case let .image(decoded):
+                        image = decoded
+                    case .refused:
+                        image = nil
+                    case .notHandled:
+                        image = WebPCreateImageFittingPixelSize(data, targetPixelSize) ?? convertFromWebP(data)?._cgImage ?? NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                    }
                     
                     if image == nil, let data = TGGUnzipData(data, 8 * 1024 * 1024) {
                         if let json = String(data: transformedWithFitzModifier(data: data, fitzModifier: representation.fitzModifier), encoding: .utf8), json.length > 0 {

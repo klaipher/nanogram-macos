@@ -54,6 +54,23 @@ class EditionRulesTests(unittest.TestCase):
         base.update(overrides)
         return editions.AppFacts(**base)
 
+    def test_decoder_service_must_be_sandboxed_hardened_and_have_no_network_or_file_access(self):
+        good = dict(decoder_present=True, decoder_entitlements={"com.apple.security.app-sandbox": True},
+                    decoder_hardened_runtime=True)
+        self.assertEqual(editions.check_edition(self.facts(**good), "mas"), [])
+        bad = dict(good, decoder_entitlements={"com.apple.security.app-sandbox": True,
+                                               "com.apple.security.network.client": True,
+                                               "com.apple.security.files.user-selected.read-write": True,
+                                               "com.apple.security.temporary-exception.mach-lookup.global-name": ["x"]},
+                   decoder_hardened_runtime=False)
+        problems = editions.check_edition(self.facts(**bad), "mas")
+        self.assertTrue(any("network.client" in p for p in problems), problems)
+        self.assertTrue(any("files.user-selected" in p for p in problems), problems)
+        self.assertTrue(any("temporary-exception" in p for p in problems), problems)
+        self.assertTrue(any("hardened runtime" in p and "decoder" in p.lower() for p in problems), problems)
+        unsandboxed = dict(good, decoder_entitlements={})
+        self.assertTrue(any("decoder" in p.lower() and "sandbox" in p for p in editions.check_edition(self.facts(**unsandboxed), "direct")))
+
     def test_mas_rejects_sparkle(self):
         problems = editions.check_edition(self.facts(sparkle_embedded=True, sparkle_symbols=["_OBJC_CLASS_$_SUUpdater"]), "mas")
         self.assertTrue(any("Sparkle.framework" in p for p in problems))

@@ -14,7 +14,7 @@ from nanogram import config  # noqa: E402
 
 PACKAGES = config.ROOT / "packages"
 FORK_PACKAGES = ("NanogramKit", "ChatAppIntents", "NanogramDebug", "VoiceRecorderInput", "VP9Hardware",
-                 "LocalAudioTranscription", "NanogramAppIcons")
+                 "LocalAudioTranscription", "NanogramAppIcons", "NanogramDecoder")
 PENDING_SWIFT6 = ("NanogramRuntime",)
 UPSTREAM_DEPENDENTS_KEEP_FLOOR = ("NanogramDebug", "VoiceRecorderInput", "VP9Hardware", "LocalAudioTranscription",
                                   "NanogramRuntime", "NanogramAppIcons")

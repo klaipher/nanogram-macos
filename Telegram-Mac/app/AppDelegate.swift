@@ -353,10 +353,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         })
         
         makeRLottie = { json, key in
-            if LottieBackend.usesTLottie {
-                return TLottieBridge(json: json)
-            }
-            return RLottieBridge(json: json, key: key)
+            return makeLottieBridge(json: json, key: key)
         }
         
         guard let containerUrl = ApiEnvironment.containerURL else {
@@ -1397,6 +1394,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         nanogramDebugObservations.append(settings.observe("media.jpegWideGamut") { _ in
             applyJPEGWideGamut()
         })
+        settings.register(DecoderIsolation.debugOption)
         settings.register(OnDeviceTranslation.legacyDebugOption)
         settings.register(LocalAudioTranscription.debugOption)
         settings.register(SystemPictureInPicture.debugOption)
