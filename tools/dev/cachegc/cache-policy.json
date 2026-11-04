@@ -1,0 +1,45 @@
+{
+ "schema": 1,
+ "description": "The one configuration of the shared build-cache cleanup (tools/dev/cachegc/cachegc.py) for the iOS and the Mac app. Identical in both repos. Every cap, age and root lives here; nothing runs on a schedule, the cleanup runs after tg build/test/run commands (cheap, throttled, time-boxed) and by hand with `tg cache-cleanup`.",
+ "roots": {
+  "cache_root": "~/.cache/nanogram-macos",
+  "bazel_disk_cache": "~/.cache/telegram-ios/bazel-disk-cache",
+  "bazel_user_root": "~/Library/Caches/bazel/_bazel_$USER",
+  "xcode_derived_data": "~/Library/Developer/Xcode/DerivedData",
+  "compilation_cache": "~/.cache/nanogram-macos/CompilationCache",
+  "log_file": "~/.cache/nanogram-macos/cachegc.log",
+  "state_file": "~/.cache/nanogram-macos/cachegc-state.json",
+  "spm_scratch_prefix": "spm-"
+ },
+ "repos": ["~/Projects/nanogram-ios", "~/Projects/nanogram-macos"],
+ "base_branches": ["main", "nanogram/integration", "nanogram"],
+ "caps_gb": {
+  "bazel_disk_cache": 30,
+  "compilation_cache": 10,
+  "xcode_module_cache": 3,
+  "spm_scratch_total": 20,
+  "cache_root_total": 40
+ },
+ "bazel_disk_cache_gc": {
+  "max_size": "30G",
+  "max_age": "14d"
+ },
+ "max_age_days": {
+  "derived_data_unused": 14,
+  "spm_build_unused": 7,
+  "spm_scratch_unused": 7,
+  "worktree_merged": 14,
+  "build_output_logs": 14,
+  "tool_tmp": 2
+ },
+ "instruments_min_age_minutes": 60,
+ "keep_unreleased_builds": 3,
+ "recently_used_minutes": 120,
+ "auto": {
+  "min_interval_minutes": 30,
+  "time_budget_seconds": 25
+ },
+ "tool_tmp_globs": ["nanogram-*", "tg-*", "frameworks-*", "casprobe*"],
+ "protected_names": ["launch-home", "sparkle-ed25519", "sparkle_ed25519", "dsyms"],
+ "protected_paths": ["~/Library/Application Support/Nanogram"]
+}

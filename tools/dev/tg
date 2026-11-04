@@ -26,13 +26,35 @@ config_value() { python3 -c "from nanogram import config; print(config.$1)"; }
 
 cmd_doctor() { py doctor; }
 
+# tg cache-cleanup [--dry-run] [--only A,B]: the shared cache cleanup (tools/dev/cachegc, policy in cache-policy.json).
+# It also runs by itself, throttled and time-boxed, after build, test, check and release commands. There is no
+# scheduled job.
+cmd_cache_cleanup() {
+  case "${1:-}" in
+    verify|report) python3 "$ROOT/tools/dev/cachegc/cachegc.py" "$1" --repo "$ROOT" ;;
+    *) python3 "$ROOT/tools/dev/cachegc/cachegc.py" run --repo "$ROOT" "$@" ;;
+  esac
+}
+
+cache_cleanup_auto() {
+  [ -z "${NANOGRAM_TG_LOCKED:-}" ] || return 0
+  python3 "$ROOT/tools/dev/cachegc/cachegc.py" auto --repo "$ROOT" || true
+}
+
+cmd_native() { python3 "$ROOT/tools/dev/native/check_native_libs.py" "$@" && python3 "$ROOT/tools/dev/native/module_settings.py" --check; }
+
 cmd_frameworks() { py frameworks "$@"; }
 
 # tg clean [--all]: this checkout's DerivedData/Build (all of its DerivedData with --all) and build-output/apps.
 cmd_clean() { py disk clean "$@"; }
 
 # tg prune [--dry-run] [--max-gb N]: lists everything under ~/.cache/nanogram-macos, removes stale build caches.
-cmd_prune() { py disk prune "$@"; }
+cmd_prune() {
+  py disk prune "$@"
+  local dry=()
+  case " $* " in *" --dry-run "*) dry=(--dry-run) ;; esac
+  cmd_cache_cleanup ${dry[@]+"${dry[@]}"}
+}
 
 # Writes the gitignored NanogramSecrets.swift (api_id/api_hash); prints only the path, never the values.
 cmd_credentials() { py credentials || die "cannot generate API credentials"; }
@@ -278,7 +300,8 @@ cmd_test() {
   for package in "${packages[@]}"; do
     [ -f "$ROOT/packages/$package/Package.swift" ] || die "no package packages/$package"
     say "swift test packages/$package"
-    swift test --package-path "$ROOT/packages/$package" || failed+=("$package")
+    swift test --package-path "$ROOT/packages/$package" \
+      --scratch-path "${NANOGRAM_CACHE_DIR:-$HOME/.cache/nanogram-macos}/spm-$(basename "$ROOT")-$package" || failed+=("$package")
   done
   [ ${#failed[@]} = 0 ] || die "tests failed: ${failed[*]}"
 }
@@ -339,6 +362,8 @@ usage: tools/dev/tg <command> [options]
   release-direct   notarized dmg + appcast for the direct edition (local)
   clean            remove this checkout's build products [--all]
   prune            list caches and build files, remove stale ones [--dry-run] [--max-gb N]
+  cache-cleanup    shared cache cleanup (Bazel, Xcode, SwiftPM, builds, worktrees) [--dry-run] [--only A,B] | verify | report
+  native           drift check: native-libs.json and module-settings.json against the build files
 USAGE
 }
 
@@ -346,11 +371,16 @@ main() {
   local cmd="${1:-help}"
   [ $# -gt 0 ] && shift
   case "$cmd" in
+    build|test|check|warnings|frameworks|testflight|release-direct|core-bump) trap cache_cleanup_auto EXIT ;;
+  esac
+  case "$cmd" in
     doctor) cmd_doctor "$@" ;;
     setup) cmd_setup "$@" ;;
     frameworks) cmd_frameworks "$@" ;;
     clean) cmd_clean "$@" ;;
     prune) cmd_prune "$@" ;;
+    cache-cleanup) cmd_cache_cleanup "$@" ;;
+    native) cmd_native "$@" ;;
     credentials) cmd_credentials ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;

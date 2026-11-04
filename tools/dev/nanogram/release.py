@@ -451,6 +451,7 @@ def testflight(export_only: bool = False) -> Path:
         return pkg
     print(f"==> Uploading Nanogram {version} ({build}) with API key {key.key_id}", flush=True)
     upload_mas(pkg, key)
+    (out_dir / ".released").write_text(f"uploaded to TestFlight: Nanogram {version} ({build})\n")
     print("==> Uploaded. It appears in App Store Connect > TestFlight after Apple processes it (10-30 min).")
     return pkg
 

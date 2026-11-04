@@ -97,7 +97,7 @@ ThinLTO and dead-code stripping):
 `buildcheck` fails a Debug build whose log has a `VerifyModule`, `GenerateDSYMFile` or `ExtractAppIntentsMetadata` task.
 
 **Compilation caching** (Debug only): `COMPILATION_CACHE_ENABLE_CACHING = YES` with one CAS for every checkout,
-`~/.cache/nanogram-macos/CompilationCache`, capped by Xcode at 10 GB (`COMPILATION_CACHE_LIMIT_SIZE`). Adopted on
+`~/.cache/nanogram-macos/CompilationCache`, capped at 10 GB (`COMPILATION_CACHE_LIMIT_SIZE` in bytes, plus the shared cleanup, see [cache-cleanup.md](cache-cleanup.md)). Adopted on
 the numbers below (`build-output/stage2/task10/`, 2026-11-03, the three settings on the command line, otherwise the
 same `tg build --clean`; loaded Mac, so compare CPU seconds):
 
@@ -608,3 +608,7 @@ Add a switch by declaring a `static let debugOption = NanogramDebugOption.toggle
 feature, registering it in `AppDelegate.installNanogramDebugMenu()`, and reading it through
 `NanogramDebugSettings.shared` (`bool`, `choice`, `observe` for live changes). Ship new behaviour behind a switch
 that defaults to off until it is proven on a real account.
+
+## Cache cleanup
+
+Stale build caches clean themselves up after every build and test command, with no scheduled job. See [cache-cleanup.md](cache-cleanup.md); `tg cache-cleanup --dry-run` shows what would go.

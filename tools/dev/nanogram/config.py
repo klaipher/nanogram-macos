@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 HOME = Path.home()
 CACHE_DIR = Path(os.environ.get("NANOGRAM_CACHE_DIR", HOME / ".cache" / "nanogram-macos"))
+COMPILATION_CACHE = CACHE_DIR / "CompilationCache"
 CHECKOUT_PREFIX = "nanogram-macos"
 
 

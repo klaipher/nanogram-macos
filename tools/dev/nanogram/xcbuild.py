@@ -60,6 +60,11 @@ def needs_resolve_hint(log: str) -> bool:
     return any(RESOLVE_ERROR.search(line) for line in log.splitlines() if "error" in line.lower())
 
 
+def ensure_cache_dirs(configuration: str) -> None:
+    if configuration == "Debug":
+        config.COMPILATION_CACHE.mkdir(parents=True, exist_ok=True)
+
+
 def run(argv: list[str]) -> int:
     own, extra = (argv[:argv.index("--")], argv[argv.index("--") + 1:]) if "--" in argv else (argv, [])
     parser = argparse.ArgumentParser(prog="tg xcbuild run")
@@ -77,6 +82,7 @@ def run(argv: list[str]) -> int:
                                               derived=args.derived, xcconfig=args.xcconfig,
                                               conditions=args.conditions, clean=args.clean, extra=extra,
                                               resolve=args.resolve_packages, settings=args.setting)]
+    ensure_cache_dirs(args.configuration)
     with args.log.open("w") as log:
         status = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=build_env(os.environ),
                                 cwd=config.ROOT).returncode

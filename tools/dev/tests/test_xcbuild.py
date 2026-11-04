@@ -147,3 +147,17 @@ class DescriptionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CacheDirsTests(unittest.TestCase):
+    def test_debug_creates_the_compilation_cache_directory_release_does_not(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "CompilationCache"
+            with mock.patch.object(xcbuild.config, "COMPILATION_CACHE", target):
+                xcbuild.ensure_cache_dirs("Release")
+                self.assertFalse(target.exists())
+                xcbuild.ensure_cache_dirs("Debug")
+                self.assertTrue(target.is_dir())
