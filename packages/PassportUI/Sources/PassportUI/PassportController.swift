@@ -81,7 +81,7 @@ private extension SecureIdVerificationDocument {
 }
 
 
-private let cManager: CountryManager = CountryManager()
+nonisolated(unsafe) private let cManager: CountryManager = CountryManager()
 
 private struct EditSettingsValues {
     let values:[SecureIdValue]
