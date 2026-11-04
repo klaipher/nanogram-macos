@@ -168,7 +168,7 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn("url = https://github.com/sparkle-project/Sparkle\n", read(ROOT / ".gitmodules"))
         direct = read(ROOT / "nanogram" / "editions" / "direct.xcconfig")
         for setting in ("SPARKLE_BUILD_LEGACY_SUUPDATER = 0", "SPARKLE_BUILD_LEGACY_DSA_SUPPORT = 0",
-                        "SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE = 0", "SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE = 0"):
+                        "SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE = 1", "SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE = 1"):
             self.assertIn(setting, direct)
         upstream = read(ROOT / "Telegram-Mac" / "updater" / "AppUpdateViewController.swift")
         self.assertTrue(upstream.startswith("#if !APP_STORE && !NANOGRAM\n"), "Sparkle 1 updater must be compiled out")
@@ -184,7 +184,8 @@ class PinnedVersionsTests(unittest.TestCase):
         symbols = subprocess.run(["nm", "-gU", str(framework / "Sparkle")], capture_output=True, text=True).stdout
         self.assertIn("_OBJC_CLASS_$_SPUUpdater", symbols)
         self.assertNotIn("_OBJC_CLASS_$_SUUpdater", symbols)
-        self.assertFalse((framework / "Versions" / "B" / "XPCServices").exists())
+        for service in ("Installer.xpc", "Downloader.xpc"):
+            self.assertTrue((framework / "Versions" / "B" / "XPCServices" / service).is_dir(), service)
 
 
 if __name__ == "__main__":

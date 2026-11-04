@@ -10,7 +10,7 @@ It is the Mac sibling of Nanogram for iOS: the same app, tuned to build faster a
   endpoints are removed.
 - Two editions from one codebase, sharing accounts and data, one running at a time:
   - `mas`: App Store / TestFlight, sandboxed, no Sparkle (`tools/dev/tg testflight`).
-  - `direct`: Developer ID, notarized dmg, Sparkle 2.10.1 updates from
+  - `direct`: Developer ID, sandboxed like `mas`, notarized dmg, Sparkle 2.10.1 updates (signed appcast) from
     [klaipher/nanogram-releases](https://github.com/klaipher/nanogram-releases) (`tools/dev/tg release-direct`).
 - Settings layer: our build settings sit in `nanogram/Nanogram.xcconfig` and `nanogram/editions/`, passed with
   `-xcconfig`; upstream's project files stay untouched apart from small hook lines.

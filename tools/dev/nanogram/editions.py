@@ -1,6 +1,7 @@
 """The two editions: what a built app must look like, and where tg build keeps a copy of each.
 
-mas: sandboxed, no Sparkle (not embedded, not referenced). direct: not sandboxed, hardened runtime, Sparkle.
+mas: sandboxed, no Sparkle (not embedded, not referenced). direct: sandboxed with the same capabilities, hardened
+runtime, Sparkle 2 with its Installer and Downloader XPC services, a signed feed and verification before extraction.
 Both: bundle org.klaipher.Nanogram, the same app group, the same data prefix (Info.plist SOURCE).
 """
 from __future__ import annotations
@@ -30,6 +31,16 @@ GROUPS = "com.apple.security.application-groups"
 # development set that profile-less local builds sign with.
 PROFILE_ONLY_KEYS = ("com.apple.developer.maps", "com.apple.developer.usernotifications.communication")
 SPARKLE_FEED_URL = sparkle.FEED_URL
+MACH_LOOKUP = "com.apple.security.temporary-exception.mach-lookup.global-name"
+HOME_READ_ONLY = "com.apple.security.temporary-exception.files.home-relative-path.read-only"
+# The unsandboxed direct builds kept their settings here; the sandboxed app imports what it lacks once
+# (NanogramKit LegacyPreferences), because macOS skips container-migration.plist for an existing container.
+LEGACY_PREFERENCES = f"/Library/Preferences/{BUNDLE_ID}.plist"
+NETWORK_CLIENT = "com.apple.security.network.client"
+SPARKLE_XPC_SERVICES = ("Downloader.xpc", "Installer.xpc")
+SPARKLE_INFO_FLAGS = ("SUEnableInstallerLauncherService", "SUEnableDownloaderService", "SUVerifyUpdateBeforeExtraction",
+                      "SURequireSignedFeed")
+SPARKLE_MACH_SERVICE_SUFFIXES = ("-spks", "-spki")
 SPARKLE_SYMBOL = re.compile(r"_OBJC_CLASS_\$_(SU|SPU)[A-Z]\w*|Sparkle")
 APPS_DIR = config.BUILD_OUTPUT / "apps"
 
@@ -48,6 +59,8 @@ class AppFacts:
     extension_entitlements: dict = field(default_factory=dict)
     sparkle_feed: str = ""
     sparkle_public_key: str = ""
+    sparkle_xpc_services: list[str] = field(default_factory=list)
+    info: dict = field(default_factory=dict)
 
 
 def _entitlements(bundle: Path) -> dict:
@@ -76,6 +89,11 @@ def _sparkle_references(binary: Path) -> list[str]:
     return found
 
 
+def _sparkle_xpc_services(app: Path) -> list[str]:
+    framework = app / "Contents" / "Frameworks" / "Sparkle.framework"
+    return sorted({path.name for path in framework.glob("Versions/*/XPCServices/*.xpc")})
+
+
 def inspect_app(app: Path) -> AppFacts:
     app = Path(app)
     with (app / "Contents" / "Info.plist").open("rb") as handle:
@@ -92,6 +110,8 @@ def inspect_app(app: Path) -> AppFacts:
         extension_entitlements=_entitlements(extensions[0]) if extensions else {},
         sparkle_feed=info.get("SUFeedURL", ""),
         sparkle_public_key=info.get("SUPublicEDKey", ""),
+        sparkle_xpc_services=_sparkle_xpc_services(app),
+        info=info,
     )
 
 
@@ -126,8 +146,28 @@ def check_edition(facts: AppFacts, edition: str) -> list[str]:
         if "com.apple.developer.associated-domains" in facts.entitlements:
             problems.append("mas app claims associated domains (Telegram's webcredentials)")
     else:
-        if sandboxed:
-            problems.append("direct app is sandboxed")
+        if not sandboxed:
+            problems.append("direct app is not sandboxed")
+        readable = facts.entitlements.get(HOME_READ_ONLY, [])
+        if LEGACY_PREFERENCES not in readable:
+            problems.append(f"direct app cannot read {LEGACY_PREFERENCES} (old settings to import)")
+        for path in readable:
+            if path != LEGACY_PREFERENCES:
+                problems.append(f"direct app may read {path} outside its container (only {LEGACY_PREFERENCES})")
+        if facts.entitlements.get(NETWORK_CLIENT) is not True:
+            problems.append(f"direct app is missing {NETWORK_CLIENT}")
+        exceptions = facts.entitlements.get(MACH_LOOKUP, [])
+        for suffix in SPARKLE_MACH_SERVICE_SUFFIXES:
+            if BUNDLE_ID + suffix not in exceptions:
+                problems.append(f"direct app has no mach-lookup exception for {BUNDLE_ID}{suffix} (Sparkle installer)")
+        for service in SPARKLE_XPC_SERVICES:
+            if service not in facts.sparkle_xpc_services:
+                problems.append(f"direct app does not embed Sparkle's {service} (needed by the sandbox)")
+        for key in SPARKLE_INFO_FLAGS:
+            if facts.info.get(key) is not True:
+                problems.append(f"direct app Info.plist does not set {key} to YES")
+        if "SUPublicDSAKeyFile" in facts.info or "SUPublicDSAKey" in facts.info:
+            problems.append("direct app Info.plist has a DSA key entry (SUPublicDSAKeyFile): EdDSA only")
         if not facts.sparkle_embedded:
             problems.append("direct app does not embed Sparkle.framework")
         if not facts.hardened_runtime:

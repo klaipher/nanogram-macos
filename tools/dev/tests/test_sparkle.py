@@ -142,6 +142,32 @@ class SparkleKeysTests(unittest.TestCase):
         self.assertNotIn(self.key_file.read_text().strip()[:16], out.stdout + out.stderr)
 
 
+class UpdaterSourceTests(unittest.TestCase):
+    SOURCE = (ROOT / "Telegram-Mac/updater/NanogramUpdater.swift").read_text()
+
+    def test_release_notes_are_plain_text_not_imported_html(self):
+        self.assertNotIn("html2Attributed", self.SOURCE)
+        self.assertNotIn("NSAttributedString", self.SOURCE)
+        self.assertNotIn("DocumentType.html", self.SOURCE)
+        self.assertIn("UpdateNotes.plainText(from: itemDescription)", self.SOURCE)
+
+    def test_the_stale_dsa_key_entry_is_gone_from_info_plist(self):
+        info = plistlib.loads((ROOT / "Telegram-Mac/Info.plist").read_bytes())
+        self.assertNotIn("SUPublicDSAKeyFile", info)
+        self.assertNotIn("SUPublicDSAKey", info)
+
+    def test_info_plist_requires_a_signed_feed_and_verifies_before_extraction(self):
+        info = plistlib.loads((ROOT / "Telegram-Mac/Info.plist").read_bytes())
+        self.assertIs(info["SURequireSignedFeed"], True)
+        self.assertIs(info["SUVerifyUpdateBeforeExtraction"], True)
+
+    def test_sparkle_accepts_exactly_the_signing_block_we_write(self):
+        reader = (ROOT / "submodules/Sparkle/Sparkle/SPUExtractSignedFeed.m").read_text()
+        self.assertIn('"<!-- sparkle-signatures:\\n"', reader)
+        self.assertIn('@"edSignature:"', reader)
+        self.assertIn('@"length:"', reader)
+
+
 class RepositoryKeyTests(unittest.TestCase):
     """The owner's real key in ~/.config/nanogram-macos: public half in the repo, private half never."""
 
@@ -171,7 +197,10 @@ class RepositoryKeyTests(unittest.TestCase):
         info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
         self.assertEqual(info.get("SUPublicEDKey"), sparkle.ensure_keys())
         self.assertEqual(info.get("SUFeedURL"), sparkle.FEED_URL)
-        self.assertEqual(info.get("SUPublicDSAKeyFile", ""), "")
+        self.assertNotIn("SUPublicDSAKeyFile", info)
+        for key in ("SURequireSignedFeed", "SUVerifyUpdateBeforeExtraction", "SUEnableInstallerLauncherService",
+                    "SUEnableDownloaderService"):
+            self.assertIs(info.get(key), True, key)
 
 
 if __name__ == "__main__":

@@ -19,31 +19,11 @@ extension SUAppcastItem {
     }
 
     var updateText: String {
-        let description = itemDescription ?? ""
-        var updateText = (description.html2Attributed?.string ?? description).replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression, range: nil)
-        while let range = updateText.range(of: "   ") {
-            updateText = updateText.replacingOccurrences(of: "   ", with: "  ", options: [], range: range)
-        }
-        updateText = updateText.replacingOccurrences(of: "•", with: "\n•", options: [], range: nil)
-        if updateText.first == "\n" {
-            updateText.removeFirst()
-        }
-        return updateText.replacingOccurrences(of: "\t", with: "  ", options: [], range: nil)
+        return UpdateNotes.plainText(from: itemDescription)
     }
 
     var versionTitle: String {
         return "Version \(displayVersionString) (\(versionString))"
-    }
-}
-
-extension String {
-    var html2Attributed: NSAttributedString? {
-        guard let data = data(using: .utf8) else {
-            return nil
-        }
-        return try? NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.html,
-                                                             .characterEncoding: String.Encoding.utf8.rawValue],
-                                       documentAttributes: nil)
     }
 }
 

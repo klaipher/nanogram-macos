@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -270,6 +271,10 @@ def nested_code(app: Path) -> list[Path]:
     code = [app]
     for directory in NESTED_CODE_DIRS:
         code += sorted(path for path in (contents / directory).glob("*") if not path.is_symlink())
+    for framework in sorted((contents / "Frameworks").glob("*.framework")):
+        for version in sorted((framework / "Versions").glob("[!C]*")):
+            code += sorted(version.glob("XPCServices/*.xpc")) + sorted(version.glob("Updater.app"))
+            code += [path for path in sorted(version.glob("Autoupdate")) if _is_macho(path)]
     for bundle in resource_bundles(app):
         if _has_signature(bundle):
             code.append(bundle)
@@ -587,6 +592,28 @@ def appcast(entries: list[str]) -> str:
             "</rss>\n")
 
 
+SIGNING_BLOCK_PREFIX = "<!-- sparkle-signatures:\n"
+
+
+def sign_appcast(feed: str, key_file: Path | None = None) -> str:
+    """The feed followed by Sparkle 2.10's signing block (edSignature and byte length of everything before it),
+    which an app with SURequireSignedFeed verifies before it trusts a single item. A block already there is replaced."""
+    from nanogram import sparkle
+    start = feed.rfind(SIGNING_BLOCK_PREFIX)
+    content = feed if start < 0 else feed[:start]
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "appcast.xml"
+        path.write_bytes(content.encode())
+        signature = sparkle.sign(path, key_file or sparkle.KEY_FILE)
+    return f"{content}{SIGNING_BLOCK_PREFIX}edSignature: {signature}\nlength: {len(content.encode())}\n-->\n"
+
+
+def write_signed_appcast(out_dir: Path, entries: list[str], key_file: Path | None = None) -> Path:
+    path = Path(out_dir) / "appcast.xml"
+    path.write_text(sign_appcast(appcast(entries), key_file))
+    return path
+
+
 def _check(command: list[str], what: str) -> str:
     result = subprocess.run(command, capture_output=True, text=True)
     output = (result.stdout + result.stderr).strip()
@@ -620,8 +647,7 @@ def release_direct(allow_dirty: bool = False) -> Path:
     signature = sparkle.sign(dmg)
     if not sparkle.verify(dmg, signature, sparkle.public_key()):
         raise ReleaseError("the Sparkle signature of the dmg does not verify with our public key")
-    (out_dir / "appcast.xml").write_text(appcast([appcast_entry(version, build, dmg, signature,
-                                                                download_url(version, build))]))
+    write_signed_appcast(out_dir, [appcast_entry(version, build, dmg, signature, download_url(version, build))])
     print("==> Writing the source archive", flush=True)
     source_archive(out_dir / f"{name}-source.tar.gz", f"{name}-source")
     print(f"==> Direct release {version} ({build}) in {out_dir} (not uploaded): {dmg.name}, appcast.xml, "

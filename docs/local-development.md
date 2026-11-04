@@ -179,13 +179,17 @@ python3 tools/dev/lint/tglint.py install-hook   # pre-push hook: lint the pushed
 |---|---|---|
 | Build | `tg build --edition mas` | `tg build` / `tg build --edition direct` |
 | Conditions | `NANOGRAM STABLE NANOGRAM_MAS` | `NANOGRAM STABLE` |
-| Sandbox | yes | no (hardened runtime) |
+| Sandbox | yes | yes (and hardened runtime) |
 | Sparkle | compiled out, not linked, not embedded | embedded |
-| Entitlements | `nanogram/entitlements/Nanogram-MAS.entitlements` | `Nanogram-Direct.entitlements` |
+| Entitlements | `nanogram/entitlements/Nanogram-MAS.entitlements` | `Nanogram-Direct.entitlements` (the mas set plus Sparkle's `-spks`/`-spki` mach-lookup exceptions and read access to the old preferences file) |
 
-The share extension is sandboxed in both (`NanogramShare.entitlements`). Every `tg build` also runs
+The share extension is sandboxed in both (`NanogramShare.entitlements`). Both editions have the same sandbox
+capabilities: network client and server (the server entitlement is for WebRTC's UDP sockets in calls, kept from
+Telegram's own sandbox set), camera, microphone, location, Downloads and user-selected files read-write, the app group.
+Every `tg build` also runs
 `tools/dev/nanogram/editions.py`, which fails the build if an edition is wrong (sandbox, app group, hardened
-runtime, any Sparkle symbol or load command in the mas binaries). It also keeps an APFS clone of each
+runtime, any Sparkle symbol or load command in the mas binaries; for direct also Sparkle's Installer and Downloader XPC
+services, the four Sparkle Info.plist flags, the mach-lookup exceptions and the absence of a DSA key entry). It also keeps an APFS clone of each
 edition's app in `build-output/apps/<Configuration>-<edition>/`, so both editions exist side by side for tests.
 Switching edition changes a compilation condition, so the next build recompiles every Swift module.
 
@@ -205,6 +209,24 @@ edition launched alone reaches the login screen and writes to the same
 `~/Library/Group Containers/YGTMYL879P.org.klaipher.Nanogram/debug/` folder, including the same pre-login account
 record, so the sandboxed mas build reads what the direct build wrote. Still to do with a real account: log in on
 direct, quit, open mas and see the same account and chats without logging in again.
+
+### Data location of the sandboxed direct edition
+
+Accounts, databases, logs, temp files and the encryption key file live in the app group container
+(`~/Library/Group Containers/YGTMYL879P.org.klaipher.Nanogram/<source>/`), which a sandboxed app reaches with its
+group entitlement, so sandboxing the direct edition moves none of it. What lived outside it: `UserDefaults`
+(`~/Library/Preferences/org.klaipher.Nanogram.plist`), Application Support, Caches, saved window state, WebKit and
+cookie storage of the bundle. A sandboxed app sees only its container (`~/Library/Containers/org.klaipher.Nanogram`),
+so `Telegram-Mac/container-migration.plist` (a resource of the app target, in both editions) tells macOS to move those
+paths into the container the first time the sandboxed app starts. macOS runs it only when the container is created, so
+existing mas installs (container already there) are unaffected. That also means it does nothing on a Mac where a mas,
+TestFlight or local mas build already created the container. For that case the direct app reads the old preferences
+file once at launch (`NanogramKit.LegacyPreferences`, read-only entitlement for exactly
+`~/Library/Preferences/org.klaipher.Nanogram.plist`) and copies the keys the container lacks; keys already in the
+container win, and a marker key stops it from running again. Caches, window state and WebKit data are not copied in
+that case. Not covered: a download folder chosen outside
+Downloads (the sandbox needs a fresh pick, per session) and Telegram crash reports in `~/Library/Logs/DiagnosticReports`
+(`CrashReportStore` is unavailable when sandboxed, as in mas).
 
 Local signing uses no provisioning profile, so local mas builds sign with
 `Nanogram-MAS-Development.entitlements`: the distribution set `Nanogram-MAS.entitlements` minus keys macOS
@@ -251,8 +273,16 @@ from `SPARKLE_ED_PUBLIC_KEY` in the same file, and there is no DSA key. The mas 
   relaunches, quitting with a ready update installs it. NanogramKit's `UpdateFlow` folds Sparkle's callbacks into
   one state (tested).
 - `direct.xcconfig` does not build Sparkle's legacy `SUUpdater` (MainMenu.xib instantiates it and would start a
-  second updater with the standard UI), legacy DSA support, or the installer and downloader XPC services (for
-  sandboxed apps only).
+  second updater with the standard UI) or legacy DSA support. The direct app is sandboxed, so it embeds Sparkle's
+  Installer and Downloader XPC services (`SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE`,
+  `SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE`), `Info.plist` enables them (`SUEnableInstallerLauncherService`,
+  `SUEnableDownloaderService`), and `Nanogram-Direct.entitlements` allows the `<bundle id>-spks` and `-spki` mach
+  services (Sparkle 2 sandboxing guide). The release check also verifies the signature of these XPC services.
+- Update security: `SUVerifyUpdateBeforeExtraction` and `SURequireSignedFeed` are on, so the app checks the archive
+  signature before unpacking and refuses an appcast without a valid EdDSA signature. `tg release-direct` appends
+  Sparkle's `<!-- sparkle-signatures: -->` block to `appcast.xml` (`release.sign_appcast`, signature over every byte before the
+  block, made with the same key as the archive). Anything that edits `appcast.xml` afterwards must re-sign it. There is no
+  DSA entry in `Info.plist`. Release notes are shown as plain text (`NanogramKit.UpdateNotes`), never imported as HTML.
 - `tools/dev/tg sparkle-key` creates the private key once at `~/.config/nanogram-macos/sparkle_ed25519` (folder
   0700, file 0600: a base64 32-byte RFC 8032 seed, the format `sign_update --ed-key-file` reads) and prints the
   public key. It never overwrites an existing key and never prints the private one. Back the key up outside this
