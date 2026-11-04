@@ -78,6 +78,9 @@ final class CodeSyntax {
     
     
     static func syntax(code: String, language: String, theme: SyntaxterTheme) -> NSAttributedString {
+        if !HardenedMediaPolicy.current.allowsCodeHighlighting {
+            return NSAttributedString(string: code)
+        }
         let standart = CodeSyntax.standart
         standart.lock.lock()
         defer {
