@@ -74,13 +74,17 @@ public class VerticalParticleListControl: Control {
     }
         
     
+    public static let visibleSegments = 3
+
+    public static func segmentHeight(count: Int, frameHeight: CGFloat, gap: CGFloat) -> CGFloat {
+        let visible = CGFloat(min(max(1, count), visibleSegments))
+        return max(1, floor((frameHeight - (visible - 1) * gap) / visible))
+    }
+
     public func update(count: Int, selectedIndex: Int, animated: Bool, force: Bool = false) {
         self.selectedIndex = selectedIndex
-        var itemSize = NSMakeSize(frame.width, 12)
         let count = max(1, count)
-        if count <= 3 {
-            itemSize.height = floor((frame.height - (CGFloat(count - 1) * frame.width)) / CGFloat(count))
-        }
+        let itemSize = NSMakeSize(frame.width, VerticalParticleListControl.segmentHeight(count: count, frameHeight: frame.height, gap: frame.width))
 
         let fgColor = self.foregroundColor ?? presentation.colors.accentIcon
 

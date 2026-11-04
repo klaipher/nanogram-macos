@@ -2,6 +2,12 @@
 
 Nanogram for macOS releases, newest first.
 
+## Unreleased
+
+### Media and UI
+- Pinned message bar: the side indicator is one aligned column the height of the title and text lines (it was a fixed 30 pt strip, with 12 pt segments that left a dim sliver on top when there are several pins); several pins show three equal segments that scroll with the selection (`ChatPinnedIndicatorLayout`, `VerticalParticleListControl.segmentHeight`).
+- Reactions: the reaction effect animations (the effect on the chip and the one around the message) now request their file and wait up to 1.5 s for it, instead of playing only when the file happened to be on disk and otherwise waiting forever and playing late or never; the effects of the first eight reactions are prefetched when the reaction list loads (`ReactionEffectFileWait`, `ReactionEffectPrefetch`, `EmojiScreenEffect`).
+
 ## 13.1.0 (202611041127) — 2026-11-04
 
 Source: `nanogram/integration` @ de638f4e · core `klaipher/nanogram` `main` @ 7a042ffd (was `mac/core` d3e0d01029; `mac/core` retired as `mac/core-legacy`) · tgcalls `klaipher/tgcalls` `nanogram-shared` @ 54220d6c (was `nanogram-mac` a598e27) · tg_owt `klaipher/tg_owt` `nanogram-mac` @ b6161528 (was c31956f2).

@@ -705,6 +705,30 @@ public final class ChatReactionsLayout {
 
 private let parsedReactionFiles: Atomic<[MediaId: (TelegramMediaFile.Accessor, TelegramMediaFile)]> = Atomic(value: [:])
 
+func reactionEffectFileDataOrNil(context: any AccountContextProtocol, file: TelegramMediaFile) -> Signal<MediaResourceData?, NoError> {
+    if let resource = file.resource as? LocalBundleResource, let path = resource.path {
+        return .single(MediaResourceData(path: path, offset: 0, size: 0, complete: true))
+    }
+    let mediaBox = context.account.postbox.mediaBox
+    let fetch: Signal<Void, NoError> = fetchedMediaResource(mediaBox: mediaBox, userLocation: .other, userContentType: .sticker, reference: .standalone(resource: file.resource))
+    |> map { _ in }
+    |> `catch` { _ in
+        return .complete()
+    }
+    return ReactionEffectFileWait.data(resource: mediaBox.resourceData(file.resource, attemptSynchronously: true), fetch: fetch)
+}
+
+func reactionEffectFileData(context: any AccountContextProtocol, file: TelegramMediaFile) -> Signal<MediaResourceData, NoError> {
+    return reactionEffectFileDataOrNil(context: context, file: file)
+    |> mapToSignal { data -> Signal<MediaResourceData, NoError> in
+        if let data {
+            return .single(data)
+        } else {
+            return .complete()
+        }
+    }
+}
+
 private func sharedParsedReactionFile(_ accessor: TelegramMediaFile.Accessor) -> TelegramMediaFile {
     let fileId = accessor.fileId
     if let cached = parsedReactionFiles.with({ $0[fileId] }), cached.0 == accessor {
@@ -1161,14 +1185,7 @@ final class ChatReactionsView : ChatLayerSceneView {
                 return
             }
 
-            let fileSignal: Signal<MediaResourceData, NoError>
-            if let resource = file.resource as? LocalBundleResource, let path = resource.path {
-                fileSignal = .single(MediaResourceData(path: path, offset: 0, size: 0, complete: true))
-            } else {
-                fileSignal = reaction.context.account.postbox.mediaBox.resourceData(file.resource, attemptSynchronously: true)
-            }
-            let signal: Signal<LottieAnimation?, NoError> = fileSignal
-            |> filter { $0.complete }
+            let signal: Signal<LottieAnimation?, NoError> = reactionEffectFileData(context: reaction.context, file: file)
             |> map { value -> Data? in
                 return try? Data(contentsOf: URL(fileURLWithPath: value.path))
             }
@@ -1615,14 +1632,7 @@ final class ChatReactionsView : ChatLayerSceneView {
                 return
             }
 
-            let fileSignal: Signal<MediaResourceData, NoError>
-            if let resource = file.resource as? LocalBundleResource, let path = resource.path {
-                fileSignal = .single(MediaResourceData(path: path, offset: 0, size: 0, complete: true))
-            } else {
-                fileSignal = reaction.context.account.postbox.mediaBox.resourceData(file.resource, attemptSynchronously: true)
-            }
-            let signal: Signal<LottieAnimation?, NoError> = fileSignal
-            |> filter { $0.complete }
+            let signal: Signal<LottieAnimation?, NoError> = reactionEffectFileData(context: reaction.context, file: file)
             |> map { value -> Data? in
                 return try? Data(contentsOf: URL(fileURLWithPath: value.path))
             }
@@ -2041,8 +2051,7 @@ final class ChatReactionsView : ChatLayerSceneView {
                 return
             }
 
-            let signal: Signal<LottieAnimation?, NoError> = reaction.context.account.postbox.mediaBox.resourceData(file.resource)
-            |> filter { $0.complete }
+            let signal: Signal<LottieAnimation?, NoError> = reactionEffectFileData(context: reaction.context, file: file)
             |> map { value -> Data? in
                 return try? Data(contentsOf: URL(fileURLWithPath: value.path))
             }

@@ -21,6 +21,8 @@ public final class EmojiScreenEffect {
     private var dataDisposable: DisposableDict<MessageId> = DisposableDict()
     private var reactionDataDisposable: DisposableDict<MessageId> = DisposableDict()
     private var largeReactionCenterDisposable: DisposableDict<MessageId> = DisposableDict()
+    private let prefetchDisposable = MetaDisposable()
+    private let prefetchFiles = DisposableSet()
     
     private let limit: Int = 5
     
@@ -76,6 +78,16 @@ public final class EmojiScreenEffect {
         self.scrollUpdater = .init(dispatchWhenVisibleRangeUpdated: false, { [weak self] position in
             self?.updateScroll(transition: .immediate)
         })
+
+        let includePremium = context.isPremium
+        self.prefetchDisposable.set((context.reactions.stateValue |> filter { $0 != nil } |> take(1)).start(next: { [weak self, weak context] available in
+            guard let self, let context, let available else {
+                return
+            }
+            for file in ReactionEffectPrefetch.files(from: available.reactions, includePremium: includePremium) {
+                self.prefetchFiles.add(fetchedMediaResource(mediaBox: context.account.postbox.mediaBox, userLocation: .other, userContentType: .sticker, reference: .standalone(resource: file.resource)).start())
+            }
+        }))
     }
     
     private func checkItem(_ item: TableRowItem, _ messageId: MessageId, with emoji: String) -> Bool {
@@ -150,6 +162,8 @@ public final class EmojiScreenEffect {
         dataDisposable.dispose()
         reactionDataDisposable.dispose()
         largeReactionCenterDisposable.dispose()
+        prefetchDisposable.dispose()
+        prefetchFiles.dispose()
         let animations = self.animations
         for animation in animations {
             deinitAnimation(key: animation.key, animated: false)
@@ -299,9 +313,7 @@ public final class EmojiScreenEffect {
             }
              |> mapToSignal { reaction -> Signal<MediaResourceData?, NoError> in
                  if let file = isLarge ? reaction?.effectAnimation._parse() : reaction?.aroundAnimation?._parse() {
-                    return context.account.postbox.mediaBox.resourceData(file.resource)
-                    |> map { $0.complete ? $0 : nil }
-                    |> take(1)
+                    return reactionEffectFileDataOrNil(context: context, file: file)
                 } else {
                     return .single(nil)
                 }
@@ -339,9 +351,7 @@ public final class EmojiScreenEffect {
                 $0!
             } |> mapToSignal { reaction -> Signal<MediaResourceData, NoError> in
                 if let file = isLarge ? reaction.effectAnimation._parse() : reaction.aroundAnimation?._parse() {
-                    return context.account.postbox.mediaBox.resourceData(file.resource)
-                    |> filter { $0.complete }
-                    |> take(1)
+                    return reactionEffectFileData(context: context, file: file)
                 } else {
                     return .complete()
                 }
@@ -411,10 +421,7 @@ public final class EmojiScreenEffect {
         let signal: Signal<LottieAnimation?, NoError> = file
         |> mapToSignal { file -> Signal<MediaResourceData?, NoError> in
             if let file {
-                return context.account.postbox.mediaBox.resourceData(file.resource)
-                |> filter { $0.complete }
-                |> take(1)
-                |> map(Optional.init)
+                return reactionEffectFileDataOrNil(context: context, file: file)
             } else {
                 return .single(nil)
             }
