@@ -785,7 +785,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 useBetaFeatures = false
                 #endif
                 
-                let systemDeviceModel = deviceModelPretty()
+                // Only the product family leaves the Mac (the session list shows it); the exact model stays private.
+                // A name the user typed in Rename Device (ApiEnvironment.customDeviceModel) still wins.
+                let systemDeviceModel = "Mac"
                 ApiEnvironment.systemDeviceModel = systemDeviceModel
                 let networkArguments = NetworkInitializationArguments(apiId: ApiEnvironment.apiId, apiHash: ApiEnvironment.apiHash, languagesCategory: ApiEnvironment.language, appVersion: ApiEnvironment.version, voipMaxLayer: OngoingCallContext.maxLayer, voipVersions: voipVersions, appData: appData, externalRequestVerificationStream: .single([:]), externalRecaptchaRequestVerification: { _, _ in return .complete() }, autolockDeadine: .single(nil), encryptionProvider: OpenSSLEncryptionProvider(), deviceModelName: ApiEnvironment.customDeviceModel ?? systemDeviceModel, useBetaFeatures: useBetaFeatures, isICloudEnabled: false, networkEngineFactory: RustNetworkEngineFactory())
                 
