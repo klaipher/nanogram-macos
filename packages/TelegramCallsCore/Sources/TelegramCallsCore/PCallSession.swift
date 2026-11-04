@@ -662,8 +662,8 @@ public class PCallSession {
         return 0.0;
     }
     
-    public func drop(_ reason:DropCallReason) {
-        account.callSessionManager.drop(internalId: internalId, reason: reason, debugLog: .single(nil))
+    public func drop(_ reason:DropCallReason, file: String = #fileID, line: Int = #line) {
+        account.callSessionManager.drop(internalId: internalId, reason: reason, debugLog: .single(nil), file: file, line: line)
     }
     private func acceptAfterAccess() {
         callAcceptedTime = CFAbsoluteTimeGetCurrent()
@@ -689,11 +689,13 @@ public class PCallSession {
     }
     
     public func acceptCallSession() {
+        CallDiagnostics.log("call \(self.internalId) answer requested")
         let window = self.alertWindow
         requestMicroAccessDisposable.set((requestMicrophonePermission() |> deliverOnMainQueue).start(next: { [weak self] access in
             if access {
                 self?.acceptAfterAccess()
             } else if let window {
+                CallDiagnostics.log("call \(self?.internalId.description ?? "-") answer: microphone access denied")
                 CallsCoreHooks.shared.verifyAlert(window, strings().requestAccesErrorHaveNotAccessCall, strings().modalOK, "", strings().requestAccesErrorConirmSettings, { [weak self] optionSelected in
                     if optionSelected {
                         openSystemSettings(.microphone)
@@ -701,6 +703,7 @@ public class PCallSession {
                     self?.drop(.hangUp)
                 })
             } else {
+                CallDiagnostics.log("call \(self?.internalId.description ?? "-") answer: microphone access denied")
                 self?.drop(.hangUp)
             }
         }))
@@ -880,6 +883,7 @@ public class PCallSession {
                     presentationState = CallState(state: .connecting(keyVisualHash), videoState: mappedVideoState, remoteVideoState: mappedRemoteVideoState, isMuted: self.isMuted, isOutgoingVideoPaused: self.isOutgoingVideoPaused, remoteAspectRatio: self.remoteAspectRatio, remoteAudioState: self.remoteAudioState, remoteBatteryLevel: self.remoteBatteryLevel, isScreenCapture: self.isScreenCapture, participants: self.incomingParticipants, conferenceReference: self.incomingConferenceSource, supportsConferenceCalls: supportsConferenceCalls)
                 case .failed:
                     presentationState = nil
+                    CallDiagnostics.log("call \(self.internalId) the call context failed to start or lost its connection, dropping as disconnect")
                     self.callSessionManager.drop(internalId: self.internalId, reason: .disconnect, debugLog: .single(nil))
                 case .connected:
                     let timestamp: Double
@@ -1289,6 +1293,7 @@ public class PCallSession {
     }
     
     public func hangUpCurrentCall(_ external: Bool) -> Signal<Bool, NoError> {
+        CallDiagnostics.log("call \(self.internalId) hangUpCurrentCall requested, \(external ? "external" : "by the user")")
         completed = external
         var reason:CallSessionTerminationReason = .ended(.hungUp)
         if let session = sessionState {
