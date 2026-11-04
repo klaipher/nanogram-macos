@@ -133,6 +133,10 @@
    "ios": "5",
    "mac": "5"
   },
+  "DiskWriteAccounting": {
+   "ios": "6",
+   "mac": "5"
+  },
   "Emoji": {
    "ios": "5",
    "mac": "5"
@@ -295,6 +299,7 @@
   }
  },
  "allowed": {
+  "DiskWriteAccounting": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
   "LocalAudioTranscription": "iOS still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
   "ManagedFile": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
   "MediaPreuploadRegistry": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
@@ -303,9 +308,9 @@
  "counts": {
   "ios_swift_modules": 817,
   "ios_swift6": 40,
-  "mac_swift_targets": 255,
+  "mac_swift_targets": 256,
   "mac_swift6": 7,
-  "built_by_both": 41,
-  "modes_differ": 4
+  "built_by_both": 42,
+  "modes_differ": 5
  }
 }

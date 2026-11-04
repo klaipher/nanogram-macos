@@ -26,7 +26,7 @@ core submodules/telegram-ios
 core-root b46f1ec67d5cd386beccb293383114aa16df832d
 repo-root ios b46f1ec67d5cd386beccb293383114aa16df832d
 remote-owner klaipher
-mode legacy
+mode shared
 reference origin/main
 lts-ref origin/mac/core-lts
 lag commits=20 days=7 block-from=2026-11-18
