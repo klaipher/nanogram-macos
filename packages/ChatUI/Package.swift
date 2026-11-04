@@ -2,6 +2,27 @@
 
 import PackageDescription
 
+let chatUITestLibraries: [(path: String, name: String)] = [
+    ("webrtc/build/webrtc", "mac_framework_objc_static"),
+    ("openssl/build/openssl/lib", "ssl"),
+    ("openssl/build/openssl/lib", "crypto"),
+    ("ffmpeg/build/ffmpeg/lib", "avformat"),
+    ("ffmpeg/build/ffmpeg/lib", "avcodec"),
+    ("ffmpeg/build/ffmpeg/lib", "swresample"),
+    ("ffmpeg/build/ffmpeg/lib", "avutil"),
+    ("OpenH264/build/output/lib", "openh264"),
+    ("libvpx/build/libvpx/lib", "vpx"),
+    ("dav1d/build/dav1d/lib", "dav1d"),
+    ("libopus/build/libopus/lib", "opus"),
+    ("Mozjpeg/build", "jpeg"),
+    ("libwebp/build/libwebp/lib", "webp"),
+    ("libwebp/build/libwebp/lib", "webpdemux"),
+    ("libwebp/build/libwebp/lib", "sharpyuv"),
+    ("tde2e/build/tde2e/lib", "tde2e"),
+    ("tde2e/build/tde2e/lib", "tdutils"),
+]
+let chatUITestLinkerFlags: [String] = chatUITestLibraries.flatMap { ["-L", "../../core-xprojects/" + $0.path, "-l" + $0.name] }
+
 let deps: [(String, String)] = [
     ("TGUIKit", "../TGUIKit"),
     ("PerfLab", "../PerfLab"),
@@ -103,6 +124,19 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("Speech"),
             ]),
-        .testTarget(name: "ChatUITests", dependencies: ["ChatUI", .product(name: "AudioPlayerCore", package: "AudioPlayerCore", condition: nil), .product(name: "FetchManager", package: "FetchManager", condition: nil), .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil), .product(name: "SceneEffects", package: "SceneEffects", condition: nil), .product(name: "TGUIKit", package: "TGUIKit", condition: nil), .product(name: "TelegramTheme", package: "TelegramTheme", condition: nil), .product(name: "GeneralRows", package: "GeneralRows", condition: nil), .product(name: "InAppSettings", package: "InAppSettings", condition: nil), .product(name: "ColorPalette", package: "ColorPalette", condition: nil), .product(name: "ThemeSettings", package: "ThemeSettings", condition: nil), .product(name: "rnoise", package: "rnoise", condition: nil), .product(name: "Localization", package: "Localization", condition: nil), .product(name: "TelegramCore", package: "TelegramCore", condition: nil)], path: "Tests/ChatUITests"),
+        .testTarget(name: "ChatUITests", dependencies: ["ChatUI", .product(name: "AudioPlayerCore", package: "AudioPlayerCore", condition: nil), .product(name: "FetchManager", package: "FetchManager", condition: nil), .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil), .product(name: "SceneEffects", package: "SceneEffects", condition: nil), .product(name: "TGUIKit", package: "TGUIKit", condition: nil), .product(name: "TelegramTheme", package: "TelegramTheme", condition: nil), .product(name: "GeneralRows", package: "GeneralRows", condition: nil), .product(name: "InAppSettings", package: "InAppSettings", condition: nil), .product(name: "ColorPalette", package: "ColorPalette", condition: nil), .product(name: "ThemeSettings", package: "ThemeSettings", condition: nil), .product(name: "rnoise", package: "rnoise", condition: nil), .product(name: "Localization", package: "Localization", condition: nil), .product(name: "TelegramCore", package: "TelegramCore", condition: nil)], path: "Tests/ChatUITests",
+            linkerSettings: [
+                .unsafeFlags(chatUITestLinkerFlags),
+                .linkedFramework("VideoToolbox"),
+                .linkedFramework("CoreMedia"),
+                .linkedFramework("AudioToolbox"),
+                .linkedFramework("CoreAudio"),
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("ScreenCaptureKit"),
+                .linkedLibrary("z"),
+                .linkedLibrary("bz2"),
+                .linkedLibrary("iconv"),
+                .linkedLibrary("c++"),
+            ]),
     ]
 )

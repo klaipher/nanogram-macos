@@ -337,7 +337,7 @@ final class ChatWalletTransferSubmoduleCompatibilityTests: XCTestCase {
             "if self.canReadHistoryValue { self.forEachVisibleMessageItemNode { itemNode in itemNode.unreadMessageRangeUpdated() } }"
         ])
         try assertSource(Self.coordinatorPath, contains: [
-            "guard self.isApplicationActive, !self.seenArrivals.contains(message.id), let interaction = self.controller?.controllerInteraction, interaction.canReadHistory,"
+            "guard self.isApplicationActive, self.canPlayArrivals, !self.seenArrivals.contains(message.id), let interaction = self.controller?.controllerInteraction, message.flags.contains(.Incoming),"
         ])
     }
 

@@ -38,14 +38,14 @@ final class ChatVoiceSendFlightSubmoduleCompatibilityTests: XCTestCase {
     }
 
     func testDurationAndCurvesMatchSubmodule() throws {
-        let duration = try numbers(in: Self.transitionPath, "private func chatMessageTransitionAnimationDuration\\(\\) -> Double \\{ #if DEBUG && false return [0-9.]+ #else return ([0-9.]+) #endif")
+        let duration = try numbers(in: Self.transitionPath, "public static let bezier: AnimationParameters = \\{ let duration = chatMessageTransitionAnimationDuration\\(([0-9.]+)\\)")
         XCTAssertEqual(duration, [ChatVoiceSendFlightMotion.duration])
 
-        let vertical = try numbers(in: Self.transitionPath, "verticalAnimationControlPoints: \\(Float, Float, Float, Float\\) = \\(([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)\\)")
+        let vertical = try numbers(in: Self.transitionPath, "verticalControlPoints: \\(Float, Float, Float, Float\\) = \\(([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)\\)")
         let actualVertical = ChatVoiceSendFlightMotion.verticalControlPoints
         XCTAssertEqual(vertical.map { Float($0) }, [actualVertical.0, actualVertical.1, actualVertical.2, actualVertical.3])
 
-        let horizontal = try numbers(in: Self.transitionPath, "horizontalAnimationCurve: ContainedViewLayoutTransitionCurve = \\.custom\\(([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)\\)")
+        let horizontal = try numbers(in: Self.transitionPath, "horizontalCurve: \\.custom\\(([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)\\)")
         let actualHorizontal = ChatVoiceSendFlightMotion.horizontalControlPoints
         XCTAssertEqual(horizontal.map { Float($0) }, [actualHorizontal.0, actualHorizontal.1, actualHorizontal.2, actualHorizontal.3])
 
@@ -58,14 +58,14 @@ final class ChatVoiceSendFlightSubmoduleCompatibilityTests: XCTestCase {
 
     func testBothAxesUseTheirOwnCurveInSubmodule() throws {
         let transition = try source(Self.transitionPath)
-        XCTAssertTrue(transition.contains("let _ = audioMicInput.micButton.animateDecorationToSentMessage(targetRect: targetAbsoluteRect, in: self.view, duration: verticalDuration, horizontalCurve: ChatMessageTransitionNodeImpl.horizontalAnimationCurve, verticalCurve: ChatMessageTransitionNodeImpl.verticalAnimationCurve)"))
-        XCTAssertTrue(transition.contains("self.containerNode.layer.animatePosition(from: CGPoint(x: 0.0, y: sourceAbsoluteRect.midY - targetAbsoluteRect.midY), to: CGPoint(), duration: verticalDuration, delay: delay, mediaTimingFunction: ChatMessageTransitionNodeImpl.verticalAnimationCurve.mediaTimingFunction, additive: true, force: true, completion: { [weak self, weak contextContainer] _ in"))
-        XCTAssertTrue(transition.contains("self.containerNode.layer.animatePosition(from: CGPoint(x: sourceAbsoluteRect.midX - targetAbsoluteRect.midX, y: 0.0), to: CGPoint(), duration: horizontalDuration, delay: delay, mediaTimingFunction: ChatMessageTransitionNodeImpl.horizontalAnimationCurve.mediaTimingFunction, additive: true)"))
+        XCTAssertTrue(transition.contains("let _ = audioMicInput.micButton.animateDecorationToSentMessage(targetRect: targetAbsoluteRect, in: self.view, duration: verticalDuration, horizontalCurve: self.parameters.horizontalCurve, verticalCurve: self.parameters.verticalCurve)"))
+        XCTAssertTrue(transition.contains("self.containerNode.layer.animatePosition(from: CGPoint(x: 0.0, y: sourceAbsoluteRect.midY - targetAbsoluteRect.midY), to: CGPoint(), duration: verticalDuration, delay: delay, timingFunction: self.parameters.verticalCurve.timingFunction, mediaTimingFunction: self.parameters.verticalCurve.mediaTimingFunction, additive: true, force: true, completion: { [weak self, weak contextContainer] _ in"))
+        XCTAssertTrue(transition.contains("self.containerNode.layer.animatePosition(from: CGPoint(x: sourceAbsoluteRect.midX - targetAbsoluteRect.midX, y: 0.0), to: CGPoint(), duration: horizontalDuration, delay: delay, timingFunction: self.parameters.horizontalCurve.timingFunction, mediaTimingFunction: self.parameters.horizontalCurve.mediaTimingFunction, additive: true)"))
 
         let button = try source(Self.recordingButtonPath)
-        XCTAssertTrue(button.contains("decoration.layer.animatePosition(from: CGPoint(x: fromPosition.x - toPosition.x, y: 0.0), to: CGPoint(), duration: duration, mediaTimingFunction: horizontalCurve.mediaTimingFunction, additive: true)"))
-        XCTAssertTrue(button.contains("decoration.layer.animatePosition(from: CGPoint(x: 0.0, y: fromPosition.y - toPosition.y), to: CGPoint(), duration: duration, mediaTimingFunction: verticalCurve.mediaTimingFunction, additive: true)"))
-        XCTAssertTrue(button.contains("decoration.layer.animateScale(from: fromScale, to: toScale, duration: duration, mediaTimingFunction: verticalCurve.mediaTimingFunction)"))
+        XCTAssertTrue(button.contains("decoration.layer.animatePosition(from: CGPoint(x: fromPosition.x - toPosition.x, y: 0.0), to: CGPoint(), duration: duration, timingFunction: horizontalCurve.timingFunction, mediaTimingFunction: horizontalCurve.mediaTimingFunction, additive: true)"))
+        XCTAssertTrue(button.contains("decoration.layer.animatePosition(from: CGPoint(x: 0.0, y: fromPosition.y - toPosition.y), to: CGPoint(), duration: duration, timingFunction: verticalCurve.timingFunction, mediaTimingFunction: verticalCurve.mediaTimingFunction, additive: true)"))
+        XCTAssertTrue(button.contains("decoration.layer.animateScale(from: fromScale, to: toScale, duration: duration, timingFunction: verticalCurve.timingFunction, mediaTimingFunction: verticalCurve.mediaTimingFunction)"))
     }
 
     func testFadesMatchSubmodule() throws {
