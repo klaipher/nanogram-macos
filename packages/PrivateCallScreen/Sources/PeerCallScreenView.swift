@@ -224,6 +224,8 @@ final class PeerCallScreenView : Control {
     private var targetAudioLevel: Float = 0.0
     private var audioLevel: Float = 0.0
     private var audioLevelUpdateSubscription: SharedDisplayLinkDriver.Link?
+    private var powerToken: CallPowerGovernor.Token?
+    private var reducedEffects = false
 
 
 
@@ -280,6 +282,51 @@ final class PeerCallScreenView : Control {
         }, for: .SingleClick)
         
         updateLayout(size: self.frame.size, transition: .immediate)
+        
+        self.powerToken = CallPowerGovernor.shared.observe({ [weak self] profile in
+            self?.applyReducedEffects(profile.reducedEffects)
+        })
+    }
+    
+    private func applyReducedEffects(_ reduced: Bool) {
+        guard self.reducedEffects != reduced else {
+            return
+        }
+        self.reducedEffects = reduced
+        self.photoView?.blobView?.blob.reducedEffects = reduced
+        self.applyVideoEffects()
+        if reduced {
+            if let videoBackgroundView {
+                videoBackgroundView.removeFromSuperview()
+                self.videoBackgroundView = nil
+            }
+        } else if let videoLink_large, self.videoBackgroundView == nil {
+            self.addVideoBackgroundView(below: videoLink_large)
+        }
+    }
+    
+    private func addVideoBackgroundView(below video: NSView) {
+        let current = NSVisualEffectView(frame: self.bounds)
+        current.material = .dark
+        current.state = .active
+        current.blendingMode = .withinWindow
+        current.wantsLayer = true
+        addSubview(current, positioned: .below, relativeTo: video)
+        self.videoBackgroundView = current
+    }
+    
+    private var allVideoViews: [CallVideoView] {
+        return [self.videoViewState?.incomingView, self.videoViewState?.outgoingView].compactMap { $0 }
+    }
+    
+    private func applyVideoEffects() {
+        let paused = !self.animationsActive
+        for view in self.allVideoViews {
+            view.isPaused = paused
+            if let metalView = view as? MetalCallVideoView {
+                metalView.isBackdropBlurEnabled = !self.reducedEffects
+            }
+        }
     }
     
     private var isEnergySavingEnabled: Bool {
@@ -317,6 +364,7 @@ final class PeerCallScreenView : Control {
     
     private func updateAnimationsActivity() {
         let active = self.animationsActive
+        self.applyVideoEffects()
         self.backgroundLayer?.isInHierarchy = active
         if let photoView = self.photoView {
             photoView.setAnimating(active)
@@ -676,6 +724,7 @@ final class PeerCallScreenView : Control {
         
         
         self.updateBackgroundActivity()
+        self.applyVideoEffects()
         
         if videoLink_large != nil {
             let current: ShadowView
@@ -707,17 +756,8 @@ final class PeerCallScreenView : Control {
         }
         
         if let videoLink_large {
-            let current: NSVisualEffectView
-            if let view = self.videoBackgroundView {
-                current = view
-            } else {
-                current = NSVisualEffectView(frame: self.bounds)
-                current.material = .dark
-                current.state = .active
-                current.blendingMode = .withinWindow
-                current.wantsLayer = true
-                addSubview(current, positioned: .below, relativeTo: videoLink_large)
-                self.videoBackgroundView = current
+            if self.videoBackgroundView == nil, !self.reducedEffects {
+                self.addVideoBackgroundView(below: videoLink_large)
             }
         } else if let videoBackgroundView {
             performSubviewRemoval(videoBackgroundView, animated: transition.isAnimated)
@@ -731,6 +771,7 @@ final class PeerCallScreenView : Control {
              } else {
                  current = PeerCallPhotoView(frame: NSMakeRect(0, 0, 120, 120))
                  current.setAnimating(self.animationsActive)
+                 current.blobView?.blob.reducedEffects = self.reducedEffects
                  if backgroundLayer_fallback != nil {
                      addSubview(current, positioned: .above, relativeTo: backgroundLayer_fallback)
                  } else {

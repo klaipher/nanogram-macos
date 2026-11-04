@@ -114,6 +114,29 @@ public final class CallBlobsLayer: MetalEngineSubjectLayer, MetalEngineSubject {
     
     private var displayLinkSubscription: SharedDisplayLinkDriver.Link?
     
+    public var reducedEffects: Bool = false {
+        didSet {
+            if oldValue != self.reducedEffects && self.displayLinkSubscription != nil {
+                self.startDisplayLink()
+            }
+        }
+    }
+    
+    private func startDisplayLink() {
+        self.displayLinkSubscription = SharedDisplayLinkDriver.shared.add(framesPerSecond: .fps(CallAnimationFrameRate.blobFramesPerSecond(reducedEffects: self.reducedEffects)), { [weak self] deltaTime in
+            guard let self else {
+                return
+            }
+            self.phase += Float(deltaTime)
+            if self.phase - floor(self.phase) <= Float(deltaTime) {
+                for i in 0 ..< self.blobs.count {
+                    self.blobs[i].advance(t: 0, speed: self.waveSpeed)
+                }
+            }
+            self.setNeedsUpdate()
+        })
+    }
+    
     public override init() {
         super.init()
         
@@ -121,18 +144,7 @@ public final class CallBlobsLayer: MetalEngineSubjectLayer, MetalEngineSubject {
             guard let self else {
                 return
             }
-            self.displayLinkSubscription = SharedDisplayLinkDriver.shared.add(framesPerSecond: .max, { [weak self] deltaTime in
-                guard let self else {
-                    return
-                }
-                self.phase += Float(deltaTime)
-                if self.phase - floor(self.phase) <= Float(deltaTime) {
-                    for i in 0 ..< self.blobs.count {
-                        self.blobs[i].advance(t: 0, speed: self.waveSpeed)
-                    }
-                }
-                self.setNeedsUpdate()
-            })
+            self.startDisplayLink()
         }
         self.didExitHierarchy = { [weak self] in
             guard let self else {

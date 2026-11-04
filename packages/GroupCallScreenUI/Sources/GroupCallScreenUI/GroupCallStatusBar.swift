@@ -7,6 +7,7 @@ import Localization
 import TelegramContext
 import TelegramTheme
 import GeneralRows
+import CallVideoLayer
 
 private let statusAnimationStepCount = 12
 
@@ -99,12 +100,18 @@ public final class GroupCallStatusBar {
     private func runAnimator() {
         let frames = statusAnimationFrames
         frameIndex = 0
-        let timer = SwiftSignalKit.Timer(timeout: 1.5 / Double(statusAnimationStepCount), repeat: true, completion: { [weak self] in
+        guard let interval = StatusBarPulsePolicy.interval(power: CallPowerGovernor.shared.step) else {
+            self.sharedContext.updateStatusBarImage(frames[statusAnimationStepCount - 1])
+            self.animator = nil
+            return
+        }
+        let frameStep = max(1, Int((interval / (1.5 / Double(statusAnimationStepCount))).rounded()))
+        let timer = SwiftSignalKit.Timer(timeout: interval, repeat: true, completion: { [weak self] in
             guard let self else {
                 return
             }
             self.sharedContext.updateStatusBarImage(frames[self.frameIndex % frames.count])
-            self.frameIndex += 1
+            self.frameIndex += frameStep
         }, queue: .mainQueue())
         self.animator = timer
         timer.start()

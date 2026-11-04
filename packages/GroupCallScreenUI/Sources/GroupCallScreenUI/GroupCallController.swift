@@ -2076,6 +2076,7 @@ public final class GroupCallUIController : ViewController {
             let state = value.0
             
             strongSelf.screenSleep.update(needed: ScreenSleepAssertion.isNeeded(hasVisibleVideo: !state.activeVideoViews.isEmpty || state.isStream, isWindowVisible: state.isWindowVisible))
+            LivestreamVideoVisibility.update(isStream: state.isStream, isWindowVisible: state.isWindowVisible)
             strongSelf.applyUpdates(state, value.1, strongSelf.data.call, animated: animated.swap(true))
             strongSelf.readyOnce()
                         
@@ -2093,6 +2094,7 @@ public final class GroupCallUIController : ViewController {
         
 
         self.onDeinit = {
+            LivestreamVideoVisibility.clear()
             currentState = nil
             _ = previousEntries.swap([])
             _ = previousState.swap(nil)
@@ -2305,6 +2307,7 @@ public final class GroupCallUIController : ViewController {
     }
     
     deinit {
+        LivestreamVideoVisibility.clear()
         self.data.call.setSuspendVideoChannelRequests(true)
         disposable.dispose()
         pushToTalkDisposable.dispose()

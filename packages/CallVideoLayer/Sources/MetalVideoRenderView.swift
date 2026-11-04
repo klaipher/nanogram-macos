@@ -131,6 +131,11 @@ private final class AdaptedCallVideoSource: VideoSource {
     private var pixelBufferPoolState: QueueLocalObject<PixelBufferPoolState>
     
     private var videoFrameDisposable: Disposable?
+    private let deliveryGate = VideoFrameDeliveryGate()
+    
+    func setDeliverySuspended(_ suspended: Bool) {
+        self.deliveryGate.setSuspended(suspended)
+    }
     
     init(videoStreamSignal: Signal<OngoingGroupCallContext.VideoFrameData, NoError>) {
         let queue = Queue(name: "AdaptedCallVideoSource")
@@ -144,6 +149,9 @@ private final class AdaptedCallVideoSource: VideoSource {
         
         self.videoFrameDisposable = (CallVideoTuning.isOptimized ? videoStreamSignal : videoStreamSignal |> deliverOnMainQueue).start(next: { [weak self] videoFrameData in
             guard let self, let textureCache = self.textureCache else {
+                return
+            }
+            guard self.deliveryGate.admit() else {
                 return
             }
             

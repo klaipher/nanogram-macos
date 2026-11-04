@@ -107,6 +107,13 @@ public protocol VideoSource: AnyObject {
     var currentOutput: Output? { get }
     
     func addOnUpdated(_ f: @escaping () -> Void) -> Disposable
+
+    func setDeliverySuspended(_ suspended: Bool)
+}
+
+public extension VideoSource {
+    func setDeliverySuspended(_ suspended: Bool) {
+    }
 }
 
 public enum CallVideoTuning {

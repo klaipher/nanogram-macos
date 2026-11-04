@@ -79,6 +79,7 @@ public class MetalCallVideoView : CallVideoView {
         didSet {
             if let video = video {
                 self.videoOnUpdatedListener?.dispose()
+                video.setDeliverySuspended(self.isPaused)
                 
                 
                 self.videoOnUpdatedListener = video.addOnUpdated { [weak self] in
@@ -124,6 +125,7 @@ public class MetalCallVideoView : CallVideoView {
     public override var isPaused: Bool {
         didSet {
             if oldValue != self.isPaused {
+                self.video?.setDeliverySuspended(self.isPaused)
                 self.setNeedsRenderIfVisible()
             }
         }
@@ -182,6 +184,14 @@ public class MetalCallVideoView : CallVideoView {
         self.updateBlurVisibility()
     }
     
+    public var isBackdropBlurEnabled: Bool = true {
+        didSet {
+            if oldValue != self.isBackdropBlurEnabled {
+                self.updateBlurVisibility()
+            }
+        }
+    }
+    
     private func updateBlurVisibility() {
         var isCovered = CallVideoTuning.isOptimized && self.videoLayer.contentsGravity == .resizeAspectFill
         if CallVideoTuning.isOptimized, !isCovered, let output = self.video?.currentOutput, self.frame.width > 0, self.frame.height > 0 {
@@ -191,6 +201,9 @@ public class MetalCallVideoView : CallVideoView {
             }
             let fitted = resolution.aspectFitted(self.frame.size)
             isCovered = self.frame.width - fitted.width < 1.0 && self.frame.height - fitted.height < 1.0
+        }
+        if !self.isBackdropBlurEnabled {
+            isCovered = true
         }
         if self.videoLayer.blurredLayer.isHidden != isCovered {
             self.videoLayer.blurredLayer.isHidden = isCovered
