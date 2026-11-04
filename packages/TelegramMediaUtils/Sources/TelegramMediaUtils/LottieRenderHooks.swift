@@ -40,7 +40,7 @@ public struct StickerImageDecodeHooks {
         self.decodeFitting = decodeFitting
     }
 
-    public private(set) static var installed: StickerImageDecodeHooks?
+    public nonisolated(unsafe) private(set) static var installed: StickerImageDecodeHooks?
 
     public static func install(_ hooks: StickerImageDecodeHooks?) {
         installed = hooks

@@ -1,8 +1,8 @@
 import Foundation
 import MapKit
-import SwiftSignalKit
+@preconcurrency import SwiftSignalKit
 import TelegramCore
-import Postbox
+@preconcurrency import Postbox
 import HardenedMedia
 
 func mapKitVenueResults(peerId: PeerId, location: CLLocation, query: String) -> Signal<ChatContextResultCollection?, NoError> {

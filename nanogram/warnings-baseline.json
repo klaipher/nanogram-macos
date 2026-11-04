@@ -152,9 +152,9 @@
   "WidgetUI": 76,
   "Zip": 1,
   "app": 826,
+  "boost_regex": 6,
   "libprisma": 1,
   "minizip": 1,
-  "regex": 6,
   "rlottie": 73,
   "sqlcipher": 194,
   "tgcalls": 26
