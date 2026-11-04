@@ -29,5 +29,9 @@ let package = Package(
             cSettings: [
                 .headerSearchPath("include")
             ]),
+        .testTarget(
+            name: "BuildConfigTests",
+            dependencies: ["BuildConfig"],
+            path: "Tests/BuildConfigTests"),
     ]
 )
