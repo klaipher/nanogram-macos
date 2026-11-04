@@ -201,6 +201,11 @@ def plan_derived_data(entries: list[dict], exists, mounted, now: float, unused_d
     return plan
 
 
+def ours_derived_data(name: str, projects: list[str]) -> bool:
+    """Only Nanogram/Telegram DerivedData folders (<project>-<28 letters>); other Xcode projects are never touched."""
+    return name.rsplit("-", 1)[0] in projects
+
+
 def plan_module_cache(path: str, size: int, cap: int, busy: bool, category: str = "module-cache") -> list[Removal]:
     if busy or size <= cap:
         return []
@@ -281,7 +286,7 @@ def plan_worktrees(trees: list[dict], now: float, days: float, cwds: set[str]) -
     """trees: {repo, path, merged, clean, locked, prunable, last_used, is_main}."""
     plan = []
     for tree in trees:
-        if tree["is_main"] or tree["locked"]:
+        if tree["is_main"] or tree["locked"] or tree.get("holds_builds"):
             continue
         if tree["prunable"]:
             plan.append(Removal("worktree", tree["path"], "directory is gone (git worktree prune)", 0,
@@ -308,8 +313,11 @@ def plan_tool_tmp(entries: list[dict], now: float, days: float, globs: list[str]
     return plan
 
 
-def is_released(edition: str, build: str, directory: Path, tags: list[str], changelog: str) -> bool:
+def is_released(edition: str, build: str, directory: Path, tags: list[str], changelog: str,
+                legacy_before: str = "") -> bool:
     if (directory / ".released").exists():
+        return True
+    if legacy_before and BUILD_ID.match(build) and len(build) == len(legacy_before) and build < legacy_before:
         return True
     if any(tag.endswith(f"-{build}") or tag.endswith(f"+{build}") for tag in tags):
         return True
@@ -447,6 +455,19 @@ def find_build_dirs(repo_roots: list[Path]) -> list[Path]:
     return found
 
 
+def holds_builds(tree: Path) -> bool:
+    """A worktree with build-output/{testflight,direct}/<build> keeps archives and dSYMs (ignored by git, so a clean
+    status says nothing about them); git worktree remove would delete them, so such a worktree is never removed."""
+    for edition in ("testflight", "direct"):
+        directory = tree / "build-output" / edition
+        try:
+            if directory.is_dir() and any(c.is_dir() and BUILD_ID.match(c.name) for c in directory.iterdir()):
+                return True
+        except OSError:
+            return True
+    return False
+
+
 def worktree_entries(repo: Path, bases: list[str]) -> list[dict]:
     text = git(repo, "worktree", "list", "--porcelain")
     trees, current = [], {}
@@ -470,6 +491,7 @@ def worktree_entries(repo: Path, bases: list[str]) -> list[dict]:
         clean = exists and merged and index > 0 and not git(path, "status", "--porcelain").strip()
         entries.append({"repo": str(repo), "path": path, "merged": merged, "clean": clean,
                         "locked": "locked" in tree, "prunable": prunable, "is_main": index == 0,
+                        "holds_builds": exists and holds_builds(Path(path)),
                         "last_used": newest_mtime(Path(path)) if exists else 0.0})
     return entries
 
@@ -498,7 +520,8 @@ def gather_and_plan(policy: Policy, only: set[str], repo: Path | None, now: floa
         entries = []
         if derived_root.is_dir():
             for child in sorted(derived_root.iterdir()):
-                if child.is_dir() and XCODE_DERIVED.match(child.name):
+                if (child.is_dir() and XCODE_DERIVED.match(child.name)
+                        and ours_derived_data(child.name, policy.data.get("derived_data_projects", []))):
                     entries.append({"path": str(child), "workspace": read_workspace(child),
                                     "last_used": max(newest_mtime(child), newest_mtime(child / "Build"),
                                                      newest_mtime(child / "Logs")), "size": 0})
@@ -612,7 +635,8 @@ def gather_build_output(policy: Policy, repo: Path, now: float) -> list[Removal]
         builds = [c.name for c in directory.iterdir() if c.is_dir() and BUILD_ID.match(c.name)]
         editions[edition] = builds
         for build in builds:
-            if is_released(edition, build, directory / build, tags, changelog):
+            if is_released(edition, build, directory / build, tags, changelog,
+                           str(policy.data.get("released_unknown_before_build", ""))):
                 released.add((edition, build))
     root_s = str(root)
     candidates = plan_build_output(editions, released, policy.data["keep_unreleased_builds"], {}, set(), root_s)

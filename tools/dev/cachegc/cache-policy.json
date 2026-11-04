@@ -32,8 +32,11 @@
   "build_output_logs": 14,
   "tool_tmp": 2
  },
+ "derived_data_projects": ["Telegram-Mac", "Telegram", "Nanogram", "NanogramKit", "TelegramShare"],
  "instruments_min_age_minutes": 60,
  "keep_unreleased_builds": 3,
+ "released_unknown_before_build": "202611050000",
+ "released_unknown_note": "Builds numbered before this were made before tg testflight wrote the .released marker; whether they were uploaded is unknown, so they count as released and are kept with their dSYMs.",
  "recently_used_minutes": 120,
  "auto": {
   "min_interval_minutes": 30,

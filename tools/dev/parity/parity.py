@@ -239,6 +239,13 @@ def check_roots(report: Report, name: str, repo: Path, revs: list[str], allowed:
         report.ok(name, f"every pushed history is rooted at {', '.join(a[:10] for a in allowed)}")
 
 
+def is_owner_url(url: str, owner: str) -> bool:
+    """A network URL of a repository under `owner`; local paths (e.g. /Users/<owner>/...) never count."""
+    name = re.escape(owner)
+    return bool(re.match(rf"^(?:https?|ssh|git)://(?:[^@/]+@)?[^/]+/{name}/[^/]+", url)
+                or re.match(rf"^[^/@:]+@[^/:]+:{name}/[^/]+", url))
+
+
 def reachable_from_owner(repo: Path, sha: str, owner: str) -> tuple[bool, str]:
     if not has_object(repo, sha):
         return False, "the commit is not in this checkout"
@@ -247,7 +254,7 @@ def reachable_from_owner(repo: Path, sha: str, owner: str) -> tuple[bool, str]:
     for ref in refs:
         remote = ref.split("/")[2] if ref.startswith("refs/remotes/") else ""
         url = git(repo, "remote", "get-url", remote, check=False).strip()
-        if f"/{owner}/" in url or url.endswith(f":{owner}") or f":{owner}/" in url:
+        if is_owner_url(url, owner):
             owned.append(ref)
     if owned:
         return True, owned[0]
@@ -259,12 +266,46 @@ def shared_paths_touched(repo: Path, sha: str, shares: list[str]) -> list[str]:
     return [p for p in out.split("\n") if p and any(covers(s, p) for s in shares)]
 
 
-def cherry_picked_from_reference(repo: Path, sha: str, reference: str) -> bool:
+def picked_sources(repo: Path, sha: str, reference: str) -> list[str]:
     body = git(repo, "show", "-s", "--format=%B", sha, check=False)
-    for source in re.findall(r"cherry picked from commit ([0-9a-f]{7,40})", body):
-        if has_object(repo, source) and is_ancestor(repo, source, reference):
-            return True
-    return False
+    return [source for source in re.findall(r"cherry picked from commit ([0-9a-f]{7,40})", body)
+            if has_object(repo, source) and is_ancestor(repo, source, reference)]
+
+
+def changed_lines(repo: Path, sha: str, paths: list[str]) -> dict[str, list[str]]:
+    """The added and removed lines of each path in one commit, without context or line numbers."""
+    out = git(repo, "-c", "core.quotePath=false", "diff", "-U0", "--no-color", "--no-renames", "--no-ext-diff",
+              f"{sha}^", sha, "--", *paths, check=False)
+    lines: dict[str, list[str]] = {}
+    current: list[str] = []
+    for line in out.splitlines():
+        if line.startswith("diff --git "):
+            current = []
+        elif line.startswith(("--- a/", "+++ b/")):
+            lines[line[6:]] = current
+        elif line[:1] in ("+", "-") and not line.startswith(("+++ ", "--- ")):
+            current.append(line.rstrip())
+    return lines
+
+
+def unexplained_paths(repo: Path, sha: str, reference: str, shares: list[str], relevant: set[str]) -> set[str]:
+    """Shared paths this pin-only commit changes in a way main does not explain.
+
+    A plain commit explains nothing. A `cherry-pick -x` of a main commit explains a file only when it adds and removes
+    the same lines there as its source (context may differ), so extra edits under a cherry-pick trailer are drift.
+    A merge explains everything except files that differ from every parent (conflict resolutions, evil merges).
+    """
+    parents = git(repo, "rev-list", "--parents", "-n", "1", sha, check=False).split()[1:]
+    if len(parents) > 1:
+        out = git(repo, "diff-tree", "-r", "--cc", "--no-commit-id", "--name-only", sha, check=False)
+        return {p for p in out.split("\n") if p in relevant}
+    touched = {p for p in shared_paths_touched(repo, sha, shares) if p in relevant}
+    sources = picked_sources(repo, sha, reference) if touched and parents else []
+    if not sources:
+        return touched
+    mine = changed_lines(repo, sha, sorted(touched))
+    theirs = [changed_lines(repo, source, sorted(touched)) for source in sources]
+    return {path for path in touched if not any(mine.get(path, []) == other.get(path) for other in theirs)}
 
 
 def core_ahead_and_behind(report: Report, repo: Path, pin: str, reference: str, config: Config,
@@ -317,20 +358,21 @@ def core_ahead_and_behind(report: Report, repo: Path, pin: str, reference: str, 
     else:
         report.ok("core-lag", summary)
 
-    diff_names = [p for p in git(repo, "diff", "--name-only", pin, reference, check=False).split("\n")
+    diff_names = [p for p in git(repo, "diff", "--name-only", "--no-renames", pin, reference, check=False).split("\n")
                   if p and any(covers(s, p) for s in config.shares)]
-    pin_only = git(repo, "rev-list", "--no-merges", f"{reference}..{pin}", check=False).split()
-    equivalent = {line.split()[1] for line in git(repo, "cherry", reference, pin, check=False).splitlines() if line.startswith("-")}
+    relevant = {p for p in diff_names if not is_allowed(config, "core", p, today)}
+    pin_only = git(repo, "rev-list", f"{reference}..{pin}", check=False).split() if relevant else []
+    equivalent = {line.split()[1] for line in git(repo, "cherry", reference, pin, check=False).splitlines() if line.startswith("-")} if pin_only else set()
     mac_touched: set[str] = set()
     for sha in pin_only:
-        if sha in equivalent or cherry_picked_from_reference(repo, sha, reference):
+        if sha in equivalent:
             continue
-        mac_touched.update(shared_paths_touched(repo, sha, config.shares))
-    unexplained = sorted(p for p in diff_names if p in mac_touched and not is_allowed(config, "core", p, today))
+        mac_touched.update(unexplained_paths(repo, sha, reference, config.shares, relevant - mac_touched))
+    unexplained = sorted(mac_touched)
     if unexplained:
         shown = ", ".join(unexplained[:8]) + (f" and {len(unexplained) - 8} more" if len(unexplained) > 8 else "")
         soft("core-files", f"{len(unexplained)} shared file(s) differ from {config.reference} through commits that are not "
-             f"cherry-picks of it and have no allow entry in {CONFIG_RELATIVE}: {shown}{suffix}")
+             f"exact cherry-picks of it (or through merge resolutions) and have no allow entry in {CONFIG_RELATIVE}: {shown}{suffix}")
     else:
         report.ok("core-files", "no shared core file differs from the reference without an allow entry or a cherry-pick")
 
@@ -529,6 +571,17 @@ def touches_shared(root: Path, config: Config, base: str, head: str) -> list[str
     return sorted(p for p in names if p and any(covers(s, p) for s in config.shares))
 
 
+def push_base(root: Path, remote: str, local_sha: str, remote_sha: str) -> str | None:
+    """Where the pushed commits start: the remote's old tip, or for a new branch the parent of its first commit the
+    remote does not have yet. "" when the remote already has every commit; None when no base is known (all checked)."""
+    if remote_sha != ZERO_SHA and has_object(root, remote_sha):
+        return git(root, "merge-base", remote_sha, local_sha, check=False).strip() or remote_sha
+    first = git(root, "rev-list", "--reverse", "--topo-order", local_sha, "--not", f"--remotes={remote}", check=False).split()
+    if not first:
+        return ""
+    return rev(root, first[0] + "^")
+
+
 def parse_push_refs(text: str) -> list[tuple[str, str, str, str]]:
     return [tuple(line.split()) for line in text.splitlines() if len(line.split()) == 4]  # type: ignore[misc]
 
@@ -549,10 +602,12 @@ def push_hook(root: Path, remote: str, stdin_text: str, today: datetime.date) ->
                 check_roots(report, "core-root", core, [pin], config.core_roots)
         else:
             check_roots(report, "history-root", root, [local_sha], config.repo_roots.get("ios", []))
-            known = remote_sha != ZERO_SHA and has_object(root, remote_sha)
-            ios_pins_published(report, root, config, local_sha, remote_sha if known else None)
-            if known:
-                shared = touches_shared(root, config, remote_sha, local_sha)
+            base = push_base(root, remote, local_sha, remote_sha)
+            if base == "":
+                continue
+            ios_pins_published(report, root, config, local_sha, base)
+            if base:
+                shared = touches_shared(root, config, base, local_sha)
                 if shared:
                     report.warn("shared-paths", f"this push changes {len(shared)} path(s) the Mac shares (e.g. {shared[0]}); "
                                 "run tools/dev/tg core-bump on the Mac side the same day")

@@ -238,10 +238,10 @@ cmd_parity() { python3 "$ROOT/tools/dev/parity/parity.py" check --root "$ROOT" "
 # pin; runs tg test (NanogramKit + changed packages) and tg parity (plus tg build with --build); puts the old pin
 # back when any fails; with --commit commits only the pin as "mac-core: <sha> (<subject>)".
 cmd_core_bump() {
-  local target="" dry=0 fetch=1 test=1 build=0 commit=0 rewind=0 plan_args=()
+  local target="" dry_run=0 fetch=1 test=1 build=0 commit=0 rewind=0 plan_args=()
   while [ $# -gt 0 ]; do
     case "$1" in
-      --dry-run) dry=1 ;;
+      --dry-run) dry_run=1 ;;
       --no-fetch) fetch=0 ;;
       --no-test) test=0 ;;
       --build) build=1 ;;
@@ -257,7 +257,7 @@ cmd_core_bump() {
   [ "$rewind" = 0 ] || plan_args+=(--allow-rewind)
   local old
   old="$(git rev-parse HEAD:submodules/telegram-ios)"
-  if [ "$dry" = 1 ]; then py sync core-bump --dry-run ${plan_args[@]+"${plan_args[@]}"}; return; fi
+  if [ "$dry_run" = 1 ]; then py sync core-bump --dry-run ${plan_args[@]+"${plan_args[@]}"}; return; fi
   py sync core-bump ${plan_args[@]+"${plan_args[@]}"} || exit 1
   local failed=()
   if [ "$test" = 1 ]; then (cmd_test) || failed+=(test); fi

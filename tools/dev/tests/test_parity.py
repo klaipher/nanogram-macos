@@ -205,15 +205,65 @@ class LagAndFilesTests(CoreRepoCase):
         self.assertEqual(result["core-files"][0], "ok")
         self.assertEqual(result["core-ancestry"][0], "ok")
 
-    def test_cherry_pick_with_edited_patch_is_matched_by_trailer(self):
+    def edited_pick(self):
         run(self.core, "checkout", "-q", "-b", "lts")
         run(self.core, "checkout", "-q", "main")
         fix = commit(self.core, {"submodules/TelegramCore/B.swift": "fixed\n"}, "fix on main")
         commit(self.core, {"submodules/TelegramCore/B.swift": "fixed again\n"}, "main moves on")
         run(self.core, "checkout", "-q", "lts")
-        pin = commit(self.core, {"submodules/TelegramCore/B.swift": "fixed differently\n"},
+        return commit(self.core, {"submodules/TelegramCore/B.swift": "fixed differently\n"},
+                      f"fix on main\n\n(cherry picked from commit {fix})")
+
+    def test_cherry_pick_trailer_does_not_hide_extra_edits(self):
+        pin = self.edited_pick()
+        result = self.lag(pin, lts=pin)
+        self.assertEqual(result["core-files"][0], "error")
+        self.assertIn("submodules/TelegramCore/B.swift", result["core-files"][1])
+
+    def test_adapted_backport_passes_with_an_allow_entry(self):
+        pin = self.edited_pick()
+        self.config.allows.append(parity.Allow("core", "submodules/TelegramCore/B.swift", "LTS backport", None))
+        self.assertEqual(self.lag(pin, lts=pin)["core-files"][0], "ok")
+
+    def test_exact_cherry_pick_with_different_context_is_not_flagged(self):
+        lines = [f"line {i}\n" for i in range(12)]
+        base = commit(self.core, {"submodules/TelegramCore/B.swift": "".join(lines)}, "base")
+        run(self.core, "checkout", "-q", "-b", "lts")
+        run(self.core, "checkout", "-q", "main")
+        moved = lines[:]
+        moved[0] = "line 0 on main\n"
+        commit(self.core, {"submodules/TelegramCore/B.swift": "".join(moved)}, "main edits the top")
+        fixed = moved[:]
+        fixed[9] = "line 9 fixed\n"
+        fix = commit(self.core, {"submodules/TelegramCore/B.swift": "".join(fixed)}, "fix on main")
+        run(self.core, "checkout", "-q", "lts")
+        self.assertEqual(run(self.core, "rev-parse", "HEAD^{tree}"), run(self.core, "rev-parse", f"{base}^{{tree}}"))
+        picked = lines[:]
+        picked[9] = "line 9 fixed\n"
+        pin = commit(self.core, {"submodules/TelegramCore/B.swift": "".join(picked)},
                      f"fix on main\n\n(cherry picked from commit {fix})")
         self.assertEqual(self.lag(pin, lts=pin)["core-files"][0], "ok")
+
+    def test_evil_merge_on_lts_is_flagged_and_a_clean_merge_is_not(self):
+        run(self.core, "checkout", "-q", "-b", "lts")
+        commit(self.core, {"submodules/Postbox/Mac.swift": "mac\n"}, "lts work")
+        run(self.core, "checkout", "-q", "main")
+        commit(self.core, {"submodules/Postbox/A.swift": "a2\n"}, "main fix")
+        run(self.core, "checkout", "-q", "lts")
+        run(self.core, "merge", "-q", "--no-ff", "--no-edit", "main")
+        clean = run(self.core, "rev-parse", "HEAD")
+        run(self.core, "checkout", "-q", "main")
+        commit(self.core, {"submodules/TelegramCore/B.swift": "b2\n"}, "main moves on")
+        self.assertEqual(self.lag(clean, lts=clean)["core-files"][0], "ok")
+        run(self.core, "checkout", "-q", "lts")
+        run(self.core, "merge", "-q", "--no-ff", "--no-commit", "main")
+        Path(self.core, "submodules/TelegramCore/B.swift").write_text("b2 plus a mac edit\n")
+        run(self.core, "add", "submodules/TelegramCore/B.swift")
+        run(self.core, "commit", "-q", "--no-edit")
+        evil = run(self.core, "rev-parse", "HEAD")
+        result = self.lag(evil, lts=evil)
+        self.assertEqual(result["core-files"][0], "error")
+        self.assertIn("submodules/TelegramCore/B.swift", result["core-files"][1])
 
 
 class PublishedTests(unittest.TestCase):
@@ -237,6 +287,27 @@ class PublishedTests(unittest.TestCase):
             run(repo, "remote", "add", "origin", "https://github.com/macosswift/tg_owt")
             run(repo, "update-ref", "refs/remotes/origin/main", sha)
             self.assertFalse(parity.reachable_from_owner(repo, sha, "klaipher")[0])
+
+
+    def test_local_path_remote_under_the_owner_home_does_not_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "r"
+            init(repo)
+            sha = commit(repo, {"a": "a\n"}, "one")
+            for url in ("/Users/klaipher/Projects/nanogram-macos/submodules/tgcalls", "file:///Users/klaipher/x",
+                        "../klaipher/x"):
+                subprocess.run(["git", "-C", str(repo), "remote", "remove", "local"], capture_output=True)
+                run(repo, "remote", "add", "local", url)
+                run(repo, "update-ref", "refs/remotes/local/main", sha)
+                self.assertFalse(parity.reachable_from_owner(repo, sha, "klaipher")[0], url)
+
+    def test_owner_url_forms(self):
+        for url in ("https://github.com/klaipher/x", "https://github.com/klaipher/x.git", "git@github.com:klaipher/x.git",
+                    "ssh://git@github.com/klaipher/x"):
+            self.assertTrue(parity.is_owner_url(url, "klaipher"), url)
+        for url in ("https://github.com/notklaipher/x", "https://github.com/klaipherx/y", "/Users/klaipher/x",
+                    "https://github.com/TelegramMessenger/klaipher"):
+            self.assertFalse(parity.is_owner_url(url, "klaipher"), url)
 
 
 class WebrtcTests(unittest.TestCase):
@@ -284,7 +355,7 @@ class MacCheckTests(unittest.TestCase):
 
     def sub(self, path, files, share_with=None):
         init(path)
-        sha = commit(path, files, "sub")
+        sha = commit(path, files, "sub", date="2026-11-01T00:00:00+0000")
         run(path, "remote", "add", "origin", OWNER_URL)
         run(path, "update-ref", "refs/remotes/origin/main", sha)
         return sha
@@ -435,6 +506,36 @@ class IosSideTests(unittest.TestCase):
         self.assertIn("unpublished", err)
         run(calls, "update-ref", "refs/remotes/origin/main", "HEAD")
         self.assertEqual(self.hook(after, before)[0], 0)
+
+    def unpublished_tgcalls_on_main(self):
+        calls = self.ios / "submodules/TgVoipWebrtc/tgcalls"
+        init(calls)
+        commit(calls, {"x.cc": "x\n"}, "sub")
+        run(calls, "remote", "add", "origin", OWNER_URL)
+        run(self.ios, "add", "submodules/TgVoipWebrtc/tgcalls")
+        run(self.ios, "commit", "-q", "-m", "pin")
+        run(self.ios, "remote", "add", "origin", "https://github.com/klaipher/nanogram.git")
+        run(self.ios, "update-ref", "refs/remotes/origin/main", "HEAD")
+        return calls
+
+    def test_hotfix_branch_is_not_blocked_by_a_pin_already_on_the_remote(self):
+        self.unpublished_tgcalls_on_main()
+        run(self.ios, "checkout", "-q", "-b", "hotfix")
+        hotfix = commit(self.ios, {"Telegram/App.swift": "fix\n"}, "hotfix")
+        code, _, err = self.hook(hotfix, parity.ZERO_SHA, ref="refs/heads/hotfix")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.hook(run(self.ios, "rev-parse", "main"), parity.ZERO_SHA, ref="refs/heads/copy")[0], 0)
+
+    def test_new_branch_that_moves_a_pin_to_an_unpublished_commit_blocks(self):
+        calls = self.unpublished_tgcalls_on_main()
+        run(calls, "update-ref", "refs/remotes/origin/main", "HEAD")
+        commit(calls, {"x.cc": "y\n"}, "sub 2")
+        run(self.ios, "checkout", "-q", "-b", "bump")
+        run(self.ios, "add", "submodules/TgVoipWebrtc/tgcalls")
+        run(self.ios, "commit", "-q", "-m", "bump")
+        code, _, err = self.hook(run(self.ios, "rev-parse", "HEAD"), parity.ZERO_SHA, ref="refs/heads/bump")
+        self.assertEqual(code, 1)
+        self.assertIn("unpublished", err)
 
     def test_fast_never_reads_the_mac_to_block(self):
         report = parity.check_ios(self.ios, self.config, mac_repo=None)

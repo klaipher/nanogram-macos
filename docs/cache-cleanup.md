@@ -13,7 +13,7 @@ One implementation, `tools/dev/cachegc/cachegc.py`, and one configuration, `tool
 | Category | Removed when |
 |---|---|
 | `bazel-output-base` | `~/Library/Caches/bazel/_bazel_$USER/<hash>` whose workspace path no longer exists (deleted worktree or clone), no Bazel server for it, not touched in 2 hours, volume mounted |
-| `derived-data` | `~/Library/Developer/Xcode/DerivedData/<Name>-<hash>`: its checkout is gone, or unused 14 days (age rule waits while xcodebuild or Xcode runs) |
+| `derived-data` | `~/Library/Developer/Xcode/DerivedData/<Name>-<hash>` of our projects only (`derived_data_projects` in the policy: Telegram-Mac, Telegram, Nanogram, NanogramKit, TelegramShare; other Xcode projects are never touched): its checkout is gone, or unused 14 days (age rule waits while xcodebuild or Xcode runs) |
 | `module-cache` | `DerivedData/ModuleCache.noindex` over 3 GB, no build tool running |
 | `compilation-cache` | the Xcode CAS (`~/.cache/nanogram-macos/CompilationCache`) over 10 GB, removed as a whole, no build running, no build lock held |
 | `spm-build` | `.build` next to a `Package.swift` inside either repo or one of its worktrees, unused 7 days, no process working inside it. `tg test` now builds under `--scratch-path` in the cache root, so new ones do not appear |
@@ -21,10 +21,11 @@ One implementation, `tools/dev/cachegc/cachegc.py`, and one configuration, `tool
 | `instruments` | `$TMPDIR/instruments*.ktrace` older than 1 hour with no open handle |
 | `build-output` | Mac `build-output/{testflight,direct}/<build>`: released builds are never touched; the newest 3 unreleased per edition stay. Loose logs older than 14 days |
 | `simulator` | `xcrun simctl delete unavailable` (at most daily) |
-| `worktree` | git worktrees of both repos whose branch is merged into the base branch, clean, unlocked, unused 14 days, nobody working in them; dangling records are pruned |
+| `worktree` | git worktrees of both repos whose branch is merged into the base branch, clean, unlocked, unused 14 days, nobody working in them, and holding no `build-output/{testflight,direct}/<build>` (git ignores those, and `git worktree remove` would delete archives and dSYMs with the tree); dangling records are pruned |
 | `tool-tmp` | `nanogram-*`, `tg-*`, `frameworks-*`, `casprobe*` in the cache root `tmp` and `$TMPDIR`, older than 2 days and not mentioned by a running process |
 
-A build counts as released when its folder has a `.released` marker (written when `tg testflight` uploads), a git tag ends with `-<build>`, or `CHANGELOG.md` mentions the build number. Released archives and dSYMs are kept forever; the iOS dSYM archive (`~/Library/Application Support/Nanogram/dsyms`) is never touched and `tg testflight` no longer prunes it (`TG_DSYM_KEEP=0` is the default).
+A build counts as released when its folder has a `.released` marker (written when `tg testflight` uploads), a git tag ends with `-<build>`, or `CHANGELOG.md` mentions the build number. Builds numbered before `released_unknown_before_build` (202611050000)
+were made before the marker existed, so whether they were uploaded is unknown: they count as released and are kept. Released archives and dSYMs are kept forever; the iOS dSYM archive (`~/Library/Application Support/Nanogram/dsyms`) is never touched and `tg testflight` no longer prunes it (`TG_DSYM_KEEP=0` is the default).
 
 The Bazel disk cache is not touched by hand: Bazel trims it itself (`--experimental_disk_cache_gc_max_size=30G`, `--experimental_disk_cache_gc_max_age=14d` in `.bazelrc`, equal to the policy).
 

@@ -56,6 +56,12 @@ class DerivedData(unittest.TestCase):
         e.update(kw)
         return e
 
+    def test_only_our_projects_are_considered(self):
+        projects = gc.load_policy().data["derived_data_projects"]
+        self.assertTrue(gc.ours_derived_data("Telegram-Mac-buemmmmpuarxgheskcgddorkypsq", projects))
+        self.assertFalse(gc.ours_derived_data("MyOtherApp-buemmmmpuarxgheskcgddorkypsq", projects))
+        self.assertFalse(gc.ours_derived_data("Telegram-Mac-Fork-buemmmmpuarxgheskcgddorkypsq", projects))
+
     def test_orphan_removed_even_when_recent_enough(self):
         self.assertEqual(len(self.plan([self.entry(last_used=NOW - 3 * DAY)])), 1)
 
@@ -128,6 +134,9 @@ class BuildOutput(unittest.TestCase):
             self.assertFalse(gc.is_released("direct", "202611031630", d, [], "nothing"))
             self.assertTrue(gc.is_released("direct", "202611031630", d, ["v13.1.0-202611031630"], ""))
             self.assertTrue(gc.is_released("testflight", "202611031753", d, [], "## 13.1.0 (202611031753)"))
+            self.assertTrue(gc.is_released("testflight", "202611031320", d, [], "", "202611050000"))
+            self.assertFalse(gc.is_released("testflight", "202611061200", d, [], "", "202611050000"))
+            self.assertFalse(gc.is_released("testflight", "202611031320", d, [], "", ""))
             (d / ".released").write_text("")
             self.assertTrue(gc.is_released("testflight", "1", d, [], ""))
 
@@ -148,9 +157,16 @@ class Worktrees(unittest.TestCase):
 
     def test_kept_cases(self):
         for kw in ({"is_main": True}, {"locked": True}, {"merged": False}, {"clean": False},
-                   {"last_used": NOW - DAY}):
+                   {"last_used": NOW - DAY}, {"holds_builds": True}):
             self.assertEqual(gc.plan_worktrees([self.tree(**kw)], NOW, 14, set()), [], kw)
         self.assertEqual(gc.plan_worktrees([self.tree()], NOW, 14, {"/w/sub"}), [])
+
+    def test_worktree_with_builds_is_detected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tree = Path(tmp)
+            self.assertFalse(gc.holds_builds(tree))
+            (tree / "build-output/testflight/202611031753").mkdir(parents=True)
+            self.assertTrue(gc.holds_builds(tree))
 
     def test_prunable_is_pruned(self):
         plan = gc.plan_worktrees([self.tree(prunable=True, last_used=NOW)], NOW, 14, set())

@@ -567,12 +567,16 @@ repos) enforces it; `tools/dev/tg parity` runs it here and `tg check` includes i
 
 - History roots: every core commit must be rooted at the import `b46f1ec6`; a push that reaches Telegram's history is
   stopped (both repos' pre-push hooks).
-- Pins published: core, tgcalls, rlottie and tg_owt pins must be on a `klaipher` remote.
+- Pins published: core, tgcalls, rlottie and tg_owt pins must be on a `klaipher` remote (a network URL under
+  `klaipher/`; a local-path remote such as `/Users/klaipher/...` does not count).
 - Equal SHAs: tgcalls, rlottie and tlottie are the same commit on both sides (read from the core pin, or from
   `--ios-repo` while the core is still `mac/core`).
 - Core pin: an ancestor of iOS `main` (or `mac/core-lts`), lag limit 20 commits / 7 days of shared-path commits
   (warning until `block-from`, then an error), and no shared file that differs through a commit that is neither a
-  `cherry-pick -x` of `main` nor allow-listed.
+  `cherry-pick -x` of `main` nor allow-listed. A cherry-pick explains a file only when it adds and removes exactly the
+  lines its source does there (context may differ), so extra edits under a `cherry picked from` trailer count as
+  drift; an adapted LTS backport needs an `allow core <path> until=DATE | reason` entry. A merge counts the files it
+  resolves differently from every parent.
 - WebRTC: shared source files of `tg_owt/src` and the iOS webrtc tree must match unless allow-listed. Allow entries
   can carry `until=DATE`, after which they stop applying.
 - `mode legacy` in the paths file keeps ancestry, lag and file checks as warnings while the Mac pins `mac/core`;
