@@ -1096,7 +1096,10 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                         }
                     })
                     let liveDisposable = (live |> deliverOn(prepareQueue)).start(next: { value in
-                        gate.liveArrived()
+                        let isReady = ChatListReadiness.isReady(isLoading: value.0.list.isLoading, hasContent: !value.0.list.items.isEmpty)
+                        if !gate.acceptLive(isReady: isReady) {
+                            return
+                        }
                         cachedDisposable.dispose()
                         subscriber.putNext(value)
                     }, completed: {

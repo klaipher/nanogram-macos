@@ -100,4 +100,27 @@ final class ChatListFirstDisplayTests: XCTestCase {
         gate.liveArrived()
         XCTAssertFalse(gate.shouldEmitCached())
     }
+
+    func testLoadingPlaceholderDoesNotSuppressPendingCachedValue() {
+        var gate = ChatListCachedReplayGate()
+        XCTAssertFalse(gate.acceptLive(isReady: false))
+        XCTAssertTrue(gate.shouldEmitCached())
+    }
+
+    func testCachedThenPlaceholderThenContentShowsNoPlaceholder() {
+        var gate = ChatListCachedReplayGate()
+        var output: [String] = []
+        if gate.shouldEmitCached() { output.append("cached") }
+        if gate.acceptLive(isReady: false) { output.append("placeholder") }
+        if gate.acceptLive(isReady: true) { output.append("content") }
+        XCTAssertEqual(output, ["cached", "content"])
+        XCTAssertFalse(gate.shouldEmitCached())
+    }
+
+    func testReadyLiveBeforeDelayDropsCachedAndLaterValuesPass() {
+        var gate = ChatListCachedReplayGate()
+        XCTAssertTrue(gate.acceptLive(isReady: true))
+        XCTAssertFalse(gate.shouldEmitCached())
+        XCTAssertTrue(gate.acceptLive(isReady: false))
+    }
 }
