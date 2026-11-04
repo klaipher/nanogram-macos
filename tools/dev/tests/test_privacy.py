@@ -49,6 +49,17 @@ class MacPrivacyTests(unittest.TestCase):
         self.assertIn('let systemDeviceModel = "Mac"', source)
         self.assertNotIn("let systemDeviceModel = deviceModelPretty()", source)
 
+    def test_no_network_is_given_the_exact_model(self):
+        # The share extension opens its own connection; it must send the same family the app does.
+        share = (ROOT / "TelegramShare/ShareViewController.swift").read_text(encoding="utf-8")
+        self.assertIn('deviceModelName: ApiEnvironment.customDeviceModel ?? "Mac"', share)
+        found = []
+        for path in list(swift_sources()) + [ROOT / "TelegramShare/ShareViewController.swift"]:
+            for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                if re.search(r"deviceModelName:[^,]*deviceModelPretty\(\)", line):
+                    found.append("%s:%d" % (path.relative_to(ROOT), number))
+        self.assertEqual(found, [])
+
 
 if __name__ == "__main__":
     unittest.main()
