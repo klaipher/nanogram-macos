@@ -13,7 +13,7 @@ let deps: [(String, String)] = [
     ("TelegramUtils", "../TelegramUtils"),
     ("AlertsUI", "../AlertsUI"),
     ("SystemPermissions", "../SystemPermissions"),
-    ("BuildConfig", "../../submodules/telegram-ios/submodules/BuildConfig"),
+    ("BuildConfig", "../../submodules/BuildConfig"),
     ("GeneralRows", "../GeneralRows"),
     ("InputDataUI", "../InputDataUI"),
 ]

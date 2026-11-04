@@ -41,7 +41,7 @@ cache_cleanup_auto() {
   python3 "$ROOT/tools/dev/cachegc/cachegc.py" auto --repo "$ROOT" || true
 }
 
-cmd_native() { python3 "$ROOT/tools/dev/native/check_native_libs.py" "$@" && python3 "$ROOT/tools/dev/native/module_settings.py" --check; }
+cmd_native() { python3 "$ROOT/tools/dev/native/check_native_libs.py" "$@" && python3 "$ROOT/tools/dev/native/module_settings.py" --check && python3 "$ROOT/tools/dev/nanogram/manifestpaths.py"; }
 
 cmd_frameworks() { py frameworks "$@"; }
 
@@ -368,7 +368,7 @@ usage: tools/dev/tg <command> [options]
   clean            remove this checkout's build products [--all]
   prune            list caches and build files, remove stale ones [--dry-run] [--max-gb N]
   cache-cleanup    shared cache cleanup (Bazel, Xcode, SwiftPM, builds, worktrees) [--dry-run] [--only A,B] | verify | report
-  native           drift check: native-libs.json and module-settings.json against the build files
+  native           drift check: native-libs.json and module-settings.json against the build files; local manifest paths
 USAGE
 }
 
