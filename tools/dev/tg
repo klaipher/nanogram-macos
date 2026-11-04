@@ -282,7 +282,8 @@ cmd_lint() {
   tglint lint "$@"
 }
 
-# tg test [--base REV] [package ...]: swift test for the named packages, or for NanogramKit plus every package
+# tg test [--base REV] [package ...]: swift test (or Tests/run-tests.sh when the package has one; packages without a
+# test target are skipped with a note) for the named packages, or for NanogramKit plus every package
 # with a Tests/ folder changed since REV (default: where unpushed work starts).
 cmd_test() {
   local base="" packages=() package failed=()
@@ -304,9 +305,17 @@ cmd_test() {
   fi
   for package in "${packages[@]}"; do
     [ -f "$ROOT/packages/$package/Package.swift" ] || die "no package packages/$package"
-    say "swift test packages/$package"
-    swift test --package-path "$ROOT/packages/$package" \
-      --scratch-path "${NANOGRAM_CACHE_DIR:-$HOME/.cache/nanogram-macos}/spm-$(basename "$ROOT")-$package" || failed+=("$package")
+    if [ -x "$ROOT/packages/$package/Tests/run-tests.sh" ]; then
+      # Packages that need the Xcode-built native libraries (swift test hangs or fails to link) ship their own runner.
+      say "packages/$package/Tests/run-tests.sh"
+      "$ROOT/packages/$package/Tests/run-tests.sh" || failed+=("$package")
+    elif ! grep -q '\.testTarget(' "$ROOT/packages/$package/Package.swift"; then
+      say "no tests: packages/$package has no test target, skipped"
+    else
+      say "swift test packages/$package"
+      swift test --package-path "$ROOT/packages/$package" \
+        --scratch-path "${NANOGRAM_CACHE_DIR:-$HOME/.cache/nanogram-macos}/spm-$(basename "$ROOT")-$package" || failed+=("$package")
+    fi
   done
   [ ${#failed[@]} = 0 ] || die "tests failed: ${failed[*]}"
 }
