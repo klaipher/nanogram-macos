@@ -34,8 +34,16 @@ ARM64_DIR="$BUILD_DIR/arm64"
 mkdir -p "$ARM64_DIR"
 pushd "$ARM64_DIR"
 
+# tde2e checks the conference-call blockchain and encrypts and decrypts call frames from other
+# participants, so the library gets the memory-safety hardening Nanogram.xcconfig gives the app's own
+# C, C++ and Objective-C (this CMake build does not see those settings). Only this target build: the
+# TL source generators above run on the build machine and stay plain.
+HARDENING_FLAGS="-ftrivial-auto-var-init=zero -fstack-protector-strong -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST"
+
 cmake "$SOURCE_DIR" \
     -DCMAKE_OSX_ARCHITECTURES=arm64 \
+    -DCMAKE_C_FLAGS="$HARDENING_FLAGS" \
+    -DCMAKE_CXX_FLAGS="$HARDENING_FLAGS" \
     $options
 
 cmake --build . --target tde2e -j$(sysctl -n hw.ncpu)
