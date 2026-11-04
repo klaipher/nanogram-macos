@@ -2,6 +2,10 @@
 
 Nanogram for macOS releases, newest first.
 
+## Unreleased
+
+- Chat input: the sticker/emoji button no longer stays highlighted after the panel is closed with the same button (the button state now follows the requested open/closed state, not the sidebar that is still animating out).
+
 ## 13.1.0 (202611041127) — 2026-11-04
 
 Source: `nanogram/integration` @ de638f4e · core `klaipher/nanogram` `main` @ 7a042ffd (was `mac/core` d3e0d01029; `mac/core` retired as `mac/core-legacy`) · tgcalls `klaipher/tgcalls` `nanogram-shared` @ 54220d6c (was `nanogram-mac` a598e27) · tg_owt `klaipher/tg_owt` `nanogram-mac` @ b6161528 (was c31956f2).

@@ -293,7 +293,12 @@ public class ChatInputActionsView: View, Notifable {
                 }
 
                 entertaiments.apply(state: .Normal)
-                entertaiments.isSelected = ChatInputUIHooks.shared.isEntertainmentSidebarVisible(self.window)
+                entertaiments.isSelected = ChatEntertainmentButtonState.isSelected(
+                    sidebarEnabled: value.sidebarEnabled,
+                    sidebarShown: value.sidebarShown,
+                    previousSidebarShown: oldValue.sidebarShown,
+                    sidebarVisibleNow: { ChatInputUIHooks.shared.isEntertainmentSidebarVisible(self.window) }
+                )
 
                 setExtraButton(keyboard, hidden: !value.isKeyboardActive, animated: animated)
                 let inputIsEmpty = value.effectiveInput.inputText.isEmpty
@@ -432,5 +437,19 @@ public class ChatInputActionsView: View, Notifable {
 
     public required init(frame frameRect: NSRect) {
         fatalError("init(frame:) has not been implemented")
+    }
+}
+
+
+/// Decides whether the sticker/emoji button in the chat input looks active.
+enum ChatEntertainmentButtonState {
+    /// When the user just toggled the sidebar, the sidebar view has not been shown or hidden yet at the moment the
+    /// input is updated, so asking the live view gives the old answer and leaves the button stuck. In that case the
+    /// requested state wins; otherwise the live view is the truth.
+    static func isSelected(sidebarEnabled: Bool?, sidebarShown: Bool?, previousSidebarShown: Bool?, sidebarVisibleNow: () -> Bool) -> Bool {
+        if sidebarShown != previousSidebarShown, let sidebarShown {
+            return sidebarShown && (sidebarEnabled ?? false)
+        }
+        return sidebarVisibleNow()
     }
 }
