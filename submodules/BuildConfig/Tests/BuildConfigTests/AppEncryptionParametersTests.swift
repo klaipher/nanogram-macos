@@ -165,4 +165,38 @@ final class AppEncryptionParametersTests: XCTestCase {
         XCTAssertNil(relaunched.decrypt())
         XCTAssertEqual(try Data(contentsOf: vaultFile), before)
     }
+
+    func testProcessWithoutTheKeychainNeverReplacesAnExistingVault() throws {
+        let original = try bytes(wrapped().decrypt())
+        let before = try Data(contentsOf: vaultFile)
+        let fallback = legacy()
+        XCTAssertNil(fallback.decrypt())
+        XCTAssertFalse(fallback.hasPasscode())
+        XCTAssertFalse(fallback.change("1234"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
+        XCTAssertEqual(try Data(contentsOf: vaultFile), before)
+        XCTAssertEqual(try bytes(wrapped().decrypt()), original)
+    }
+
+    func testProcessWithoutTheKeychainReadsThePasscodeFlagFromTheVault() throws {
+        let encryption = wrapped()
+        XCTAssertTrue(encryption.change("1234"))
+        XCTAssertTrue(legacy().hasPasscode())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
+    }
+
+    func testPasscodeChangeAfterADelayedMigrationRewrapsTheVaultOnly() throws {
+        let original = try bytes(legacy().decrypt())
+        store.failWrites = true
+        let encryption = wrapped()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultFile.path))
+        store.failWrites = false
+        XCTAssertTrue(encryption.change("1234"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
+        let relaunched = wrapped()
+        XCTAssertTrue(relaunched.hasPasscode())
+        XCTAssertNil(relaunched.decrypt())
+        relaunched.applyPasscode("1234")
+        XCTAssertEqual(try bytes(relaunched.decrypt()), original)
+    }
 }

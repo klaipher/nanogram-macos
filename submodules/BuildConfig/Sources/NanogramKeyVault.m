@@ -225,6 +225,7 @@ static NanogramKeyVaultResult *Result(NanogramVaultOutcome outcome, NSData *payl
 
 typedef struct {
     BOOL valid;
+    BOOL unsupported;
     BOOL hasPasscode;
     NSData *keyId;
     NSData *salt;
@@ -232,11 +233,18 @@ typedef struct {
 } VaultHeader;
 
 static VaultHeader ParseHeader(NSData *file) {
-    VaultHeader header = {NO, NO, nil, nil, 0};
-    if (file.length < kHeaderLength + kIVLength + kCCBlockSizeAES128 + kTagLength) {
+    VaultHeader header = {NO, NO, NO, nil, nil, 0};
+    if (file.length < 5) {
         return header;
     }
     const uint8_t *bytes = file.bytes;
+    if (memcmp(bytes, kVaultMagic, 4) == 0 && bytes[4] > kVaultVersion) {
+        header.unsupported = YES;
+        return header;
+    }
+    if (file.length < kHeaderLength + kIVLength + kCCBlockSizeAES128 + kTagLength) {
+        return header;
+    }
     if (memcmp(bytes, kVaultMagic, 4) != 0 || bytes[4] != kVaultVersion) {
         return header;
     }
@@ -341,9 +349,12 @@ static NSData *SubKey(NSData *master, NSString *label) {
 - (NanogramKeyVaultResult *)openWithPasscode:(NSString *)passcode {
     NSData *file = [NSData dataWithContentsOfFile:_path];
     if (file == nil) {
-        return Result([self fileExists] ? NanogramVaultOutcomeCorrupt : NanogramVaultOutcomeMissing, nil, NO);
+        return Result([self fileExists] ? NanogramVaultOutcomeUnreadable : NanogramVaultOutcomeMissing, nil, NO);
     }
     VaultHeader header = ParseHeader(file);
+    if (header.unsupported) {
+        return Result(NanogramVaultOutcomeUnreadable, nil, NO);
+    }
     if (!header.valid) {
         return Result(NanogramVaultOutcomeCorrupt, nil, NO);
     }
@@ -526,6 +537,20 @@ static NSData *SubKey(NSData *master, NSString *label) {
     return result;
 }
 
+- (BOOL)setAsideIfUnrecoverable {
+    __block BOOL setAside = NO;
+    [self withLock:^{
+        NanogramVaultOutcome outcome = [self openWithPasscode:nil].outcome;
+        if (outcome != NanogramVaultOutcomeKeyLost && outcome != NanogramVaultOutcomeCorrupt) {
+            return;
+        }
+        NSString *lostPath = [self->_path stringByAppendingString:@".lost"];
+        [[NSFileManager defaultManager] removeItemAtPath:lostPath error:nil];
+        setAside = [[NSFileManager defaultManager] moveItemAtPath:self->_path toPath:lostPath error:nil];
+    }];
+    return setAside;
+}
+
 + (NanogramKeyVaultResult *)resolvePlainKeyFileAtPath:(NSString *)legacyPath vault:(NanogramKeyVault *)vault create:(BOOL)create {
     NSData * (^read)(void) = ^NSData *{
         NSData *data = [NSData dataWithContentsOfFile:legacyPath];
@@ -542,7 +567,7 @@ static NSData *SubKey(NSData *master, NSString *label) {
     NSString *plainPath = [rootPath stringByAppendingPathComponent:@".tempkey"];
     NSString *vaultPath = [rootPath stringByAppendingPathComponent:@".tempkeyVault"];
     NSData *plain = [NSData dataWithContentsOfFile:plainPath];
-    BOOL vaultExists = [[NSFileManager defaultManager] fileExistsAtPath:vaultPath];
+    BOOL vaultExisted = [[NSFileManager defaultManager] fileExistsAtPath:vaultPath];
 
     if (store != nil) {
         NanogramKeyVault *vault = [[NanogramKeyVault alloc] initWithPath:vaultPath store:store];
@@ -554,10 +579,18 @@ static NSData *SubKey(NSData *master, NSString *label) {
             }
         }
         NanogramKeyVaultResult *result = [NanogramKeyVault resolvePlainKeyFileAtPath:plainPath vault:vault create:YES];
+        for (int attempt = 0; attempt < 3 && vaultExisted && result.outcome == NanogramVaultOutcomeKeychainUnavailable; attempt++) {
+            usleep(50 * 1000);
+            result = [NanogramKeyVault resolvePlainKeyFileAtPath:plainPath vault:vault create:YES];
+        }
+        if ((result.outcome == NanogramVaultOutcomeKeyLost || result.outcome == NanogramVaultOutcomeCorrupt) && [vault setAsideIfUnrecoverable]) {
+            NSLog(@"NanogramKeyVault: the key vault cannot be recovered (%ld), starting a new key", (long)result.outcome);
+            result = [NanogramKeyVault resolvePlainKeyFileAtPath:plainPath vault:vault create:YES];
+        }
         if (result.outcome == NanogramVaultOutcomeOK && result.payload != nil) {
             return result.payload;
         }
-        if (vaultExists || result.outcome != NanogramVaultOutcomeKeychainUnavailable) {
+        if ([vault fileExists] || result.outcome != NanogramVaultOutcomeKeychainUnavailable) {
             NSLog(@"NanogramKeyVault: key unavailable (%ld), using a throwaway key", (long)result.outcome);
             return RandomData(kPayloadLength);
         }

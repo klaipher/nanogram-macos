@@ -145,6 +145,11 @@ static NSObject *sharedWrapKeyStoreLock = nil;
         }
         if (store != nil) {
             self->_vault = [[NanogramKeyVault alloc] initWithPath:[self vaultPath] store:store iterations:iterations];
+        } else if ([NSFileManager.defaultManager fileExistsAtPath:[self vaultPath]]) {
+            NanogramMemoryWrapKeyStore *unavailable = [[NanogramMemoryWrapKeyStore alloc] init];
+            unavailable.unavailable = YES;
+            self->_vault = [[NanogramKeyVault alloc] initWithPath:[self vaultPath] store:unavailable iterations:iterations];
+            NSLog(@"DatabaseKey: the key vault exists but the keychain is not available in this process");
         }
         [self applyPasscode:AppEncryptionParameters.defaultKey];
         [self upgradeLegacyIfNeeded];
@@ -264,6 +269,9 @@ static NSObject *sharedWrapKeyStoreLock = nil;
         return [self rewrapVaultWithPasscode:passcode];
     }
     DeviceSpecificEncryptionParameters *parameters = [self decrypt];
+    if (self->_vault != nil && [self->_vault fileExists]) {
+        return [self rewrapVaultWithPasscode:passcode];
+    }
     [self applyPasscode:passcode];
     [self reencrypt: parameters];
     return YES;

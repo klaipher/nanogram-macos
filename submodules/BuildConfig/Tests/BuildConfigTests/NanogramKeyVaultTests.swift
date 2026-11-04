@@ -334,11 +334,94 @@ final class NanogramKeyVaultTests: XCTestCase {
         XCTAssertEqual(devicePayload(store), real)
     }
 
+    func testUnreadableVaultFileIsReportedAsUnreadableNotCorrupt() throws {
+        let vault = makeVault()
+        XCTAssertEqual(vault.writePayload(payload, passcode: nil), .OK)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: vaultPath)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: vaultPath) }
+        XCTAssertEqual(vault.open(withPasscode: nil).outcome, .unreadable)
+    }
+
+    func testDeviceKeyWithLostWrapKeyStartsOneFreshKeyInsteadOfAThrowawayEveryLaunch() throws {
+        let first = devicePayload(store)
+        for id in store.keyIds { store.deleteWrapKey(withId: id) }
+        let second = devicePayload(store)
+        XCTAssertNotEqual(second, first)
+        XCTAssertEqual(devicePayload(store), second)
+        XCTAssertEqual(makeVault().open(withPasscode: nil).payload, second)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: vaultPath + ".lost"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyPath))
+    }
+
+    func testDeviceKeyWithCorruptVaultStartsOneFreshKey() throws {
+        let first = devicePayload(store)
+        try Data(repeating: 0xAB, count: 140).write(to: URL(fileURLWithPath: vaultPath))
+        let second = devicePayload(store)
+        XCTAssertNotEqual(second, first)
+        XCTAssertEqual(devicePayload(store), second)
+    }
+
+    func testDeviceKeyWithUnreadableVaultIsThrowawayAndKeepsTheVault() throws {
+        let real = devicePayload(store)
+        let before = try Data(contentsOf: URL(fileURLWithPath: vaultPath))
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: vaultPath)
+        let during = devicePayload(store)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: vaultPath)
+        XCTAssertNotEqual(during, real)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: vaultPath)), before)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultPath + ".lost"))
+        XCTAssertEqual(devicePayload(store), real)
+    }
+
+    func testVaultFromALaterFormatVersionIsLeftAlone() throws {
+        let real = devicePayload(store)
+        var file = try Data(contentsOf: URL(fileURLWithPath: vaultPath))
+        file[4] = 2
+        try file.write(to: URL(fileURLWithPath: vaultPath))
+        XCTAssertEqual(makeVault().open(withPasscode: nil).outcome, .unreadable)
+        XCTAssertNotEqual(devicePayload(store), real)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: vaultPath)), file)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultPath + ".lost"))
+    }
+
+    func testDeviceKeyRetriesATransientKeychainFailure() {
+        let real = devicePayload(store)
+        let flaky = FlakyWrapKeyStore(inner: store, failingReads: 2)
+        XCTAssertEqual(devicePayload(flaky), real)
+        XCTAssertEqual(flaky.failingReads, 0)
+    }
+
     func testDeviceKeyWithLegacyKeyAndLockedKeychainStillReturnsTheLegacyKey() throws {
         try payload.write(to: URL(fileURLWithPath: legacyPath))
         store.unavailable = true
         XCTAssertEqual(devicePayload(store), payload)
         XCTAssertTrue(FileManager.default.fileExists(atPath: legacyPath))
         XCTAssertFalse(FileManager.default.fileExists(atPath: vaultPath))
+    }
+}
+
+private final class FlakyWrapKeyStore: NSObject, NanogramWrapKeyStore {
+    private let inner: NanogramMemoryWrapKeyStore
+    private(set) var failingReads: Int
+
+    init(inner: NanogramMemoryWrapKeyStore, failingReads: Int) {
+        self.inner = inner
+        self.failingReads = failingReads
+    }
+
+    func readWrapKey(withId keyId: String, data: AutoreleasingUnsafeMutablePointer<NSData?>) -> NanogramWrapKeyStatus {
+        if failingReads > 0 {
+            failingReads -= 1
+            return .unavailable
+        }
+        return inner.readWrapKey(withId: keyId, data: data)
+    }
+
+    func writeWrapKey(_ key: Data, withId keyId: String) -> Bool {
+        return inner.writeWrapKey(key, withId: keyId)
+    }
+
+    func deleteWrapKey(withId keyId: String) {
+        inner.deleteWrapKey(withId: keyId)
     }
 }

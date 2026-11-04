@@ -10,6 +10,7 @@ typedef NS_ENUM(NSInteger, NanogramVaultOutcome) {
     NanogramVaultOutcomeKeyLost = 4,
     NanogramVaultOutcomeCorrupt = 5,
     NanogramVaultOutcomeInterrupted = 6,
+    NanogramVaultOutcomeUnreadable = 7,
 };
 
 typedef NS_ENUM(NSInteger, NanogramWrapKeyStatus) {
