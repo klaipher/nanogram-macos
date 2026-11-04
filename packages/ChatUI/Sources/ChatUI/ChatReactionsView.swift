@@ -60,6 +60,14 @@ extension MessageReaction {
     }
 }
 
+enum ChatReactionsUpdatePlan: Equatable {
+    case rebuild
+    case relayoutOnly
+    static func make(sameLayoutObject: Bool, viewCount: Int, reactionCount: Int) -> ChatReactionsUpdatePlan {
+        return sameLayoutObject && viewCount == reactionCount ? .relayoutOnly : .rebuild
+    }
+}
+
 public final class ChatReactionsLayout {
     
     public struct Theme : Equatable {
@@ -2315,7 +2323,10 @@ final class ChatReactionsView : ChatLayerSceneView {
     }
     
     public func update(with layout: ChatReactionsLayout, animated: Bool) {
-        if self.currentLayout === layout, self.views.count == layout.reactions.count {
+        if ChatReactionsUpdatePlan.make(sameLayoutObject: self.currentLayout === layout, viewCount: self.views.count, reactionCount: layout.reactions.count) == .relayoutOnly {
+            // The row re-measures the same layout object in place on resize (rects change), so
+            // chips must still be re-framed.
+            self.updateLayout(size: layout.size, transition: .immediate)
             return
         }
 

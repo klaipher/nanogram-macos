@@ -60,7 +60,6 @@ private class TabBarViewController : View {
 public class TabBarController: ViewController, TabViewDelegate {
 
     
-    public var willChangeIndex:(Int)->Void = {_ in}
     public var didChangedIndex:(Int)->Void = {_ in}
     public var selectedIndex: Int {
         return genericView.tabView.selectedIndex
@@ -111,7 +110,6 @@ public class TabBarController: ViewController, TabViewDelegate {
     
     public func didChange(selected item: TabItem, index: Int) {
         if current != item.controller {
-            willChangeIndex(index)
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             defer {

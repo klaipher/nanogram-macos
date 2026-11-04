@@ -14,10 +14,11 @@ final class ChatLayerNodeLifetimeTests: XCTestCase {
 
     func testNodesDoNotKeepDanglingSceneAfterSceneIsReleased() {
         let node = ChatLayerNode(id: "node")
-        var scene: ChatLayerSceneView? = ChatLayerSceneView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
-        try? scene?.root.setChildren([node])
-        XCTAssertNotNil(node.scene)
-        scene = nil
+        autoreleasepool {
+            let scene = ChatLayerSceneView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+            try? scene.root.setChildren([node])
+            XCTAssertNotNil(node.scene)
+        }
         XCTAssertNil(node.scene)
     }
 }

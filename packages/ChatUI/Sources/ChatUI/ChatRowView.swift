@@ -784,7 +784,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     
     public override func scrollDidEndLiveScrolling() {
         super.scrollDidEndLiveScrolling()
-        (rowView as? ChatLayerSceneView)?.refreshPointerAfterScroll()
+        for scene in ChatLayerSceneView.scenes(in: self) { scene.refreshPointerAfterScroll() }
     }
 
     public override func updateMouse(animated: Bool) {

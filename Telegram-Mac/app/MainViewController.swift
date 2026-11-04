@@ -531,10 +531,8 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
             self.layoutConnectingStatusView()
         }))
         
-        tabController.willChangeIndex = { [weak self] index in
-            self?.checkSettings(index)
-        }
         tabController.didChangedIndex = { [weak self] index in
+            self?.checkSettings(index)
             self?.updateChatListBottomOverlays()
         }
     }
@@ -542,6 +540,17 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
     func prepareControllers() {
         chatList.loadViewIfNeeded(bounds)
         settings.loadViewIfNeeded(bounds)
+        if context.layout != .single {
+            settingsPanePrewarm.prewarm()
+        }
+    }
+
+    /// GeneralSettingsViewController fills its table asynchronously (postbox reads). Building it
+    /// ahead of the tab switch means the left column and the pane change in the same frame.
+    private lazy var settingsPanePrewarm = PrewarmedSlot<GeneralSettingsViewController> { [unowned self] in
+        let controller = GeneralSettingsViewController(self.context)
+        controller.loadViewIfNeeded(self.context.bindings.rootNavigation().bounds)
+        return controller
     }
 
     private func showCallsTab() {
@@ -779,9 +788,11 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
         } else {
             if previousIndex == tabController.count - 1 || isSettings {
                 if isSettings && context.layout != .single {
-                    let controller = GeneralSettingsViewController(context)
-                    controller.loadViewIfNeeded(navigation.bounds)
-                    navigation.push(controller, false)
+                    navigation.push(settingsPanePrewarm.take(), false)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, self.context.layout != .single else { return }
+                        self.settingsPanePrewarm.prewarm()
+                    }
                 } else {
                     navigation.enumerateControllers( { controller, index in
                         if (controller is ChatController) || (controller is PeerInfoController) || (controller is ChannelAdminsViewController) || (controller is ChannelAdminsViewController) || (controller is EmptyChatViewController) {

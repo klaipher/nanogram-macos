@@ -76,8 +76,6 @@ let package = Package(
             name: "ChatListUITests",
             dependencies: [
                 "ChatListUI",
-                .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
-                .product(name: "InlineStickerLayer", package: "InlineStickerLayer", condition: nil),
                 .product(name: "TGUIKit", package: "TGUIKit", condition: nil),
                 .product(name: "TelegramMedia", package: "TelegramMedia", condition: nil),
                 .product(name: "TLottie", package: "TLottie", condition: nil),

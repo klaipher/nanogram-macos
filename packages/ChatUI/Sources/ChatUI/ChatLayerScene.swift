@@ -23,8 +23,8 @@ struct ChatLayerPointerEvent {
 class ChatLayerNode {
     let id: AnyHashable
     let layer: SimpleLayer
-    private(set) unowned(unsafe) var parent: ChatLayerNode?
-    fileprivate(set) unowned(unsafe) var scene: ChatLayerSceneView?
+    private(set) weak var parent: ChatLayerNode?
+    fileprivate(set) weak var scene: ChatLayerSceneView?
     private(set) var children: [ChatLayerNode] = []
     fileprivate var orderedChildren: [ChatLayerNode] = []
     fileprivate var accessibilityElement: ChatLayerAccessibilityElement?
@@ -96,13 +96,6 @@ class ChatLayerNode {
             layer.zPosition = CGFloat(zIndex)
             parent?.sortChildren()
             scene?.needsLayout = true
-        }
-    }
-
-    deinit {
-        for child in children {
-            child.parent = nil
-            child.attach(to: nil)
         }
     }
 
@@ -274,10 +267,6 @@ class ChatLayerSceneView: View {
         var pointerArea: NSTrackingArea? = nil
         var toolTipNodes: [ChatLayerTextNode]? = nil
         init(root: ChatLayerNode, canRelease: Bool = false) { self.root = root; self.canRelease = canRelease }
-    }
-
-    deinit {
-        storedState?.root.attach(to: nil)
     }
 
     private var storedState: State?
@@ -848,6 +837,18 @@ class ChatLayerSceneView: View {
     }
     private var isInTableLiveScroll: Bool {
         return (enclosingScrollView as? TableView)?.liveScrolling == true
+    }
+
+    /// Every scene in the subtree of `view`, including `view` itself. Rows host nested scenes
+    /// (reactions, message text, floating avatar) that skip pointer events during a live scroll.
+    static func scenes(in view: NSView) -> [ChatLayerSceneView] {
+        var result: [ChatLayerSceneView] = []
+        var stack: [NSView] = [view]
+        while let current = stack.popLast() {
+            if let scene = current as? ChatLayerSceneView { result.append(scene) }
+            stack.append(contentsOf: current.subviews)
+        }
+        return result
     }
 
     func refreshPointerAfterScroll() {
