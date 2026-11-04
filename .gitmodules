@@ -17,12 +17,6 @@
 	path = submodules/tg_owt
 	url = https://github.com/klaipher/tg_owt
 	branch = nanogram-mac
-[submodule "submodules/libprisma"]
-	path = submodules/libprisma
-	url = https://github.com/desktop-app/libprisma
-[submodule "submodules/regex"]
-	path = submodules/regex
-	url = https://github.com/boostorg/regex
 [submodule "submodules/tlottie"]
 	path = submodules/tlottie
 	url = https://github.com/dkaraush/tlottie

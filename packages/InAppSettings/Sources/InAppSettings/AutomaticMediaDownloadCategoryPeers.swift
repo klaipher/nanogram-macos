@@ -1,4 +1,5 @@
 import Cocoa
+import HardenedMedia
 import Postbox
 import SwiftSignalKit
 import TelegramCore
@@ -178,6 +179,14 @@ public struct AutomaticMediaDownloadSettings: Codable, Equatable {
         return lhs.categories == rhs.categories && lhs.automaticDownload == rhs.automaticDownload && lhs.downloadFolder == rhs.downloadFolder && lhs.automaticSaveDownloadedFiles == rhs.automaticSaveDownloadedFiles && lhs.respectLowDataMode == rhs.respectLowDataMode
     }
     
+    public static func effective(_ entry: PreferencesEntry?, policy: HardenedMediaPolicy = .current) -> AutomaticMediaDownloadSettings {
+        return (entry?.get(AutomaticMediaDownloadSettings.self) ?? .defaultSettings).hardened(by: policy)
+    }
+
+    public func hardened(by policy: HardenedMediaPolicy) -> AutomaticMediaDownloadSettings {
+        return AutomaticMediaDownloadSettings(categories: self.categories, automaticDownload: self.automaticDownload && policy.allowsAutomaticDownload(fromContact: false), downloadFolder: self.downloadFolder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles, respectLowDataMode: self.respectLowDataMode)
+    }
+
     public func withUpdatedCategories(_ categories: AutomaticMediaDownloadCategories) -> AutomaticMediaDownloadSettings {
         return AutomaticMediaDownloadSettings(categories: categories, automaticDownload: automaticDownload, downloadFolder: self.downloadFolder, automaticSaveDownloadedFiles: self.automaticSaveDownloadedFiles, respectLowDataMode: self.respectLowDataMode)
     }
@@ -212,6 +221,6 @@ public func updateMediaDownloadSettingsInteractively(postbox: Postbox, _ f: @esc
 
 public func automaticDownloadSettings(postbox: Postbox) -> Signal<AutomaticMediaDownloadSettings, NoError> {
     return postbox.preferencesView(keys: [ApplicationSpecificPreferencesKeys.automaticMediaDownloadSettings]) |> map { value in
-        return value.values[ApplicationSpecificPreferencesKeys.automaticMediaDownloadSettings]?.get(AutomaticMediaDownloadSettings.self) ?? .defaultSettings
+        return AutomaticMediaDownloadSettings.effective(value.values[ApplicationSpecificPreferencesKeys.automaticMediaDownloadSettings])
     }
 }

@@ -81,6 +81,9 @@ share third-party/td
 share third-party/dav1d
 share third-party/mozjpeg
 share third-party/ogg
+share third-party/libprisma
+share third-party/boost_regex
+share submodules/HardenedMedia
 
 # Intended WebRTC differences
 allow webrtc api/peer_connection_interface.cc | iOS TGCALLS seam (disable_payload_type_demuxing, external transport security, dtls factory)

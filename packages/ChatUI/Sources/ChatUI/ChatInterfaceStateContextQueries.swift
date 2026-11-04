@@ -680,7 +680,7 @@ func urlPreviewMatchesInput(_ chatPresentationInterfaceState: ChatPresentationIn
                         }
                     }
                     
-                    if chatPresentationInterfaceState.chatLocation.peerId.namespace == Namespaces.Peer.SecretChat {
+                    if chatPresentationInterfaceState.chatLocation.peerId.namespace == Namespaces.Peer.SecretChat || HardenedMediaPolicy.current.confirmsOutgoingLinkPreviews {
                         let value = FastSettings.isSecretChatWebPreviewAvailable(for: context.account.id.int64)
                         
                         if let value = value {

@@ -806,7 +806,7 @@ final class AccountContext {
         
         let autoplayMedia = _autoplayMedia
         prefDisposable.add(account.postbox.preferencesView(keys: [ApplicationSpecificPreferencesKeys.autoplayMedia]).start(next: { view in
-            _ = autoplayMedia.swap(view.values[ApplicationSpecificPreferencesKeys.autoplayMedia]?.get(AutoplayMediaPreferences.self) ?? AutoplayMediaPreferences.defaultSettings)
+            _ = autoplayMedia.swap(AutoplayMediaPreferences.effective(view.values[ApplicationSpecificPreferencesKeys.autoplayMedia]))
         }))
         
         let contentSettings = _contentSettings

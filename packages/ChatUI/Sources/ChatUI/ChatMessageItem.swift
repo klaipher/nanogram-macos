@@ -447,7 +447,7 @@ public class ChatMessageItem: ChatRowItem {
                 )
             }
 
-             let ignoreWebpage = !entry.additionalData.canHighlightLinks && isIncoming
+             let ignoreWebpage = (!entry.additionalData.canHighlightLinks && isIncoming) || (isIncoming && !HardenedMediaPolicy.current.generatesLinkPreviewsForReceivedLinks)
             
              if let webpage = media as? TelegramMediaWebpage, !ignoreWebpage {
                  switch webpage.content {
