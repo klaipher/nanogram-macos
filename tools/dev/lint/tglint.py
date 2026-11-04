@@ -28,6 +28,8 @@ import tempfile
 import urllib.request
 import zipfile
 
+import changelog_reminder
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 LINT_DIR = os.path.join(ROOT, 'tools', 'dev', 'lint')
 CONFIG = os.path.join(LINT_DIR, 'swiftlint.yml')
@@ -400,6 +402,7 @@ def cmd_pre_push(args):
     head = git('rev-parse', 'HEAD', check=False).strip()
     check_base = None
     blocking = 0
+    range_paths = []
     for local_ref, local_sha, remote_ref, remote_sha in refs:
         if local_sha == ZERO_SHA:
             continue  # deleting a ref
@@ -410,6 +413,7 @@ def cmd_pre_push(args):
         if check_base is None or local_sha == head:
             check_base = base
         print('tglint: checking {} ({}..{})'.format(local_ref, base[:10], local_sha[:10]))
+        range_paths += git('diff', '--name-only', '--no-renames', base, local_sha, check=False).splitlines()
         try:
             violations = lint_changed(changed_lines_commits(base, local_sha), local_sha)
         except FileNotFoundError:
@@ -420,6 +424,11 @@ def cmd_pre_push(args):
     if blocking:
         print('tglint: {} blocking lint finding(s); push stopped. Fix them, or push with --no-verify.'.format(blocking), file=sys.stderr)
         return 1
+    note = changelog_reminder.reminder(range_paths)
+    if note:
+        print('tglint: ' + note, file=sys.stderr)
+        if os.environ.get('TG_CHANGELOG_STRICT') == '1':
+            return 1
     if os.environ.get('TG_PRE_PUSH_CHECK') == '0' or check_base is None:
         return 0
     if git('status', '--porcelain', '--untracked-files=no', check=False).strip():

@@ -3,6 +3,33 @@
 This file provides guidance to coding agents working with code in this repository.
 
 
+## Hard rules
+
+- Marketing version follows upstream; only the build number changes. Never fetch upstream tags/branches into this repository by hand (`tg sync-upstream` only, released code only).
+- A fix in shared code (core, tgcalls, tg_owt, rlottie, libprisma) lands on both apps in the same round: iOS `main` first, then `tools/dev/tg core-bump` here.
+- Never `--no-verify`. Never read `~/.config/telegram-ios`, keychains or signing material. No scheduled jobs.
+- Agents do not build or launch the app (`tg build/check/test/warnings`, `xcodebuild`, `swift build/test`); one combined build at the end of a round. Pure-Python tests are fine.
+- Work in your own worktree and branch under `~/Projects/wt/`, never in the main checkout.
+- Mac releases go to the GitHub release (`tg release-direct`); Mac TestFlight only on request.
+
+## Development pipeline (full text: [docs/development-pipeline.md](docs/development-pipeline.md))
+
+1. Research and review in parallel lenses, with evidence. 2. Adversarial verification of every finding.
+3. Fix confirmed findings on branches, tests first. 4. No builds by agents. 5. One combined build per platform at the end.
+6. Fix what the build shows. 7. Push through the hooks. 8. Report: findings with evidence, decisions with trade-offs, open questions.
+
+## Change records (see [docs/fork-records.md](docs/fork-records.md))
+
+Every change that alters behaviour updates `CHANGELOG.md` (`## Unreleased`: what and how, with commit) and, when it changes how we differ from upstream, `NANOGRAM-CHANGES.md`. A fork submodule change also needs the fork's own records. Public notes (releases repo, appcast) are short and say which part got better, never how. The pre-push hook warns when a push of product code touches neither file.
+
+## Disk and worktrees
+
+DerivedData, SwiftPM scratch (`~/.cache/nanogram-macos/spm-*`) and the compilation cache are per checkout. `git worktree remove` finished worktrees, then `tools/dev/tg cache-cleanup`. Details in the pipeline doc and `docs/cache-cleanup.md`.
+
+## Commands and docs
+
+Everything goes through `tools/dev/tg` (`tg help`); the guide is [docs/local-development.md](docs/local-development.md); all documents are indexed in [docs/README.md](docs/README.md).
+
 ## Code Style
 
 ### Comments
@@ -68,11 +95,3 @@ Only the modules you will touch most. Find anything else with `grep -rn "func Na
 - Packages enforce runtime exclusivity (the app has it off), so `inout` access conflicts can trap after a move
 - `BETA`/`STABLE`/`ALPHA`/`APP_STORE` are false in packages in Xcode UI builds; only `buildbox/build-mac.sh` sets them
 - App extensions like `Peer.isForum` and `Peer.displayLetters` shadow TelegramCore members; in a package call them through hooks
-
-
-## Shipping a Beta
-A beta build starts when `beta` is pushed to `origin`.
-1. Commit all pending work on `beta`, including any submodule bumps (`submodules/telegram-ios` carries the Rust engine)
-2. Merge the feature branches being shipped into `beta`, e.g. `git merge origin/sam/new-wallet`
-3. Bump the build number: increment `CFBundleVersion` in `Telegram-Mac/Info.plist` and `TelegramShare/Info.plist`, commit as `Bump the build number to <N>`
-4. `git push origin beta`

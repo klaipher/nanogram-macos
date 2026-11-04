@@ -1,5 +1,7 @@
 # Building with Xcode 27
 
+> **Upstream's guide, not our build flow.** Nanogram builds with `tools/dev/tg` (Apple Silicon only, macOS 15 deployment target, Xcode 27): see [docs/local-development.md](docs/local-development.md). The text below is Telegram for macOS's own and is kept for reference; Rosetta, Intel and the 10.13 target do not apply to us.
+
 Xcode 27 supports macOS **12.0** and newer as a deployment target, but the project targets **10.13**, so the build
 fails with:
 

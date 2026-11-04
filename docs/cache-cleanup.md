@@ -27,7 +27,7 @@ One implementation, `tools/dev/cachegc/cachegc.py`, and one configuration, `tool
 A build counts as released when its folder has a `.released` marker (written when `tg testflight` uploads), a git tag ends with `-<build>`, or `CHANGELOG.md` mentions the build number. Builds numbered before `released_unknown_before_build` (202611050000)
 were made before the marker existed, so whether they were uploaded is unknown: they count as released and are kept. Released archives and dSYMs are kept forever; the iOS dSYM archive (`~/Library/Application Support/Nanogram/dsyms`) is never touched and `tg testflight` no longer prunes it (`TG_DSYM_KEEP=0` is the default).
 
-The Bazel disk cache is not touched by hand: Bazel trims it itself (`--experimental_disk_cache_gc_max_size=30G`, `--experimental_disk_cache_gc_max_age=14d` in `.bazelrc`, equal to the policy).
+The Bazel disk cache is not touched by hand: Bazel trims it itself (`--experimental_disk_cache_gc_max_size=20G`, `--experimental_disk_cache_gc_max_age=14d` in `.bazelrc`, equal to the policy).
 
 ## Hard safety rules
 

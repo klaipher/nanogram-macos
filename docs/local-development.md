@@ -541,10 +541,9 @@ What it does (`tools/dev/nanogram/sync.py`, then `tools/dev/tg`):
 3. On conflicts nothing is resolved or committed: the merge stays in progress, the conflicted paths are listed
    and the exit status is 1. Resolve, `git add`, `git commit`, then `tools/dev/tg sync-upstream --after-merge`;
    or `git merge --abort`. Our changes sit in our own files and small hook lines, so conflicts should be few.
-4. If upstream moved its `submodules/telegram-ios` pin, it says so and prints rebase commands for the old
-   `nanogram-mac` branch. Do not run them: the core now lives on the history-free `mac/core` branch, and a rebase
-   onto upstream's pin would pull Telegram's history into it. Update the core as described in The shared Telegram
-   core below, to the iOS release the new Mac pin belongs to.
+4. If upstream moved its `submodules/telegram-ios` pin, ignore the pin: our core comes from the iOS repository
+   (see The shared Telegram core below). Do not run the rebase commands it prints; a rebase onto upstream's pin
+   would pull Telegram's history into the core.
 5. After a clean merge: `git submodule update --init --recursive`, the local submodule fixes (`localfixes.py`),
    `tg frameworks` (rebuilds only libraries whose stamp changed), `tg warnings --update` (a clean debug build with
    buildcheck and the edition checks; warnings that arrive with upstream code join
@@ -557,37 +556,36 @@ upstream changed stopped with that one path listed, `MERGE_HEAD` set and nothing
 
 ## The shared Telegram core
 
-`submodules/telegram-ios` is not Telegram-iOS: it comes from our iOS fork's repository,
-`https://github.com/klaipher/nanogram.git`, branch `mac/core` (`.gitmodules`). That repository holds no Telegram
-history: its `upstream` branch is one snapshot commit per official Telegram-iOS release (`b46f1ec6 Import upstream
-Telegram-iOS release-13.1.1`, then `0650eac5 … release-13.1.2`), each with `Upstream-Tag:` and `Upstream-Commit:`
-trailers. `mac/core` is our Mac core work (the Xcode 27 MetalEngine fix, FFmpeg, the runtime H-items, …) on top of
-the release-13.1.1 snapshot; the superproject pins `9f63c699`, whose tree equals the core the Mac merge built.
+`submodules/telegram-ios` is not Telegram-iOS: it is our iOS repository, `https://github.com/klaipher/nanogram.git`,
+branch `main` (`.gitmodules`; the old `mac/core` branch was retired as `mac/core-legacy` on 2026-11-04). That
+repository holds no Telegram history: its `upstream` branch is one snapshot commit per official Telegram-iOS release
+(`b46f1ec6 Import upstream Telegram-iOS release-13.1.1`, then `0650eac5 ... release-13.1.2`), each with
+`Upstream-Tag:` and `Upstream-Commit:` trailers. The Mac and the iOS app build the same core; Mac-only behaviour sits
+behind `#if os(macOS)` there.
 
 Rules for the core checkout:
 
-- Commits go on the local branch `mac/core`, on top of the current pin. Never merge or rebase anything that carries
-  Telegram's history into it (no `Telegram-iOS` branches, no `fetch` of tags; fetch with `--no-tags`).
-- The checkout's push URL is set to `DISABLED` on purpose; the owner pushes `mac/core` to `klaipher/nanogram`.
-- After a core commit, point the superproject at it (`git add submodules/telegram-ios`) and commit there.
+- The core is changed in the iOS repository (`~/Projects/nanogram-ios`), on `main` or a branch merged into it, never in
+  this checkout. Never merge or rebase anything that carries Telegram's history into it (no `Telegram-iOS` branches,
+  no `fetch` of tags; fetch with `--no-tags`).
+- The checkout's push URL is set to `DISABLED` on purpose; the owner pushes the core from the iOS repository.
+- A shared fix is committed to iOS `main` first; then `tools/dev/tg core-bump` moves this repository's pin (the only
+  way to move it) and the same round commits it here.
 
 Moving the core to a new Telegram-iOS release, without its history:
 
-1. In the iOS repository (`~/Projects/nanogram-ios`): `tools/dev/tg sync-upstream release-<X>`. It fetches only
-   that tag (`--depth 1 --no-tags`) and adds a snapshot commit with that tree to `upstream`, whose only parent is
-   the previous snapshot. The iOS fork merges it into its `main` as usual.
-2. In `submodules/telegram-ios`: fetch that `upstream` branch from `klaipher/nanogram` (`git fetch --no-tags
-   origin upstream`), check out `mac/core` and `git merge <snapshot commit>`. The merge brings only the snapshot
-   chain, so `mac/core` stays history-free. Resolve the conflicts in our core commits.
-3. Build and test the Mac app on it (`tg build`, `tg check`, `tg warnings --update` if upstream warnings moved),
-   then commit the new pin in the superproject.
+1. In the iOS repository: `tools/dev/tg sync-upstream release-<X>`. It fetches only that tag (`--depth 1 --no-tags`)
+   and adds a snapshot commit with that tree to `upstream`; the iOS repository merges it into its `main` as usual.
+2. Here: `tools/dev/tg core-bump`, then `tg build`, `tg check`, `tg warnings --update` if upstream warnings moved, and
+   commit the new pin.
 
 Upstream's Mac app pins a Telegram-iOS commit, not a tag. Move the core to the newest `release-*` tag that
 contains that pin (`git tag --contains <pin>` in a Telegram-iOS clone, or the first release after it), never to a
 commit past the newest tag.
 
-Other forks we pin: `submodules/tgcalls` = `klaipher/tgcalls` branch `nanogram-mac` (the iOS fork's tgcalls plus
-two Mac build commits), `submodules/rlottie` = `klaipher/rlottie` branch `nanogram-mac`. Run
+Other forks we pin: `submodules/tgcalls` = `klaipher/tgcalls` branch `nanogram-shared` (one implementation for iOS and
+Mac), `submodules/tg_owt` = `klaipher/tg_owt` branch `nanogram-mac`, `submodules/rlottie` = `klaipher/rlottie` branch
+`nanogram-mac`. Their records: `NANOGRAM-CHANGES.md` and `CHANGELOG.md` in each fork. Run
 `git submodule sync --recursive` after `.gitmodules` URLs change; existing checkouts keep their old remotes until then.
 
 ## Parity gate and `tg core-bump`
@@ -600,8 +598,7 @@ repos) enforces it; `tools/dev/tg parity` runs it here and `tg check` includes i
   stopped (both repos' pre-push hooks).
 - Pins published: core, tgcalls, rlottie and tg_owt pins must be on a `klaipher` remote (a network URL under
   `klaipher/`; a local-path remote such as `/Users/klaipher/...` does not count).
-- Equal SHAs: tgcalls, rlottie and tlottie are the same commit on both sides (read from the core pin, or from
-  `--ios-repo` while the core is still `mac/core`).
+- Equal SHAs: tgcalls, rlottie and tlottie are the same commit on both sides (read from the core pin).
 - Core pin: an ancestor of iOS `main` (or `mac/core-lts`), lag limit 20 commits / 7 days of shared-path commits
   (warning until `block-from`, then an error), and no shared file that differs through a commit that is neither a
   `cherry-pick -x` of `main` nor allow-listed. A cherry-pick explains a file only when it adds and removes exactly the
@@ -610,8 +607,7 @@ repos) enforces it; `tools/dev/tg parity` runs it here and `tg check` includes i
   resolves differently from every parent.
 - WebRTC: shared source files of `tg_owt/src` and the iOS webrtc tree must match unless allow-listed. Allow entries
   can carry `until=DATE`, after which they stop applying.
-- `mode legacy` in the paths file keeps ancestry, lag and file checks as warnings while the Mac pins `mac/core`;
-  phase 3 sets `mode shared`. `--release` makes a dirty core an error. `TG_PARITY=0` skips the hook once.
+- The paths file runs in `mode shared` (a `mode legacy` keeps ancestry, lag and file checks as warnings). `--release` makes a dirty core an error. `TG_PARITY=0` skips the hook once.
 
 `tg core-bump [REF|SHA] [--dry-run] [--no-fetch] [--no-test] [--build] [--commit]` is the only way to move the core
 pin. It fetches iOS `main` and `mac/core-lts`, refuses anything unpublished, not rooted at our import, off `main`/LTS
