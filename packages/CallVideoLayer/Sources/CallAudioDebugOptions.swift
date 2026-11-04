@@ -9,11 +9,8 @@ public enum CallAudioDebugOptions {
         NanogramDebugChoice(id: "rnnoise", title: "RNNoise only")
     ], defaultValue: "both")
 
-    public static let audioWorkgroup = NanogramDebugOption.toggle(id: "calls.audioWorkgroup", section: CallVideoDebugOptions.section, title: "Audio threads join the device's workgroup", detail: "The microphone and speaker threads join the audio device's real-time workgroup so the system schedules them with the audio hardware. Falls back to normal scheduling if the device has none. Default: off until measured in Instruments. Applies to the next call.", defaultValue: false)
-
     public static let all: [NanogramDebugOption] = [
-        CallAudioDebugOptions.groupNoiseMode,
-        CallAudioDebugOptions.audioWorkgroup
+        CallAudioDebugOptions.groupNoiseMode
     ]
 
     public static func groupNoiseModeValue(_ choice: String?) -> Int {
@@ -26,6 +23,5 @@ public enum CallAudioDebugOptions {
 
     public static func applyNativeOptions(from settings: NanogramDebugSettings) {
         TGCallsRuntimeOptionsBridge.setGroupNoiseMode(CallAudioDebugOptions.groupNoiseModeValue(settings.choice(CallAudioDebugOptions.groupNoiseMode.id)))
-        TGCallsRuntimeOptionsBridge.setAudioWorkgroupEnabled(settings.bool(CallAudioDebugOptions.audioWorkgroup.id))
     }
 }

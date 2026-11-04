@@ -237,7 +237,6 @@ final class CallSystemPolicyTests: XCTestCase {
             CallPowerGovernor.shared.stop()
         }
         XCTAssertFalse(settings.bool("calls.thermalVideoLadder"))
-        XCTAssertFalse(settings.bool("calls.threadQoS"))
         let ids = (CallSystemDebugOptions.all + CallAudioDebugOptions.all + CallVideoDebugOptions.all).map { $0.id }
         XCTAssertEqual(Set(ids).count, ids.count)
     }

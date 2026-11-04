@@ -21,7 +21,21 @@ final class CallAudioDebugOptionsTests: XCTestCase {
         let settings = self.makeSettings()
         _ = CallVideoDebugOptions.install(in: settings)
         XCTAssertEqual(settings.choice("calls.groupNoiseMode"), "both")
-        XCTAssertFalse(settings.bool("calls.audioWorkgroup"))
+    }
+
+    func testExperimentsTheOwnerRemovedAreGoneWithTheirStoredValues() {
+        let settings = self.makeSettings()
+        settings.set("calls.audioWorkgroup", bool: true)
+        settings.set("calls.threadQoS", bool: true)
+        _ = CallVideoDebugOptions.install(in: settings)
+        defer {
+            CallPowerGovernor.shared.stop()
+        }
+        let ids = (CallVideoDebugOptions.all + CallAudioDebugOptions.all + CallSystemDebugOptions.all).map { $0.id }
+        XCTAssertFalse(ids.contains("calls.audioWorkgroup"))
+        XCTAssertFalse(ids.contains("calls.threadQoS"))
+        XCTAssertFalse(settings.isOverridden("calls.audioWorkgroup"))
+        XCTAssertFalse(settings.isOverridden("calls.threadQoS"))
     }
 
     func testChoiceMapping() {

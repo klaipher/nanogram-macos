@@ -35,7 +35,7 @@ public enum CallVideoDebugOptions {
         settings.migrate(from: "calls.thermalLadder", to: CallSystemDebugOptions.thermalVideoLadder.id, transform: { stored in
             return (stored as? String) == "uiAndVideo" ? true : nil
         })
-        for removed in ["calls.backgroundGradientIdle", "calls.cameraFormatV2", "calls.encoderLowLatency", "calls.groupVideoCap", "calls.groupNarrowbandProcessing", "calls.micGainMode", "calls.opusComplexity", "calls.apmRate", "calls.suspendHiddenLivestream"] {
+        for removed in ["calls.backgroundGradientIdle", "calls.cameraFormatV2", "calls.encoderLowLatency", "calls.groupVideoCap", "calls.groupNarrowbandProcessing", "calls.micGainMode", "calls.opusComplexity", "calls.apmRate", "calls.suspendHiddenLivestream", "calls.audioWorkgroup", "calls.threadQoS"] {
             settings.migrate(from: removed, to: removed + ".removed", transform: { _ in nil })
         }
     }
