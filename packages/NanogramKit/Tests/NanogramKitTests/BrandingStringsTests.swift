@@ -86,4 +86,14 @@ final class BrandingStringsTests: XCTestCase {
         XCTAssertEqual(BrandingStrings.brand(source, languageCode: "de"), source)
         XCTAssertNil(BrandingStrings.brand([:], languageCode: "en")["Login.EnterCodeFromApp"])
     }
+
+    func test_crashReportCardIsBrandedByOverridesAndTheTableKeepsUpstreamWording() {
+        let table = Self.englishTable
+        XCTAssertEqual(table["CrashReport.CardTitle"], "Telegram quit unexpectedly")
+        XCTAssertEqual(table["CrashReport.CardTitleTimes_other"], "Telegram quit unexpectedly %1$d times")
+        let branded = BrandingStrings.brand(table, languageCode: "en")
+        XCTAssertEqual(branded["CrashReport.CardTitle"], "Nanogram quit unexpectedly")
+        XCTAssertEqual(branded["CrashReport.CardTitleTimes_other"], "Nanogram quit unexpectedly %1$d times")
+        XCTAssertEqual(branded["CrashReport.CardInfo"], "Choose where to send the report to help fix it.")
+    }
 }
