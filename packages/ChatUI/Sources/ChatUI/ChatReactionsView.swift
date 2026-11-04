@@ -715,7 +715,8 @@ func reactionEffectFileDataOrNil(context: any AccountContextProtocol, file: Tele
     |> `catch` { _ in
         return .complete()
     }
-    return ReactionEffectFileWait.data(resource: mediaBox.resourceData(file.resource, attemptSynchronously: true), fetch: fetch)
+    ReactionEffectFetches.shared.ensure(file.fileId, fetch: fetch)
+    return ReactionEffectFileWait.data(resource: mediaBox.resourceData(file.resource, attemptSynchronously: true))
 }
 
 func reactionEffectFileData(context: any AccountContextProtocol, file: TelegramMediaFile) -> Signal<MediaResourceData, NoError> {

@@ -22,32 +22,26 @@ final class ReactionEffectFileWaitTests: XCTestCase {
     }
 
     func testAFileAlreadyOnTheDevicePlaysWithoutWaiting() {
-        let signal = ReactionEffectFileWait.data(resource: .single(data(complete: true)), fetch: .complete(), limit: 1.0, queue: Queue())
+        let signal = ReactionEffectFileWait.data(resource: .single(data(complete: true)), limit: 1.0, queue: Queue())
         let started = CFAbsoluteTimeGetCurrent()
         let value = firstValue(of: signal)
         XCTAssertNotNil(value ?? nil)
         XCTAssertLessThan(CFAbsoluteTimeGetCurrent() - started, 0.5)
     }
 
-    func testAMissingFileIsRequestedAndPlaysWhenItArrives() {
+    func testAMissingFilePlaysWhenItArrivesInTime() {
         let resource = Promise<MediaResourceData>(data(complete: false))
-        let fetchCount = Atomic<Int>(value: 0)
-        let fetch = Signal<Void, NoError> { _ in
-            _ = fetchCount.modify { $0 + 1 }
-            return EmptyDisposable
-        }
-        let signal = ReactionEffectFileWait.data(resource: resource.get(), fetch: fetch, limit: 2.0, queue: Queue())
+        let signal = ReactionEffectFileWait.data(resource: resource.get(), limit: 2.0, queue: Queue())
         Queue.concurrentDefaultQueue().after(0.1) {
             resource.set(.single(self.data(complete: true)))
         }
         let value = firstValue(of: signal)
         XCTAssertNotNil(value ?? nil)
-        XCTAssertEqual(fetchCount.with { $0 }, 1)
     }
 
     func testAFileThatNeverArrivesGivesUpAfterTheLimitInsteadOfWaitingForever() {
         let pending = Promise<MediaResourceData>(data(complete: false))
-        let signal = ReactionEffectFileWait.data(resource: pending.get(), fetch: .complete(), limit: 0.1, queue: Queue())
+        let signal = ReactionEffectFileWait.data(resource: pending.get(), limit: 0.1, queue: Queue())
         let started = CFAbsoluteTimeGetCurrent()
         let value = firstValue(of: signal)
         guard let value else {
@@ -57,19 +51,56 @@ final class ReactionEffectFileWaitTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(CFAbsoluteTimeGetCurrent() - started, 0.09)
     }
 
-    func testTheRequestStopsOnceTheWaitEnds() {
+    func testTheDownloadKeepsRunningAfterTheWaitEnds() {
+        let fetches = ReactionEffectFetches()
         let disposed = Atomic<Bool>(value: false)
         let fetch = Signal<Void, NoError> { _ in
             return ActionDisposable { _ = disposed.swap(true) }
         }
+        let id = MediaId(namespace: 0, id: 777)
+        XCTAssertTrue(fetches.ensure(id, fetch: fetch, cap: 30, queue: Queue()))
         let pending = Promise<MediaResourceData>(data(complete: false))
-        let signal = ReactionEffectFileWait.data(resource: pending.get(), fetch: fetch, limit: 0.05, queue: Queue())
+        let signal = ReactionEffectFileWait.data(resource: pending.get(), limit: 0.05, queue: Queue())
         let value = firstValue(of: signal)
         XCTAssertNotNil(value)
-        let deadline = Date().addingTimeInterval(1.0)
-        while !disposed.with({ $0 }) && Date() < deadline {
+        XCTAssertNil(value ?? nil)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertFalse(disposed.with { $0 })
+        XCTAssertTrue(fetches.isActive(id))
+    }
+
+    func testOneDownloadPerFileAndItIsForgottenWhenDone() {
+        let fetches = ReactionEffectFetches()
+        let started = Atomic<Int>(value: 0)
+        let subscriber = Atomic<Subscriber<Void, NoError>?>(value: nil)
+        let fetch = Signal<Void, NoError> { s in
+            _ = started.modify { $0 + 1 }
+            _ = subscriber.swap(s)
+            return EmptyDisposable
+        }
+        let id = MediaId(namespace: 0, id: 778)
+        XCTAssertTrue(fetches.ensure(id, fetch: fetch, cap: 30, queue: Queue()))
+        XCTAssertFalse(fetches.ensure(id, fetch: fetch, cap: 30, queue: Queue()))
+        XCTAssertEqual(started.with { $0 }, 1)
+        subscriber.with { $0 }?.putCompletion()
+        XCTAssertFalse(fetches.isActive(id))
+        XCTAssertEqual(fetches.activeCount, 0)
+        XCTAssertTrue(fetches.ensure(id, fetch: fetch, cap: 30, queue: Queue()))
+    }
+
+    func testADownloadThatNeverEndsIsCancelledAtTheCap() {
+        let fetches = ReactionEffectFetches()
+        let disposed = Atomic<Bool>(value: false)
+        let fetch = Signal<Void, NoError> { _ in
+            return ActionDisposable { _ = disposed.swap(true) }
+        }
+        let id = MediaId(namespace: 0, id: 779)
+        fetches.ensure(id, fetch: fetch, cap: 0.05, queue: Queue())
+        let deadline = Date().addingTimeInterval(2.0)
+        while fetches.isActive(id) && Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.01))
         }
+        XCTAssertFalse(fetches.isActive(id))
         XCTAssertTrue(disposed.with { $0 })
     }
 
@@ -91,21 +122,29 @@ final class ReactionEffectFileWaitTests: XCTestCase {
     func testPrefetchTakesTheEffectFilesOfTheFirstReactionsOnly() {
         let reactions = (1 ... 20).map { reaction(Int64($0)) }
         let files = ReactionEffectPrefetch.files(from: reactions, includePremium: false, limit: 3)
-        XCTAssertEqual(files.map { $0.fileId.id }, [15, 16, 25, 26, 35, 36])
+        XCTAssertEqual(files.map { $0.fileId.id }, [15, 16, 14, 13, 25, 26, 24, 23, 35, 36, 34, 33])
     }
 
     func testPrefetchSkipsDisabledAndPremiumReactionsForOrdinaryAccounts() {
         let reactions = [reaction(1, enabled: false), reaction(2, premium: true), reaction(3), reaction(4, effects: false)]
-        XCTAssertEqual(ReactionEffectPrefetch.files(from: reactions, includePremium: false).map { $0.fileId.id }, [35, 36])
-        XCTAssertEqual(ReactionEffectPrefetch.files(from: reactions, includePremium: true).map { $0.fileId.id }, [25, 26, 35, 36])
+        XCTAssertEqual(ReactionEffectPrefetch.files(from: reactions, includePremium: false).map { $0.fileId.id }, [35, 36, 34, 33])
+        XCTAssertEqual(ReactionEffectPrefetch.files(from: reactions, includePremium: true).map { $0.fileId.id }, [25, 26, 24, 23, 35, 36, 34, 33, 44, 43])
     }
 
     func testASourceThatEndsWithoutTheFileStopsWaitingAtOnce() {
-        let signal = ReactionEffectFileWait.data(resource: .single(data(complete: false)), fetch: .complete(), limit: 5.0, queue: Queue())
+        let signal = ReactionEffectFileWait.data(resource: .single(data(complete: false)), limit: 5.0, queue: Queue())
         let started = CFAbsoluteTimeGetCurrent()
         let value = firstValue(of: signal)
         XCTAssertNotNil(value)
         XCTAssertNil(value ?? nil)
         XCTAssertLessThan(CFAbsoluteTimeGetCurrent() - started, 1.0)
+    }
+
+    func testOnlyTheFirstReactionsPrefetchOnDemandFiles() {
+        let reactions = (1 ... 8).map { reaction(Int64($0)) }
+        let ids = Set(ReactionEffectPrefetch.files(from: reactions, includePremium: false).map { $0.fileId.id })
+        XCTAssertTrue(ids.contains(44))
+        XCTAssertFalse(ids.contains(54))
+        XCTAssertTrue(ids.contains(55))
     }
 }
