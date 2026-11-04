@@ -112,6 +112,9 @@ public struct ForumUI {
                 }
                 
                 let mode: PeerListMode = peerId == context.peerId ? .savedMessagesChats(peerId: peerId) : .forum(peerId, fullWidth || context.layout == .minimisize, parentIsArchive)
+                if let pending = navigation.pendingController as? ChatListControllerKind, pending.mode == mode {
+                    return
+                }
                 let controller = ChatListUIHooks.shared.makeChatListController(context, false, mode)
                 navigation.push(controller)
                 if context.layout == .single {

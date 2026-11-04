@@ -3409,8 +3409,10 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
     private var lastAppliedScroll: TableScrollState?
     
     @discardableResult private func merge(with transition:TableUpdateTransition, forceApply: Bool, appearAnimated: Bool) -> Bool {
-        
-        
+        let mergeSignpost = PerformanceSignposts.begin("tableMerge")
+        defer {
+            PerformanceSignposts.end("tableMerge", mergeSignpost)
+        }
         if processedIds.contains(transition.uniqueId)  {
             return false
         }

@@ -826,6 +826,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }
         
         if changedFolder {
+            self.cancelPendingForumPush(newLocationPeerId: nil, folderChanged: true)
             self.removeRevealStateIfNeeded(nil)
             self.genericView.tableView.scroll(to: .up(true))
             self.folderUpdatesDisposable.set(context.engine.peers.pollChatFolderUpdates(folderId: ChatListUIHooks.shared.chatListFilterId(data.filter)).start())
@@ -833,6 +834,18 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }
 
         setCenterTitle(self.defaultBarTitle)
+    }
+    
+    private func cancelPendingForumPush(newLocationPeerId: PeerId?, folderChanged: Bool) {
+        guard let navigation = self.navigationController, navigation.controller === self else {
+            return
+        }
+        guard let pending = navigation.pendingController as? ChatListControllerKind else {
+            return
+        }
+        if ChatListPendingPushPolicy.cancels(pendingMode: pending.mode, newLocationPeerId: newLocationPeerId, folderChanged: folderChanged) {
+            navigation.cancelPendingPush()
+        }
     }
     
     private let previousChatList:Atomic<EngineChatList?> = Atomic(value: nil)
@@ -843,6 +856,9 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         self?.chatListVisibility.set(visible)
     })
     private let chatListAppliedOnce = Atomic<Bool>(value: false)
+    private let recentViews = Atomic<ChatListRecentViewCache<ChatListFilter, ChatListViewUpdate>>(value: ChatListRecentViewCache(capacity: 4))
+    private let folderSwitchSignpost = Atomic<PerformanceSignposts.OneShot?>(value: nil)
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
     private let chatListSkippedWhileHidden = Atomic<Bool>(value: false)
     private let animated = Atomic(value: false)
     private let removePeerIdGroupDisposable = MetaDisposable()
@@ -879,6 +895,16 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let initialSize = self.atomicSize
         let context = self.context
+        DispatchQueue.main.asyncAfter(deadline: .now() + ChatListReadiness.fallbackDelay(mode: self.mode), execute: { [weak self] in
+            self?.readyOnce()
+        })
+        let pressureSource = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
+        let pressureViews = self.recentViews
+        pressureSource.setEventHandler {
+            _ = pressureViews.modify { _ in ChatListRecentViewCache(capacity: 4) }
+        }
+        pressureSource.resume()
+        self.memoryPressureSource = pressureSource
         let previousChatList = self.previousChatList
         let first = Atomic<(hasEarlier: Bool, hasLater: Bool)>(value: (hasEarlier: false, hasLater: false))
         let scrollUp:Atomic<Bool> = self.first
@@ -1011,6 +1037,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         globalPeerDisposable.set(context.globalPeerHandler.get().start(next: { [weak self] location in
             if previousLocation.swap(location) != location {
                 self?.removeRevealStateIfNeeded(nil)
+                self?.cancelPendingForumPush(newLocationPeerId: location?.peerId, folderChanged: false)
             }
             
             self?.removeHighlightEvents()
@@ -1023,14 +1050,68 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }))
 
         
-        let chatHistoryView: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?), NoError> = filterSignal |> distinctUntilChanged(isEqual: { lhs, rhs in
+        let recentViews = self.recentViews
+        let folderSwitchSignpost = self.folderSwitchSignpost
+        let replayedCached = Atomic<Bool>(value: false)
+        let chatHistoryView: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool), NoError> = filterSignal |> distinctUntilChanged(isEqual: { lhs, rhs in
             return lhs.filter == rhs.filter && lhs.request == rhs.request
         }) |> mapToSignal { data in
             
-            let signal = combineLatest(context.engine.peers.subscribedChatFolderUpdates(folderId: ChatListUIHooks.shared.chatListFilterId(data.filter)), chatListViewForLocation(chatListLocation: mode.location, location: data.request, filter: data.filter, account: context.account))
-            return  signal |> map { updates, view in
-                return (view, data, false, updates)
+            let folderUpdates: Signal<ChatFolderUpdates?, NoError> = .single(nil) |> then(context.engine.peers.subscribedChatFolderUpdates(folderId: ChatListUIHooks.shared.chatListFilterId(data.filter)))
+            let signal = combineLatest(folderUpdates, chatListViewForLocation(chatListLocation: mode.location, location: data.request, filter: data.filter, account: context.account))
+            let live: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool), NoError> = signal |> map { updates, view in
+                if case .Initial = data.request {
+                    let now = CACurrentMediaTime()
+                    _ = recentViews.modify { cache in
+                        var cache = cache
+                        cache.put(data.filter, view, at: now)
+                        return cache
+                    }
+                }
+                return (view, data, false, updates, false)
             }
+            let usesCache: Bool
+            switch data.request {
+            case let .Initial(_, scrollState):
+                usesCache = ChatListCachedReplay.usesCache(isInitialRequest: true, hasScrollPosition: scrollState != nil)
+            case .Index:
+                usesCache = false
+            }
+            var cached: ChatListViewUpdate?
+            if usesCache {
+                let now = CACurrentMediaTime()
+                cached = recentViews.with { $0.fresh(data.filter, now: now, maxAge: ChatListCachedReplay.maxAge) }
+            }
+            let isSwitch = chatListAppliedOnce.with { $0 }
+            if let cached, !cached.list.items.isEmpty {
+                if isSwitch {
+                    _ = folderSwitchSignpost.swap(PerformanceSignposts.OneShot("chatListFolderSwitchCached"))?.end()
+                }
+                let cachedValue: (ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool) = (cached, data, false, nil, true)
+                return Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool), NoError> { subscriber in
+                    var gate = ChatListCachedReplayGate()
+                    let cachedDisposable = (Signal<Void, NoError>.single(Void()) |> delay(ChatListCachedReplay.delay, queue: prepareQueue)).start(next: { _ in
+                        if gate.shouldEmitCached() {
+                            subscriber.putNext(cachedValue)
+                        }
+                    })
+                    let liveDisposable = (live |> deliverOn(prepareQueue)).start(next: { value in
+                        gate.liveArrived()
+                        cachedDisposable.dispose()
+                        subscriber.putNext(value)
+                    }, completed: {
+                        subscriber.putCompletion()
+                    })
+                    return ActionDisposable {
+                        cachedDisposable.dispose()
+                        liveDisposable.dispose()
+                    }
+                }
+            }
+            if isSwitch {
+                _ = folderSwitchSignpost.swap(PerformanceSignposts.OneShot("chatListFolderSwitchLive"))?.end()
+            }
+            return live
         }
         
         //            self.storyList =
@@ -1038,18 +1119,19 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let storyState: Signal<EngineStorySubscriptions?, NoError>
         if self.mode.groupId == .root {
-            storyState = context.engine.messages.storySubscriptions(isHidden: true) |> map(Optional.init)
+            storyState = .single(nil) |> then(context.engine.messages.storySubscriptions(isHidden: true) |> map(Optional.init))
         } else {
             storyState = .single(nil)
         }
         
-        let suspiciousSession: Signal<[NewSessionReview], NoError> = newSessionReviews(postbox: context.account.postbox)
+        let waitsForBanners = ChatListFirstDisplayPolicy.waitsForBanners(mode: mode)
+        let suspiciousSession: Signal<[NewSessionReview], NoError> = .single([]) |> then(waitsForBanners ? newSessionReviews(postbox: context.account.postbox) : .never())
 
         let previousLayout: Atomic<SplitViewState> = Atomic(value: context.layout)
                 
         
-        let suggestions = combineLatest(context.engine.notices.getServerProvidedSuggestions(), ChatListUIHooks.shared.crashReportCard(context))
-        let birthdays: Signal<[UIChatListBirthday], NoError> = combineLatest(context.engine.notices.getServerDismissedSuggestions(), context.account.stateManager.contactBirthdays) |> map { dismissed, list in
+        let bannerSuggestions = combineLatest(context.engine.notices.getServerProvidedSuggestions(), ChatListUIHooks.shared.crashReportCard(context))
+        let birthdayList: Signal<[UIChatListBirthday], NoError> = combineLatest(context.engine.notices.getServerDismissedSuggestions(), context.account.stateManager.contactBirthdays) |> map { dismissed, list in
             return (list.filter {
                 $0.value.isToday
             }, dismissed)
@@ -1067,7 +1149,11 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             }
         }
         
-        let myBirthday = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Birthday(id: context.peerId))
+        let myBirthdayValue = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Birthday(id: context.peerId))
+        
+        let bannerSignals: Signal<(([ServerProvidedSuggestion], ChatListCrashReportCard?), [UIChatListBirthday], TelegramBirthday?), NoError> = combineLatest(bannerSuggestions, birthdayList, myBirthdayValue)
+        let emptyBanners: (([ServerProvidedSuggestion], ChatListCrashReportCard?), [UIChatListBirthday], TelegramBirthday?) = (([], nil), [], nil)
+        let banners: Signal<(([ServerProvidedSuggestion], ChatListCrashReportCard?), [UIChatListBirthday], TelegramBirthday?), NoError> = .single(emptyBanners) |> then(waitsForBanners ? bannerSignals : .never())
         
         let subState: Signal<StarsSubscriptionsContext.State?, NoError>
         if let subContext {
@@ -1077,9 +1163,10 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }
         
         
-        let appConfiguration = context.account.postbox.preferencesView(keys: [PreferencesKeys.appConfiguration]) |> map { view in
+        let appConfiguration: Signal<AppConfiguration, NoError> = .single(AppConfiguration.defaultValue) |> then(context.account.postbox.preferencesView(keys: [PreferencesKeys.appConfiguration]) |> map { view in
             return view.values[PreferencesKeys.appConfiguration]?.get(AppConfiguration.self) ?? AppConfiguration.defaultValue
-        }
+        })
+        let giftAuctionState: Signal<[GiftAuctionContext.State], NoError> = .single([]) |> then(context.giftAuctionsManager.state)
         
         
         
@@ -1091,13 +1178,13 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         |> map { _ in Void() }
         let projectedState: Signal<ChatListStateProjection, NoError> = combineLatest(stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, activityTicks)
         |> map { state, _ in state }
-        let list:Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey), NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, projectedState, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey), NoError> in
+        let list:Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey, Bool), NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, projectedState, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, banners, subState, appConfiguration, giftAuctionState, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, bannerValues, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey, Bool), NoError> in
             if !HistoryVisibilityGate.shouldApply(visible: isVisible, isPlainGenericUpdate: !value.2 && !scrollUp.with { $0 }, hasScrollPosition: scroll != nil, appliedOnce: chatListAppliedOnce.with { $0 }) {
                 _ = chatListSkippedWhileHidden.swap(true)
                 return .complete()
             }
             let catchesUpAfterHidden = isVisible && chatListSkippedWhileHidden.swap(false)
-            let (suggestions, crashReportCard) = suggestionsAndCrashReport
+            let ((suggestions, crashReportCard), birthdays, myBirthday) = bannerValues
                                 
             let filterData = value.1
             let rowFolders = FilterData(filter: .allChats, tabs: state.filterData.tabs, sidebar: false, showTags: state.filterData.showTags, request: .Initial(50, nil), badges: .init(total: 0, filters: []), requestTimestamp: 0, isTop: true)
@@ -1265,6 +1352,12 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             if catchesUpAfterHidden {
                 animated = false
             }
+
+            if value.4 {
+                _ = replayedCached.swap(true)
+            } else if replayedCached.swap(false) {
+                animated = false
+            }
                         
             if value.2 {
                 animated = false
@@ -1296,13 +1389,17 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             
             let pageWindow = ChatListPageWindow(hasLater: update.list.hasLater, hasEarlier: update.list.hasEarlier, firstAnchor: update.list.items.first?.index, lastAnchor: update.list.items.last?.index)
             let pageKey = ChatListPageKey(filterData)
-            return prepareEntries(from: previousEntries.swap(entries), to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode) |> map { ($0, pageWindow, pageKey) }
+            let isReady = ChatListReadiness.isReady(isLoading: update.list.isLoading, hasContent: !update.list.items.isEmpty)
+            return prepareEntries(from: previousEntries.swap(entries), to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode) |> map { ($0, pageWindow, pageKey, isReady) }
         }
         
         
         
-        let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition, pageWindow, pageKey -> Signal<Void, NoError> in
-            self?.enqueueTransition(transition)
+        let firstListSignpost = PerformanceSignposts.OneShot("chatListToFirstTransition")
+        let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition, pageWindow, pageKey, isReady -> Signal<Void, NoError> in
+            self?.enqueueTransition(transition, isReady: isReady)
+            firstListSignpost.end()
+            folderSwitchSignpost.swap(nil)?.end()
             _ = chatListAppliedOnce.swap(true)
             self?.chatListPageApplied(window: pageWindow, key: pageKey)
             return .complete()
@@ -1505,9 +1602,11 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     }
     
     
-    private func enqueueTransition(_ transition: TableUpdateTransition) {
+    private func enqueueTransition(_ transition: TableUpdateTransition, isReady: Bool) {
         let applied = self.genericView.tableView.merge(with: transition)
-        self.readyOnce()
+        if isReady {
+            self.readyOnce()
+        }
         if !applied {
             return
         }
@@ -2060,6 +2159,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     
     
     deinit {
+        memoryPressureSource?.cancel()
         removePeerIdGroupDisposable.dispose()
         disposable.dispose()
         reorderDisposable.dispose()

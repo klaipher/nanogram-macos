@@ -3598,7 +3598,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
 
         
-        let animatedEmojiStickers: Signal<[String: StickerPackItem], NoError> = context.diceCache.animatedEmojies
+        let animatedEmojiStickers: Signal<[String: StickerPackItem], NoError> = .single([:]) |> then(context.diceCache.animatedEmojies)
         // Use the process-wide cache on `context.reactions` instead of
         // re-running the postbox transaction + Codable+FlatBuffer decode
         // (~15-20ms in release, ~85ms in debug) on every chat-open. The
@@ -3610,13 +3610,13 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         let savedMessageTags: Signal<SavedMessageTags?, NoError>
         if peerId == self.context.account.peerId {
-            savedMessageTags = context.engine.stickers.savedMessageTagData()
+            savedMessageTags = .single(nil) |> then(context.engine.stickers.savedMessageTagData())
         } else {
             savedMessageTags = .single(nil)
         }
 
         
-        let reactions = context.reactions.stateValue
+        let reactions: Signal<AvailableReactions?, NoError> = .single(context.reactions.available) |> then(context.reactions.stateValue)
 
         
         let customChannelDiscussionReadState: Signal<MessageId?, NoError>
@@ -3737,7 +3737,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         let adMessages:Signal<(fixed: Message?, opportunistic: [Message], version: Int), NoError>
         if let ad = self.adMessages {
-            adMessages = ad.allMessages
+            adMessages = .single((nil, [], 0)) |> then(ad.allMessages)
         } else {
             adMessages = .single((nil, [], 0))
         }
@@ -3897,7 +3897,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         let recommendedChannels: Signal<RecommendedChannels?, NoError>
         if peerId.namespace == Namespaces.Peer.CloudChannel {
-            recommendedChannels = context.engine.peers.recommendedChannels(peerId: peerId)
+            recommendedChannels = .single(nil) |> then(context.engine.peers.recommendedChannels(peerId: peerId))
         } else {
             recommendedChannels = .single(nil)
         }
@@ -8875,8 +8875,13 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         //self.ready.set(.single(true))
         
+        let openSignpost = PerformanceSignposts.OneShot("chatOpenToReady")
         self.ready.set(combine |> map { (hReady, appearanceReady, _, iReady, monoforumReady) in
-            return hReady && iReady && appearanceReady && monoforumReady
+            let isReady = hReady && iReady && appearanceReady && monoforumReady
+            if isReady {
+                openSignpost.end()
+            }
+            return isReady
         })
         
         

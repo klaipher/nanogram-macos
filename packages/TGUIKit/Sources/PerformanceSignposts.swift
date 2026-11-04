@@ -40,4 +40,25 @@ public enum PerformanceSignposts {
             }
         }
     }
+
+    public final class OneShot: @unchecked Sendable {
+        private let lock = NSLock()
+        private let name: StaticString
+        private var state: State?
+
+        public init(_ name: StaticString) {
+            self.name = name
+            self.state = PerformanceSignposts.begin(name)
+        }
+
+        public func end() {
+            lock.lock()
+            let current = state
+            state = nil
+            lock.unlock()
+            if let current {
+                PerformanceSignposts.end(name, current)
+            }
+        }
+    }
 }
