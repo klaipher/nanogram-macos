@@ -1858,7 +1858,7 @@ public final class GroupCallUIController : ViewController {
                 }
             }
             
-            if !state.isStream {
+            if !state.isStream, CallVideoDebugOptions.isGroupVideoCapEnabled() {
                 let candidates = items.map { item -> GroupVideoChannelCandidate in
                     let owner = participants.first(where: { $0.videoEndpointId == item.endpointId || $0.presentationEndpointId == item.endpointId })
                     return GroupVideoChannelCandidate(

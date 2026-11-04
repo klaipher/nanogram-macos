@@ -118,6 +118,16 @@ final class CallVideoDebugOptionsTests: XCTestCase {
         XCTAssertFalse(settings.bool("calls.nativeDecodeFormat"))
         XCTAssertFalse(settings.bool("tgcalls.livestreamHardwareDecode"))
         XCTAssertFalse(settings.bool("tgcalls.screencastHardwareEncoder"))
+        XCTAssertFalse(settings.bool("calls.groupVideoCap"))
+        XCTAssertFalse(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+    }
+
+    func testGroupVideoCapOverride() {
+        let settings = self.makeSettings()
+        let observations = CallVideoDebugOptions.install(in: settings)
+        settings.set("calls.groupVideoCap", bool: true)
+        XCTAssertTrue(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+        withExtendedLifetime(observations) {}
     }
 
     func testOverrideReachesSettings() {

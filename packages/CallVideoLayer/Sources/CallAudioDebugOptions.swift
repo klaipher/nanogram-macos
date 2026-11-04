@@ -23,7 +23,7 @@ public enum CallAudioDebugOptions {
         NanogramDebugChoice(id: "5", title: "5")
     ], defaultValue: "default")
 
-    public static let apmRate = NanogramDebugOption.toggle(id: "calls.apmRate", section: CallVideoDebugOptions.section, title: "Voice processing at 32 kHz", detail: "Runs echo cancellation and noise suppression at 32 kHz instead of 48 kHz when the voice bitrate is 40 kbps or lower. Slightly less CPU. Applies to the next call.", defaultValue: false)
+    public static let apmRate = NanogramDebugOption.toggle(id: "calls.apmRate", section: CallVideoDebugOptions.section, title: "Voice processing at 32 kHz", detail: "Runs echo cancellation and noise suppression at 32 kHz instead of 48 kHz only when the voice bitrate is 12 kbps or lower (at 32 kbps Opus still sends 16-20 kHz, so normal calls are unchanged). Applies to the next call.", defaultValue: false)
 
     public static let audioWorkgroup = NanogramDebugOption.toggle(id: "calls.audioWorkgroup", section: CallVideoDebugOptions.section, title: "Audio threads join the device's real-time workgroup", detail: "The microphone and speaker worker threads join the audio device's workgroup so the system schedules them with the audio hardware. Falls back to normal scheduling if the device has none. Applies to the next call.", defaultValue: false)
 
