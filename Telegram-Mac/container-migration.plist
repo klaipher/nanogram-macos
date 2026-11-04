@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Move</key>
+	<array>
+		<string>Library/Preferences/org.klaipher.Nanogram.plist</string>
+		<string>Library/Application Support/org.klaipher.Nanogram</string>
+		<string>Library/Caches/org.klaipher.Nanogram</string>
+		<string>Library/Saved Application State/org.klaipher.Nanogram.savedState</string>
+		<string>Library/WebKit/org.klaipher.Nanogram</string>
+		<string>Library/HTTPStorages/org.klaipher.Nanogram</string>
+		<string>Library/Cookies/org.klaipher.Nanogram.binarycookies</string>
+	</array>
+</dict>
+</plist>

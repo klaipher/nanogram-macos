@@ -18,6 +18,13 @@ from nanogram import editions  # noqa: E402
 CONFIGURATION = os.environ.get("NANOGRAM_EDITIONS_CONFIGURATION", "Debug")
 GROUP = "YGTMYL879P.org.klaipher.Nanogram"
 ENTITLEMENTS = Path(__file__).resolve().parents[3] / "nanogram" / "entitlements"
+MACH_LOOKUP = "com.apple.security.temporary-exception.mach-lookup.global-name"
+DIRECT_ENTITLEMENTS = {"com.apple.security.app-sandbox": True,
+                       "com.apple.security.application-groups": [GROUP],
+                       "com.apple.security.network.client": True,
+                       MACH_LOOKUP: ["org.klaipher.Nanogram-spks", "org.klaipher.Nanogram-spki"]}
+DIRECT_INFO = {"SUEnableInstallerLauncherService": True, "SUEnableDownloaderService": True,
+               "SUVerifyUpdateBeforeExtraction": True, "SURequireSignedFeed": True}
 
 
 def built(edition):
@@ -49,18 +56,58 @@ class EditionRulesTests(unittest.TestCase):
         self.assertTrue(any("Sparkle.framework" in p for p in problems))
         self.assertTrue(any("SUUpdater" in p for p in problems))
 
-    def test_direct_rejects_sandbox(self):
-        problems = editions.check_edition(self.facts(sparkle_embedded=True, hardened_runtime=True), "direct")
-        self.assertTrue(any("sandbox" in p for p in problems))
+    def direct_facts(self, **overrides):
+        base = dict(entitlements=dict(DIRECT_ENTITLEMENTS), sparkle_embedded=True, hardened_runtime=True,
+                    sparkle_feed=editions.SPARKLE_FEED_URL, sparkle_public_key="A" * 43 + "=",
+                    sparkle_xpc_services=["Downloader.xpc", "Installer.xpc"], info=dict(DIRECT_INFO))
+        base.update(overrides)
+        return self.facts(**base)
+
+    def test_direct_requires_sandbox(self):
+        entitlements = dict(DIRECT_ENTITLEMENTS)
+        del entitlements["com.apple.security.app-sandbox"]
+        problems = editions.check_edition(self.direct_facts(entitlements=entitlements), "direct")
+        self.assertTrue(any("not sandboxed" in p for p in problems), problems)
+
+    def test_sandboxed_direct_with_everything_is_clean(self):
+        self.assertEqual(editions.check_edition(self.direct_facts(), "direct"), [])
+
+    def test_direct_requires_both_sparkle_xpc_services(self):
+        for missing in ("Downloader.xpc", "Installer.xpc"):
+            services = [s for s in ("Downloader.xpc", "Installer.xpc") if s != missing]
+            problems = editions.check_edition(self.direct_facts(sparkle_xpc_services=services), "direct")
+            self.assertTrue(any(missing in p for p in problems), problems)
+
+    def test_direct_requires_the_sparkle_service_and_security_keys(self):
+        for key in ("SUEnableInstallerLauncherService", "SUEnableDownloaderService",
+                    "SUVerifyUpdateBeforeExtraction", "SURequireSignedFeed"):
+            info = dict(DIRECT_INFO)
+            info[key] = False
+            problems = editions.check_edition(self.direct_facts(info=info), "direct")
+            self.assertTrue(any(key in p for p in problems), (key, problems))
+
+    def test_direct_rejects_a_dsa_key_entry(self):
+        info = dict(DIRECT_INFO, SUPublicDSAKeyFile="")
+        problems = editions.check_edition(self.direct_facts(info=info), "direct")
+        self.assertTrue(any("SUPublicDSAKeyFile" in p for p in problems), problems)
+
+    def test_direct_requires_the_sparkle_mach_lookup_exceptions(self):
+        for name in ("-spks", "-spki"):
+            entitlements = dict(DIRECT_ENTITLEMENTS)
+            entitlements[MACH_LOOKUP] = [n for n in entitlements[MACH_LOOKUP] if not n.endswith(name)]
+            problems = editions.check_edition(self.direct_facts(entitlements=entitlements), "direct")
+            self.assertTrue(any(editions.BUNDLE_ID + name in p for p in problems), problems)
+
+    def test_direct_requires_the_network_client_entitlement(self):
+        entitlements = dict(DIRECT_ENTITLEMENTS)
+        del entitlements["com.apple.security.network.client"]
+        problems = editions.check_edition(self.direct_facts(entitlements=entitlements), "direct")
+        self.assertTrue(any("network.client" in p for p in problems), problems)
 
     def test_direct_needs_our_feed_and_ed_key(self):
-        base = dict(entitlements={"com.apple.security.application-groups": [GROUP]}, sparkle_embedded=True,
-                    hardened_runtime=True)
-        problems = editions.check_edition(self.facts(**base), "direct")
+        problems = editions.check_edition(self.direct_facts(sparkle_feed="", sparkle_public_key=""), "direct")
         self.assertTrue(any("SUFeedURL" in p for p in problems), problems)
         self.assertTrue(any("SUPublicEDKey" in p for p in problems), problems)
-        good = self.facts(**base, sparkle_feed=editions.SPARKLE_FEED_URL, sparkle_public_key="A" * 43 + "=")
-        self.assertEqual(editions.check_edition(good, "direct"), [])
 
     def test_mas_has_no_feed(self):
         problems = editions.check_edition(self.facts(sparkle_feed="https://example.org/appcast.xml"), "mas")
@@ -79,6 +126,97 @@ class EditionRulesTests(unittest.TestCase):
             full.pop(key)
         self.assertEqual(development, full)
         self.assertNotIn("com.apple.developer.associated-domains", full)
+
+class DirectEntitlementsTests(unittest.TestCase):
+    """Nanogram-Direct.entitlements is the sandboxed mas set plus Sparkle's mach-lookup exceptions, nothing else."""
+
+    def load(self, name):
+        return plistlib.loads((ENTITLEMENTS / name).read_bytes())
+
+    def test_direct_is_sandboxed(self):
+        self.assertIs(self.load("Nanogram-Direct.entitlements").get("com.apple.security.app-sandbox"), True)
+
+    def test_direct_equals_the_mas_set_plus_the_sparkle_exceptions(self):
+        direct = self.load("Nanogram-Direct.entitlements")
+        exceptions = direct.pop(MACH_LOOKUP)
+        self.assertEqual(sorted(exceptions), ["$(PRODUCT_BUNDLE_IDENTIFIER)-spki", "$(PRODUCT_BUNDLE_IDENTIFIER)-spks"])
+        self.assertEqual(direct, self.load("Nanogram-MAS-Development.entitlements"))
+
+    def test_mas_sets_have_no_sparkle_exceptions(self):
+        for name in ("Nanogram-MAS.entitlements", "Nanogram-MAS-Development.entitlements"):
+            self.assertNotIn(MACH_LOOKUP, self.load(name))
+
+    def test_calls_and_files_capabilities_are_kept(self):
+        direct = self.load("Nanogram-Direct.entitlements")
+        for key in ("com.apple.security.network.client", "com.apple.security.network.server",
+                    "com.apple.security.device.camera", "com.apple.security.device.audio-input",
+                    "com.apple.security.personal-information.location", "com.apple.security.files.downloads.read-write",
+                    "com.apple.security.files.user-selected.read-write"):
+            self.assertIs(direct.get(key), True, key)
+        self.assertEqual(direct["com.apple.security.application-groups"], [GROUP])
+
+
+class DirectBuildSettingsTests(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parents[3]
+
+    def setting(self, name):
+        text = (self.ROOT / "nanogram" / "editions" / "direct.xcconfig").read_text()
+        match = re.search(rf"^{name} = (.*)$", text, re.M)
+        return match.group(1).strip() if match else None
+
+    def test_both_sparkle_xpc_services_are_embedded(self):
+        self.assertEqual(self.setting("SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE"), "1")
+        self.assertEqual(self.setting("SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE"), "1")
+
+    def test_the_connection_and_status_services_stay_off(self):
+        self.assertIsNone(self.setting("SPARKLE_EMBED_INSTALLER_CONNECTION_XPC_SERVICE"))
+        self.assertIsNone(self.setting("SPARKLE_EMBED_INSTALLER_STATUS_XPC_SERVICE"))
+
+    def test_legacy_updater_and_dsa_stay_out(self):
+        self.assertEqual(self.setting("SPARKLE_BUILD_LEGACY_SUUPDATER"), "0")
+        self.assertEqual(self.setting("SPARKLE_BUILD_LEGACY_DSA_SUPPORT"), "0")
+        self.assertIsNone(self.setting("DSA_PEM_FILE"))
+
+    def test_info_plist_carries_the_sparkle_security_keys(self):
+        info = plistlib.loads((self.ROOT / "Telegram-Mac" / "Info.plist").read_bytes())
+        for key in DIRECT_INFO:
+            self.assertIs(info.get(key), True, key)
+        self.assertNotIn("SUPublicDSAKeyFile", info)
+        self.assertEqual(info["SUPublicEDKey"], "$(SPARKLE_ED_PUBLIC_KEY)")
+
+
+class ContainerMigrationTests(unittest.TestCase):
+    """The unsandboxed direct builds kept preferences and caches under ~/Library; the sandboxed app finds them in its
+    new container because macOS moves the listed paths when that container is first created."""
+    ROOT = Path(__file__).resolve().parents[3]
+    PLIST = ROOT / "Telegram-Mac" / "container-migration.plist"
+
+    def moves(self):
+        return plistlib.loads(self.PLIST.read_bytes())["Move"]
+
+    def test_preferences_and_support_folders_of_the_bundle_move_into_the_container(self):
+        moves = self.moves()
+        for path in ("Library/Preferences/org.klaipher.Nanogram.plist",
+                     "Library/Application Support/org.klaipher.Nanogram",
+                     "Library/Caches/org.klaipher.Nanogram",
+                     "Library/Saved Application State/org.klaipher.Nanogram.savedState"):
+            self.assertIn(path, moves)
+
+    def test_only_paths_of_this_bundle_move_and_the_app_group_stays_put(self):
+        for path in self.moves():
+            self.assertTrue(path.startswith("Library/"), path)
+            self.assertIn("org.klaipher.Nanogram", path)
+            self.assertNotIn("Group Containers", path)
+            self.assertNotIn("..", path)
+
+    def test_plist_is_a_resource_of_the_app_target(self):
+        project = (self.ROOT / "Telegram.xcodeproj" / "project.pbxproj").read_text()
+        build_file = re.search(r"^\t\t(\w{24}) /\* container-migration.plist in Resources \*/ = \{isa = PBXBuildFile;", project, re.M)
+        self.assertIsNotNone(build_file, "container-migration.plist is not in a Resources build phase")
+        phase = re.search(r"D098C7131D7E175A007784E4 /\* Resources \*/ = \{.*?files = \((.*?)\);", project, re.S)
+        self.assertIn(build_file.group(1), phase.group(1), "container-migration.plist is not in the app's Resources phase")
+        self.assertEqual(project.count("container-migration.plist in Resources */,"), 1)
+
 
 class BuildDescriptionTests(unittest.TestCase):
     """Xcode reused a cached build description after an edition xcconfig changed (seen in Task 9: mas build,
@@ -268,12 +406,19 @@ class BuiltEditionsTests(unittest.TestCase):
         self.assertNotIn("com.apple.developer.associated-domains", facts.entitlements)
         self.assertEqual(editions.check_edition(facts, "mas"), [])
 
-    def test_direct_has_sparkle_no_sandbox(self):
+    def test_direct_is_sandboxed_with_sparkle_and_its_xpc_services(self):
         facts = editions.inspect_app(DIRECT)
-        self.assertNotIn(facts.entitlements.get("com.apple.security.app-sandbox"), (True,))
+        self.assertIs(facts.entitlements.get("com.apple.security.app-sandbox"), True)
+        self.assertEqual(sorted(facts.sparkle_xpc_services), ["Downloader.xpc", "Installer.xpc"])
         self.assertTrue(facts.sparkle_embedded, "direct does not embed Sparkle.framework")
         self.assertTrue(facts.hardened_runtime, "direct is not signed with the hardened runtime")
         self.assertEqual(editions.check_edition(facts, "direct"), [])
+
+    def test_both_ship_the_container_migration(self):
+        for app in (MAS, DIRECT):
+            plist = app / "Contents" / "Resources" / "container-migration.plist"
+            self.assertTrue(plist.is_file(), app)
+            self.assertIn("Library/Preferences/org.klaipher.Nanogram.plist", plistlib.loads(plist.read_bytes())["Move"])
 
     def test_both_share_app_group(self):
         for app in (MAS, DIRECT):

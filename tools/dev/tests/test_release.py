@@ -11,7 +11,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from nanogram import config, release  # noqa: E402
+from nanogram import config, release, sparkle  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -342,6 +342,84 @@ def make_repo(path: Path, files: dict) -> Path:
     git(path, "add", "-A")
     git(path, "commit", "-q", "-m", "init")
     return path
+
+
+class SignedAppcastTests(unittest.TestCase):
+    PREFIX = "<!-- sparkle-signatures:\n"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.key_file = Path(self.tmp.name) / "keys" / "sparkle_ed25519"
+        self.public = sparkle.ensure_keys(self.key_file)
+        dmg = Path(self.tmp.name) / "Nanogram.dmg"
+        dmg.write_bytes(b"x" * 10)
+        self.feed = release.appcast([release.appcast_entry("13.1.0", "4242", dmg, "c2ln", "https://example.org/a.dmg")])
+
+    def parse(self, signed):
+        data = signed.encode()
+        start = data.rindex(self.PREFIX.encode())
+        block = data[start + len(self.PREFIX):].decode()
+        self.assertTrue(block.endswith("-->\n"), block)
+        lines = dict(line.split(": ", 1) for line in block[:-len("-->\n")].splitlines())
+        return data[:start], lines["edSignature"], int(lines["length"])
+
+    def verify(self, content, signature):
+        path = Path(self.tmp.name) / "content.xml"
+        path.write_bytes(content)
+        return sparkle.verify(path, signature, self.public)
+
+    def test_feed_ends_with_a_signing_block_in_sparkles_format(self):
+        signed = release.sign_appcast(self.feed, self.key_file)
+        content, signature, length = self.parse(signed)
+        self.assertEqual(content, self.feed.encode())
+        self.assertEqual(length, len(content))
+        self.assertTrue(self.verify(content, signature))
+
+    def test_signed_feed_is_still_valid_xml(self):
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(release.sign_appcast(self.feed, self.key_file))
+        self.assertIsNotNone(root.find("channel/item"))
+
+    def test_a_changed_feed_does_not_verify_against_the_signature(self):
+        _, signature, _ = self.parse(release.sign_appcast(self.feed, self.key_file))
+        tampered = self.feed.replace("4242", "4243").encode()
+        self.assertFalse(self.verify(tampered, signature))
+
+    def test_signing_an_already_signed_feed_replaces_the_block(self):
+        once = release.sign_appcast(self.feed, self.key_file)
+        twice = release.sign_appcast(once, self.key_file)
+        self.assertEqual(twice.count("sparkle-signatures"), 1)
+        self.assertEqual(self.parse(twice)[0], self.feed.encode())
+
+    def test_write_signed_appcast_writes_a_verifiable_file(self):
+        out = Path(self.tmp.name) / "out"
+        out.mkdir()
+        path = release.write_signed_appcast(out, [], key_file=self.key_file)
+        self.assertEqual(path, out / "appcast.xml")
+        content, signature, length = self.parse(path.read_text())
+        self.assertEqual(length, len(content))
+        self.assertTrue(self.verify(content, signature))
+
+    def test_release_direct_writes_the_feed_through_the_signing_step(self):
+        import inspect
+        source = inspect.getsource(release.release_direct)
+        self.assertIn("write_signed_appcast", source)
+        self.assertNotIn('"appcast.xml").write_text', source)
+
+
+class SparkleNestedCodeTests(unittest.TestCase):
+    def test_sparkle_xpc_services_and_helpers_are_checked_for_distribution_signing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            version = app / "Contents" / "Frameworks" / "Sparkle.framework" / "Versions" / "B"
+            (version / "XPCServices" / "Installer.xpc" / "Contents" / "MacOS").mkdir(parents=True)
+            (version / "XPCServices" / "Downloader.xpc" / "Contents" / "MacOS").mkdir(parents=True)
+            (version / "Updater.app").mkdir()
+            (version / "Autoupdate").write_bytes(bytes.fromhex("cffaedfe") + b"\0" * 60)
+            code = [str(path.relative_to(version)) for path in release.nested_code(app) if version in path.parents]
+            self.assertEqual(sorted(code), ["Autoupdate", "Updater.app", "XPCServices/Downloader.xpc",
+                                            "XPCServices/Installer.xpc"])
 
 
 class DirectReleaseTests(unittest.TestCase):
