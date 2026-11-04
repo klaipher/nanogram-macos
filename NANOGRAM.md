@@ -14,6 +14,14 @@ It is the Mac sibling of Nanogram for iOS: the same app, tuned to build faster a
     [klaipher/nanogram-releases](https://github.com/klaipher/nanogram-releases) (`tools/dev/tg release-direct`).
 - Settings layer: our build settings sit in `nanogram/Nanogram.xcconfig` and `nanogram/editions/`, passed with
   `-xcconfig`; upstream's project files stay untouched apart from small hook lines.
+- Memory hardening: every C, C++ and Objective-C compile gets `-ftrivial-auto-var-init=zero` and
+  `-fstack-protector-strong`, Release C++ also `_LIBCPP_HARDENING_MODE_FAST` (Debug already has Xcode's own debug
+  mode); FFmpeg's script adds the stack protector. Apple Enhanced Security entitlements in soft mode (hardware
+  memory tagging logs simulated crashes instead of ending the process) are off by default: the App ID needs the
+  Enhanced Security capability and a new profile first. Build with `NANOGRAM_ENHANCED_SECURITY_REQUEST=YES` (release
+  builds: `NANOGRAM_ENHANCED_SECURITY=1 tools/dev/tg testflight`) to sign with the generated
+  `nanogram/entitlements/*-EnhancedSecurity.entitlements`; regenerate them with
+  `python3 -m nanogram.enhanced_security` from `tools/dev` after changing a base file.
 - Strictness: our `packages/Nanogram*` build in Swift 6 with warnings as errors; upstream code may only lower its
   warning count (`nanogram/warnings-baseline.json`). `tg check` is the pre-push gate (crash-risk lint on changed
   lines, the warning baseline, package tests).

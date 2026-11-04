@@ -7,7 +7,7 @@
 // minus profile-only keys such as Maps). tg testflight re-signs the archived app with Nanogram-MAS.entitlements
 // before the export, which signs it with the App Store profile. (A setting this file defines cannot be overridden
 // on xcodebuild's command line: the -xcconfig file wins.)
-NANOGRAM_MAS_ENTITLEMENTS = nanogram/entitlements/Nanogram-MAS-Development.entitlements
+NANOGRAM_MAS_ENTITLEMENTS = nanogram/entitlements/Nanogram-MAS-Development$(NANOGRAM_ENTITLEMENTS_SUFFIX).entitlements
 NANOGRAM_ENTITLEMENTS_Telegram = $(NANOGRAM_MAS_ENTITLEMENTS)
 NANOGRAM_ENTITLEMENTS_TelegramShare = nanogram/entitlements/NanogramShare.entitlements
 CODE_SIGN_ENTITLEMENTS = $(NANOGRAM_ENTITLEMENTS_$(TARGET_NAME):default=$(inherited))

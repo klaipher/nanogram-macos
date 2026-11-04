@@ -4,7 +4,7 @@
 // tools/dev/tg build --edition direct passes it with -xcconfig.
 #include "../Nanogram.xcconfig"
 
-NANOGRAM_ENTITLEMENTS_Telegram = nanogram/entitlements/Nanogram-Direct.entitlements
+NANOGRAM_ENTITLEMENTS_Telegram = nanogram/entitlements/Nanogram-Direct$(NANOGRAM_ENTITLEMENTS_SUFFIX).entitlements
 NANOGRAM_ENTITLEMENTS_TelegramShare = nanogram/entitlements/NanogramShare.entitlements
 CODE_SIGN_ENTITLEMENTS = $(NANOGRAM_ENTITLEMENTS_$(TARGET_NAME):default=$(inherited))
 
