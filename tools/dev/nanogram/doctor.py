@@ -15,6 +15,9 @@ SUBMODULE_MARKERS = {
     "rlottie": "submodules/rlottie/CMakeLists.txt",
     "tlottie": "submodules/tlottie/Cargo.toml",
     "telegram-ios": "submodules/telegram-ios/submodules/TelegramCore/Package.swift",
+    # libvpx and libopus are built from the core's copies (nested submodule and tarball).
+    "libvpx source": "submodules/telegram-ios/third-party/libvpx/libvpx/configure",
+    "opus tarball": "submodules/telegram-ios/third-party/opus/opus-1.6.1.tar.gz",
 }
 
 

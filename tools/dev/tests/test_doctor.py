@@ -55,6 +55,23 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(len(str(error.exception).splitlines()), 1)
         self.assertIn("put it there", str(error.exception))
 
+    def test_submodule_check_needs_core_libvpx_and_opus(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for marker in doctor.SUBMODULE_MARKERS.values():
+                if "libvpx" in marker or "opus" in marker:
+                    continue
+                (root / marker).parent.mkdir(parents=True, exist_ok=True)
+                (root / marker).write_text("x")
+            result = doctor.check_submodules(root)
+            self.assertFalse(result.ok)
+            self.assertIn("libvpx source", result.hint)
+            self.assertIn("opus tarball", result.hint)
+            for marker in doctor.SUBMODULE_MARKERS.values():
+                (root / marker).parent.mkdir(parents=True, exist_ok=True)
+                (root / marker).write_text("x")
+            self.assertTrue(doctor.check_submodules(root).ok)
+
 
 if __name__ == "__main__":
     unittest.main()
