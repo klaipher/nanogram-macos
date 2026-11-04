@@ -71,12 +71,18 @@ final class TestService: @unchecked Sendable {
     private let lock = NSLock()
     private var serverConnections: [NSXPCConnection] = []
 
+    let imageHook = HookBox()
+
     init(limits: DecoderLimits = .standard) {
         let animations = animations
+        let imageHook = imageHook
         delegate = DecoderListenerDelegate(
             limits: limits,
             makeAnimation: { json, preferTLottie in animations.make(json: json, preferTLottie: preferTLottie) },
-            decodeImage: { data, maxPixelSize in try ImageIODecoder.decode(data, maxPixelSize: maxPixelSize, limits: limits) })
+            decodeImage: { data, maxPixelSize in
+                imageHook.value?()
+                return try ImageIODecoder.decode(data, maxPixelSize: maxPixelSize, limits: limits)
+            })
         listener.delegate = delegate
         listener.resume()
     }
@@ -105,4 +111,65 @@ func samplePNG(width: Int, height: Int) -> Data {
     CGImageDestinationAddImage(destination, image, nil)
     CGImageDestinationFinalize(destination)
     return output as Data
+}
+
+final class HookBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: (@Sendable () -> Void)?
+
+    var value: (@Sendable () -> Void)? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return stored
+        }
+        set {
+            lock.lock()
+            stored = newValue
+            lock.unlock()
+        }
+    }
+}
+
+final class HostileImageService: NSObject, NanogramDecoderXPCProtocol, NSXPCListenerDelegate, @unchecked Sendable {
+    let listener = NSXPCListener.anonymous()
+    var imageReply: (Data?, Int32, Int32, Int32) = (Data(count: 4), Int32.max / 2, 1, 4)
+
+    override init() {
+        super.init()
+        listener.delegate = self
+        listener.resume()
+    }
+
+    func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
+        newConnection.exportedInterface = NSXPCInterface(with: NanogramDecoderXPCProtocol.self)
+        newConnection.exportedObject = self
+        newConnection.resume()
+        return true
+    }
+
+    func makeClient() -> DecoderXPCClient {
+        let endpoint = listener.endpoint
+        return DecoderXPCClient(configuration: .init(), makeConnection: { NSXPCConnection(listenerEndpoint: endpoint) })
+    }
+
+    func openAnimation(_ data: Data, preferTLottie: Bool, reply: @escaping @Sendable (Int64, Int32, Int32, Int32, String?) -> Void) {
+        reply(1, 0, 10, 30, nil)
+    }
+
+    func renderFrame(session: Int64, index: Int32, width: Int32, height: Int32, bytesPerRow: Int32, reply: @escaping @Sendable (Data?, String?) -> Void) {
+        reply(nil, DecoderError.unknownSession.rawValue)
+    }
+
+    func setColor(session: Int64, red: Double, green: Double, blue: Double, alpha: Double, keyPath: String) {}
+
+    func closeAnimation(session: Int64) {}
+
+    func decodeImage(_ data: Data, maxPixelSize: Int32, reply: @escaping @Sendable (Data?, Int32, Int32, Int32, String?) -> Void) {
+        reply(imageReply.0, imageReply.1, imageReply.2, imageReply.3, nil)
+    }
+
+    deinit {
+        listener.invalidate()
+    }
 }

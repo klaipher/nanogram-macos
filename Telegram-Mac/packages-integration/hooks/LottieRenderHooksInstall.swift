@@ -108,9 +108,15 @@ func installLottieRenderHooks() {
     }))
     StickerImageDecodeHooks.install(StickerImageDecodeHooks(decodeFitting: { data, pixelSize in
         guard DecoderIsolation.isEnabled else {
-            return nil
+            return .notHandled
         }
-        let bitmap = DecoderIsolation.backend.decodeImage(data, maxPixelSize: Int(max(pixelSize.width, pixelSize.height)), fallback: { nil })
-        return bitmap.flatMap { makeCGImage($0) }
+        switch DecoderIsolation.backend.decodeImage(data, maxPixelSize: Int(max(pixelSize.width, pixelSize.height))) {
+        case let .decoded(bitmap):
+            return makeCGImage(bitmap).map { .image($0) } ?? .refused
+        case .refused:
+            return .refused
+        case .unavailable:
+            return .notHandled
+        }
     }))
 }

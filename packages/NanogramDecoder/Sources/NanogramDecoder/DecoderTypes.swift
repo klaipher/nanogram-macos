@@ -46,12 +46,14 @@ public enum DecoderError: String, Error, Equatable, Sendable {
     case timedOut
     case connectionLost
     case badReply
+    case serviceUnavailable
+    case staleSession
 
     var countsAsServiceFailure: Bool {
         switch self {
-        case .timedOut, .connectionLost, .badReply:
+        case .timedOut, .connectionLost, .badReply, .serviceUnavailable:
             return true
-        case .inputTooLarge, .invalidDimensions, .tooManySessions, .unknownSession, .rendererUnavailable, .decodeFailed:
+        case .inputTooLarge, .invalidDimensions, .tooManySessions, .unknownSession, .rendererUnavailable, .decodeFailed, .staleSession:
             return false
         }
     }
@@ -65,7 +67,7 @@ public struct DecoderLimits: Equatable, Sendable {
     public var maxImageBytes: Int
     public var maxSourcePixels: Int
 
-    public init(maxAnimationBytes: Int = 8 * 1024 * 1024, maxFrameDimension: Int = 2048, maxFrameBytes: Int = 16 * 1024 * 1024, maxSessionsPerConnection: Int = 64, maxImageBytes: Int = 8 * 1024 * 1024, maxSourcePixels: Int = 36 * 1024 * 1024) {
+    public init(maxAnimationBytes: Int = 8 * 1024 * 1024, maxFrameDimension: Int = 4096, maxFrameBytes: Int = 64 * 1024 * 1024, maxSessionsPerConnection: Int = 512, maxImageBytes: Int = 8 * 1024 * 1024, maxSourcePixels: Int = 36 * 1024 * 1024) {
         self.maxAnimationBytes = maxAnimationBytes
         self.maxFrameDimension = maxFrameDimension
         self.maxFrameBytes = maxFrameBytes

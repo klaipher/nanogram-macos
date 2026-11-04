@@ -19,16 +19,16 @@ final class DecoderXPCTests: XCTestCase {
         XCTAssertEqual(opened.endFrame, 60)
         XCTAssertEqual(opened.fps, 30)
 
-        let frame = try client.renderFrame(session: opened.session, index: 7, width: 8, height: 4, bytesPerRow: 32)
+        let frame = try client.renderFrame(opened, index: 7, width: 8, height: 4, bytesPerRow: 32)
         XCTAssertEqual(frame.count, 32 * 4)
         XCTAssertEqual(frame[0], UInt8(truncatingIfNeeded: 7 + json.count))
 
-        client.setColor(session: opened.session, color: DecoderColor(red: 1, green: 0.5, blue: 0, alpha: 1), keyPath: "layer.fill")
-        _ = try client.renderFrame(session: opened.session, index: 8, width: 8, height: 4, bytesPerRow: 32)
+        client.setColor(opened, color: DecoderColor(red: 1, green: 0.5, blue: 0, alpha: 1), keyPath: "layer.fill")
+        _ = try client.renderFrame(opened, index: 8, width: 8, height: 4, bytesPerRow: 32)
         XCTAssertEqual(service.animations.created.first?.colors, ["layer.fill:1.0,0.5,0.0,1.0"])
 
-        client.closeAnimation(session: opened.session)
-        XCTAssertThrowsError(try client.renderFrame(session: opened.session, index: 1, width: 8, height: 4, bytesPerRow: 32)) { error in
+        client.closeAnimation(opened)
+        XCTAssertThrowsError(try client.renderFrame(opened, index: 1, width: 8, height: 4, bytesPerRow: 32)) { error in
             XCTAssertEqual(error as? DecoderError, .unknownSession)
         }
     }
@@ -69,10 +69,10 @@ final class DecoderXPCTests: XCTestCase {
         let service = TestService()
         let client = service.makeClient(configuration: .init(limits: DecoderLimits(maxFrameDimension: 100_000, maxFrameBytes: 1 << 40)))
         let opened = try client.openAnimation(Data("{}".utf8), preferTLottie: true)
-        XCTAssertThrowsError(try client.renderFrame(session: opened.session, index: 0, width: 50_000, height: 50_000, bytesPerRow: 200_000)) { error in
+        XCTAssertThrowsError(try client.renderFrame(opened, index: 0, width: 50_000, height: 50_000, bytesPerRow: 200_000)) { error in
             XCTAssertEqual(error as? DecoderError, .invalidDimensions)
         }
-        XCTAssertThrowsError(try client.renderFrame(session: opened.session, index: 0, width: 8, height: 4, bytesPerRow: 16)) { error in
+        XCTAssertThrowsError(try client.renderFrame(opened, index: 0, width: 8, height: 4, bytesPerRow: 16)) { error in
             XCTAssertEqual(error as? DecoderError, .invalidDimensions)
         }
     }
@@ -100,62 +100,15 @@ final class DecoderXPCTests: XCTestCase {
         XCTAssertTrue(client.isAvailable)
     }
 
-    func test_serviceCrashMidRender_fallsBackInProcessAndAppSurvives() throws {
-        let service = TestService()
-        let client = service.makeClient(configuration: .init(failureThreshold: 10))
-        let json = Data("{\"v\":\"9\"}".utf8)
-        let fallbackCount = Counter()
-        let fallbackAnimation = FakeAnimation(json: Data("{\"v\":\"fallback\"}".utf8))
-        let renderer = try XCTUnwrap(IsolatedDecoderBackend(client: client).makeAnimation(json: json, preferTLottie: true, fallback: {
-            fallbackCount.increment()
-            return fallbackAnimation
-        }))
-        renderer.setColor(DecoderColor(red: 0, green: 1, blue: 0, alpha: 1), keyPath: "k")
-        service.animations.onRender = { [service] index in
-            if index == 13 {
-                service.dropAllConnections()
-                Thread.sleep(forTimeInterval: 0.3)
-            }
-        }
-        let (buffer, bytesPerRow) = makeFrame()
-        defer { buffer.deallocate() }
-        renderer.renderFrame(12, into: buffer, width: 8, height: 4, bytesPerRow: Int32(bytesPerRow))
-        XCTAssertEqual(buffer[0], UInt8(truncatingIfNeeded: 12 + json.count))
-        XCTAssertEqual(fallbackCount.value, 0)
-
-        renderer.renderFrame(13, into: buffer, width: 8, height: 4, bytesPerRow: Int32(bytesPerRow))
-        XCTAssertEqual(fallbackCount.value, 1)
-        XCTAssertEqual(buffer[0], UInt8(truncatingIfNeeded: 13 + fallbackAnimation.json.count))
-        XCTAssertEqual(fallbackAnimation.colors, ["k:0.0,1.0,0.0,1.0"])
-
-        renderer.renderFrame(14, into: buffer, width: 8, height: 4, bytesPerRow: Int32(bytesPerRow))
-        XCTAssertEqual(fallbackCount.value, 1)
-        XCTAssertEqual(buffer[0], UInt8(truncatingIfNeeded: 14 + fallbackAnimation.json.count))
-    }
-
     func test_serviceRestartsCleanlyAfterACrash() throws {
         let service = TestService()
         let client = service.makeClient(configuration: .init(failureThreshold: 10))
         let first = try client.openAnimation(Data("{}".utf8), preferTLottie: true)
         service.dropAllConnections()
-        XCTAssertThrowsError(try client.renderFrame(session: first.session, index: 1, width: 8, height: 4, bytesPerRow: 32))
+        XCTAssertThrowsError(try client.renderFrame(first, index: 1, width: 8, height: 4, bytesPerRow: 32))
         let second = try client.openAnimation(Data("{}".utf8), preferTLottie: true)
-        let frame = try client.renderFrame(session: second.session, index: 2, width: 8, height: 4, bytesPerRow: 32)
+        let frame = try client.renderFrame(second, index: 2, width: 8, height: 4, bytesPerRow: 32)
         XCTAssertEqual(frame.count, 128)
-    }
-
-    func test_hungService_timesOutAndFallsBack() throws {
-        let service = TestService()
-        let client = service.makeClient(configuration: .init(renderTimeout: 0.2, failureThreshold: 10))
-        service.animations.onRender = { _ in Thread.sleep(forTimeInterval: 1.0) }
-        let fallbackAnimation = FakeAnimation(json: Data("{\"v\":\"fb\"}".utf8))
-        let renderer = try XCTUnwrap(IsolatedDecoderBackend(client: client).makeAnimation(json: Data("{}".utf8), preferTLottie: true, fallback: { fallbackAnimation }))
-        let (buffer, bytesPerRow) = makeFrame()
-        defer { buffer.deallocate() }
-        let started = Date()
-        renderer.renderFrame(5, into: buffer, width: 8, height: 4, bytesPerRow: Int32(bytesPerRow))
-        XCTAssertLessThan(Date().timeIntervalSince(started), 0.9)
-        XCTAssertEqual(buffer[0], UInt8(truncatingIfNeeded: 5 + fallbackAnimation.json.count))
     }
 
     func test_repeatedFailures_disableTheServiceThenRetryAfterCooldown() throws {
@@ -170,14 +123,11 @@ final class DecoderXPCTests: XCTestCase {
         }
         let (buffer, bytesPerRow) = makeFrame()
         defer { buffer.deallocate() }
-        for _ in 0..<2 {
-            let renderer = try XCTUnwrap(backend.makeAnimation(json: Data("{}".utf8), preferTLottie: true, fallback: { fallbackAnimation }))
-            renderer.renderFrame(1, into: buffer, width: 8, height: 4, bytesPerRow: Int32(bytesPerRow))
-        }
+        let failing = try XCTUnwrap(backend.makeAnimation(json: Data("{\"n\":1}".utf8), preferTLottie: true, fallback: { fallbackAnimation }))
+        failing.renderFrame(1, into: buffer, width: 8, height: 4, bytesPerRow: Int32(bytesPerRow))
         XCTAssertFalse(client.isAvailable)
         let created = service.animations.created.count
-        let direct = try XCTUnwrap(backend.makeAnimation(json: Data("{}".utf8), preferTLottie: true, fallback: { fallbackAnimation }))
-        XCTAssertTrue(direct === fallbackAnimation)
+        XCTAssertNil(backend.makeAnimation(json: Data("{}".utf8), preferTLottie: true, fallback: { fallbackAnimation }))
         XCTAssertEqual(service.animations.created.count, created)
 
         clock.advance(31)
@@ -218,18 +168,6 @@ final class DecoderXPCTests: XCTestCase {
         }
     }
 
-    func test_isolatedImageDecode_fallsBackWhenServiceIsGone() throws {
-        let service = TestService()
-        let client = service.makeClient(configuration: .init(imageTimeout: 0.5))
-        service.dropAllConnections()
-        let marker = DecodedBitmap(pixels: Data(count: 4), width: 1, height: 1, bytesPerRow: 4)
-        let result = IsolatedDecoderBackend(client: client).decodeImage(samplePNG(width: 4, height: 4), maxPixelSize: 4, fallback: { marker })
-        XCTAssertEqual(result?.width, 4)
-        service.listener.invalidate()
-        let afterShutdown = IsolatedDecoderBackend(client: client).decodeImage(samplePNG(width: 4, height: 4), maxPixelSize: 4, fallback: { marker })
-        XCTAssertEqual(afterShutdown, marker)
-    }
-
     func test_perFrameOverhead_isMeasured() throws {
         let service = TestService()
         let client = service.makeClient()
@@ -248,11 +186,11 @@ final class DecoderXPCTests: XCTestCase {
         }
         let directPerFrame = Double(DispatchTime.now().uptimeNanoseconds - directStart) / Double(frames) / 1000
 
-        _ = try client.renderFrame(session: opened.session, index: 0, width: width, height: height, bytesPerRow: bytesPerRow)
+        _ = try client.renderFrame(opened, index: 0, width: width, height: height, bytesPerRow: bytesPerRow)
         var samples: [Double] = []
         for index in 0..<frames {
             let start = DispatchTime.now().uptimeNanoseconds
-            let data = try client.renderFrame(session: opened.session, index: Int32(index % 60), width: width, height: height, bytesPerRow: bytesPerRow)
+            let data = try client.renderFrame(opened, index: Int32(index % 60), width: width, height: height, bytesPerRow: bytesPerRow)
             _ = data.withUnsafeBytes { raw in
                 memcpy(buffer, raw.baseAddress!, raw.count)
             }

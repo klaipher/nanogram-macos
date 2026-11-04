@@ -9,7 +9,6 @@ public final class DecoderConnectionService: NSObject, NanogramDecoderXPCProtoco
     private let imageDecoder: ImageDecoder
     private let lock = NSLock()
     private var sessions: [Int64: AnimationRendering] = [:]
-    private var nextSession: Int64 = 1
 
     public init(limits: DecoderLimits, makeAnimation: @escaping AnimationFactory, decodeImage: @escaping ImageDecoder) {
         self.limits = limits
@@ -34,8 +33,10 @@ public final class DecoderConnectionService: NSObject, NanogramDecoderXPCProtoco
             return
         }
         lock.lock()
-        let session = nextSession
-        nextSession += 1
+        var session = Int64.random(in: 1...Int64.max)
+        while sessions[session] != nil {
+            session = Int64.random(in: 1...Int64.max)
+        }
         sessions[session] = animation
         lock.unlock()
         reply(session, animation.startFrame, animation.endFrame, animation.fps, nil)
@@ -113,11 +114,25 @@ public final class DecoderListenerDelegate: NSObject, NSXPCListenerDelegate, @un
     public func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
         newConnection.exportedInterface = NSXPCInterface(with: NanogramDecoderXPCProtocol.self)
         newConnection.exportedObject = DecoderConnectionService(limits: limits, makeAnimation: makeAnimation, decodeImage: imageDecoder)
+        newConnection.invalidationHandler = { [weak self, weak newConnection] in
+            guard let self else {
+                return
+            }
+            self.lock.lock()
+            self.connections.removeAll(where: { $0 === newConnection || newConnection == nil })
+            self.lock.unlock()
+        }
         lock.lock()
         connections.append(newConnection)
         lock.unlock()
         newConnection.resume()
         return true
+    }
+
+    public var connectionCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return connections.count
     }
 
     public func invalidateAllConnections() {

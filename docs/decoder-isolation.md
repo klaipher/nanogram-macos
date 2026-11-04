@@ -25,36 +25,56 @@ before (TLottie, or RLottie when forced or when the server kill switch is set), 
 `makeRLottie` (the animated sticker and emoji player) both call `makeLottieBridge(json:key:)`. With the switch on it
 asks `IsolatedDecoderBackend.makeAnimation`, which returns:
 
-1. a renderer backed by the XPC service, or
-2. the legacy in-process bridge, wrapped, when the service is unavailable, refuses the input or fails to open.
+1. a renderer backed by the XPC service,
+2. the legacy in-process bridge, wrapped, only when the service could not be started at all in this run (it has
+   never answered and the connection is invalid, for example a build without the embedded service), or
+3. nothing (the sticker shows its placeholder) when the service refused the content, the content is quarantined, or
+   the service has been switched off by the breaker after it had worked.
 
 `AnimationRendering` is the package-level abstraction both backends implement (start, end, fps, render a frame into
 a caller buffer, set a colour). `StickerImageDecodeHooks` (TelegramMediaUtils) is the same seam for still WebP
-sticker previews; it is `nil` unless the app installs it and the switch is on, and the cached-representation fetch
-falls back to libwebp when it returns `nil`.
+sticker previews. It answers `image`, `refused` (show nothing, never try an in-process decoder) or `notHandled`
+(switch off, or service never started: the cached-representation fetch uses libwebp as before).
 
 ## Process boundary
 
 - Sandbox: `com.apple.security.app-sandbox` only. No network, no file access, no mach-lookup exceptions, hardened
   runtime. The service gets compressed JSON bytes and returns pixels; it never sees a path.
 - Connection: `NSXPCConnection(serviceName: "org.klaipher.Nanogram.Decoder")`. The interface carries only `Data`,
-  `String` and numbers (no object graphs to deserialize). Each connection is its own service instance and its own
-  session table.
+  `String` and numbers (no object graphs to deserialize). launchd runs one service process for the app; each
+  connection has its own session table, which the service drops when the client hangs up. Session ids are random,
+  and the client tags every session with its connection generation, so after a crash and relaunch a stale session
+  can never address another animation.
 - Wire: `openAnimation(Data)` returns a session, frame range and fps; `renderFrame(session, index, w, h,
   bytesPerRow)` returns `Data`; `setColor` and `closeAnimation` are one way.
 - Limits, enforced by the client before sending and again by the service: animation 8 MB (the app's own unzip cap),
-  frame sides 2048, frame 16 MB, 64 sessions per connection, image 8 MB, source image 36 Mpixel.
+  frame sides 4096, frame 64 MB, 512 sessions per connection, image 8 MB, source image 36 Mpixel. The client treats
+  the service as hostile: every reply (frame size, image geometry) is checked in overflow-safe arithmetic before use.
 - Image decoding (still WebP) uses ImageIO inside the service, with the pixel-count check made from the header
   before any decode.
 
 ## Failure handling
 
-Every call has a timeout (open 3 s, render 1.5 s, image 3 s). On a lost connection, a timeout or a malformed reply
-the animation switches, for good, to an in-process renderer built from the same JSON with the colours replayed, and
-the frame being asked for is rendered there, so the caller never sees a failure. The connection is invalidated, so
-the next call starts a fresh service instance. Three failures in a row switch XPC off for 60 s (animations then go
-straight in-process) and it is tried again afterwards. Content rejections (too large, unparsable, too many
-sessions) are not service failures and never trip the breaker.
+The rule is the one BlastDoor follows: content that made the isolated decoder fail is never handed to an in-process
+decoder, because a failed exploit attempt usually looks like a crash, and retrying it in the app would give the
+attacker a second try in the process that holds the session keys.
+
+- Every call has a timeout (open 3 s, render 1.5 s, image 3 s).
+- A lost connection, a timeout or a malformed reply is a service failure. The connection is dropped, so the next
+  call starts a fresh service instance, and the same content is retried once there (an innocent sticker that was on
+  screen when another one crashed the service, or a jetsam kill, recovers this way, colours replayed).
+- A second consecutive failure on the same content quarantines it (SHA-256 of the bytes, last 512 kept): the
+  animation renders transparent frames, a still image is refused, and the bytes are not sent again in this run.
+- Three failures in a row (counted once per service instance, so one crash with many stickers on screen is one
+  failure) switch XPC off for 60 s. During that time new stickers are not decoded at all if the service had worked
+  before in this run; only if it never started (missing or unlaunchable service) does the app decode in process, as it
+  did before isolation. After the cool-down XPC is tried again.
+- Content rejections (too large, unparsable, too many sessions) are not service failures: the sticker is not shown
+  and the breaker is untouched.
+- A frame larger than the frame limit renders transparent for that frame only.
+
+The owner may prefer availability over this policy (fall back in process on a crash); that is a one-line change in
+`IsolatedDecoderBackend`, but it removes most of the protection.
 
 ## Measurements
 

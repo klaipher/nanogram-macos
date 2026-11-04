@@ -27,10 +27,16 @@ public struct LottieRenderHooks {
     }
 }
 
-public struct StickerImageDecodeHooks {
-    public let decodeFitting: (Data, CGSize) -> CGImage?
+public enum StickerImageDecodeResult {
+    case image(CGImage)
+    case refused
+    case notHandled
+}
 
-    public init(decodeFitting: @escaping (Data, CGSize) -> CGImage?) {
+public struct StickerImageDecodeHooks {
+    public let decodeFitting: (Data, CGSize) -> StickerImageDecodeResult
+
+    public init(decodeFitting: @escaping (Data, CGSize) -> StickerImageDecodeResult) {
         self.decodeFitting = decodeFitting
     }
 
