@@ -3,7 +3,7 @@
 //   swift tools/dev/nanogram/render-mac-icon.swift
 // Writes:
 // - Telegram-Mac/Assets.xcassets/AppIcon.appiconset/Logo_*.png (the icon before macOS 26, which uses
-//   Telegram-Mac/AppIcon.icon) and TelegramShare/icon.icns, from NanogramComet.svg (the dark Comet);
+//   Telegram-Mac/AppIcon.icon) and TelegramShare/icon.icns, from NanogramSphere.svg (the Sphere);
 // - packages/NanogramAppIcons/Sources/NanogramAppIcons/Icons/<Name>.icns, every icon of the app icon picker
 //   (16 to 1024 px, so Finder's large icon view, Gallery and Quick Look stay sharp);
 // - Telegram-Mac/Assets.xcassets/StatusIcon.imageset (the menu bar glyph) and Icon_TelegramLogin.imageset
@@ -34,7 +34,7 @@ func attempt<T>(_ what: String, _ body: () throws -> T) -> T {
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
     .deletingLastPathComponent().deletingLastPathComponent()
 let sources = root.appendingPathComponent("nanogram/icon")
-let defaultIconName = "NanogramComet"
+let defaultIconName = "NanogramSphere"
 let assets = root.appendingPathComponent("Telegram-Mac/Assets.xcassets")
 let appIconSet = assets.appendingPathComponent("AppIcon.appiconset")
 let shareIcon = root.appendingPathComponent("TelegramShare/icon.icns")

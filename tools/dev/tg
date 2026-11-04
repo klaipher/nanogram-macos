@@ -295,7 +295,12 @@ cmd_test() {
     shift
   done
   if [ ${#packages[@]} = 0 ]; then
-    while IFS= read -r package; do packages+=("$package"); done < <(tglint affected-packages ${base:+--base "$base"})
+    local listed
+    listed="$(tglint affected-packages ${base:+--base "$base"})" || die "cannot list the packages to test (tglint affected-packages failed)"
+    while IFS= read -r package; do
+      [ -z "$package" ] || packages+=("$package")
+    done <<< "$listed"
+    [ ${#packages[@]} != 0 ] || die "no packages to test: tglint affected-packages listed none (it always lists NanogramKit)"
   fi
   for package in "${packages[@]}"; do
     [ -f "$ROOT/packages/$package/Package.swift" ] || die "no package packages/$package"

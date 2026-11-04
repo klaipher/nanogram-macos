@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100"><defs>
+<filter id="kBlur05" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="0.5"/></filter>
+<filter id="kBlur1" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.2"/></filter>
+<linearGradient id="kBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2742"/><stop offset="1" stop-color="#0a0e1a"/></linearGradient>
+<radialGradient id="kVig" cx="0.55" cy="0.42" r="0.75"><stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.45"/></radialGradient>
+<radialGradient id="kGlow" gradientUnits="userSpaceOnUse" cx="60" cy="40" r="38"><stop offset="0" stop-color="#4d7dff" stop-opacity="0.45"/><stop offset="1" stop-color="#4d7dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="kBeam" gradientUnits="userSpaceOnUse" x1="20" y1="84" x2="60" y2="40"><stop offset="0" stop-color="#5b8cff" stop-opacity="0"/><stop offset="0.55" stop-color="#5b8cff" stop-opacity="0.3"/><stop offset="1" stop-color="#9bb8ff" stop-opacity="0.75"/></linearGradient>
+<linearGradient id="kCore" gradientUnits="userSpaceOnUse" x1="20" y1="84" x2="60" y2="40"><stop offset="0.2" stop-color="#a8c2ff" stop-opacity="0"/><stop offset="1" stop-color="#d6e2ff" stop-opacity="0.6"/></linearGradient>
+<radialGradient id="kSphere" cx="0.38" cy="0.32" r="0.78"><stop offset="0" stop-color="#d2e0ff"/><stop offset="0.3" stop-color="#7ea5ff"/><stop offset="0.68" stop-color="#4673f0"/><stop offset="1" stop-color="#213da8"/></radialGradient>
+<radialGradient id="kShade" cx="0.72" cy="0.78" r="0.55"><stop offset="0" stop-color="#071030" stop-opacity="0.55"/><stop offset="1" stop-color="#071030" stop-opacity="0"/></radialGradient>
+</defs>
+<g id="icon">
+<rect width="100" height="100" fill="url(#kBg)"/>
+<rect width="100" height="100" fill="url(#kGlow)"/>
+<rect width="100" height="100" fill="url(#kVig)"/>
+<circle cx="18" cy="22" r="0.6" fill="#fff" fill-opacity="0.55"/>
+<circle cx="31" cy="13" r="0.4" fill="#fff" fill-opacity="0.4"/>
+<circle cx="84" cy="70" r="0.5" fill="#fff" fill-opacity="0.45"/>
+<circle cx="86" cy="19" r="0.35" fill="#fff" fill-opacity="0.4"/>
+<polygon points="20,84 71.1,50.1 48.9,29.9" fill="url(#kBeam)"/>
+<polygon points="22,82 65.2,44.7 54.8,35.3" fill="url(#kCore)" filter="url(#kBlur1)"/>
+<circle cx="60" cy="40" r="15.5" fill="url(#kSphere)"/>
+<circle cx="60" cy="40" r="15.5" fill="url(#kShade)"/>
+<path d="M59.5 55.5 A 15.5 15.5 0 0 1 44.65 42.2" fill="none" stroke="#b3c9ff" stroke-opacity="0.6" stroke-width="0.9" stroke-linecap="round" filter="url(#kBlur05)"/>
+<ellipse cx="54" cy="33.5" rx="5" ry="3" fill="#fff" fill-opacity="0.5" filter="url(#kBlur1)" transform="rotate(-35 54 33.5)"/>
+<path d="M53 30 Q53.35 32.65 56 33 Q53.35 33.35 53 36 Q52.65 33.35 50 33 Q52.65 32.65 53 30 Z" fill="#ffffff"/>
+<circle cx="60" cy="40" r="15.1" fill="none" stroke="#c8d8ff" stroke-opacity="0.3" stroke-width="0.5"/>
+</g>
+</svg>

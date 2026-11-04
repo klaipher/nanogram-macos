@@ -13,6 +13,12 @@ Nanogram for macOS releases, newest first.
   - Merge notes: `editions.py` and `project.pbxproj` conflicts between the sandbox and decoder branches were resolved by keeping both sides.
 - Chat input: the sticker/emoji button no longer stays highlighted after the panel is closed with the same button (the button state now follows the requested open/closed state, not the sidebar that is still animating out).
 
+### App icon
+- New default icon, the Sphere (glossy blue sphere with a light beam on a night sky), for both editions (direct and mas share one `AppIcon`). `Telegram-Mac/AppIcon.icon` (macOS 26+) is the iOS fork's layered Icon Composer file (Background, Light, Sphere, Sparkle; dark and tinted variants). macOS 15 uses `AppIcon.appiconset` (macOS template, 16 to 1024 px) rendered by `tools/dev/nanogram/render-mac-icon.swift` from `nanogram/icon/NanogramSphere.svg`, which also renders `TelegramShare/icon.icns` (and so the DMG volume icon fallback) and the share extension's sign-in logo.
+- App Icon picker: Sphere first and default (stored as no custom icon); Comet is an ordinary choice now.
+- Policy test `tools/dev/tests/test_app_icon.py`; `NanogramAppIconTests` updated.
+- Needs no new iOS core pin.
+
 ## 13.1.0 (202611041127) — 2026-11-04
 
 Source: `nanogram/integration` @ de638f4e · core `klaipher/nanogram` `main` @ 7a042ffd (was `mac/core` d3e0d01029; `mac/core` retired as `mac/core-legacy`) · tgcalls `klaipher/tgcalls` `nanogram-shared` @ 54220d6c (was `nanogram-mac` a598e27) · tg_owt `klaipher/tg_owt` `nanogram-mac` @ b6161528 (was c31956f2).

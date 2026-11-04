@@ -5,6 +5,7 @@ public struct NanogramAppIcon: Hashable, Sendable {
     public let title: String
 
     public static let all: [NanogramAppIcon] = [
+        NanogramAppIcon(name: "NanogramSphere", title: "Sphere"),
         NanogramAppIcon(name: "NanogramComet", title: "Comet"),
         NanogramAppIcon(name: "NanogramWhite", title: "White"),
         NanogramAppIcon(name: "NanogramGlass", title: "Glass"),

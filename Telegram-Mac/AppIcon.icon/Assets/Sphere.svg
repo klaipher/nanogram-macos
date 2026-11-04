@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100"><defs>
+<radialGradient id="kSphere" cx="0.38" cy="0.32" r="0.78"><stop offset="0" stop-color="#d2e0ff"/><stop offset="0.3" stop-color="#7ea5ff"/><stop offset="0.68" stop-color="#4673f0"/><stop offset="1" stop-color="#213da8"/></radialGradient>
+<radialGradient id="kShade" cx="0.72" cy="0.78" r="0.55"><stop offset="0" stop-color="#071030" stop-opacity="0.55"/><stop offset="1" stop-color="#071030" stop-opacity="0"/></radialGradient>
+</defs>
+<circle cx="60" cy="40" r="15.5" fill="url(#kSphere)"/>
+<circle cx="60" cy="40" r="15.5" fill="url(#kShade)"/>
+<circle cx="60" cy="40" r="15.1" fill="none" stroke="#c8d8ff" stroke-opacity="0.3" stroke-width="0.5"/>
+</svg>
