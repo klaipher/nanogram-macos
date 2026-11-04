@@ -385,7 +385,12 @@ def parse_push_refs(text):
 def cmd_pre_push(args):
     if os.environ.get('TG_PRE_PUSH') == '0':
         return 0
-    refs = parse_push_refs(sys.stdin.read())
+    pushed = sys.stdin.read()
+    refs = parse_push_refs(pushed)
+    parity_script = os.path.join(ROOT, 'tools', 'dev', 'parity', 'parity.py')
+    if os.path.exists(parity_script) and subprocess.run([sys.executable, parity_script, 'push', '--root', ROOT, args.remote],
+                                                        input=pushed, text=True).returncode != 0:
+        return 1
     head = git('rev-parse', 'HEAD', check=False).strip()
     check_base = None
     blocking = 0

@@ -6,6 +6,10 @@
 fast-forward of `upstream`, and a `git merge upstream` on a clean working tree. Conflicts are never resolved
 here: the merge is left in progress, the conflicted paths are printed and the exit status is 1.
 
+  python3 -m nanogram.sync core-bump [REF|SHA] [--dry-run] [--no-fetch] [--allow-rewind] [--revert SHA] [--finish]
+    `tg core-bump`: the only way to move the core pin (submodules/telegram-ios) to a newer iOS `main` commit
+    (or `mac/core-lts`); see docs/mac-core-paths.txt and the pin policy in the shared-codebase plan.
+
 Exit status: 0 merged (run the post-merge steps), NOTHING_TO_DO when the branch already has upstream's tip,
 1 conflicts, 2 any other error.
 """
@@ -18,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nanogram import config
+from nanogram.parity_loader import parity
 
 UPSTREAM_URL = "https://github.com/TelegramMessenger/telegram-macos.git"
 LOCAL_BRANCH = "upstream"
@@ -131,7 +136,133 @@ def merge_upstream(repo: Path = config.ROOT, local: str = LOCAL_BRANCH) -> Merge
     return MergeResult(clean=False, conflicts=sorted(conflicts), telegram_ios=pin)
 
 
+@dataclass
+class BumpPlan:
+    old: str
+    new: str
+    subject: str
+    commits: list[str]
+    via: str
+
+
+def core_dir(repo: Path) -> Path:
+    return repo / TELEGRAM_IOS
+
+
+def default_bump_message(new: str, subject: str) -> str:
+    return f"mac-core: {new[:10]} ({subject})"
+
+
+def plan_core_bump(repo: Path, target: str | None = None, fetch: bool = True, allow_rewind: bool = False,
+                   cfg: "parity.Config | None" = None) -> BumpPlan:
+    """Validates a core pin move; changes nothing. Raises SyncError with the reason when the move is not allowed."""
+    cfg = cfg or parity.load_config(repo)
+    core = core_dir(repo)
+    if not (core / ".git").exists():
+        raise SyncError(f"{TELEGRAM_IOS} is not checked out (tools/dev/tg setup)")
+    old = parity.gitlink(repo, "HEAD", TELEGRAM_IOS)
+    if old is None:
+        raise SyncError(f"no gitlink for {TELEGRAM_IOS} in HEAD")
+    dirty = git(core, "status", "--porcelain", "--untracked-files=no", check=False).stdout.strip()
+    if dirty:
+        raise SyncError(f"{TELEGRAM_IOS} has uncommitted edits; a core fix is committed to iOS main first, never here:\n{dirty}")
+    staged = git(repo, "diff", "--cached", "--name-only", check=False).stdout.split()
+    if staged:
+        raise SyncError("the Mac index has staged changes; commit or unstage them first: " + ", ".join(staged[:5]))
+    if fetch:
+        remote, _, branch = cfg.reference.partition("/")
+        git(core, "fetch", "--quiet", "--no-tags", remote, f"+refs/heads/{branch}:refs/remotes/{cfg.reference}")
+        lts_remote, _, lts_branch = cfg.lts_ref.partition("/")
+        git(core, "fetch", "--quiet", "--no-tags", lts_remote, f"+refs/heads/{lts_branch}:refs/remotes/{cfg.lts_ref}", check=False)
+    reference, lts = rev(core, cfg.reference), rev(core, cfg.lts_ref)
+    if reference is None:
+        raise SyncError(f"{cfg.reference} is not in {TELEGRAM_IOS}; run without --no-fetch")
+    new = rev(core, target or cfg.reference)
+    if new is None:
+        raise SyncError(f"cannot resolve {target} in {TELEGRAM_IOS}")
+    if new == old:
+        raise SyncError(f"the pin is already {old[:10]}")
+    via = cfg.reference
+    if not is_ancestor(core, new, reference):
+        if lts and is_ancestor(core, new, lts):
+            via = cfg.lts_ref
+        else:
+            raise SyncError(f"{new[:10]} is on neither {cfg.reference} nor {cfg.lts_ref}; push it to iOS main first")
+    if not allow_rewind and not is_ancestor(core, old, new):
+        raise SyncError(f"{new[:10]} does not contain the current pin {old[:10]}; the pin only moves forward (--allow-rewind to override)")
+    roots = parity.Report()
+    parity.check_roots(roots, "core-root", core, [new], cfg.core_roots)
+    published, where = parity.reachable_from_owner(core, new, cfg.remote_owner)
+    if roots.failed:
+        raise SyncError("; ".join(roots.lines()))
+    if not published:
+        raise SyncError(f"{new[:10]} is not on a {cfg.remote_owner} remote ({where})")
+    commits = git(core, "log", "--format=%h %s", f"{old}..{new}", check=False).stdout.splitlines()
+    subject = git(core, "log", "-1", "--format=%s", new).stdout.strip()
+    return BumpPlan(old, new, subject, commits, via)
+
+
+def apply_core_bump(repo: Path, plan: BumpPlan) -> None:
+    git(core_dir(repo), "checkout", "--quiet", "--detach", plan.new)
+    git(repo, "add", TELEGRAM_IOS)
+
+
+def revert_core_bump(repo: Path, old: str) -> None:
+    git(core_dir(repo), "checkout", "--quiet", "--detach", old)
+    git(repo, "reset", "--quiet", "--", TELEGRAM_IOS)
+
+
+def finish_core_bump(repo: Path) -> str:
+    """Commits only the pin; the message follows the repo convention `mac-core: <sha10> (<subject>)`."""
+    new = rev(core_dir(repo), "HEAD")
+    staged = git(repo, "rev-parse", "--verify", "--quiet", f":{TELEGRAM_IOS}", check=False).stdout.strip()
+    if new is None or new != staged or new == parity.gitlink(repo, "HEAD", TELEGRAM_IOS):
+        raise SyncError("the staged pin does not match the core checkout; run tg core-bump again")
+    subject = git(core_dir(repo), "log", "-1", "--format=%s", new).stdout.strip()
+    message = default_bump_message(new, subject)
+    git(repo, "commit", "--quiet", "-m", message, "--", TELEGRAM_IOS)
+    return message
+
+
+def core_bump_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="tg core-bump")
+    parser.add_argument("target", nargs="?", help="a ref or sha of the core (default: the reference branch, origin/main)")
+    parser.add_argument("--repo", type=Path, default=config.ROOT)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-fetch", action="store_true")
+    parser.add_argument("--allow-rewind", action="store_true")
+    parser.add_argument("--revert", metavar="SHA", help="put the pin back to SHA (used when the gate fails)")
+    parser.add_argument("--finish", action="store_true", help="commit the staged pin")
+    args = parser.parse_args(argv)
+    try:
+        if args.revert:
+            revert_core_bump(args.repo, args.revert)
+            print(f"core-bump: pin put back to {args.revert[:10]}")
+            return 0
+        if args.finish:
+            print("core-bump: committed: " + finish_core_bump(args.repo))
+            return 0
+        plan = plan_core_bump(args.repo, args.target, fetch=not args.no_fetch, allow_rewind=args.allow_rewind)
+        print(f"core-bump: {plan.old[:10]} -> {plan.new[:10]} via {plan.via}, {len(plan.commits)} commit(s):")
+        for line in plan.commits[:40]:
+            print(f"  {line}")
+        if len(plan.commits) > 40:
+            print(f"  ... and {len(plan.commits) - 40} more")
+        if args.dry_run:
+            print("core-bump: dry run, nothing changed")
+            return 0
+        apply_core_bump(args.repo, plan)
+        print(f"core-bump: pin moved to {plan.new[:10]} and staged; proposed message: {default_bump_message(plan.new, plan.subject)}")
+        return 0
+    except (SyncError, parity.ParityError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "core-bump":
+        return core_bump_main(argv[1:])
     parser = argparse.ArgumentParser(prog="tg sync-upstream")
     parser.add_argument("--repo", type=Path, default=config.ROOT)
     parser.add_argument("--remote", default="telegram")

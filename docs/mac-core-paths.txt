@@ -1,0 +1,191 @@
+# Paths shared by the iOS and macOS Nanogram apps, and the parity rules around them.
+# Identical in both repos (nanogram-ios/docs and nanogram-macos/docs); checked by tools/dev/parity/parity.py.
+# Paths are relative to the core repo root (the iOS `main` layout). The Mac keeps the core in the
+# submodule named by `core`.
+#
+# Directives
+#   core <path>             Mac superproject path of the core submodule
+#   core-root <sha>         the only history root a core commit may have (the history-free import)
+#   repo-root ios <sha>     the only history root the iOS repo may have
+#   mode legacy|shared      legacy while the Mac pins mac/core (ancestry, lag and file checks only warn);
+#                           shared once the Mac pins iOS main or mac/core-lts (phase 3 flips it)
+#   reference <ref>         where the pin must be an ancestor of, inside the core checkout
+#   lts-ref <ref>           the history-free LTS branch used while iOS main is ahead of the Mac UI
+#   lag commits=N days=N block-from=DATE   limit for shared-path commits on the reference that the pin lacks;
+#                           warning until block-from, then an error
+#   pin <name> ios=<path in the iOS repo> mac=<path in the Mac repo> [external] [warn-until=DATE]
+#   share <path>            a shared path inside the core
+#   webrtc-root mac=<dir> ios=<dir>   where the WebRTC sources start in the tg_owt and webrtc trees
+#   allow core|webrtc <path-prefix> [until=DATE] | reason   an intended difference, with its reason
+#
+# Process: a fix to anything listed under `share` is committed to iOS main first; the same day run
+# tools/dev/tg core-bump on the Mac (or cherry-pick -x into mac/core-lts). Mac-only code in shared
+# modules stays behind #if os(macOS) or in Mac-only files and gets an `allow core` line here.
+
+core submodules/telegram-ios
+core-root b46f1ec67d5cd386beccb293383114aa16df832d
+repo-root ios b46f1ec67d5cd386beccb293383114aa16df832d
+remote-owner klaipher
+mode legacy
+reference origin/main
+lts-ref origin/mac/core-lts
+lag commits=20 days=7 block-from=2026-11-18
+
+pin tgcalls ios=submodules/TgVoipWebrtc/tgcalls mac=submodules/tgcalls
+pin rlottie ios=submodules/rlottie/rlottie mac=submodules/rlottie warn-until=2026-11-18
+pin tlottie ios=submodules/tlottie/tlottie mac=submodules/tlottie external
+pin webrtc ios=third-party/webrtc/webrtc mac=submodules/tg_owt
+webrtc-root mac=src ios=
+
+share submodules/SSignalKit
+share submodules/Postbox
+share submodules/TelegramCore
+share submodules/TelegramApi
+share submodules/MtProtoKit
+share submodules/MTProtoRustEngine
+share submodules/EncryptionProvider
+share submodules/OpenSSLEncryptionProvider
+share submodules/CryptoUtils
+share submodules/MurMurHash32
+share submodules/ManagedFile
+share submodules/Utils
+share submodules/Reachability
+share submodules/BuildConfig
+share submodules/Emoji
+share submodules/GraphCore
+share submodules/PasscodeCore
+share submodules/QrCode
+share submodules/Svg
+share submodules/YuvConversion
+share submodules/OpusBinding
+share submodules/TelegramAudio
+share submodules/TelegramMediaResources
+share submodules/MediaPlayer
+share submodules/MetalEngine
+share submodules/TelegramVoip
+share submodules/TgVoipWebrtc
+share submodules/WalletContext
+share submodules/WalletBackupCrypto
+share submodules/FFMpegBinding
+share submodules/ffmpeg
+share submodules/libphonenumber
+share submodules/sqlcipher
+share submodules/openssl
+share submodules/rlottie
+share submodules/tlottie
+share submodules/LottieBinding
+share third-party/rnnoise
+share third-party/mtproto-engine
+share third-party/wallet-engine
+share third-party/td
+share third-party/dav1d
+share third-party/mozjpeg
+share third-party/ogg
+
+# Intended WebRTC differences
+allow webrtc api/peer_connection_interface.cc | iOS TGCALLS seam (disable_payload_type_demuxing, external transport security, dtls factory)
+allow webrtc api/peer_connection_interface.h | iOS TGCALLS seam
+allow webrtc pc | iOS TGCALLS seam edits in peer_connection, sdp, srtp, external_hmac
+allow webrtc modules/desktop_capture | Windows, Linux and desktop screen capture code is not built on iOS
+allow webrtc modules/video_capture | Windows and Linux capture code is not built on iOS
+allow webrtc modules/audio_device | per-platform audio device code; iOS uses its own, the Mac uses CoreAudio
+allow webrtc OWNERS | repository metadata
+allow webrtc AUTHORS | repository metadata
+allow webrtc .gitignore | repository metadata
+
+# Temporary: the 13 tg_owt security and crash fixes are not on iOS yet (owner exception 2026-11-04).
+# Remove each line when the klaipher/webrtc fork carries the fix; the entries expire on their own.
+allow webrtc api/audio_codecs/audio_format.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc api/peer_connection_interface.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc api/peer_connection_interface.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc api/scoped_refptr.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc api/video/nv12_buffer.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc api/video_codecs/sdp_video_format.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc audio/utility/channel_mixer.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc call/rtp_payload_params.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc call/rtp_payload_params_unittest.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc common_video/h265/h265_pps_parser.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc media/engine/webrtc_video_engine.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_coding/codecs/opus/opus_inst.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_coding/neteq/normal.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_coding/neteq/normal.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_coding/neteq/normal_unittest.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_device/audio_device_buffer.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_device/audio_device_impl.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_device/mac/audio_device_mac.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_device/mac/audio_device_mac.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_device/win/audio_device_core_win.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_processing/aec3/alignment_mixer.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/audio_processing/aec3/matched_filter_avx2.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/congestion_controller/goog_cc/loss_based_bwe_v2.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/desktop_capturer.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/desktop_capturer_differ_wrapper.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/desktop_frame_rotation.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/desktop_frame_rotation_unittest.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/linux/wayland/egl_dmabuf.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/linux/wayland/egl_dmabuf.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/linux/wayland/shared_screencast_stream.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/linux/x11/screen_capturer_x11.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/linux/x11/screen_capturer_x11.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/linux/x11/x_window_property.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/win/dxgi_output_duplicator.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/win/full_screen_win_application_handler.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/desktop_capture/win/window_capture_utils.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/rtp_rtcp/source/forward_error_correction.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/rtp_rtcp/source/rtp_fec_unittest.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/rtp_rtcp/source/rtp_packetizer_av1_test_helper.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_capture/linux/device_info_linux.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_capture/linux/device_info_v4l2.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_capture/linux/pipewire_session.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_capture/linux/video_capture_linux.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_capture/linux/video_capture_v4l2.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_capture/video_capture_options.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_capture/windows/sink_filter_ds.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_capture/windows/sink_filter_ds.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/codecs/h264/h264.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/codecs/h264/h264_color_space.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/codecs/h264/h264_decoder_impl.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/codecs/h264/h264_decoder_impl.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/codecs/h264/h264_encoder_impl.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/codecs/h264/h264_encoder_impl.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/generic_decoder.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/utility/ivf_file_reader.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc modules/video_coding/video_codec_initializer.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc net/dcsctp/packet/bounded_byte_writer.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc net/dcsctp/packet/crc32c.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc net/dcsctp/tx/outstanding_data.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc net/dcsctp/tx/outstanding_data_test.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc net/dcsctp/tx/retransmission_queue.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc net/dcsctp/tx/retransmission_queue_test.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc p2p/base/basic_ice_controller.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc p2p/base/connection.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc p2p/base/ice_transport_internal.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc p2p/base/stun_dictionary.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/external_hmac.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/external_hmac.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/peer_connection.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/peer_connection.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/peer_connection_internal.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/sdp_offer_answer.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/sdp_offer_answer_unittest.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/srtp_session.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/webrtc_sdp.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc pc/webrtc_sdp_unittest.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/byte_order.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/ip_address.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/net_test_helpers.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/openssl_certificate.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/physical_socket_server.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/platform_thread_types.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/platform_thread_types.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/synchronization/sequence_checker_internal.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc rtc_base/system/arch.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc sdk/objc/components/network/RTCNetworkMonitor.mm until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc sdk/objc/components/renderer/metal/RTCMTLRenderer.mm until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc system_wrappers/source/cpu_info.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc system_wrappers/source/denormal_disabler.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc video/rtp_video_stream_receiver2.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc video/rtp_video_stream_receiver2.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc video/stats_counter.h until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc video/unique_timestamp_counter.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork
+allow webrtc video/video_receive_stream2.cc until=2026-11-18 | pending WebRTC fix set, resolved by the klaipher/webrtc fork

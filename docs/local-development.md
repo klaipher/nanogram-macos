@@ -559,6 +559,34 @@ Other forks we pin: `submodules/tgcalls` = `klaipher/tgcalls` branch `nanogram-m
 two Mac build commits), `submodules/rlottie` = `klaipher/rlottie` branch `nanogram-mac`. Run
 `git submodule sync --recursive` after `.gitmodules` URLs change; existing checkouts keep their old remotes until then.
 
+## Parity gate and `tg core-bump`
+
+The iOS and macOS apps share one core, tgcalls, rlottie/tlottie and WebRTC. `docs/mac-core-paths.txt` (identical in
+both repos) lists the shared paths and the intended differences. `tools/dev/parity/parity.py` (identical in both
+repos) enforces it; `tools/dev/tg parity` runs it here and `tg check` includes it, so the pre-push hook does too.
+
+- History roots: every core commit must be rooted at the import `b46f1ec6`; a push that reaches Telegram's history is
+  stopped (both repos' pre-push hooks).
+- Pins published: core, tgcalls, rlottie and tg_owt pins must be on a `klaipher` remote.
+- Equal SHAs: tgcalls, rlottie and tlottie are the same commit on both sides (read from the core pin, or from
+  `--ios-repo` while the core is still `mac/core`).
+- Core pin: an ancestor of iOS `main` (or `mac/core-lts`), lag limit 20 commits / 7 days of shared-path commits
+  (warning until `block-from`, then an error), and no shared file that differs through a commit that is neither a
+  `cherry-pick -x` of `main` nor allow-listed.
+- WebRTC: shared source files of `tg_owt/src` and the iOS webrtc tree must match unless allow-listed. Allow entries
+  can carry `until=DATE`, after which they stop applying.
+- `mode legacy` in the paths file keeps ancestry, lag and file checks as warnings while the Mac pins `mac/core`;
+  phase 3 sets `mode shared`. `--release` makes a dirty core an error. `TG_PARITY=0` skips the hook once.
+
+`tg core-bump [REF|SHA] [--dry-run] [--no-fetch] [--no-test] [--build] [--commit]` is the only way to move the core
+pin. It fetches iOS `main` and `mac/core-lts`, refuses anything unpublished, not rooted at our import, off `main`/LTS
+or behind the current pin, moves and stages the pin, runs `tg test` and `tg parity` (and `tg build` with `--build`),
+restores the old pin when one fails, and with `--commit` commits only the pin as `mac-core: <sha> (<subject>)`.
+A shared fix is committed to iOS `main` first; the same day run `tg core-bump`.
+
+On the iOS side the pre-push hook adds only fast checks: the history root, pushed submodule pins, and a note when the
+push touches Mac-shared paths. It never builds the Mac core, so an iOS hotfix is not blocked by the Mac.
+
 ## Debug Settings and feature switches
 
 The app menu has **Nanogram → Debug Settings…** (`packages/NanogramDebug`, installed by `AppDelegate`). Signed in,

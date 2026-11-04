@@ -205,6 +205,53 @@ cmd_xcode() {
   open --env "XCODE_XCCONFIG_FILE=$xcconfig" -a Xcode "$ROOT/Telegram-Mac.xcworkspace"
 }
 
+# tg parity [--release] [--ios-repo DIR] [--ios-ref REF]: the iOS/macOS parity gate (tools/dev/parity/parity.py,
+# rules in docs/mac-core-paths.txt): history roots, published pins, equal tgcalls/rlottie/tlottie SHAs, core pin on
+# iOS main and its lag, shared files without an allow entry, WebRTC differences. Exit 1 on any error.
+cmd_parity() { python3 "$ROOT/tools/dev/parity/parity.py" check --root "$ROOT" "$@"; }
+
+# tg core-bump [REF|SHA] [--dry-run] [--no-fetch] [--no-test] [--build] [--commit] [--allow-rewind]: the only way to
+# move the core pin (submodules/telegram-ios) to a newer iOS main commit (default origin/main) or to mac/core-lts.
+# Checks the commit is on iOS main/LTS, published, rooted at our import and ahead of the pin; moves and stages the
+# pin; runs tg test (NanogramKit + changed packages) and tg parity (plus tg build with --build); puts the old pin
+# back when any fails; with --commit commits only the pin as "mac-core: <sha> (<subject>)".
+cmd_core_bump() {
+  local target="" dry=0 fetch=1 test=1 build=0 commit=0 rewind=0 plan_args=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --dry-run) dry=1 ;;
+      --no-fetch) fetch=0 ;;
+      --no-test) test=0 ;;
+      --build) build=1 ;;
+      --commit) commit=1 ;;
+      --allow-rewind) rewind=1 ;;
+      -*) die "unknown core-bump option: $1" ;;
+      *) [ -z "$target" ] || die "core-bump takes one REF or SHA"; target="$1" ;;
+    esac
+    shift
+  done
+  [ -z "$target" ] || plan_args+=("$target")
+  [ "$fetch" = 1 ] || plan_args+=(--no-fetch)
+  [ "$rewind" = 0 ] || plan_args+=(--allow-rewind)
+  local old
+  old="$(git rev-parse HEAD:submodules/telegram-ios)"
+  if [ "$dry" = 1 ]; then py sync core-bump --dry-run ${plan_args[@]+"${plan_args[@]}"}; return; fi
+  py sync core-bump ${plan_args[@]+"${plan_args[@]}"} || exit 1
+  local failed=()
+  if [ "$test" = 1 ]; then (cmd_test) || failed+=(test); fi
+  if [ "$build" = 1 ]; then (cmd_build) || failed+=(build); fi
+  (cmd_parity) || failed+=(parity)
+  if [ ${#failed[@]} != 0 ]; then
+    py sync core-bump --revert "$old"
+    die "core-bump stopped (${failed[*]} failed); the pin is back at ${old:0:10}"
+  fi
+  if [ "$commit" = 1 ]; then
+    py sync core-bump --finish
+  else
+    say "Pin staged. Commit it with: git commit -m 'mac-core: ...' -- submodules/telegram-ios (or rerun with --commit)"
+  fi
+}
+
 tglint() { python3 "$ROOT/tools/dev/lint/tglint.py" "$@"; }
 
 # tg lint [--base REV | --commits A..B] [--strict]: SwiftLint (pinned, installed on first use) on changed lines.
@@ -236,7 +283,7 @@ cmd_test() {
   [ ${#failed[@]} = 0 ] || die "tests failed: ${failed[*]}"
 }
 
-# tg check [--base REV]: everything a push must pass (the pre-push hook runs it): tooling tests, lint of the
+# tg check [--base REV]: everything a push must pass (the pre-push hook runs it): tooling tests, parity gate, lint of the
 # unpushed lines, a clean debug build with buildcheck, editions and the warning baseline, package tests.
 # Every step runs; exit 1 when any failed.
 cmd_check() {
@@ -250,7 +297,7 @@ cmd_check() {
   done
   [ -n "$base" ] || base="$(tglint default-base)"
   local tg="$ROOT/tools/dev/tg" start=$SECONDS failed=() step step_start
-  local steps=("tools/dev/tests/run.sh" "lint --base $base" "warnings" "test --base $base")
+  local steps=("tools/dev/tests/run.sh" "parity" "lint --base $base" "warnings" "test --base $base")
   for step in "${steps[@]}"; do
     say "check: $step"
     step_start=$SECONDS
@@ -285,6 +332,8 @@ usage: tools/dev/tg <command> [options]
   lint             SwiftLint on changed Swift lines [--base REV | --commits A..B] [--strict]
   warnings         clean debug build, compare upstream warnings with the baseline [--update] [--log FILE]
   check            tests, lint, clean build + warnings, package tests (pre-push gate) [--base REV]
+  parity           iOS/macOS parity gate: roots, published pins, shared SHAs, core pin lag, shared files [--release]
+  core-bump        move the core pin to a newer iOS main commit, test, gate, commit [REF|SHA] [--dry-run] [--commit]
   sync-upstream    fast-forward upstream, merge it, rebuild, update the warning baseline [--no-build] [--after-merge]
   testflight       archive and upload the mas edition [--export-only]
   release-direct   notarized dmg + appcast for the direct edition (local)
@@ -311,6 +360,8 @@ main() {
     lint) cmd_lint "$@" ;;
     test) cmd_test "$@" ;;
     check) cmd_check "$@" ;;
+    parity) cmd_parity "$@" ;;
+    core-bump) cmd_core_bump "$@" ;;
     testflight) cmd_testflight "$@" ;;
     release-direct) cmd_release_direct "$@" ;;
     run) not_yet "$cmd" ;;
