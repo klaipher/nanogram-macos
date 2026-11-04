@@ -181,7 +181,7 @@ python3 tools/dev/lint/tglint.py install-hook   # pre-push hook: lint the pushed
 | Conditions | `NANOGRAM STABLE NANOGRAM_MAS` | `NANOGRAM STABLE` |
 | Sandbox | yes | yes (and hardened runtime) |
 | Sparkle | compiled out, not linked, not embedded | embedded |
-| Entitlements | `nanogram/entitlements/Nanogram-MAS.entitlements` | `Nanogram-Direct.entitlements` (the mas set plus Sparkle's `-spks`/`-spki` mach-lookup exceptions) |
+| Entitlements | `nanogram/entitlements/Nanogram-MAS.entitlements` | `Nanogram-Direct.entitlements` (the mas set plus Sparkle's `-spks`/`-spki` mach-lookup exceptions and read access to the old preferences file) |
 
 The share extension is sandboxed in both (`NanogramShare.entitlements`). Both editions have the same sandbox
 capabilities: network client and server (the server entitlement is for WebRTC's UDP sockets in calls, kept from
@@ -219,7 +219,12 @@ group entitlement, so sandboxing the direct edition moves none of it. What lived
 cookie storage of the bundle. A sandboxed app sees only its container (`~/Library/Containers/org.klaipher.Nanogram`),
 so `Telegram-Mac/container-migration.plist` (a resource of the app target, in both editions) tells macOS to move those
 paths into the container the first time the sandboxed app starts. macOS runs it only when the container is created, so
-existing mas installs (container already there) are unaffected. Not covered: a download folder chosen outside
+existing mas installs (container already there) are unaffected. That also means it does nothing on a Mac where a mas,
+TestFlight or local mas build already created the container. For that case the direct app reads the old preferences
+file once at launch (`NanogramKit.LegacyPreferences`, read-only entitlement for exactly
+`~/Library/Preferences/org.klaipher.Nanogram.plist`) and copies the keys the container lacks; keys already in the
+container win, and a marker key stops it from running again. Caches, window state and WebKit data are not copied in
+that case. Not covered: a download folder chosen outside
 Downloads (the sandbox needs a fresh pick, per session) and Telegram crash reports in `~/Library/Logs/DiagnosticReports`
 (`CrashReportStore` is unavailable when sandboxed, as in mas).
 

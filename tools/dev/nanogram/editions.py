@@ -32,6 +32,10 @@ GROUPS = "com.apple.security.application-groups"
 PROFILE_ONLY_KEYS = ("com.apple.developer.maps", "com.apple.developer.usernotifications.communication")
 SPARKLE_FEED_URL = sparkle.FEED_URL
 MACH_LOOKUP = "com.apple.security.temporary-exception.mach-lookup.global-name"
+HOME_READ_ONLY = "com.apple.security.temporary-exception.files.home-relative-path.read-only"
+# The unsandboxed direct builds kept their settings here; the sandboxed app imports what it lacks once
+# (NanogramKit LegacyPreferences), because macOS skips container-migration.plist for an existing container.
+LEGACY_PREFERENCES = f"/Library/Preferences/{BUNDLE_ID}.plist"
 NETWORK_CLIENT = "com.apple.security.network.client"
 SPARKLE_XPC_SERVICES = ("Downloader.xpc", "Installer.xpc")
 SPARKLE_INFO_FLAGS = ("SUEnableInstallerLauncherService", "SUEnableDownloaderService", "SUVerifyUpdateBeforeExtraction",
@@ -144,6 +148,12 @@ def check_edition(facts: AppFacts, edition: str) -> list[str]:
     else:
         if not sandboxed:
             problems.append("direct app is not sandboxed")
+        readable = facts.entitlements.get(HOME_READ_ONLY, [])
+        if LEGACY_PREFERENCES not in readable:
+            problems.append(f"direct app cannot read {LEGACY_PREFERENCES} (old settings to import)")
+        for path in readable:
+            if path != LEGACY_PREFERENCES:
+                problems.append(f"direct app may read {path} outside its container (only {LEGACY_PREFERENCES})")
         if facts.entitlements.get(NETWORK_CLIENT) is not True:
             problems.append(f"direct app is missing {NETWORK_CLIENT}")
         exceptions = facts.entitlements.get(MACH_LOOKUP, [])

@@ -1,5 +1,6 @@
 // Direct edition: Developer ID, hardened runtime, notarized, Sparkle, App Sandbox with the same capabilities as the
-// mas edition plus Sparkle's mach-lookup exceptions (Nanogram-Direct.entitlements). The share extension is sandboxed too.
+// mas edition plus Sparkle's mach-lookup exceptions and read access to the old preferences file
+// (Nanogram-Direct.entitlements). The share extension is sandboxed too.
 // tools/dev/tg build --edition direct passes it with -xcconfig.
 #include "../Nanogram.xcconfig"
 

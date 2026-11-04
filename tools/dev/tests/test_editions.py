@@ -19,10 +19,13 @@ CONFIGURATION = os.environ.get("NANOGRAM_EDITIONS_CONFIGURATION", "Debug")
 GROUP = "YGTMYL879P.org.klaipher.Nanogram"
 ENTITLEMENTS = Path(__file__).resolve().parents[3] / "nanogram" / "entitlements"
 MACH_LOOKUP = "com.apple.security.temporary-exception.mach-lookup.global-name"
+HOME_READ_ONLY = "com.apple.security.temporary-exception.files.home-relative-path.read-only"
+LEGACY_PREFERENCES = "/Library/Preferences/org.klaipher.Nanogram.plist"
 DIRECT_ENTITLEMENTS = {"com.apple.security.app-sandbox": True,
                        "com.apple.security.application-groups": [GROUP],
                        "com.apple.security.network.client": True,
-                       MACH_LOOKUP: ["org.klaipher.Nanogram-spks", "org.klaipher.Nanogram-spki"]}
+                       MACH_LOOKUP: ["org.klaipher.Nanogram-spks", "org.klaipher.Nanogram-spki"],
+                       HOME_READ_ONLY: [LEGACY_PREFERENCES]}
 DIRECT_INFO = {"SUEnableInstallerLauncherService": True, "SUEnableDownloaderService": True,
                "SUVerifyUpdateBeforeExtraction": True, "SURequireSignedFeed": True}
 
@@ -98,6 +101,17 @@ class EditionRulesTests(unittest.TestCase):
             problems = editions.check_edition(self.direct_facts(entitlements=entitlements), "direct")
             self.assertTrue(any(editions.BUNDLE_ID + name in p for p in problems), problems)
 
+    def test_direct_requires_read_access_to_the_old_preferences_file(self):
+        entitlements = dict(DIRECT_ENTITLEMENTS)
+        del entitlements[HOME_READ_ONLY]
+        problems = editions.check_edition(self.direct_facts(entitlements=entitlements), "direct")
+        self.assertTrue(any(LEGACY_PREFERENCES in p for p in problems), problems)
+
+    def test_direct_reads_nothing_else_outside_its_container(self):
+        entitlements = dict(DIRECT_ENTITLEMENTS, **{HOME_READ_ONLY: [LEGACY_PREFERENCES, "/.ssh/"]})
+        problems = editions.check_edition(self.direct_facts(entitlements=entitlements), "direct")
+        self.assertTrue(any("/.ssh/" in p for p in problems), problems)
+
     def test_direct_requires_the_network_client_entitlement(self):
         entitlements = dict(DIRECT_ENTITLEMENTS)
         del entitlements["com.apple.security.network.client"]
@@ -128,7 +142,8 @@ class EditionRulesTests(unittest.TestCase):
         self.assertNotIn("com.apple.developer.associated-domains", full)
 
 class DirectEntitlementsTests(unittest.TestCase):
-    """Nanogram-Direct.entitlements is the sandboxed mas set plus Sparkle's mach-lookup exceptions, nothing else."""
+    """Nanogram-Direct.entitlements is the sandboxed mas set plus Sparkle's mach-lookup exceptions and read access to
+    the old unsandboxed preferences file, nothing else."""
 
     def load(self, name):
         return plistlib.loads((ENTITLEMENTS / name).read_bytes())
@@ -140,11 +155,12 @@ class DirectEntitlementsTests(unittest.TestCase):
         direct = self.load("Nanogram-Direct.entitlements")
         exceptions = direct.pop(MACH_LOOKUP)
         self.assertEqual(sorted(exceptions), ["$(PRODUCT_BUNDLE_IDENTIFIER)-spki", "$(PRODUCT_BUNDLE_IDENTIFIER)-spks"])
+        self.assertEqual(direct.pop(HOME_READ_ONLY), [LEGACY_PREFERENCES])
         self.assertEqual(direct, self.load("Nanogram-MAS-Development.entitlements"))
 
-    def test_mas_sets_have_no_sparkle_exceptions(self):
+    def test_mas_sets_have_no_temporary_exceptions(self):
         for name in ("Nanogram-MAS.entitlements", "Nanogram-MAS-Development.entitlements"):
-            self.assertNotIn(MACH_LOOKUP, self.load(name))
+            self.assertEqual([key for key in self.load(name) if "temporary-exception" in key], [], name)
 
     def test_calls_and_files_capabilities_are_kept(self):
         direct = self.load("Nanogram-Direct.entitlements")
@@ -183,6 +199,23 @@ class DirectBuildSettingsTests(unittest.TestCase):
             self.assertIs(info.get(key), True, key)
         self.assertNotIn("SUPublicDSAKeyFile", info)
         self.assertEqual(info["SUPublicEDKey"], "$(SPARKLE_ED_PUBLIC_KEY)")
+
+
+class LegacyPreferencesImportTests(unittest.TestCase):
+    """macOS skips container-migration.plist when the container already exists (a mas or TestFlight build ran first),
+    so the direct app also copies keys it lacks from the old preferences file once, before anything reads them."""
+    ROOT = Path(__file__).resolve().parents[3]
+
+    def test_main_imports_before_any_hook_or_setting_is_read(self):
+        main = (self.ROOT / "Telegram-Mac" / "app" / "main.swift").read_text()
+        guard = main.index("guard SingleInstance.ensure() else { exit(0) }")
+        start = main.index("#if NANOGRAM && !NANOGRAM_MAS\nif let home = LegacyPreferences.userHomeDirectory()")
+        call = main.index("LegacyPreferences.importOnce(into: UserDefaults.standard, domain: ApiEnvironment.bundleId, "
+                          "legacyFile: LegacyPreferences.legacyFile(home: home, bundleIdentifier: ApiEnvironment.bundleId), "
+                          "isSandboxed: LegacyPreferences.isSandboxed)")
+        self.assertLess(guard, start)
+        self.assertLess(start, call)
+        self.assertLess(call, main.index("installLocalizationTransform"))
 
 
 class ContainerMigrationTests(unittest.TestCase):

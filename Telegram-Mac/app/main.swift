@@ -6,6 +6,12 @@ import NanogramKit
 
 guard SingleInstance.ensure() else { exit(0) }
 
+#if NANOGRAM && !NANOGRAM_MAS
+if let home = LegacyPreferences.userHomeDirectory() {
+    LegacyPreferences.importOnce(into: UserDefaults.standard, domain: ApiEnvironment.bundleId, legacyFile: LegacyPreferences.legacyFile(home: home, bundleIdentifier: ApiEnvironment.bundleId), isSandboxed: LegacyPreferences.isSandboxed)
+}
+#endif
+
 installLocalizationTransform(BrandingStrings.brand)
 
 @_silgen_name("OPENSSL_init_crypto")
