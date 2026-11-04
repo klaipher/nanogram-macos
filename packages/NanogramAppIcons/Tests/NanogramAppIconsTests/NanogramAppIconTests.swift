@@ -4,6 +4,7 @@ import XCTest
 
 final class NanogramAppIconTests: XCTestCase {
     private let iosPickerOrder: [(name: String, title: String)] = [
+        ("NanogramSphere", "Sphere"),
         ("NanogramComet", "Comet"),
         ("NanogramWhite", "White"),
         ("NanogramGlass", "Glass"),
@@ -25,8 +26,8 @@ final class NanogramAppIconTests: XCTestCase {
         XCTAssertEqual(NanogramAppIcon.all.map(\.title), iosPickerOrder.map(\.title))
     }
 
-    func testTheDarkCometIsTheDefaultAndIsStoredAsNoCustomIcon() {
-        XCTAssertEqual(NanogramAppIcon.defaultIcon.name, "NanogramComet")
+    func testTheSphereIsTheDefaultAndIsStoredAsNoCustomIcon() {
+        XCTAssertEqual(NanogramAppIcon.defaultIcon.name, "NanogramSphere")
         XCTAssertTrue(NanogramAppIcon.defaultIcon.isDefault)
         XCTAssertNil(NanogramAppIcon.defaultIcon.storedName)
         XCTAssertEqual(NanogramAppIcon.all.filter(\.isDefault).count, 1)
@@ -50,7 +51,8 @@ final class NanogramAppIconTests: XCTestCase {
     }
 
     func testAStoredDefaultNameMigratesToNoCustomIcon() {
-        XCTAssertNil(NanogramAppIcon.migratedStoredName("NanogramComet"))
+        XCTAssertNil(NanogramAppIcon.migratedStoredName("NanogramSphere"))
+        XCTAssertEqual(NanogramAppIcon.migratedStoredName("NanogramComet"), "NanogramComet")
         XCTAssertNil(NanogramAppIcon.migratedStoredName(nil))
     }
 

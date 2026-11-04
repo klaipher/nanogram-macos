@@ -1,28 +1,118 @@
 {
-  "fill": {
-    "solid": "srgb:0.06667,0.09020,0.13333,1.00000"
-  },
+  "fill": "automatic",
   "groups": [
     {
       "layers": [
         {
-          "glass": true,
-          "image-name": "Head.svg",
-          "name": "Head"
+          "name": "Sparkle",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "Sparkle.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "SparkleMono.svg"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "image-name": "SphereSheen.png",
+          "name": "Sphere sheen",
+          "glass": false
         },
         {
-          "glass": false,
-          "image-name": "Tail.svg",
-          "name": "Tail"
+          "name": "Sphere",
+          "glass": true,
+          "image-name-specializations": [
+            {
+              "value": "Sphere.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "SphereMono.svg"
+            }
+          ]
         }
       ],
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.25
+        "opacity": 0.5
       },
+      "specular": true,
       "translucency": {
-        "enabled": true,
-        "value": 0.5
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "image-name": "LightCore.png",
+          "name": "Light core",
+          "glass": false
+        },
+        {
+          "name": "Light",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "Light.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "LightMono.svg"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "name": "Background",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "Background.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "BackgroundDark.svg"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
       }
     }
   ],

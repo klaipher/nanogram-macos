@@ -110,14 +110,14 @@ def close(rgba, hex_rgb, tolerance=6):
 
 
 class IconTests(unittest.TestCase):
-    """The rendered macOS icon is the dark Comet in Apple's icon grid (rounded square, transparent margin)."""
+    """The rendered macOS icon is the Sphere in Apple's icon grid (rounded square, transparent margin)."""
 
-    def test_app_icon_is_the_comet(self):
+    def test_app_icon_is_the_sphere(self):
         width, rows = png_pixels(ROOT / "Telegram-Mac/Assets.xcassets/AppIcon.appiconset/Logo_1024.png")
         self.assertEqual(width, 1024)
         self.assertEqual(rows[4][4][3], 0, "the corner outside the rounded square must be transparent")
-        self.assertTrue(close(rows[431][593], "508FFF"), rows[431][593])
-        self.assertTrue(close(rows[784][784], "111722"), rows[784][784])
+        self.assertTrue(close(rows[431][593], "6A89D6"), rows[431][593])  # the blue sphere
+        self.assertTrue(close(rows[784][784], "0C101D"), rows[784][784])  # the night-sky background
 
     def test_every_size_rendered(self):
         icons = json.loads((ROOT / "Telegram-Mac/Assets.xcassets/AppIcon.appiconset/Contents.json").read_text())
@@ -128,10 +128,9 @@ class IconTests(unittest.TestCase):
 
     def test_liquid_glass_icon_is_nanogram(self):
         icon = json.loads((ROOT / "Telegram-Mac/AppIcon.icon/icon.json").read_text())
-        self.assertEqual(icon["fill"], {"solid": "srgb:0.06667,0.09020,0.13333,1.00000"})
-        images = sorted(layer["image-name"] for group in icon["groups"] for layer in group["layers"])
-        self.assertEqual(images, ["Head.svg", "Tail.svg"])
-        self.assertIn('fill="#508FFF"', (ROOT / "Telegram-Mac/AppIcon.icon/Assets/Head.svg").read_text())
+        names = sorted(layer["name"] for group in icon["groups"] for layer in group["layers"])
+        self.assertEqual(names, ["Background", "Light", "Light core", "Sparkle", "Sphere", "Sphere sheen"])
+        self.assertIn('#d2e0ff', (ROOT / "Telegram-Mac/AppIcon.icon/Assets/Sphere.svg").read_text())
 
 
 @unittest.skipUnless(BOTH_BUILT, NOT_BUILT)
