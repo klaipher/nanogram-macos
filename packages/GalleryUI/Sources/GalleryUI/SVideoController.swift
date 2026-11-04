@@ -446,12 +446,13 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         let account = self.account
         
         if isHLSVideo(file: reference.media) {
-            let fetchSignal = HLSVideoContent.minimizedHLSQualityPreloadData(postbox: account.postbox, file: reference, userLocation: reference.userLocation, prefixSeconds: 10, autofetchPlaylist: true, initialQuality: FastSettings.videoQuality)
+            let userLocation = reference.userLocation
+            let fetchSignal = HLSVideoContent.minimizedHLSQualityPreloadData(postbox: account.postbox, file: reference, userLocation: userLocation, prefixSeconds: 10, autofetchPlaylist: true, initialQuality: FastSettings.videoQuality)
             |> mapToSignal { fileAndRange -> Signal<Never, NoError> in
                 guard let fileAndRange else {
                     return .complete()
                 }
-                return freeMediaFileResourceInteractiveFetched(postbox: account.postbox, userLocation: reference.userLocation, fileReference: fileAndRange.0, resource: fileAndRange.0.media.resource, range: (fileAndRange.1, .default))
+                return freeMediaFileResourceInteractiveFetched(postbox: account.postbox, userLocation: userLocation, fileReference: fileAndRange.0, resource: fileAndRange.0.media.resource, range: (fileAndRange.1, .default))
                 |> ignoreValues
                 |> `catch` { _ -> Signal<Never, NoError> in
                     return .complete()
