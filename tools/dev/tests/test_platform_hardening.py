@@ -55,6 +55,13 @@ class CompilerHardeningTests(unittest.TestCase):
         script = (ROOT / "core-xprojects" / "ffmpeg" / "ffmpeg" / "build.sh").read_text()
         self.assertRegex(script, r'EXTRA_CFLAGS="[^"]*-fstack-protector-strong')
 
+    def test_ffmpeg_has_the_native_av1_decoder_for_the_videotoolbox_hwaccel(self):
+        script = (ROOT / "core-xprojects" / "ffmpeg" / "ffmpeg" / "build.sh").read_text()
+        decoders = re.search(r"--enable-decoder=(\S+)", script).group(1).rstrip("\\").split(",")
+        self.assertIn("av1", decoders)
+        self.assertIn("libdav1d", decoders)
+        self.assertIn("av1_videotoolbox", re.search(r"--enable-hwaccel=(\S+)", script).group(1))
+
 
 class EnhancedSecurityTests(unittest.TestCase):
     def test_variants_are_the_base_plus_the_soft_mode_keys(self):
