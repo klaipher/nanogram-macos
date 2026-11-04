@@ -31,7 +31,8 @@ core-xprojects/tlottie/build
 *.profraw
 
 # Nanogram
-/build-output/
+/build-output
+/build-output.noindex/
 packages/ApiCredentials/Sources/ApiCredentials/NanogramSecrets.swift
 nanogram/local.json
 __pycache__/
