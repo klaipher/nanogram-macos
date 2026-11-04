@@ -53,7 +53,7 @@ public enum CallThermalLadderMode: String, Equatable {
     }
 }
 
-public struct CallPowerProfile: Equatable {
+public struct CallPowerProfile: Equatable, Sendable {
     public var reducedEffects: Bool
     public var maxShortSide: Int
     public var maxFps: Int
@@ -146,7 +146,7 @@ public struct CallPowerHysteresis {
     }
 }
 
-public final class CallPowerGovernor {
+public final class CallPowerGovernor: @unchecked Sendable {
     public static let shared = CallPowerGovernor()
 
     public final class Token {

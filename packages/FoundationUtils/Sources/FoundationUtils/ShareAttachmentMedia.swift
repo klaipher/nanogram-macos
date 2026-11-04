@@ -1,6 +1,6 @@
 import Foundation
 import ImageIO
-import CoreServices
+import UniformTypeIdentifiers
 
 public enum ShareAttachmentMedia {
     public static let maxImagePixelSize = 1280
@@ -84,7 +84,7 @@ public enum ShareAttachmentMedia {
 
     private static func jpegData(_ image: CGImage) -> Data? {
         let data = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(data as CFMutableData, kUTTypeJPEG, 1, nil) else {
+        guard let destination = CGImageDestinationCreateWithData(data as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
             return nil
         }
         CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: jpegQuality] as CFDictionary)

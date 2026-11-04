@@ -631,13 +631,18 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
         controller.transitionStyle = .horizontalStrip
     }
     
+    private var displayedPageIndex: Int {
+        let controller = self.controller
+        return MainActor.assumeIsolated { controller.selectedIndex }
+    }
+
     private var hasPendingTransitions: Bool {
         return lockedTransition || !queuedTransitions.isEmpty
     }
 
     private func releaseDistantItems(around index: Int) {
         let items = self.items
-        let displayedIndex: Int? = items.isEmpty ? nil : controller.selectedIndex
+        let displayedIndex: Int? = items.isEmpty ? nil : displayedPageIndex
         let decision = releaseSchedule.note(itemCount: items.count, index: index, displayedIndex: displayedIndex, pending: hasPendingTransitions)
         #if DEBUG
         if decision.oldRuleWouldReleaseDisplayed, let displayedIndex = displayedIndex {
@@ -651,10 +656,10 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
 
     private func flushDeferredRelease() {
         let items = self.items
-        let indices = releaseSchedule.flush(itemCount: items.count, displayedIndex: controller.selectedIndex, pending: hasPendingTransitions)
+        let indices = releaseSchedule.flush(itemCount: items.count, displayedIndex: displayedPageIndex, pending: hasPendingTransitions)
         #if DEBUG
         if !indices.isEmpty {
-            Logger.shared.log("GalleryRelease", "deferred release flushed: shown=\(controller.selectedIndex) count=\(items.count) released=\(indices.count)")
+            Logger.shared.log("GalleryRelease", "deferred release flushed: shown=\(displayedPageIndex) count=\(items.count) released=\(indices.count)")
         }
         #endif
         for itemIndex in indices {

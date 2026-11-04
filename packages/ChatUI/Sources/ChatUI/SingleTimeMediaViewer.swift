@@ -230,7 +230,7 @@ private final class VideoView : View, MediaView {
     private var activityBackground: NSColor = .clear
     private var playerView: GIFPlayerView
 
-    private let statusDisposable = MetaDisposable()
+    private nonisolated(unsafe) let statusDisposable = MetaDisposable()
     
     var didFinish:((NSView)->Void)? = nil
 
