@@ -157,11 +157,9 @@ class PinnedVersionsTests(unittest.TestCase):
         modules = read(ROOT / ".gitmodules")
         self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-mac\n', modules)
 
-    def test_libprisma(self):
-        self.assertEqual(gitlink(ROOT, "submodules/libprisma"), "086296336c69723f58ca6aa603434ef8cf682c39")
-
-    def test_boost_regex(self):
-        self.assertEqual(gitlink(ROOT, "submodules/regex"), "7760ef2a61d643c1770026f0392b440bdfb5687d")
+    def test_libprisma_and_boost_regex_come_from_the_core(self):
+        self.assertTrue((TG_IOS / "third-party" / "libprisma" / "Sources" / "SyntaxHighlighter.cpp").exists())
+        self.assertTrue((TG_IOS / "third-party" / "boost_regex" / "include" / "boost" / "regex.hpp").exists())
 
     def test_sparkle_2(self):
         self.assertEqual(gitlink(ROOT, "submodules/Sparkle"), "ab7d71291238df6e0492143b120c9b696a35f603")
