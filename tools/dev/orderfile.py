@@ -169,12 +169,25 @@ def parse_link_map(lines):
     return sorted(by_address.items())
 
 
+def ambiguous_names(entries):
+    """Names the linker would place at several addresses (per-module helpers, outlined functions): a list entry
+    for one moves every copy and says nothing about which one launch ran, so lists must not hold them."""
+    seen = collections.Counter(name for _, names in entries for name in set(names))
+    return {name for name, count in seen.items() if count > 1 or name.startswith('_OUTLINED_FUNCTION_')}
+
+
+def prune_ambiguous(order, entries):
+    ambiguous = ambiguous_names(entries)
+    return [name for name in order if name not in ambiguous]
+
+
 def layout_report(entries, order):
     """How the listed functions sit in __text: (listed, found, leading, in_order, functions).
 
     found: listed functions the binary has (aliases at one address count once, at their first mention); leading:
     how many of them are among the first `found` functions of __text; in_order: how many follow the previous one."""
-    address_of = {name: address for address, names in entries for name in names}
+    ambiguous = ambiguous_names(entries)
+    address_of = {name: address for address, names in entries for name in names if name not in ambiguous}
     addresses = list(collections.OrderedDict.fromkeys(address_of[n] for n in order if n in address_of))
     first = {address for address, _ in entries[:len(addresses)]}
     leading = sum(1 for address in addresses if address in first)
@@ -231,8 +244,8 @@ def load_symbols(binary):
     return SymbolTable(entries, text_vmaddr_of(binary))
 
 
-def order_symbols(offsets, table, known=()):
-    known = set(known)
+def order_symbols(offsets, table, known=(), ambiguous=()):
+    known = set(known) | set(ambiguous)
     symbols = collections.OrderedDict()
     for offset in offsets:
         for name in table.names_at(offset):
@@ -438,8 +451,19 @@ def main():
     parser.add_argument('--out-dir', default=ORDER_DIR)
     parser.add_argument('--check', metavar='DSYM_OR_LINK_MAP',
                         help='only check that a Release link put the listed functions first in __text, in list order')
+    parser.add_argument('--prune', metavar='DSYM_OR_BINARY',
+                        help='drop names that are not unique in this binary from the lists in --out-dir')
     parser.add_argument('--order', default=os.path.join(ORDER_DIR, ORDER_FILE), help='list to --check')
     args = parser.parse_args()
+    if args.prune:
+        entries = parse_nm(run(['nm', '-m', '-n', '-U', args.prune]).stdout.split('\n'))
+        for name in (SIGNED_IN, SIGNED_OUT, ORDER_FILE):
+            path = os.path.join(args.out_dir, name)
+            before = read_lines(path)
+            if before:
+                write_lines(path, prune_ambiguous(before, entries))
+                print(f'{path}: {len(before)} -> {len(read_lines(path))} symbols')
+        return
     if args.check:
         sys.exit(0 if check_layout(args.check, args.order) else 1)
 
@@ -476,7 +500,7 @@ def main():
 
     offsets = first_seen_offsets(runs)
     source = SIGNED_IN if args.signed_in else SIGNED_OUT
-    symbols_out = order_symbols(offsets, table)
+    symbols_out = order_symbols(offsets, table, ambiguous=ambiguous_names(zip(table.addresses, table.names)))
     signed_in, login_only = write_order_files(args.out_dir, source, symbols_out)
     print(f'{os.path.join(args.out_dir, source)}: {len(symbols_out)} symbols from '
           f'{len(offsets)} sampled addresses in {len(runs)} launches')

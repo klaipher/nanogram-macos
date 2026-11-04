@@ -128,6 +128,28 @@ class LayoutTests(unittest.TestCase):
             self.assertTrue(orderfile.check_layout(link_map, listed))
 
 
+class AmbiguousNameTests(unittest.TestCase):
+    ENTRIES = [(0x100, ['_main']), (0x180, ['_OUTLINED_FUNCTION_3']), (0x200, ['_$sURLWOhTm']),
+               (0x280, ['_$sURLWOhTm']), (0x300, ['_unique', '_alias'])]
+
+    def test_names_at_several_addresses_and_outlined_functions_are_ambiguous(self):
+        self.assertEqual(orderfile.ambiguous_names(self.ENTRIES), {'_OUTLINED_FUNCTION_3', '_$sURLWOhTm'})
+
+    def test_order_skips_ambiguous_names(self):
+        table = orderfile.SymbolTable(self.ENTRIES, 0)
+        self.assertEqual(orderfile.order_symbols([0x100, 0x180, 0x200, 0x300], table, ambiguous=orderfile.ambiguous_names(self.ENTRIES)),
+                         ['_main', '_unique', '_alias'])
+
+    def test_prune_keeps_unique_and_non_text_names(self):
+        self.assertEqual(orderfile.prune_ambiguous(['_main', '_OUTLINED_FUNCTION_3', '_$sURLWOhTm', '_data', '_unique'], self.ENTRIES),
+                         ['_main', '_data', '_unique'])
+
+    def test_check_ignores_ambiguous_names_instead_of_picking_one_copy(self):
+        order = ['_main', '_$sURLWOhTm', '_unique']
+        entries = [(0x100, ['_main']), (0x180, ['_unique']), (0x200, ['_$sURLWOhTm']), (0x280, ['_$sURLWOhTm']), (0x300, ['_x'])]
+        self.assertEqual(orderfile.layout_report(entries, order), (3, 2, 2, 2, 5))
+
+
 class OrderFilesTests(unittest.TestCase):
     def test_signed_in_order_comes_first_then_login_only_symbols(self):
         self.assertEqual(orderfile.compose(['_main', '_b', '_c'], ['_main', '_login', '_c', '_form']),
