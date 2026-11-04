@@ -22,6 +22,9 @@ Nanogram for macOS releases, newest first.
 - App Icon picker: Sphere first and default (stored as no custom icon); Comet is an ordinary choice now.
 - Policy test `tools/dev/tests/test_app_icon.py`; `NanogramAppIconTests` updated.
 - Needs no new iOS core pin.
+### Media and UI
+- Pinned message bar: the side indicator is one aligned column the height of the title and text lines (it was a fixed 30 pt strip, with 12 pt segments that left a dim sliver on top when there are several pins); several pins show three equal segments that scroll with the selection (`ChatPinnedIndicatorLayout`, `VerticalParticleListControl.segmentHeight`). The highlighted segment is placed at its own slot in the scrolled list (`VerticalParticleListControl.positions`), so the second-to-last pin no longer lights up the last segment; the dim list is redrawn when the segment height changes.
+- Reactions: the reaction effect animations (the effect on the chip and the one around the message) now request their file and wait up to 1.5 s for it, instead of playing only when the file happened to be on disk and otherwise waiting forever and playing late or never; the effects of the first eight reactions are prefetched when the reaction list loads (`ReactionEffectFileWait`, `ReactionEffectPrefetch`, `EmojiScreenEffect`).
 
 ## 13.1.0 (202611041127) — 2026-11-04
 

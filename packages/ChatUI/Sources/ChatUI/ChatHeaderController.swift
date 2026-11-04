@@ -975,6 +975,18 @@ private final class ChatSponsoredView : Control, ChatHeaderProtocol {
     }
 }
 
+enum ChatPinnedIndicatorLayout {
+    static let originX: CGFloat = 22
+    static let width: CGFloat = 2
+    static let minimumVerticalInset: CGFloat = 5
+
+    static func frame(in size: NSSize, contentHeight: CGFloat) -> NSRect {
+        let available = max(0, size.height - minimumVerticalInset * 2)
+        let height = min(max(0, contentHeight), available)
+        return NSRect(x: originX, y: floor((size.height - height) / 2), width: width, height: height)
+    }
+}
+
 class ChatPinnedView : Control, ChatHeaderProtocol {
     private var node:ReplyModel?
     private let chatInteraction:ChatInteraction
@@ -1045,7 +1057,7 @@ class ChatPinnedView : Control, ChatHeaderProtocol {
         addSubview(container)
 
         
-        particleList.frame = NSMakeRect(22, 5, 2, 30)
+        particleList.frame = ChatPinnedIndicatorLayout.frame(in: frame.size, contentHeight: frame.height)
         particleList.foregroundColor = theme.colors.text
 
         addSubview(particleList)
@@ -1190,6 +1202,7 @@ class ChatPinnedView : Control, ChatHeaderProtocol {
         self.pinnedMessage = pinnedMessage
         self.translate = translate
         updateLocalizationAndTheme(theme: theme)
+        needsLayout = true
     }
     
     private func installReplyMarkup(_ button: ReplyMarkupButton, message: Message, animated: Bool) {
@@ -1308,6 +1321,7 @@ class ChatPinnedView : Control, ChatHeaderProtocol {
         }
 
         transition.updateFrame(view: container, frame: container.centerFrameY(x: 24))
+        updateIndicator(size: size)
 
         let dismissX = size.width - 10 - dismiss.frame.width
         ContainedViewLayoutTransition.immediate.updateFrame(view: dismiss, frame: dismiss.centerFrameY(x: dismissX))
@@ -1322,6 +1336,18 @@ class ChatPinnedView : Control, ChatHeaderProtocol {
         }
     }
     
+    private func updateIndicator(size: NSSize) {
+        let contentHeight = node?.size.height ?? size.height
+        let indicatorFrame = ChatPinnedIndicatorLayout.frame(in: size, contentHeight: contentHeight)
+        guard particleList.frame != indicatorFrame else {
+            return
+        }
+        particleList.frame = indicatorFrame
+        if let pinnedMessage {
+            particleList.update(count: pinnedMessage.totalCount, selectedIndex: pinnedMessage.index, animated: false, force: true)
+        }
+    }
+
     private struct MeasureKey: Equatable {
         let node: ObjectIdentifier
         let header: ObjectIdentifier?
