@@ -43,4 +43,26 @@ final class ChatPinnedIndicatorLayoutTests: XCTestCase {
     func testAnIndicatorTooSmallToSplitStillDrawsASegment() {
         XCTAssertGreaterThanOrEqual(VerticalParticleListControl.segmentHeight(count: 9, frameHeight: 3, gap: 2), 1)
     }
+    func testTheSelectedSegmentSitsOnItsOwnSlotForEveryPin() {
+        let gap: CGFloat = 2
+        for frameHeight: CGFloat in [22, 28, 30, 34] {
+            for count in 1 ... 50 {
+                let height = VerticalParticleListControl.segmentHeight(count: count, frameHeight: frameHeight, gap: gap)
+                for index in 0 ..< count {
+                    let positions = VerticalParticleListControl.positions(count: count, selectedIndex: index, frameHeight: frameHeight, gap: gap)
+                    let itemY = floor(height * CGFloat(index) + CGFloat(index) * gap)
+                    XCTAssertEqual(positions.selected, itemY + positions.list, "count \(count) index \(index) height \(frameHeight)")
+                    XCTAssertGreaterThanOrEqual(positions.selected, 0, "count \(count) index \(index) height \(frameHeight)")
+                    XCTAssertLessThanOrEqual(positions.selected, frameHeight - height, "count \(count) index \(index) height \(frameHeight)")
+                }
+            }
+        }
+    }
+
+    func testSteppingBetweenTheLastTwoOfFourPinsMovesTheHighlight() {
+        let third = VerticalParticleListControl.positions(count: 4, selectedIndex: 2, frameHeight: 30, gap: 2)
+        let fourth = VerticalParticleListControl.positions(count: 4, selectedIndex: 3, frameHeight: 30, gap: 2)
+        XCTAssertNotEqual(third.selected, fourth.selected)
+        XCTAssertEqual(fourth.selected, 22)
+    }
 }

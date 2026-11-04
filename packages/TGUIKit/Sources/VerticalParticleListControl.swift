@@ -81,6 +81,21 @@ public class VerticalParticleListControl: Control {
         return max(1, floor((frameHeight - (visible - 1) * gap) / visible))
     }
 
+    public static func positions(count: Int, selectedIndex: Int, frameHeight: CGFloat, gap: CGFloat) -> (list: CGFloat, selected: CGFloat) {
+        let count = max(1, count)
+        let segment = segmentHeight(count: count, frameHeight: frameHeight, gap: gap)
+        let index = CGFloat(selectedIndex)
+        let itemY = floor((segment * index) + (index * gap))
+        let listHeight = (segment * CGFloat(count)) + (gap * CGFloat(count - 1))
+        let maxDifference = -(listHeight - frameHeight)
+        var list: CGFloat = 0
+        if count > visibleSegments {
+            let topDifference = itemY + segment - frameHeight
+            list = max(min(0, -topDifference - ((frameHeight - segment) / 2)), maxDifference)
+        }
+        return (list: list, selected: itemY + list)
+    }
+
     public func update(count: Int, selectedIndex: Int, animated: Bool, force: Bool = false) {
         self.selectedIndex = selectedIndex
         let count = max(1, count)
@@ -88,7 +103,7 @@ public class VerticalParticleListControl: Control {
 
         let fgColor = self.foregroundColor ?? presentation.colors.accentIcon
 
-        if self.count != count || force {
+        if self.count != count || self.itemSize != itemSize || force {
             self.unselected.image = generateList(max(1, count), itemSize: itemSize, backgroundColor: .clear, foregroundColor: fgColor.withAlphaComponent(0.2), mask: false)
             self.unselected.sizeToFit()
 
@@ -102,23 +117,9 @@ public class VerticalParticleListControl: Control {
         }
         
         
-        var pos:NSPoint = .zero
-        var selectedPoint:NSPoint = .zero
-        let itemPos = NSMakePoint(0, floor((itemSize.height * CGFloat(selectedIndex)) + (CGFloat(selectedIndex) * itemSize.width)))
-        let maxDifference = -(unselected.frame.height - frame.height)
-        if count > 3 {
-            let topDifference = itemPos.y + itemSize.height - frame.height
-            pos = NSMakePoint(0, max(min(0, -topDifference - ((frame.height - itemSize.height) / 2)), maxDifference))
-            
-        }
-        
-        if pos.y == 0 {
-            selectedPoint = itemPos
-        } else if pos.y == maxDifference {
-            selectedPoint = NSMakePoint(0, frame.height - itemSize.height)
-        } else {
-            selectedPoint = NSMakePoint(0, (frame.height - itemSize.height) / 2)
-        }
+        let positions = VerticalParticleListControl.positions(count: count, selectedIndex: selectedIndex, frameHeight: frame.height, gap: frame.width)
+        let pos = NSMakePoint(0, positions.list)
+        let selectedPoint = NSMakePoint(0, positions.selected)
         
         if animated {
             self.unselected.layer?.animatePosition(from: self.unselected.frame.origin - pos, to: .zero, duration: 0.4, timingFunction: .spring, additive: true)
