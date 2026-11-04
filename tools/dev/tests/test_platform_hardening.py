@@ -137,3 +137,26 @@ class EnhancedSecurityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EmbeddedBundleVersionTests(unittest.TestCase):
+    """The decoder service must follow the app's version; upstream version bumps never touch it."""
+
+    def test_every_marketing_version_in_the_project_is_the_same(self):
+        text = (ROOT / "Telegram.xcodeproj" / "project.pbxproj").read_text()
+        self.assertEqual(len(set(re.findall(r"MARKETING_VERSION = ([0-9.]+);", text))), 1)
+        self.assertEqual(len(set(re.findall(r"CURRENT_PROJECT_VERSION = ([0-9.]+);", text))), 1)
+
+    def test_decoder_info_plist_takes_both_versions_from_build_settings(self):
+        info = plistlib.loads((ROOT / "NanogramDecoderService" / "Info.plist").read_bytes())
+        self.assertEqual(info["CFBundleShortVersionString"], "$(MARKETING_VERSION)")
+        self.assertEqual(info["CFBundleVersion"], "$(CURRENT_PROJECT_VERSION)")
+
+    def test_a_pinned_embedded_version_is_reported(self):
+        from nanogram import editions
+        facts = editions.AppFacts(bundle_id="", source="", sparkle_embedded=False, sparkle_symbols=[], entitlements={},
+                                  hardened_runtime=True, info={"CFBundleShortVersionString": "13.2.0"},
+                                  embedded_versions={"NanogramDecoder.xpc": "13.1.0", "Share.appex": "13.2.0"})
+        problems = editions._check_embedded_versions(facts)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("NanogramDecoder.xpc", problems[0])
