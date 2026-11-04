@@ -7,7 +7,7 @@ private final class FakeEnvironment {
     var inputs = CallPowerInputs(thermalState: .nominal, isLowPowerModeEnabled: false)
     var time: TimeInterval = 1000
     var scheduled: [(delay: TimeInterval, work: () -> Void, cancelled: Bool)] = []
-    var appliedLimits: [(Int, Int)] = []
+    var appliedLevels: [Int] = []
     var logs: [String] = []
     let center = NotificationCenter()
 
@@ -16,7 +16,7 @@ private final class FakeEnvironment {
             let index = self.scheduled.count
             self.scheduled.append((delay, work, false))
             return { self.scheduled[index].cancelled = true }
-        }, applyVideoLimit: { self.appliedLimits.append(($0, $1)) }, log: { self.logs.append($0) }, notificationCenter: self.center)
+        }, applyThermalLevel: { self.appliedLevels.append($0) }, log: { self.logs.append($0) }, notificationCenter: self.center)
     }
 
     func fireLiveTimers() {
@@ -33,7 +33,7 @@ final class CallPowerGovernorTests: XCTestCase {
         XCTAssertEqual(CallPowerPolicy.step(for: CallPowerInputs(thermalState: .fair, isLowPowerModeEnabled: false)), .fair)
         XCTAssertEqual(CallPowerPolicy.step(for: CallPowerInputs(thermalState: .serious, isLowPowerModeEnabled: false)), .serious)
         XCTAssertEqual(CallPowerPolicy.step(for: CallPowerInputs(thermalState: .critical, isLowPowerModeEnabled: false)), .critical)
-        XCTAssertEqual(CallPowerPolicy.step(for: CallPowerInputs(thermalState: .nominal, isLowPowerModeEnabled: true)), .critical)
+        XCTAssertEqual(CallPowerPolicy.step(for: CallPowerInputs(thermalState: .nominal, isLowPowerModeEnabled: true)), .fair)
     }
 
     func testProfileByMode() {
@@ -43,7 +43,7 @@ final class CallPowerGovernorTests: XCTestCase {
         XCTAssertEqual(CallPowerPolicy.profile(step: .critical, mode: .ui), CallPowerProfile(reducedEffects: true, maxShortSide: 0, maxFps: 0))
         XCTAssertEqual(CallPowerPolicy.profile(step: .fair, mode: .uiAndVideo), CallPowerProfile(reducedEffects: true, maxShortSide: 0, maxFps: 0))
         XCTAssertEqual(CallPowerPolicy.profile(step: .serious, mode: .uiAndVideo), CallPowerProfile(reducedEffects: true, maxShortSide: 540, maxFps: 20))
-        XCTAssertEqual(CallPowerPolicy.profile(step: .critical, mode: .uiAndVideo), CallPowerProfile(reducedEffects: true, maxShortSide: 480, maxFps: 15))
+        XCTAssertEqual(CallPowerPolicy.profile(step: .critical, mode: .uiAndVideo), CallPowerProfile(reducedEffects: true, maxShortSide: 360, maxFps: 15))
     }
 
     func testHysteresisStepsDownAtOnceAndRestoresAfterThirtySeconds() {
@@ -83,17 +83,14 @@ final class CallPowerGovernorTests: XCTestCase {
         governor.refresh()
         XCTAssertEqual(governor.step, .serious)
         XCTAssertTrue(governor.profile.reducedEffects)
-        XCTAssertTrue(environment.appliedLimits.isEmpty)
+        XCTAssertTrue(environment.appliedLevels.allSatisfy { $0 == 0 })
 
         governor.setMode(.uiAndVideo)
-        XCTAssertEqual(environment.appliedLimits.count, 1)
-        XCTAssertEqual(environment.appliedLimits[0].0, 540)
-        XCTAssertEqual(environment.appliedLimits[0].1, 20)
+        XCTAssertEqual(environment.appliedLevels.last, 2)
         XCTAssertFalse(environment.logs.isEmpty)
 
         governor.setMode(.off)
-        XCTAssertEqual(environment.appliedLimits.last?.0, 0)
-        XCTAssertEqual(environment.appliedLimits.last?.1, 0)
+        XCTAssertEqual(environment.appliedLevels.last, 0)
     }
 
     func testGovernorRestoresAfterTimerFires() {
@@ -102,7 +99,7 @@ final class CallPowerGovernorTests: XCTestCase {
         governor.start(mode: .uiAndVideo)
         environment.inputs = CallPowerInputs(thermalState: .critical, isLowPowerModeEnabled: false)
         governor.refresh()
-        XCTAssertEqual(environment.appliedLimits.last?.0, 480)
+        XCTAssertEqual(environment.appliedLevels.last, 3)
 
         environment.inputs = CallPowerInputs(thermalState: .nominal, isLowPowerModeEnabled: false)
         governor.refresh()
@@ -114,7 +111,7 @@ final class CallPowerGovernorTests: XCTestCase {
         environment.fireLiveTimers()
         XCTAssertEqual(governor.step, .nominal)
         XCTAssertEqual(governor.profile, .full)
-        XCTAssertEqual(environment.appliedLimits.last?.0, 0)
+        XCTAssertEqual(environment.appliedLevels.last, 0)
     }
 
     func testNotificationRefreshesGovernor() {
@@ -165,9 +162,9 @@ final class CallPowerGovernorTests: XCTestCase {
         XCTAssertNil(weakGovernor)
         XCTAssertTrue(environment.scheduled.allSatisfy { $0.cancelled })
         token?.invalidate()
-        let limitsBefore = environment.appliedLimits.count
+        let limitsBefore = environment.appliedLevels.count
         environment.center.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
-        XCTAssertEqual(environment.appliedLimits.count, limitsBefore)
+        XCTAssertEqual(environment.appliedLevels.count, limitsBefore)
     }
 
     func testLadderModeParsing() {
@@ -239,8 +236,7 @@ final class CallSystemPolicyTests: XCTestCase {
         defer {
             CallPowerGovernor.shared.stop()
         }
-        XCTAssertEqual(settings.choice("calls.thermalLadder"), "ui")
-        XCTAssertTrue(settings.bool("calls.suspendHiddenLivestream"))
+        XCTAssertFalse(settings.bool("calls.thermalVideoLadder"))
         XCTAssertFalse(settings.bool("calls.threadQoS"))
         let ids = (CallSystemDebugOptions.all + CallAudioDebugOptions.all + CallVideoDebugOptions.all).map { $0.id }
         XCTAssertEqual(Set(ids).count, ids.count)

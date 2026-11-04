@@ -137,6 +137,20 @@ public final class NanogramDebugSettings: @unchecked Sendable {
         return defaultValue
     }
 
+    public func migrate(from oldId: String, to newId: String, transform: ((Any) -> Any?)? = nil) {
+        let oldKey = self.storageKey(oldId)
+        guard let stored = self.defaults.object(forKey: oldKey) else {
+            return
+        }
+        if self.defaults.object(forKey: self.storageKey(newId)) == nil {
+            let value = transform?(stored) ?? (transform == nil ? stored : nil)
+            if let value = value {
+                self.defaults.set(value, forKey: self.storageKey(newId))
+            }
+        }
+        self.defaults.removeObject(forKey: oldKey)
+    }
+
     public func isOverridden(_ id: String) -> Bool {
         return self.defaults.object(forKey: self.storageKey(id)) != nil
     }

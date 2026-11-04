@@ -330,9 +330,6 @@ final class PeerCallScreenView : Control {
     }
     
     private var isEnergySavingEnabled: Bool {
-        guard CallVideoDebugOptions.isBackgroundGradientIdleEnabled() else {
-            return false
-        }
         if #available(macOS 12.0, *) {
             return ProcessInfo.processInfo.isLowPowerModeEnabled
         }
@@ -343,8 +340,7 @@ final class PeerCallScreenView : Control {
         guard let backgroundLayer else {
             return
         }
-        let isIdleOptimizationEnabled = CallVideoDebugOptions.isBackgroundGradientIdleEnabled()
-        backgroundLayer.isIdleOptimizationEnabled = isIdleOptimizationEnabled
+        backgroundLayer.isIdleOptimizationEnabled = true
         backgroundLayer.isAnimationSuspended = self.videoLink_large != nil
         backgroundLayer.isBlurPassNeeded = self.videoLink_large == nil
     }

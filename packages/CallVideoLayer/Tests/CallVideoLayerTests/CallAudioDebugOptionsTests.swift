@@ -21,20 +21,7 @@ final class CallAudioDebugOptionsTests: XCTestCase {
         let settings = self.makeSettings()
         _ = CallVideoDebugOptions.install(in: settings)
         XCTAssertEqual(settings.choice("calls.groupNoiseMode"), "both")
-        XCTAssertEqual(settings.choice("calls.micGainMode"), "analog")
-        XCTAssertEqual(settings.choice("calls.opusComplexity"), "default")
-        XCTAssertFalse(settings.bool("calls.apmRate"))
         XCTAssertFalse(settings.bool("calls.audioWorkgroup"))
-    }
-
-    /// Group calls on a narrowband (Bluetooth) microphone have always used the processed signal on the Mac; the
-    /// unified switch name is `groupNarrowbandProcessing` and its Mac default is on.
-    func testGroupNarrowbandProcessingDefaultsToOn() {
-        let settings = self.makeSettings()
-        _ = CallVideoDebugOptions.install(in: settings)
-        XCTAssertEqual(CallAudioDebugOptions.groupNarrowbandProcessing.id, "calls.groupNarrowbandProcessing")
-        XCTAssertTrue(CallAudioDebugOptions.all.contains(where: { $0.id == "calls.groupNarrowbandProcessing" }))
-        XCTAssertTrue(settings.bool("calls.groupNarrowbandProcessing"))
     }
 
     func testChoiceMapping() {
@@ -43,17 +30,6 @@ final class CallAudioDebugOptionsTests: XCTestCase {
         XCTAssertEqual(CallAudioDebugOptions.groupNoiseModeValue("rnnoise"), 2)
         XCTAssertEqual(CallAudioDebugOptions.groupNoiseModeValue("garbage"), 0)
         XCTAssertEqual(CallAudioDebugOptions.groupNoiseModeValue(nil), 0)
-
-        XCTAssertEqual(CallAudioDebugOptions.micGainModeValue("analog"), 0)
-        XCTAssertEqual(CallAudioDebugOptions.micGainModeValue("digital"), 1)
-        XCTAssertEqual(CallAudioDebugOptions.micGainModeValue("garbage"), 0)
-        XCTAssertEqual(CallAudioDebugOptions.micGainModeValue(nil), 0)
-
-        XCTAssertEqual(CallAudioDebugOptions.opusComplexityValue("default"), 0)
-        XCTAssertEqual(CallAudioDebugOptions.opusComplexityValue("7"), 7)
-        XCTAssertEqual(CallAudioDebugOptions.opusComplexityValue("5"), 5)
-        XCTAssertEqual(CallAudioDebugOptions.opusComplexityValue("3"), 0)
-        XCTAssertEqual(CallAudioDebugOptions.opusComplexityValue(nil), 0)
     }
 
     func testChoicesAreOfferedAndDefaultsExist() {

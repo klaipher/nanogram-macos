@@ -105,45 +105,53 @@ final class CallVideoDebugOptionsTests: XCTestCase {
         let ids = CallVideoDebugOptions.all.map { $0.id }
         XCTAssertEqual(Set(ids).count, ids.count)
         for id in ids {
-            XCTAssertTrue(id.hasPrefix("calls.") || id.hasPrefix("tgcalls."), id)
+            XCTAssertTrue(id.hasPrefix("calls."), id)
         }
     }
 
     func testDefaults() {
         let settings = self.makeSettings()
         _ = CallVideoDebugOptions.install(in: settings)
-        XCTAssertTrue(settings.bool("calls.backgroundGradientIdle"))
-        XCTAssertTrue(settings.bool("calls.cameraFormatV2"))
         XCTAssertFalse(settings.bool("calls.hardwareCrop"))
         XCTAssertFalse(settings.bool("calls.nativeDecodeFormat"))
-        XCTAssertFalse(settings.bool("tgcalls.livestreamHardwareDecode"))
-        XCTAssertFalse(settings.bool("tgcalls.screencastHardwareEncoder"))
-        XCTAssertFalse(settings.bool("calls.groupVideoCap"))
-        XCTAssertFalse(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+        XCTAssertFalse(settings.bool("calls.livestreamHardwareDecoding"))
+        XCTAssertFalse(settings.bool("calls.screencastHardwareEncoder"))
     }
 
-    /// The low-latency H.264 encoder was always on in the Mac build (Q6); the switch is a kill switch, so its default keeps today.
-    func testEncoderLowLatencyKillSwitchDefaultsToOn() {
+    func testSectionIsStreamsAndCalls() {
+        XCTAssertEqual(CallVideoDebugOptions.section, "Streams & Calls")
+        for option in CallVideoDebugOptions.all + CallAudioDebugOptions.all + CallSystemDebugOptions.all {
+            XCTAssertEqual(option.section, "Streams & Calls", option.id)
+            XCTAssertNotNil(option.detail, option.id)
+            XCTAssertTrue(option.detail?.contains("Default:") ?? false, option.id)
+        }
+    }
+
+    func testStoredValuesOfRenamedAndMergedOptionsMigrate() {
         let settings = self.makeSettings()
+        settings.set("tgcalls.livestreamHardwareDecode", bool: true)
+        settings.set("tgcalls.screencastHardwareEncoder", bool: true)
+        settings.set("calls.thermalLadder", choice: "uiAndVideo")
         _ = CallVideoDebugOptions.install(in: settings)
-        XCTAssertEqual(CallVideoDebugOptions.encoderLowLatency.id, "calls.encoderLowLatency")
-        XCTAssertTrue(CallVideoDebugOptions.all.contains(where: { $0.id == "calls.encoderLowLatency" }))
-        XCTAssertTrue(settings.bool("calls.encoderLowLatency"))
+        XCTAssertTrue(settings.bool("calls.livestreamHardwareDecoding"))
+        XCTAssertTrue(settings.bool("calls.screencastHardwareEncoder"))
+        XCTAssertTrue(settings.bool("calls.thermalVideoLadder"))
+        XCTAssertFalse(settings.isOverridden("tgcalls.livestreamHardwareDecode"))
+        XCTAssertFalse(settings.isOverridden("calls.thermalLadder"))
     }
 
-    func testGroupVideoCapOverride() {
+    func testStoredOffThermalLadderStaysOff() {
         let settings = self.makeSettings()
-        let observations = CallVideoDebugOptions.install(in: settings)
-        settings.set("calls.groupVideoCap", bool: true)
-        XCTAssertTrue(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
-        withExtendedLifetime(observations) {}
+        settings.set("calls.thermalLadder", choice: "ui")
+        _ = CallVideoDebugOptions.install(in: settings)
+        XCTAssertFalse(settings.bool("calls.thermalVideoLadder"))
     }
 
     func testOverrideReachesSettings() {
         let settings = self.makeSettings()
         let observations = CallVideoDebugOptions.install(in: settings)
-        settings.set("calls.backgroundGradientIdle", bool: false)
-        XCTAssertFalse(CallVideoDebugOptions.isBackgroundGradientIdleEnabled(in: settings))
+        settings.set("calls.hardwareCrop", bool: true)
+        XCTAssertTrue(settings.bool("calls.hardwareCrop"))
         withExtendedLifetime(observations) {}
     }
 }

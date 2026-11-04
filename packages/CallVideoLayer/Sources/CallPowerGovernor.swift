@@ -78,7 +78,7 @@ public enum CallPowerPolicy {
         @unknown default: step = .critical
         }
         if inputs.isLowPowerModeEnabled {
-            step = max(step, .critical)
+            step = max(step, .fair)
         }
         return step
     }
@@ -96,7 +96,7 @@ public enum CallPowerPolicy {
                 profile.maxShortSide = 540
                 profile.maxFps = 20
             case .critical:
-                profile.maxShortSide = 480
+                profile.maxShortSide = 360
                 profile.maxFps = 15
             }
         }
@@ -171,7 +171,7 @@ public final class CallPowerGovernor {
     private let readInputs: () -> CallPowerInputs
     private let now: () -> TimeInterval
     private let schedule: (TimeInterval, @escaping () -> Void) -> Scheduled
-    private let applyVideoLimit: (Int, Int) -> Void
+    private let applyThermalLevel: (Int) -> Void
     private let log: (String) -> Void
     private let notificationCenter: NotificationCenter
 
@@ -196,8 +196,8 @@ public final class CallPowerGovernor {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
             return { item.cancel() }
         },
-        applyVideoLimit: @escaping (Int, Int) -> Void = { maxShortSide, maxFps in
-            TGCallsRuntimeOptionsBridge.setOutgoingCameraLimitWithMaxShortSide(maxShortSide, maxFps: maxFps)
+        applyThermalLevel: @escaping (Int) -> Void = { level in
+            TGCallsRuntimeOptionsBridge.setThermalLevel(level)
         },
         log: @escaping (String) -> Void = { NSLog("%@", $0) },
         notificationCenter: NotificationCenter = .default
@@ -205,7 +205,7 @@ public final class CallPowerGovernor {
         self.readInputs = readInputs
         self.now = now
         self.schedule = schedule
-        self.applyVideoLimit = applyVideoLimit
+        self.applyThermalLevel = applyThermalLevel
         self.log = log
         self.notificationCenter = notificationCenter
     }
@@ -287,8 +287,8 @@ public final class CallPowerGovernor {
         self.profile = updated
         if previous.maxShortSide != updated.maxShortSide || previous.maxFps != updated.maxFps {
             self.log("Call outgoing video cap \(updated.maxShortSide)p at \(updated.maxFps) fps (\(reason))")
-            self.applyVideoLimit(updated.maxShortSide, updated.maxFps)
         }
+        self.applyThermalLevel(updated.maxShortSide == 0 ? 0 : self.hysteresis.step.rawValue)
         for listener in Array(self.listeners.values) {
             listener(updated)
         }
