@@ -27,6 +27,16 @@ final class CallAudioDebugOptionsTests: XCTestCase {
         XCTAssertFalse(settings.bool("calls.audioWorkgroup"))
     }
 
+    /// Group calls on a narrowband (Bluetooth) microphone have always used the processed signal on the Mac; the
+    /// unified switch name is `groupNarrowbandProcessing` and its Mac default is on.
+    func testGroupNarrowbandProcessingDefaultsToOn() {
+        let settings = self.makeSettings()
+        _ = CallVideoDebugOptions.install(in: settings)
+        XCTAssertEqual(CallAudioDebugOptions.groupNarrowbandProcessing.id, "calls.groupNarrowbandProcessing")
+        XCTAssertTrue(CallAudioDebugOptions.all.contains(where: { $0.id == "calls.groupNarrowbandProcessing" }))
+        XCTAssertTrue(settings.bool("calls.groupNarrowbandProcessing"))
+    }
+
     func testChoiceMapping() {
         XCTAssertEqual(CallAudioDebugOptions.groupNoiseModeValue("both"), 0)
         XCTAssertEqual(CallAudioDebugOptions.groupNoiseModeValue("apm"), 1)

@@ -25,6 +25,8 @@ public enum CallAudioDebugOptions {
 
     public static let apmRate = NanogramDebugOption.toggle(id: "calls.apmRate", section: CallVideoDebugOptions.section, title: "Voice processing at 32 kHz", detail: "Runs echo cancellation and noise suppression at 32 kHz instead of 48 kHz only when the voice bitrate is 12 kbps or lower (at 32 kbps Opus still sends 16-20 kHz, so normal calls are unchanged). Applies to the next call.", defaultValue: false)
 
+    public static let groupNarrowbandProcessing = NanogramDebugOption.toggle(id: "calls.groupNarrowbandProcessing", section: CallVideoDebugOptions.section, title: "Group calls: process Bluetooth microphone audio", detail: "With a Bluetooth headset microphone (8 or 16 kHz) group calls keep the signal that went through the noise suppressor and the screen-share audio mix. Off: that audio is sent unprocessed, as the engine's speech detector only listens. Applies to the next group call.", defaultValue: true)
+
     public static let audioWorkgroup = NanogramDebugOption.toggle(id: "calls.audioWorkgroup", section: CallVideoDebugOptions.section, title: "Audio threads join the device's real-time workgroup", detail: "The microphone and speaker worker threads join the audio device's workgroup so the system schedules them with the audio hardware. Falls back to normal scheduling if the device has none. Applies to the next call.", defaultValue: false)
 
     public static let all: [NanogramDebugOption] = [
@@ -32,6 +34,7 @@ public enum CallAudioDebugOptions {
         CallAudioDebugOptions.micGainMode,
         CallAudioDebugOptions.opusComplexity,
         CallAudioDebugOptions.apmRate,
+        CallAudioDebugOptions.groupNarrowbandProcessing,
         CallAudioDebugOptions.audioWorkgroup
     ]
 
@@ -59,6 +62,7 @@ public enum CallAudioDebugOptions {
         TGCallsRuntimeOptionsBridge.setMicGainMode(CallAudioDebugOptions.micGainModeValue(settings.choice(CallAudioDebugOptions.micGainMode.id)))
         TGCallsRuntimeOptionsBridge.setOpusComplexity(CallAudioDebugOptions.opusComplexityValue(settings.choice(CallAudioDebugOptions.opusComplexity.id)))
         TGCallsRuntimeOptionsBridge.setLowBitrateApmRateEnabled(settings.bool(CallAudioDebugOptions.apmRate.id))
+        TGCallsRuntimeOptionsBridge.setGroupNarrowbandProcessingEnabled(settings.bool(CallAudioDebugOptions.groupNarrowbandProcessing.id))
         TGCallsRuntimeOptionsBridge.setAudioWorkgroupEnabled(settings.bool(CallAudioDebugOptions.audioWorkgroup.id))
     }
 }

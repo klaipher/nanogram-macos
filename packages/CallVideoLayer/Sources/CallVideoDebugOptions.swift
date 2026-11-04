@@ -17,6 +17,8 @@ public enum CallVideoDebugOptions {
 
     public static let screencastHardwareEncoder = NanogramDebugOption.toggle(id: "tgcalls.screencastHardwareEncoder", section: CallVideoDebugOptions.section, title: "Group screen share: hardware H.264 encoder", detail: "Experiment: encodes group-call screen shares with VideoToolbox instead of OpenH264 when H.264 is negotiated. Text may look softer. Applies to the next share.", defaultValue: false)
 
+    public static let encoderLowLatency = NanogramDebugOption.toggle(id: "calls.encoderLowLatency", section: CallVideoDebugOptions.section, title: "H.264 encoder: low-latency rate control", detail: "Kill switch for the VideoToolbox low-latency rate control and real-time mode that call video uses with the High profiles. A session that fails turns it off for the rest of the app run by itself. Off: the standard encoder session. Applies to the next encoder session.", defaultValue: true)
+
     public static let groupVideoCap = NanogramDebugOption.toggle(id: "calls.groupVideoCap", section: CallVideoDebugOptions.section, title: "Group calls: ask for at most 10 remote videos", detail: "Experiment: requests video for 10 remote channels at most, dominant speakers and screen shares first. Participants after the 10th get no video even when their tile is on screen. Off: every video participant is requested, as before.", defaultValue: false)
 
     public static let all: [NanogramDebugOption] = [
@@ -24,6 +26,7 @@ public enum CallVideoDebugOptions {
         CallVideoDebugOptions.backgroundGradientIdle,
         CallVideoDebugOptions.cameraFormatV2,
         CallVideoDebugOptions.hardwareCrop,
+        CallVideoDebugOptions.encoderLowLatency,
         CallVideoDebugOptions.nativeDecodeFormat,
         CallVideoDebugOptions.livestreamHardwareDecode,
         CallVideoDebugOptions.screencastHardwareEncoder
@@ -40,6 +43,7 @@ public enum CallVideoDebugOptions {
     public static func applyNativeOptions(from settings: NanogramDebugSettings) {
         TGCallsRuntimeOptionsBridge.setCameraFormatV2Enabled(settings.bool(CallVideoDebugOptions.cameraFormatV2.id))
         TGCallsRuntimeOptionsBridge.setHardwareCropEnabled(settings.bool(CallVideoDebugOptions.hardwareCrop.id))
+        TGCallsRuntimeOptionsBridge.setEncoderLowLatencyEnabled(settings.bool(CallVideoDebugOptions.encoderLowLatency.id))
         TGCallsRuntimeOptionsBridge.setNativeDecodeFormatEnabled(settings.bool(CallVideoDebugOptions.nativeDecodeFormat.id))
         TGCallsRuntimeOptionsBridge.setLivestreamHardwareDecodeEnabled(settings.bool(CallVideoDebugOptions.livestreamHardwareDecode.id))
         TGCallsRuntimeOptionsBridge.setScreencastHardwareEncoderEnabled(settings.bool(CallVideoDebugOptions.screencastHardwareEncoder.id))

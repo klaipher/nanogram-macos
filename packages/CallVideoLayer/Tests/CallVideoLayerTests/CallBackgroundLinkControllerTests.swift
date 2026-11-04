@@ -122,6 +122,15 @@ final class CallVideoDebugOptionsTests: XCTestCase {
         XCTAssertFalse(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
     }
 
+    /// The low-latency H.264 encoder was always on in the Mac build (Q6); the switch is a kill switch, so its default keeps today.
+    func testEncoderLowLatencyKillSwitchDefaultsToOn() {
+        let settings = self.makeSettings()
+        _ = CallVideoDebugOptions.install(in: settings)
+        XCTAssertEqual(CallVideoDebugOptions.encoderLowLatency.id, "calls.encoderLowLatency")
+        XCTAssertTrue(CallVideoDebugOptions.all.contains(where: { $0.id == "calls.encoderLowLatency" }))
+        XCTAssertTrue(settings.bool("calls.encoderLowLatency"))
+    }
+
     func testGroupVideoCapOverride() {
         let settings = self.makeSettings()
         let observations = CallVideoDebugOptions.install(in: settings)
