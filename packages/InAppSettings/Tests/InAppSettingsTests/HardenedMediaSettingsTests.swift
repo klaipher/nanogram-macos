@@ -1,5 +1,6 @@
 import XCTest
 import HardenedMedia
+import Postbox
 @testable import InAppSettings
 
 final class HardenedMediaSettingsTests: XCTestCase {
@@ -25,5 +26,23 @@ final class HardenedMediaSettingsTests: XCTestCase {
 
     func testAnInactivePolicyKeepsAutoplay() {
         XCTAssertEqual(AutoplayMediaPreferences.defaultSettings.hardened(by: .inactive), AutoplayMediaPreferences.defaultSettings)
+    }
+
+    func testAStoredDownloadEntryIsReadHardened() {
+        let entry = PreferencesEntry(AutomaticMediaDownloadSettings.defaultSettings)
+        XCTAssertFalse(AutomaticMediaDownloadSettings.effective(entry, policy: .lockdown).automaticDownload)
+        XCTAssertEqual(AutomaticMediaDownloadSettings.effective(entry, policy: .inactive), .defaultSettings)
+        XCTAssertFalse(AutomaticMediaDownloadSettings.effective(nil, policy: .lockdown).automaticDownload)
+        XCTAssertEqual(AutomaticMediaDownloadSettings.effective(nil, policy: .inactive), .defaultSettings)
+    }
+
+    func testAStoredAutoplayEntryIsReadHardened() {
+        let entry = PreferencesEntry(AutoplayMediaPreferences.defaultSettings)
+        let hardened = AutoplayMediaPreferences.effective(entry, policy: .lockdown)
+        XCTAssertFalse(hardened.gifs)
+        XCTAssertFalse(hardened.videos)
+        XCTAssertFalse(hardened.loopAnimatedStickers)
+        XCTAssertEqual(AutoplayMediaPreferences.effective(entry, policy: .inactive), .defaultSettings)
+        XCTAssertFalse(AutoplayMediaPreferences.effective(nil, policy: .lockdown).gifs)
     }
 }

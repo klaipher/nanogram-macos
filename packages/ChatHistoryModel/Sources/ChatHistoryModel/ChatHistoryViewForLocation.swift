@@ -510,12 +510,12 @@ private func extractAdditionalData(view: MessageHistoryView, chatLocation: ChatL
                     limitsConfiguration = value?.get(LimitsConfiguration.self) ?? .defaultValue
                 }
                 if key == ApplicationSpecificPreferencesKeys.autoplayMedia {
-                    autoplayMedia = value?.get(AutoplayMediaPreferences.self) ?? .defaultSettings
+                    autoplayMedia = AutoplayMediaPreferences.effective(value)
                     
                 }
                 
                 if key == ApplicationSpecificPreferencesKeys.automaticMediaDownloadSettings {
-                    autodownloadSettings = value?.get(AutomaticMediaDownloadSettings.self) ?? .defaultSettings
+                    autodownloadSettings = AutomaticMediaDownloadSettings.effective(value)
                 }
             case .totalUnreadState(_):
                 if let combinedReadStates = view.fixedReadStates {

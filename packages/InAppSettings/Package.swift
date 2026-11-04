@@ -41,7 +41,7 @@ let package = Package(
                            .product(name: "TelegramCore", package: "TelegramCore", condition: nil)]),
         .testTarget(
             name: "InAppSettingsTests",
-            dependencies: ["InAppSettings", .product(name: "HardenedMedia", package: "HardenedMedia", condition: nil)],
+            dependencies: ["InAppSettings", .product(name: "HardenedMedia", package: "HardenedMedia", condition: nil), .product(name: "Postbox", package: "Postbox", condition: nil)],
             path: "Tests/InAppSettingsTests"),
     ]
 )

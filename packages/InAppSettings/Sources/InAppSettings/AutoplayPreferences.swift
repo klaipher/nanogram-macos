@@ -64,6 +64,10 @@ public class AutoplayMediaPreferences : Codable, Equatable {
         return lhs.gifs == rhs.gifs && lhs.videos == rhs.videos && lhs.soundOnHover == rhs.soundOnHover && lhs.preloadVideos == rhs.preloadVideos && lhs.loopAnimatedStickers == rhs.loopAnimatedStickers
     }
     
+    public static func effective(_ entry: PreferencesEntry?, policy: HardenedMediaPolicy = .current) -> AutoplayMediaPreferences {
+        return (entry?.get(AutoplayMediaPreferences.self) ?? .defaultSettings).hardened(by: policy)
+    }
+
     public func hardened(by policy: HardenedMediaPolicy) -> AutoplayMediaPreferences {
         let allowed = policy.allowsAutoplay(fromContact: false)
         return AutoplayMediaPreferences(gifs: self.gifs && allowed, videos: self.videos && allowed, soundOnHover: self.soundOnHover, preloadVideos: self.preloadVideos && allowed, loopAnimatedStickers: self.loopAnimatedStickers && allowed)
@@ -105,6 +109,6 @@ public func updateAutoplayMediaSettingsInteractively(postbox: Postbox, _ f: @esc
 
 public func autoplayMediaSettings(postbox: Postbox) -> Signal<AutoplayMediaPreferences, NoError> {
     return postbox.preferencesView(keys: [ApplicationSpecificPreferencesKeys.autoplayMedia]) |> map { views in
-        return (views.values[ApplicationSpecificPreferencesKeys.autoplayMedia]?.get(AutoplayMediaPreferences.self) ?? AutoplayMediaPreferences.defaultSettings).hardened(by: .current)
+        return AutoplayMediaPreferences.effective(views.values[ApplicationSpecificPreferencesKeys.autoplayMedia])
     }
 }
