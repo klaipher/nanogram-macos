@@ -382,10 +382,16 @@ def parse_push_refs(text):
     return refs
 
 
+def scrub_git_hook_environment(environ=os.environ):
+    for name in [name for name in environ if name.startswith('GIT_')]:
+        del environ[name]
+
+
 def cmd_pre_push(args):
     if os.environ.get('TG_PRE_PUSH') == '0':
         return 0
     pushed = sys.stdin.read()
+    scrub_git_hook_environment()
     refs = parse_push_refs(pushed)
     parity_script = os.path.join(ROOT, 'tools', 'dev', 'parity', 'parity.py')
     if os.path.exists(parity_script) and subprocess.run([sys.executable, parity_script, 'push', '--root', ROOT, args.remote],

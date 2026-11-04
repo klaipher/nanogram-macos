@@ -65,6 +65,29 @@ class RepoTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
 
+class HookEnvironmentTests(unittest.TestCase):
+    def check_new_repository_under_hook_environment(self, scrub):
+        repo = make_repo()
+        worktree = tempfile.mkdtemp(prefix='tglint-worktree-')
+        scratch = tempfile.mkdtemp(prefix='tglint-scratch-')
+        for path in (repo, worktree, scratch):
+            self.addCleanup(shutil.rmtree, path, True)
+        os.rmdir(worktree)
+        run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'base'], repo)
+        run(['git', 'worktree', 'add', '-q', '--detach', worktree], repo)
+        environment = dict(os.environ, GIT_DIR=os.path.join(repo, '.git', 'worktrees', os.path.basename(worktree)))
+        if scrub:
+            tglint.scrub_git_hook_environment(environment)
+        subprocess.run(['git', 'init', '-q', os.path.join(scratch, 'new')], cwd=scratch, env=environment, capture_output=True)
+        return subprocess.run(['git', 'config', '--get', 'core.bare'], cwd=repo, capture_output=True, text=True).stdout.strip()
+
+    def test_a_push_from_a_worktree_reinitialises_the_repository_without_the_scrub(self):
+        self.assertEqual(self.check_new_repository_under_hook_environment(scrub=False), 'true')
+
+    def test_a_test_repository_made_under_the_hook_leaves_the_pushing_repository_alone(self):
+        self.assertEqual(self.check_new_repository_under_hook_environment(scrub=True), 'false')
+
+
 class DiffParsingTests(unittest.TestCase):
     def test_added_and_changed_lines(self):
         diff = '\n'.join([
