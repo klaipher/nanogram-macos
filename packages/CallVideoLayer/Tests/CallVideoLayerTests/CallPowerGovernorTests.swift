@@ -75,6 +75,43 @@ final class CallPowerGovernorTests: XCTestCase {
         XCTAssertEqual(hysteresis.update(target: .nominal, now: 40), .fair)
     }
 
+    func testRestoreKeepsGoingWhenTheRealStateIsLowerThanTheRestoredStep() {
+        var hysteresis = CallPowerHysteresis()
+        XCTAssertEqual(hysteresis.update(target: .critical, now: 0), .critical)
+        XCTAssertNil(hysteresis.update(target: .serious, now: 1))
+        XCTAssertNil(hysteresis.update(target: .nominal, now: 2))
+        XCTAssertEqual(hysteresis.update(target: .nominal, now: 31), .serious)
+        XCTAssertTrue(hysteresis.isRestorePending)
+        XCTAssertNil(hysteresis.update(target: .nominal, now: 60))
+        XCTAssertEqual(hysteresis.update(target: .nominal, now: 61), .nominal)
+        XCTAssertFalse(hysteresis.isRestorePending)
+    }
+
+    func testGovernorWalksCriticalSeriousNominalWithoutExtraNotifications() {
+        let environment = FakeEnvironment()
+        let governor = environment.makeGovernor()
+        governor.start(mode: .uiAndVideo)
+        environment.inputs = CallPowerInputs(thermalState: .critical, isLowPowerModeEnabled: false)
+        governor.refresh()
+        environment.time += 1
+        environment.inputs = CallPowerInputs(thermalState: .serious, isLowPowerModeEnabled: false)
+        governor.refresh()
+        environment.time += 1
+        environment.inputs = CallPowerInputs(thermalState: .nominal, isLowPowerModeEnabled: false)
+        governor.refresh()
+        XCTAssertEqual(governor.step, .critical)
+
+        environment.time += 30
+        environment.fireLiveTimers()
+        XCTAssertEqual(governor.step, .serious)
+        XCTAssertEqual(environment.scheduled.filter { !$0.cancelled }.count, 1)
+
+        environment.time += 30
+        environment.fireLiveTimers()
+        XCTAssertEqual(governor.step, .nominal)
+        XCTAssertEqual(governor.profile, .full)
+    }
+
     func testGovernorAppliesVideoLimitOnlyInVideoMode() {
         let environment = FakeEnvironment()
         let governor = environment.makeGovernor()
