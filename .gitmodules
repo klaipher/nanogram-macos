@@ -15,7 +15,8 @@
 	branch = nanogram-mac
 [submodule "submodules/tg_owt"]
 	path = submodules/tg_owt
-	url = https://github.com/macosswift/tg_owt
+	url = https://github.com/klaipher/tg_owt
+	branch = nanogram-mac
 [submodule "submodules/libprisma"]
 	path = submodules/libprisma
 	url = https://github.com/desktop-app/libprisma
