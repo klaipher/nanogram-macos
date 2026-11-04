@@ -23,8 +23,8 @@ struct ChatLayerPointerEvent {
 class ChatLayerNode {
     let id: AnyHashable
     let layer: SimpleLayer
-    private(set) weak var parent: ChatLayerNode?
-    fileprivate(set) weak var scene: ChatLayerSceneView?
+    private(set) unowned(unsafe) var parent: ChatLayerNode?
+    fileprivate(set) unowned(unsafe) var scene: ChatLayerSceneView?
     private(set) var children: [ChatLayerNode] = []
     fileprivate var orderedChildren: [ChatLayerNode] = []
     fileprivate var accessibilityElement: ChatLayerAccessibilityElement?
@@ -96,6 +96,13 @@ class ChatLayerNode {
             layer.zPosition = CGFloat(zIndex)
             parent?.sortChildren()
             scene?.needsLayout = true
+        }
+    }
+
+    deinit {
+        for child in children {
+            child.parent = nil
+            child.attach(to: nil)
         }
     }
 
@@ -267,6 +274,10 @@ class ChatLayerSceneView: View {
         var pointerArea: NSTrackingArea? = nil
         var toolTipNodes: [ChatLayerTextNode]? = nil
         init(root: ChatLayerNode, canRelease: Bool = false) { self.root = root; self.canRelease = canRelease }
+    }
+
+    deinit {
+        storedState?.root.attach(to: nil)
     }
 
     private var storedState: State?
@@ -835,8 +846,24 @@ class ChatLayerSceneView: View {
     override func rightMouseUp(with event: NSEvent) {
         if !handlePointer(.up, at: convert(event.locationInWindow, from: nil), button: 1, native: event) { super.rightMouseUp(with: event) }
     }
+    private var isInTableLiveScroll: Bool {
+        return (enclosingScrollView as? TableView)?.liveScrolling == true
+    }
+
+    func refreshPointerAfterScroll() {
+        guard hasLayerContent, let window else { return }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        if bounds.contains(point) {
+            _ = handlePointer(.moved, at: point)
+        } else if lastPointer != nil {
+            lastPointer = nil
+            updateHover(at: nil)
+        }
+    }
+
     override func mouseMoved(with event: NSEvent) {
         guard hasLayerContent else { super.mouseMoved(with: event); return }
+        if isInTableLiveScroll { return }
         _ = handlePointer(.moved, at: convert(event.locationInWindow, from: nil), native: event)
     }
     override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }

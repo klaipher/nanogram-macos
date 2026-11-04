@@ -1615,6 +1615,93 @@ public class PeerListContainerView : Control {
         }
     }
 
+    private func storyHeaderGeometry(size: NSSize, controlMaxX titlePlusStoryMaxX: CGFloat, arguments: Arguments) -> (storiesShift: CGFloat, titleX: CGFloat, storyX: CGFloat) {
+        let storiesShift: CGFloat
+        if let storiesItem = storiesItem, storiesItem.itemsCount < 3 {
+            storiesShift = StoryListChatListRowItem.smallSize.width / 2 * CGFloat(3 - storiesItem.itemsCount)
+        } else {
+            storiesShift = 0
+        }
+        let titlePlusStoryMinX = arguments.navigationBarLeftPosition() + 8 - storiesShift
+        titleView.displaysStatus = storiesItem == nil || titlePlusStoryMinX + 59 + titleView.size(displayingStatus: true).width <= titlePlusStoryMaxX
+
+        let titlePlusStorySize = titleView.size.width + (59)
+        var titlePlusStoryStartX = (size.width - titlePlusStorySize) / 2
+        titlePlusStoryStartX = max(titlePlusStoryMinX, titlePlusStoryStartX)
+        titlePlusStoryStartX = min(titlePlusStoryMaxX - titlePlusStorySize, titlePlusStoryStartX)
+
+        let storyXStart = titlePlusStoryStartX - 10
+        let titleXStart = titlePlusStoryStartX + (59)
+
+        let storyXEnd: CGFloat = 0
+        let titleXEnd = (size.width - titleView.size.width) / 2
+
+        var titleX: CGFloat = titleXEnd
+        var storyX: CGFloat = storyXEnd
+
+        if let stories = self.storiesItem {
+            titleX = titleXEnd - (titleXEnd - titleXStart) * (1 - stories.progress)
+            storyX = storyXEnd + (storyXStart - storyXEnd) * (1 - stories.progress)
+        }
+        return (storiesShift, titleX, storyX)
+    }
+
+    func updateStoryRevealLayout(_ size: NSSize) {
+        guard let state = self.state, let arguments = self.arguments, layoutSize == size else {
+            updateLayout(size, transition: .immediate)
+            return
+        }
+        let transition = ContainedViewLayoutTransition.immediate
+        let displaysFullForumHeader = state.splitState != .minimisize && state.mode.isFullForum
+        let progress: CGFloat = displaysFullForumHeader ? 0.0 : (getDeltaProgress() ?? (state.appear == .short ? 0.0 : 1.0))
+        let navigationHeight_ = self.navigationHeight
+        let containerWidth = state.splitState == .minimisize ? 90 : size.width
+
+        transition.updateFrame(view: self.containerView, frame: NSMakeRect(0, 0, containerWidth, navigationHeight_))
+        transition.updateFrame(view: self.borderView, frame: CGRect(origin: CGPoint(x: 0, y: navigationHeight_ - .borderSize), size: CGSize(width: size.width, height: .borderSize)))
+
+        let componentHeight: CGFloat = 30
+        var searchY: CGFloat = self.statusHeight
+        if let storiesItem = storiesItem {
+            searchY += (StoryListChatListRowItem.InterfaceState.revealed.height * storiesItem.progress) + 9 * storiesItem.progress
+        }
+        let edge: CGFloat = 10
+        let hasLeftSidebar = state.filterData.sidebar && !state.filterData.isEmpty
+        let inlineBackButton = self.backButton != nil && !hasLeftSidebar && state.splitState != .minimisize && state.splitState != .single && !state.mode.isCommunity && !displaysFullForumHeader
+        let searchLeading: CGFloat = inlineBackButton ? backRect(size: size).maxX + 10 : edge
+        let searchRect = NSMakeRect(searchLeading, searchY, size.width - searchLeading - edge, componentHeight)
+        transition.updateFrame(view: searchView, frame: searchRect)
+
+        if let backButton = self.backButton, inlineBackButton {
+            transition.updateFrame(view: backButton, frame: backRect(size: size))
+        }
+
+        var controlMaxX = containerWidth - 14 - componentHeight
+        if proxy != nil {
+            controlMaxX -= componentHeight
+        }
+        let storyGeometry = self.storyHeaderGeometry(size: size, controlMaxX: controlMaxX - 4, arguments: arguments)
+        let statusHeight = self.statusHeight
+        transition.updateFrame(view: titleView, frame: CGRect(origin: CGPoint(x: storyGeometry.titleX, y: floorToScreenPixels(bsc, (statusHeight - titleView.size.height) / 2) - 2), size: titleView.size))
+
+        if let storiesItem = storiesItem, let view = storiesView {
+            let storiesSize = NSMakeSize(size.width, storiesItem.height)
+            var rect = CGRect(origin: NSMakePoint(storyGeometry.storyX, 10 + storiesItem.getInterfaceState().progress * 40), size: storiesSize)
+            rect.origin.x += (1 - storiesItem.getInterfaceState().progress) * storyGeometry.storiesShift
+            transition.updateFrame(view: view, frame: rect)
+            view.set(item: storiesItem, animated: false)
+            view.updateLayout(size: storiesSize, transition: transition)
+            transition.updateAlpha(view: view, alpha: progress)
+        }
+
+        if let foldersItem = foldersItem, let view = foldersView {
+            let controlSize = NSMakeSize(size.width, foldersItem.height)
+            transition.updateFrame(view: view, frame: CGRect(origin: NSMakePoint(0, navigationHeight_ - controlSize.height), size: controlSize))
+        }
+
+        self.updateScrollerInset(animated: false)
+    }
+
     public func updateLayout(_ size: NSSize, transition: ContainedViewLayoutTransition) {
 
 
@@ -1744,37 +1831,10 @@ public class PeerListContainerView : Control {
             transition.updateFrame(view: view, frame: CGRect(origin: NSMakePoint(10, floorToScreenPixels((50 - view.frame.height) / 2)), size: view.frame.size))
         }
 
-        let storiesShift: CGFloat
-        if let storiesItem = storiesItem, storiesItem.itemsCount < 3 {
-            storiesShift = StoryListChatListRowItem.smallSize.width / 2 * CGFloat(3 - storiesItem.itemsCount)
-        } else {
-            storiesShift = 0
-        }
-        let titlePlusStoryMinX = arguments.navigationBarLeftPosition() + 8 - storiesShift
-        let titlePlusStoryMaxX = controlPoint.x - 4
-        titleView.displaysStatus = storiesItem == nil || titlePlusStoryMinX + 59 + titleView.size(displayingStatus: true).width <= titlePlusStoryMaxX
-
-        let titlePlusStorySize = titleView.size.width + (59)
-        var titlePlusStoryStartX = (size.width - titlePlusStorySize) / 2
-        titlePlusStoryStartX = max(titlePlusStoryMinX, titlePlusStoryStartX)
-        titlePlusStoryStartX = min(titlePlusStoryMaxX - titlePlusStorySize, titlePlusStoryStartX)
-
-        let storyXStart = titlePlusStoryStartX - 10
-        let titleXStart = titlePlusStoryStartX + (59)
-
-        let storyXEnd: CGFloat = 0
-        let titleXEnd = (size.width - titleView.size.width) / 2
-
-
-
-        var titleX: CGFloat = titleXEnd
-        var storyX: CGFloat = storyXEnd
-
-        if let stories = self.storiesItem {
-            titleX = titleXEnd - (titleXEnd - titleXStart) * (1 - stories.progress)
-            storyX = storyXEnd + (storyXStart - storyXEnd) * (1 - stories.progress)
-        }
-
+        let storyGeometry = self.storyHeaderGeometry(size: size, controlMaxX: controlPoint.x - 4, arguments: arguments)
+        let storiesShift = storyGeometry.storiesShift
+        let titleX = storyGeometry.titleX
+        let storyX = storyGeometry.storyX
 
         transition.updateFrame(view: titleView, frame: CGRect(origin: CGPoint(x: titleX, y: floorToScreenPixels(bsc, (statusHeight - titleView.size.height) / 2) - 2), size: titleView.size))
         titleView.updateLayout(size: titleView.size, transition: transition)
@@ -3837,7 +3897,7 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
         #if DEBUG
         let started = CACurrentMediaTime()
         #endif
-        self.relayoutStoryReveal()
+        self.relayoutStoryReveal(onlyIfChanged: true)
         #if DEBUG
         if StoryRevealLabRegistry.isRecording {
             StoryRevealLabRegistry.layoutMs.append((CACurrentMediaTime() - started) * 1000)
@@ -3845,14 +3905,19 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
         #endif
     }
 
-    private func relayoutStoryReveal() {
+    private var storyRevealLayoutGate = StoryRevealLayoutGate<StoryListChatListRowItem.InterfaceState>()
+
+    private func relayoutStoryReveal(onlyIfChanged: Bool = false) {
         guard let item = self.genericView.tableView.item(stableId: UIChatListEntryId.space) as? ChatListSpaceItem else {
+            return
+        }
+        guard self.storyRevealLayoutGate.shouldLayout(fraction: self.storyReveal.fraction, state: self.storyReveal.interfaceState, force: !onlyIfChanged) else {
             return
         }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         self.genericView.tableView.noteHeightOfRow(item.index, false)
-        self.genericView.updateLayout(frame.size, transition: .immediate)
+        self.genericView.updateStoryRevealLayout(frame.size)
         CATransaction.commit()
     }
 

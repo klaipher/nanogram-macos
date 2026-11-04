@@ -354,6 +354,14 @@ public final class InlineStickerView: Control {
 }
 
 
+private let inlineStickerImageQueue = Queue(name: "InlineStickerImageQueue", qos: .userInitiated)
+
+public func deliverOnImageGenerationQueue<T, E>(synchronous: Bool) -> (Signal<T, E>) -> Signal<T, E> {
+    return { signal in
+        return synchronous ? signal : signal |> deliverOn(inlineStickerImageQueue)
+    }
+}
+
 public final class InlineStickerItemLayer : SimpleLayer {
 
     public override init(layer: Any) {
@@ -937,7 +945,7 @@ public final class InlineStickerItemLayer : SimpleLayer {
                 previewDisposable?.dispose()
 
                 if result == nil || result?.highQuality == false {
-                    let result = signal |> map { data -> TransformImageResult in
+                    let result = signal |> deliverOnImageGenerationQueue(synchronous: synchronyous) |> map { data -> TransformImageResult in
                         let context = data.execute(arguments, data.data)
                         let image = context?.generateDisplayImage()
                         return TransformImageResult(image, context?.isHighQuality ?? false)

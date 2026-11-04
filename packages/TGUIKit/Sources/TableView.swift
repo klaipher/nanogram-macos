@@ -1561,6 +1561,12 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
             liveScrollStartPosition = nil
         }
         liveScrollMaxOffset = nil
+        let range = self.visibleRows()
+        for i in range.location ..< range.location + range.length {
+            if let view = self.viewNecessary(at: i) {
+                view.scrollDidEndLiveScrolling()
+            }
+        }
         _scrollDidEndLiveScrolling?()
     }
     

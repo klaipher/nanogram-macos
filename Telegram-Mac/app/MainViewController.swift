@@ -531,8 +531,10 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
             self.layoutConnectingStatusView()
         }))
         
-        tabController.didChangedIndex = { [weak self] index in
+        tabController.willChangeIndex = { [weak self] index in
             self?.checkSettings(index)
+        }
+        tabController.didChangedIndex = { [weak self] index in
             self?.updateChatListBottomOverlays()
         }
     }
@@ -777,7 +779,9 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
         } else {
             if previousIndex == tabController.count - 1 || isSettings {
                 if isSettings && context.layout != .single {
-                    navigation.push(GeneralSettingsViewController(context), false)
+                    let controller = GeneralSettingsViewController(context)
+                    controller.loadViewIfNeeded(navigation.bounds)
+                    navigation.push(controller, false)
                 } else {
                     navigation.enumerateControllers( { controller, index in
                         if (controller is ChatController) || (controller is PeerInfoController) || (controller is ChannelAdminsViewController) || (controller is ChannelAdminsViewController) || (controller is EmptyChatViewController) {

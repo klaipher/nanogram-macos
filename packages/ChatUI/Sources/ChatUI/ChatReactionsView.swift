@@ -2315,8 +2315,10 @@ final class ChatReactionsView : ChatLayerSceneView {
     }
     
     public func update(with layout: ChatReactionsLayout, animated: Bool) {
-                
-        
+        if self.currentLayout === layout, self.views.count == layout.reactions.count {
+            return
+        }
+
         let previous = self.reactions
         
         let (removed, inserted, updated) = mergeListsStableWithUpdates(leftList: self.reactions, rightList: layout.reactions)

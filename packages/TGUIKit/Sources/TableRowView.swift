@@ -306,15 +306,29 @@ open class TableRowView: NSTableRowView, CALayerDelegate {
     
     open override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        updateMouse(animated: true)
+        if !isTableLiveScrolling {
+            updateMouse(animated: true)
+        }
     }
     open override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        updateMouse(animated: true)
+        if !isTableLiveScrolling {
+            updateMouse(animated: true)
+        }
     }
     open override func mouseExited(with event: NSEvent) {
         super.mouseMoved(with: event)
-        updateMouse(animated: true)
+        if !isTableLiveScrolling {
+            updateMouse(animated: true)
+        }
+    }
+
+    public var isTableLiveScrolling: Bool {
+        return (enclosingScrollView as? TableView)?.liveScrolling == true
+    }
+
+    open func scrollDidEndLiveScrolling() {
+        updateMouse(animated: false)
     }
     
     open override func mouseDown(with event: NSEvent) {

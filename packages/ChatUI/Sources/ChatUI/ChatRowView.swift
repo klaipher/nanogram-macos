@@ -782,6 +782,11 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         return NSPointInRect(window.mouseLocationOutsideOfEventStream, rect)
     }
     
+    public override func scrollDidEndLiveScrolling() {
+        super.scrollDidEndLiveScrolling()
+        (rowView as? ChatLayerSceneView)?.refreshPointerAfterScroll()
+    }
+
     public override func updateMouse(animated: Bool) {
         if let item = item as? ChatRowItem {
             let shouldBeVisible = shareVisibleForCurrentItem
