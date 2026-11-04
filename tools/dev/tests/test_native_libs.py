@@ -50,6 +50,17 @@ class NativeLibsTests(unittest.TestCase):
             fake_repo(Path(tmp), flags="--enable-a --enable-new")
             self.assertTrue(any("lib.flags" in p for p in native.check(Path(tmp), data())))
 
+    def test_flags_from_a_sourced_shared_file_count(self):
+        d = data()
+        probe = d["libs"]["lib"]["probes"]["mac"][2]
+        probe["also"] = [{"file": "core-xprojects/common.sh", "region": [r'^COMMON="', r'^\s*"\s*$']}]
+        d["libs"]["lib"]["flags"]["mac"] = ["--disable-b", "--enable-a", "--enable-c=x,y", "--enable-shared-one"]
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_repo(Path(tmp))
+            self.assertTrue(any("lib.flags" in p for p in native.check(Path(tmp), d)))
+            (Path(tmp) / "core-xprojects/common.sh").write_text('COMMON="--enable-shared-one \\\n  "\n')
+            self.assertEqual(native.check(Path(tmp), d), [])
+
     def test_unlisted_difference_between_sides_is_drift(self):
         d = data()
         d["libs"]["lib"]["version"] = {"ios": "2.4", "mac": "2.5"}

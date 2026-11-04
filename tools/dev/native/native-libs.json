@@ -40,6 +40,15 @@
       "region": [
        "^CONFIGURE_FLAGS=\"",
        "^\\s*\"\\s*$"
+      ],
+      "also": [
+       {
+        "file": "submodules/ffmpeg/Sources/FFMpeg/ffmpeg-common-flags.sh",
+        "region": [
+         "^FFMPEG_COMMON_FLAGS=\"",
+         "^\\s*\"\\s*$"
+        ]
+       }
       ]
      }
     ],
@@ -66,6 +75,15 @@
       "region": [
        "^CONFIGURE_FLAGS=\"",
        "^\\s*\"\\s*$"
+      ],
+      "also": [
+       {
+        "file": "submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg/ffmpeg-common-flags.sh",
+        "region": [
+         "^FFMPEG_COMMON_FLAGS=\"",
+         "^\\s*\"\\s*$"
+        ]
+       }
       ]
      }
     ]
@@ -73,24 +91,33 @@
    "flags": {
     "ios": [
      "--disable-all",
+     "--disable-appkit",
      "--disable-armv5te",
      "--disable-armv6",
      "--disable-armv6t2",
+     "--disable-avfoundation",
+     "--disable-bzlib",
+     "--disable-coreimage",
      "--disable-doc",
      "--disable-everything",
+     "--disable-iconv",
+     "--disable-metal",
+     "--disable-network",
      "--disable-programs",
+     "--disable-sdl2",
+     "--disable-securetransport",
      "--disable-xlib",
      "--enable-avcodec",
      "--enable-avformat",
      "--enable-bsf=aac_adtstoasc,h264_mp4toannexb,vp9_superframe",
      "--enable-cross-compile",
-     "--enable-decoder=av1,flac,h264,hevc,libdav1d,libopus,libvpx_vp9,mp3,pcm_f32le,pcm_s16le,pcm_s24le",
-     "--enable-demuxer=aac,aiff,flac,libopus,m4v,matroska,mov,mp3,mpegts,ogg,wav",
+     "--enable-decoder=av1,flac,h264,hevc,libdav1d,libopus,libvpx_vp9,mp3,pcm_f32le,pcm_s16le,pcm_s24le,vorbis",
+     "--enable-demuxer=aac,aiff,flac,m4v,matroska,mov,mp3,mpegts,ogg,wav",
      "--enable-libdav1d",
      "--enable-libopus",
      "--enable-libvpx",
      "--enable-muxer=matroska,mp4,mpegts,ogg",
-     "--enable-parser=aac,h264,libopus,mp3",
+     "--enable-parser=aac,h264,mp3",
      "--enable-pic",
      "--enable-protocol=file",
      "--enable-swresample"
@@ -118,7 +145,8 @@
      "--enable-avformat",
      "--enable-bsf=aac_adtstoasc,h264_mp4toannexb,vp9_superframe",
      "--enable-cross-compile",
-     "--enable-decoder=aac,alac_at,flac,gsm_ms_at,h264,hevc,libdav1d,libopus,libvpx_vp9,mp3,pcm_f32le,pcm_s16le,pcm_s24le,vorbis",
+     "--enable-decoder=aac,alac_at,gsm_ms_at",
+     "--enable-decoder=av1,flac,h264,hevc,libdav1d,libopus,libvpx_vp9,mp3,pcm_f32le,pcm_s16le,pcm_s24le,vorbis",
      "--enable-demuxer=aac,aiff,flac,m4v,matroska,mov,mp3,mpegts,ogg,wav",
      "--enable-hwaccel=av1_videotoolbox,h264_videotoolbox,hevc_videotoolbox",
      "--enable-libdav1d",
@@ -579,7 +607,7 @@
   }
  },
  "known_differences": {
-  "ffmpeg.flags": "Mac enables AudioToolbox/VideoToolbox decoders and hardware acceleration (alac_at, gsm_ms_at, aac, vorbis, h264/hevc/av1_videotoolbox) and builds without the muxers; iOS adds the mp4/matroska/ogg/mpegts muxers for recording and the av1 decoder. Align when the core merge (phase 2) brings one ffmpeg script.",
+  "ffmpeg.flags": "The shared list is submodules/ffmpeg/Sources/FFMpeg/ffmpeg-common-flags.sh (decoders incl. vorbis and av1, demuxers, parsers, the disabled network and Apple-framework glue); both scripts source it. Left apart on purpose: iOS adds the mp4/matroska/ogg/mpegts muxers for recording, and its AudioToolbox decoders and encoders and the hwaccels come with the darwin configure call; Mac adds AudioToolbox, the native aac decoder, alac_at/gsm_ms_at and the VideoToolbox hwaccels in build.sh. tools/dev/tests/test_ffmpeg_flags_parity.py pins both deltas.",
   "opus.flags": "iOS cross-compiles static PIC with intrinsics; the Mac build uses fixed-point and no PIC option. Both disable asm. Align when phase 2 shares one opus script.",
   "libvpx.flags": "iOS builds the realtime encoder only (no WebM IO, multi-res encoding, no postproc); the Mac builds the full VP8/VP9 decoder with WebM IO and runtime CPU detection. Different jobs: calls on iOS, playback of WebM on Mac.",
   "libyuv.version": "Mac gets libyuv from the tg_owt fork (1872); iOS from third-party/libyuv (1977). Closed by the WebRTC fork work (phase 4 parity gate), not by a flag."

@@ -48,25 +48,15 @@ export PATH="$SOURCE_DIR:$PATH"
 LIB_NAMES="libavcodec libavformat libavutil libswresample"
 
 
-CONFIGURE_FLAGS="--enable-cross-compile --disable-programs \
-                 --disable-armv5te --disable-armv6 --disable-armv6t2 \
-                 --disable-doc --enable-pic --disable-all --disable-everything \
-                 --enable-avcodec  \
-                 --enable-swresample \
-                 --enable-avformat \
-                 --disable-xlib \
-                 --enable-libopus \
-                 --enable-libvpx \
-                 --enable-libdav1d \
+# The shared list (decoders, demuxers, parsers, disabled Apple frameworks) is the iOS repo's
+# ffmpeg-common-flags.sh, so the two apps cannot drift. What is added here is Mac only: AudioToolbox (the
+# alac/gsm decoders), the native AAC decoder and the VideoToolbox hwaccels; the Mac builds no muxers.
+. "$SOURCE_DIR/ffmpeg-common-flags.sh"
+
+CONFIGURE_FLAGS="$FFMPEG_COMMON_FLAGS \
                  --enable-audiotoolbox \
-                 --enable-bsf=aac_adtstoasc,vp9_superframe,h264_mp4toannexb \
-                 --enable-decoder=h264,libvpx_vp9,hevc,libopus,mp3,aac,flac,alac_at,pcm_s16le,pcm_s24le,pcm_f32le,gsm_ms_at,vorbis,libdav1d \
-                 --enable-demuxer=aac,mov,m4v,mp3,ogg,flac,wav,aiff,matroska,mpegts \
-                 --enable-parser=aac,h264,mp3 \
-                 --enable-protocol=file \
+                 --enable-decoder=aac,alac_at,gsm_ms_at \
                  --enable-hwaccel=h264_videotoolbox,hevc_videotoolbox,av1_videotoolbox \
-                 --disable-network --disable-securetransport --disable-bzlib --disable-iconv \
-                 --disable-appkit --disable-avfoundation --disable-coreimage --disable-metal --disable-sdl2 \
                  "
 
 EXTRA_CFLAGS="-DCONFIG_SAFE_BITSTREAM_READER=1 -fstack-protector-strong"
