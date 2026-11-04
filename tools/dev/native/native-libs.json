@@ -1,0 +1,588 @@
+{
+ "schema": 1,
+ "description": "Single reference for native-library versions and build flags of the iOS (Bazel) and Mac (Xcode, core-xprojects) apps. Identical in both repos; tools/dev/native/check_native_libs.py compares it with the real build files. To bump a library: change the build files and this file together, in both repos.",
+ "policy": {
+  "versions": "Library versions equal on both sides unless listed under known_differences.",
+  "min_os": {
+   "ios": "13.0 (device and simulator libraries)",
+   "mac": "14.0 for the native libraries (-mmacosx-version-min=14.0) while the app targets 15.0; 14.0 libraries link into a 15.0 app and changing it would break shared cache keys"
+  },
+  "platform_specific_by_design": {
+   "tls": "iOS links BoringSSL; the Mac builds OpenSSL 3.5.9 (core-xprojects/openssl) and TDLib's tde2e against it",
+   "rust_lto": "iOS builds Rust with fat LTO (Make.py); the Mac uses the Cargo release profile (thin LTO). Same compiler (rust version above). Details: docs/module-build-settings.md",
+   "mac_order_file": "The Mac Release link uses an order file; iOS does not",
+   "webrtc": "iOS third-party/webrtc and Mac submodules/tg_owt: pin and fix-set parity is enforced by the phase 4 parity gate, not here"
+  }
+ },
+ "libs": {
+  "ffmpeg": {
+   "probes": {
+    "ios": [
+     {
+      "id": "BUILD",
+      "what": "version",
+      "kind": "regex",
+      "file": "submodules/ffmpeg/BUILD",
+      "regex": "FFMPEG_VERSION=\"([\\d.]+)\""
+     },
+     {
+      "id": "source",
+      "what": "version",
+      "kind": "regex",
+      "file": "submodules/ffmpeg/Sources/FFMpeg/ffmpeg-*/RELEASE",
+      "regex": "^([\\d.]+)"
+     },
+     {
+      "id": "configure",
+      "what": "flags",
+      "kind": "flags",
+      "file": "submodules/ffmpeg/Sources/FFMpeg/build-ffmpeg-bazel.sh",
+      "region": [
+       "^CONFIGURE_FLAGS=\"",
+       "^\\s*\"\\s*$"
+      ]
+     }
+    ],
+    "mac": [
+     {
+      "id": "build.sh",
+      "what": "version",
+      "kind": "regex",
+      "file": "core-xprojects/ffmpeg/ffmpeg/build.sh",
+      "regex": "^FF_VERSION=\"([\\d.]+)\""
+     },
+     {
+      "id": "source",
+      "what": "version",
+      "kind": "regex",
+      "file": "submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg/ffmpeg-*/RELEASE",
+      "regex": "^([\\d.]+)"
+     },
+     {
+      "id": "configure",
+      "what": "flags",
+      "kind": "flags",
+      "file": "core-xprojects/ffmpeg/ffmpeg/build.sh",
+      "region": [
+       "^CONFIGURE_FLAGS=\"",
+       "^\\s*\"\\s*$"
+      ]
+     }
+    ]
+   },
+   "flags": {
+    "ios": [
+     "--disable-all",
+     "--disable-armv5te",
+     "--disable-armv6",
+     "--disable-armv6t2",
+     "--disable-doc",
+     "--disable-everything",
+     "--disable-programs",
+     "--disable-xlib",
+     "--enable-avcodec",
+     "--enable-avformat",
+     "--enable-bsf=aac_adtstoasc,h264_mp4toannexb,vp9_superframe",
+     "--enable-cross-compile",
+     "--enable-decoder=av1,flac,h264,hevc,libdav1d,libopus,libvpx_vp9,mp3,pcm_f32le,pcm_s16le,pcm_s24le",
+     "--enable-demuxer=aac,aiff,flac,libopus,m4v,matroska,mov,mp3,mpegts,ogg,wav",
+     "--enable-libdav1d",
+     "--enable-libopus",
+     "--enable-libvpx",
+     "--enable-muxer=matroska,mp4,mpegts,ogg",
+     "--enable-parser=aac,h264,libopus,mp3",
+     "--enable-pic",
+     "--enable-protocol=file",
+     "--enable-swresample"
+    ],
+    "mac": [
+     "--disable-all",
+     "--disable-appkit",
+     "--disable-armv5te",
+     "--disable-armv6",
+     "--disable-armv6t2",
+     "--disable-avfoundation",
+     "--disable-bzlib",
+     "--disable-coreimage",
+     "--disable-doc",
+     "--disable-everything",
+     "--disable-iconv",
+     "--disable-metal",
+     "--disable-network",
+     "--disable-programs",
+     "--disable-sdl2",
+     "--disable-securetransport",
+     "--disable-xlib",
+     "--enable-audiotoolbox",
+     "--enable-avcodec",
+     "--enable-avformat",
+     "--enable-bsf=aac_adtstoasc,h264_mp4toannexb,vp9_superframe",
+     "--enable-cross-compile",
+     "--enable-decoder=aac,alac_at,flac,gsm_ms_at,h264,hevc,libdav1d,libopus,libvpx_vp9,mp3,pcm_f32le,pcm_s16le,pcm_s24le,vorbis",
+     "--enable-demuxer=aac,aiff,flac,m4v,matroska,mov,mp3,mpegts,ogg,wav",
+     "--enable-hwaccel=av1_videotoolbox,h264_videotoolbox,hevc_videotoolbox",
+     "--enable-libdav1d",
+     "--enable-libopus",
+     "--enable-libvpx",
+     "--enable-parser=aac,h264,mp3",
+     "--enable-pic",
+     "--enable-protocol=file",
+     "--enable-swresample"
+    ]
+   },
+   "version": {
+    "shared": "9.0.2"
+   }
+  },
+  "opus": {
+   "probes": {
+    "ios": [
+     {
+      "id": "tarball",
+      "what": "version",
+      "kind": "filename",
+      "file": "third-party/opus/opus-*.tar.gz",
+      "regex": "^opus-([\\d.]+)\\.tar\\.gz$"
+     },
+     {
+      "id": "tarball",
+      "what": "sha256",
+      "kind": "sha256",
+      "file": "third-party/opus/opus-*.tar.gz"
+     },
+     {
+      "id": "configure",
+      "what": "flags",
+      "kind": "flags",
+      "file": "third-party/opus/build-opus-bazel.sh"
+     }
+    ],
+    "mac": [
+     {
+      "id": "tarball",
+      "what": "version",
+      "kind": "filename",
+      "file": "core-xprojects/libopus/opus-*.tar.gz",
+      "regex": "^opus-([\\d.]+)\\.tar\\.gz$"
+     },
+     {
+      "id": "tarball",
+      "what": "sha256",
+      "kind": "sha256",
+      "file": "core-xprojects/libopus/opus-*.tar.gz"
+     },
+     {
+      "id": "configure",
+      "what": "flags",
+      "kind": "flags",
+      "file": "core-xprojects/libopus/libopus/build.sh"
+     }
+    ]
+   },
+   "flags": {
+    "ios": [
+     "--disable-asm",
+     "--disable-doc",
+     "--disable-extra-programs",
+     "--disable-shared",
+     "--enable-intrinsics",
+     "--enable-static",
+     "--with-pic"
+    ],
+    "mac": [
+     "--disable-asm",
+     "--disable-doc",
+     "--disable-extra-programs",
+     "--enable-fixed-point"
+    ]
+   },
+   "sha256": {
+    "shared": "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1"
+   },
+   "version": {
+    "shared": "1.6.1"
+   }
+  },
+  "libvpx": {
+   "probes": {
+    "ios": [
+     {
+      "id": "CHANGELOG",
+      "what": "version",
+      "kind": "regex",
+      "file": "third-party/libvpx/libvpx/CHANGELOG",
+      "regex": "^\\S+ v([\\d.]+)"
+     },
+     {
+      "id": "configure",
+      "what": "flags",
+      "kind": "flags",
+      "file": "third-party/libvpx/build-libvpx-bazel.sh",
+      "region": [
+       "^CONFIGURE_ARGS=\"",
+       "\"\\s*$"
+      ]
+     }
+    ],
+    "mac": [
+     {
+      "id": "CHANGELOG",
+      "what": "version",
+      "kind": "regex",
+      "file": "core-xprojects/libvpx/source/CHANGELOG",
+      "regex": "^\\S+ v([\\d.]+)"
+     },
+     {
+      "id": "configure",
+      "what": "flags",
+      "kind": "flags",
+      "file": "core-xprojects/libvpx/libvpx/build.sh",
+      "region": [
+       "^CONFIGURE_ARGS=\"",
+       "\"\\s*$"
+      ]
+     }
+    ]
+   },
+   "flags": {
+    "ios": [
+     "--disable-docs",
+     "--disable-examples",
+     "--disable-postproc",
+     "--disable-unit-tests",
+     "--disable-vp9-highbitdepth",
+     "--disable-vp9-postproc",
+     "--disable-vp9-temporal-denoising",
+     "--disable-webm-io",
+     "--enable-multi-res-encoding",
+     "--enable-realtime-only",
+     "--size-limit=8192x8192"
+    ],
+    "mac": [
+     "--disable-docs",
+     "--disable-examples",
+     "--disable-tools",
+     "--disable-unit-tests",
+     "--enable-runtime-cpu-detect",
+     "--enable-vp8",
+     "--enable-vp9",
+     "--enable-webm-io",
+     "--size-limit=8192x8192"
+    ]
+   },
+   "version": {
+    "shared": "1.17.0"
+   }
+  },
+  "dav1d": {
+   "probes": {
+    "ios": [
+     {
+      "id": "meson.build",
+      "what": "version",
+      "kind": "regex",
+      "file": "third-party/dav1d/dav1d/meson.build",
+      "regex": "version:\\s*'([\\d.]+)'"
+     },
+     {
+      "id": "meson options",
+      "what": "flags",
+      "kind": "flags",
+      "file": "third-party/dav1d/build-dav1d-bazel.sh",
+      "region": [
+       "^MESON_OPTIONS=\"",
+       "\"\\s*$"
+      ]
+     }
+    ],
+    "mac": [
+     {
+      "id": "meson.build",
+      "what": "version",
+      "kind": "regex",
+      "file": "submodules/telegram-ios/third-party/dav1d/dav1d/meson.build",
+      "regex": "version:\\s*'([\\d.]+)'"
+     },
+     {
+      "id": "meson options",
+      "what": "flags",
+      "kind": "flags",
+      "file": "core-xprojects/dav1d/dav1d/build.sh",
+      "region": [
+       "^MESON_OPTIONS=\"",
+       "\"\\s*$"
+      ]
+     }
+    ]
+   },
+   "flags": {
+    "shared": [
+     "--buildtype=release",
+     "--default-library=static",
+     "-Denable_tests=false",
+     "-Denable_tools=false"
+    ]
+   },
+   "version": {
+    "shared": "1.5.4"
+   }
+  },
+  "libwebp": {
+   "probes": {
+    "ios": [
+     {
+      "id": "configure.ac",
+      "what": "version",
+      "kind": "regex",
+      "file": "third-party/webp/libwebp/configure.ac",
+      "regex": "AC_INIT\\(\\[libwebp\\],\\s*\\[([\\d.]+)\\]"
+     },
+     {
+      "id": "cmake options",
+      "what": "flags",
+      "kind": "flags",
+      "file": "third-party/webp/build-webp-bazel.sh",
+      "region": [
+       "^COMMON_ARGS=\"",
+       "\"\\s*$"
+      ]
+     }
+    ],
+    "mac": [
+     {
+      "id": "tarball",
+      "what": "version",
+      "kind": "filename",
+      "file": "core-xprojects/libwebp/libwebp-*.tar.gz",
+      "regex": "^libwebp-([\\d.]+)\\.tar\\.gz$"
+     },
+     {
+      "id": "tarball",
+      "what": "sha256",
+      "kind": "sha256",
+      "file": "core-xprojects/libwebp/libwebp-*.tar.gz"
+     },
+     {
+      "id": "cmake options",
+      "what": "flags",
+      "kind": "flags",
+      "file": "core-xprojects/libwebp/libwebp/build-cmake.sh",
+      "region": [
+       "^COMMON_ARGS=\"",
+       "\"\\s*$"
+      ]
+     }
+    ]
+   },
+   "flags": {
+    "shared": [
+     "-DWEBP_BUILD_ANIM_UTILS=0",
+     "-DWEBP_BUILD_CWEBP=0",
+     "-DWEBP_BUILD_DWEBP=0",
+     "-DWEBP_BUILD_EXTRAS=0",
+     "-DWEBP_BUILD_GIF2WEBP=0",
+     "-DWEBP_BUILD_IMG2WEBP=0",
+     "-DWEBP_BUILD_LIBWEBPMUX=0",
+     "-DWEBP_BUILD_VWEBP=0",
+     "-DWEBP_BUILD_WEBPINFO=0",
+     "-DWEBP_BUILD_WEBPMUX=0",
+     "-DWEBP_LINK_STATIC=1"
+    ]
+   },
+   "sha256": {
+    "mac": "e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564"
+   },
+   "version": {
+    "shared": "1.6.0"
+   }
+  },
+  "libjpeg-turbo": {
+   "probes": {
+    "ios": [
+     {
+      "id": "MODULE.bazel",
+      "what": "version",
+      "kind": "regex",
+      "file": "MODULE.bazel",
+      "regex": "libjpeg-turbo-([\\d.]+)\\.tar\\.gz\"\\]"
+     },
+     {
+      "id": "MODULE.bazel",
+      "what": "sha256",
+      "kind": "regex",
+      "file": "MODULE.bazel",
+      "regex": "sha256 = \"([0-9a-f]{64})\",\\n\\s*urls = \\[\"https://github.com/libjpeg-turbo"
+     }
+    ],
+    "mac": [
+     {
+      "id": "build.sh",
+      "what": "version",
+      "kind": "regex",
+      "file": "core-xprojects/Mozjpeg/Mozjpeg/build.sh",
+      "regex": "^SOURCE_NAME=\"libjpeg-turbo-([\\d.]+)\""
+     },
+     {
+      "id": "build.sh",
+      "what": "sha256",
+      "kind": "regex",
+      "file": "core-xprojects/Mozjpeg/Mozjpeg/build.sh",
+      "regex": "^SOURCE_SHA256=\"([0-9a-f]{64})\""
+     },
+     {
+      "id": "tarball",
+      "what": "sha256",
+      "kind": "sha256",
+      "file": "core-xprojects/Mozjpeg/libjpeg-turbo-*.tar.gz"
+     }
+    ]
+   },
+   "sha256": {
+    "shared": "c27ad72a68da151177929aa969ae773a2da5ac2af9ce946079314fdac8cece7f"
+   },
+   "version": {
+    "shared": "3.2.1"
+   }
+  },
+  "openh264": {
+   "probes": {
+    "ios": [
+     {
+      "id": "codec_ver.h",
+      "what": "version",
+      "kind": "regex",
+      "file": "third-party/openh264/third_party/openh264/src/codec/api/wels/codec_ver.h",
+      "regex": "OPENH264_MAJOR \\((\\d+)\\)[\\s\\S]*?OPENH264_MINOR \\((\\d+)\\)[\\s\\S]*?OPENH264_REVISION \\((\\d+)\\)"
+     }
+    ],
+    "mac": [
+     {
+      "id": "build.sh",
+      "what": "version",
+      "kind": "regex",
+      "file": "core-xprojects/OpenH264/OpenH264/build.sh",
+      "regex": "git clone -b v([\\d.]+)"
+     }
+    ]
+   },
+   "version": {
+    "shared": "2.7.0"
+   }
+  },
+  "tdlib": {
+   "probes": {
+    "ios": [
+     {
+      "id": "CMakeLists.txt",
+      "what": "version",
+      "kind": "regex",
+      "file": "third-party/td/td/CMakeLists.txt",
+      "regex": "project\\(TDLib VERSION ([\\d.]+)"
+     }
+    ],
+    "mac": [
+     {
+      "id": "CMakeLists.txt",
+      "what": "version",
+      "kind": "regex",
+      "file": "submodules/telegram-ios/third-party/td/td/CMakeLists.txt",
+      "regex": "project\\(TDLib VERSION ([\\d.]+)"
+     }
+    ]
+   },
+   "version": {
+    "shared": "1.8.69"
+   }
+  },
+  "rust": {
+   "probes": {
+    "ios": [
+     {
+      "id": "MODULE.bazel",
+      "what": "version",
+      "kind": "regex",
+      "file": "MODULE.bazel",
+      "regex": "versions = \\[\"([\\d.]+)\"\\]"
+     }
+    ],
+    "mac": [
+     {
+      "id": "rust-toolchain.toml",
+      "what": "version",
+      "kind": "regex",
+      "file": "core-xprojects/rust-toolchain.toml",
+      "regex": "channel = \"([\\d.]+)\""
+     }
+    ]
+   },
+   "version": {
+    "shared": "1.99.1"
+   }
+  },
+  "flatbuffers": {
+   "probes": {
+    "ios": [
+     {
+      "id": "MODULE.bazel",
+      "what": "version",
+      "kind": "regex",
+      "file": "MODULE.bazel",
+      "regex": "flatbuffers/archive/refs/tags/v([\\d.]+)\\.zip"
+     }
+    ],
+    "mac": [
+     {
+      "id": "flatc binary",
+      "what": "version",
+      "kind": "regex",
+      "file": "scripts/flatc",
+      "regex": "flatbuffers-([\\d.]+)/grpc"
+     }
+    ]
+   },
+   "version": {
+    "ios": "25.12.19",
+    "mac": "24.12.23"
+   }
+  },
+  "libyuv": {
+   "probes": {
+    "ios": [
+     {
+      "id": "version.h",
+      "what": "version",
+      "kind": "regex",
+      "file": "third-party/libyuv/third_party/libyuv/include/libyuv/version.h",
+      "regex": "LIBYUV_VERSION (\\d+)"
+     }
+    ],
+    "mac": [
+     {
+      "id": "version.h",
+      "what": "version",
+      "kind": "regex",
+      "file": "submodules/tg_owt/src/third_party/libyuv/include/libyuv/version.h",
+      "regex": "LIBYUV_VERSION (\\d+)"
+     }
+    ]
+   },
+   "version": {
+    "ios": "1977",
+    "mac": "1872"
+   }
+  },
+  "rnnoise": {
+   "probes": {
+    "ios": [],
+    "mac": []
+   }
+  }
+ },
+ "known_differences": {
+  "ffmpeg.flags": "Mac enables AudioToolbox/VideoToolbox decoders and hardware acceleration (alac_at, gsm_ms_at, aac, vorbis, h264/hevc/av1_videotoolbox) and builds without the muxers; iOS adds the mp4/matroska/ogg/mpegts muxers for recording and the av1 decoder. Align when the core merge (phase 2) brings one ffmpeg script.",
+  "opus.flags": "iOS cross-compiles static PIC with intrinsics; the Mac build uses fixed-point and no PIC option. Both disable asm. Align when phase 2 shares one opus script.",
+  "libvpx.flags": "iOS builds the realtime encoder only (no WebM IO, multi-res encoding, no postproc); the Mac builds the full VP8/VP9 decoder with WebM IO and runtime CPU detection. Different jobs: calls on iOS, playback of WebM on Mac.",
+  "flatbuffers.version": "Mac still ships flatc 24.12.23 (scripts/flatc, a prebuilt binary); iOS builds 25.12.19. Generated Swift is compatible today; replace the binary with a 25.12.19 build when the core merge lands.",
+  "libyuv.version": "Mac gets libyuv from the tg_owt fork (1872); iOS from third-party/libyuv (1977). Closed by the WebRTC fork work (phase 4 parity gate), not by a flag."
+ }
+}

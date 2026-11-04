@@ -1,0 +1,311 @@
+{
+ "schema": 1,
+ "platform": {
+  "swift_opt": {
+   "label": "Swift optimisation, Release",
+   "ios": "-O (swift.opt_uses_osize off)",
+   "mac": "-O; -Osize for 12 cold feature modules",
+   "equal": "yes, except the 12 listed Mac modules",
+   "probes": {
+    "ios": [
+     {
+      "id": "Make.py",
+      "file": "build-system/Make/Make.py",
+      "regex": "(Swift modules build with -O \\(speed\\) rather than -Osize)"
+     }
+    ],
+    "mac": [
+     {
+      "id": "xcconfig",
+      "file": "nanogram/Nanogram.xcconfig",
+      "regex": "(SWIFT_OPTIMIZATION_LEVEL\\[config=Release\\] = \\$\\(NANOGRAM_SWIFT_OPT_\\$\\(TARGET_NAME\\):default=-O\\))"
+     }
+    ]
+   }
+  },
+  "swift_debug": {
+   "label": "Swift optimisation, Debug",
+   "ios": "-Onone (fastbuild/dbg)",
+   "mac": "-Onone",
+   "equal": "yes",
+   "probes": {
+    "ios": [],
+    "mac": [
+     {
+      "id": "xcconfig",
+      "file": "nanogram/Nanogram.xcconfig",
+      "regex": "(SWIFT_OPTIMIZATION_LEVEL\\[config=Debug\\] = -Onone)"
+     }
+    ]
+   }
+  },
+  "wmo": {
+   "label": "Whole-module optimisation, Release",
+   "ios": "on (swift.opt_uses_wmo)",
+   "mac": "on (SWIFT_COMPILATION_MODE=wholemodule)",
+   "equal": "yes",
+   "probes": {
+    "ios": [
+     {
+      "id": "Make.py",
+      "file": "build-system/Make/Make.py",
+      "regex": "(--features=swift.opt_uses_wmo)"
+     }
+    ],
+    "mac": [
+     {
+      "id": "xcconfig",
+      "file": "nanogram/Nanogram.xcconfig",
+      "regex": "(SWIFT_COMPILATION_MODE\\[config=Release\\] = wholemodule)"
+     }
+    ]
+   }
+  },
+  "c_lto": {
+   "label": "C, C++, Objective-C LTO, Release",
+   "ios": "ThinLTO (-flto=thin)",
+   "mac": "ThinLTO (LLVM_LTO=YES_THIN), also -O3",
+   "equal": "yes",
+   "probes": {
+    "ios": [
+     {
+      "id": "Make.py",
+      "file": "build-system/Make/Make.py",
+      "regex": "(--copt=-flto=thin)"
+     }
+    ],
+    "mac": [
+     {
+      "id": "xcconfig",
+      "file": "nanogram/Nanogram.xcconfig",
+      "regex": "(LLVM_LTO\\[config=Release\\] = YES_THIN)"
+     }
+    ]
+   }
+  },
+  "rust_lto": {
+   "label": "Rust LTO, Release",
+   "ios": "fat",
+   "mac": "thin (Cargo.toml release profile)",
+   "equal": "no, by design",
+   "probes": {
+    "ios": [
+     {
+      "id": "Make.py",
+      "file": "build-system/Make/Make.py",
+      "regex": "(rust/settings:lto=fat)"
+     }
+    ],
+    "mac": [
+     {
+      "id": "Cargo.toml",
+      "file": "submodules/telegram-ios/third-party/mtproto-engine/Cargo.toml",
+      "regex": "lto = \"(thin)\""
+     }
+    ]
+   }
+  },
+  "dead_strip": {
+   "label": "Dead-code stripping, Release",
+   "ios": "on (--features=dead_strip)",
+   "mac": "on (DEAD_CODE_STRIPPING=YES)",
+   "equal": "yes",
+   "probes": {
+    "ios": [
+     {
+      "id": "Make.py",
+      "file": "build-system/Make/Make.py",
+      "regex": "(--features=dead_strip)"
+     }
+    ],
+    "mac": [
+     {
+      "id": "xcconfig",
+      "file": "nanogram/Nanogram.xcconfig",
+      "regex": "(DEAD_CODE_STRIPPING\\[config=Release\\] = YES)"
+     }
+    ]
+   }
+  }
+ },
+ "modules": {
+  "ChatListUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "Emoji": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "FlatBuffers": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "FlatSerialization": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "GalleryUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "GraphCore": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "GraphUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "InAppPurchaseManager": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "InstantPageUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "InviteLinksUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "LocalAudioTranscription": {
+   "ios": "5",
+   "mac": "6"
+  },
+  "LocationUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "MTProtoRustEngine": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "MTProtoRustEngineMapping": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "ManagedFile": {
+   "ios": "6",
+   "mac": "5"
+  },
+  "MediaPreuploadRegistry": {
+   "ios": "6",
+   "mac": "5"
+  },
+  "MetalEngine": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "MosaicLayout": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "PasscodeCore": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "PasscodeUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "PassportUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "PeerInfoUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "Postbox": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "PremiumUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "RangeSet": {
+   "ios": "6",
+   "mac": "5"
+  },
+  "Reachability": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "RichTextEditorCore": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "RichTextEditorUIKit": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "RichTextEngineEditor": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "SettingsUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "StatisticsUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "Svg": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "SwiftSignalKit": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "TelegramApi": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "TelegramAudio": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "TelegramCore": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "TelegramVoip": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "TranslateUI": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "VP9Hardware": {
+   "ios": "6",
+   "mac": "6"
+  },
+  "WalletContext": {
+   "ios": "5",
+   "mac": "5"
+  },
+  "WebProxyTransport": {
+   "ios": "5",
+   "mac": "5"
+  }
+ },
+ "allowed": {
+  "LocalAudioTranscription": "iOS still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
+  "ManagedFile": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
+  "MediaPreuploadRegistry": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
+  "RangeSet": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk"
+ },
+ "counts": {
+  "ios_swift_modules": 817,
+  "ios_swift6": 40,
+  "mac_swift_targets": 255,
+  "mac_swift6": 7,
+  "built_by_both": 41,
+  "modes_differ": 4
+ }
+}
