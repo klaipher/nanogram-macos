@@ -21,10 +21,12 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 from nanogram import branding, buildcheck, config, editions
+from nanogram import enhanced_security as enhanced_security_module
 from nanogram import dmg as disk_image
 
 TEAM = "YGTMYL879P"
@@ -45,11 +47,12 @@ ORDER_FILE = config.ROOT / "Telegram-Mac" / "OrderFiles" / "Telegram.order"
 # overridden on the command line, so the archive signs with the development set and the archived app is re-signed
 # with the distribution set before export (which provisions and signs it for the App Store).
 DISTRIBUTION_ENTITLEMENTS = {"mas": config.ROOT / "nanogram" / "entitlements" / "Nanogram-MAS.entitlements"}
+ENHANCED_SECURITY_ENV = "NANOGRAM_ENHANCED_SECURITY"
 BUILD_NUMBER_RE = re.compile(r"^\d+(\.\d+){0,2}$")
 ASC_API = "https://api.appstoreconnect.apple.com"
 EXPORT_TIMEOUT = 600
 
-__all__ = ["AscKey", "asc_key", "build_number", "marketing_version", "conditions", "release_settings",
+__all__ = ["AscKey", "asc_key", "build_number", "marketing_version", "conditions", "release_settings", "distribution_entitlements", "enhanced_security_requested",
            "archive_command", "archive", "export_options", "export", "set_build_number", "ensure_mac_platform",
            "upload_mas", "unsign_resource_bundles", "check_distribution_signing", "check_exported_app", "testflight", "notarize", "make_dmg", "appcast_entry", "appcast", "source_archive",
            "release_direct"]
@@ -114,12 +117,26 @@ def conditions(edition: str) -> str:
     return value + " NANOGRAM_MAS" if edition == "mas" else value
 
 
-def release_settings(order_file: Path = ORDER_FILE) -> list[str]:
+def enhanced_security_requested(environ: Mapping[str, str] | None = None) -> bool:
+    environ = os.environ if environ is None else environ
+    return environ.get(ENHANCED_SECURITY_ENV, "").strip().lower() in ("1", "yes", "true")
+
+
+def distribution_entitlements(edition: str, enhanced_security: bool = False) -> Path | None:
+    path = DISTRIBUTION_ENTITLEMENTS.get(edition)
+    if path is not None and enhanced_security:
+        return enhanced_security_module.variant_path(path)
+    return path
+
+
+def release_settings(order_file: Path = ORDER_FILE, environ: Mapping[str, str] | None = None) -> list[str]:
     """Command-line settings of every Release build: they reach every target, SwiftPM packages included.
     M17: no runtime exclusivity checks in Release (the app target already has them off); Debug and tests keep them."""
     settings = ["SWIFT_ENFORCE_EXCLUSIVE_ACCESS=off"]
     if Path(order_file).is_file():
         settings.append(f"NANOGRAM_ORDER_FILE={order_file}")
+    if enhanced_security_requested(environ):
+        settings.append("NANOGRAM_ENHANCED_SECURITY_REQUEST=YES")
     return settings
 
 
@@ -198,7 +215,7 @@ def archive(edition: str, build: str, out_dir: Path, key: AscKey) -> Path:
     unsigned = unsign_resource_bundles(archived_app(archive_path))
     if unsigned:
         print(f"==> Removed the build signature of {len(unsigned)} resource bundles", flush=True)
-    set_build_number(archive_path, build, DISTRIBUTION_ENTITLEMENTS.get(edition))
+    set_build_number(archive_path, build, distribution_entitlements(edition, enhanced_security_requested()))
     check_archive(archive_path, log, edition)
     return archive_path
 

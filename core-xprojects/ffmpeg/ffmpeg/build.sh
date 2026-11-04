@@ -69,7 +69,7 @@ CONFIGURE_FLAGS="--enable-cross-compile --disable-programs \
                  --disable-appkit --disable-avfoundation --disable-coreimage --disable-metal --disable-sdl2 \
                  "
 
-EXTRA_CFLAGS="-DCONFIG_SAFE_BITSTREAM_READER=1"
+EXTRA_CFLAGS="-DCONFIG_SAFE_BITSTREAM_READER=1 -fstack-protector-strong"
 CONFIGURE_FLAGS="$CONFIGURE_FLAGS --disable-debug"
 
 COMPILE="y"

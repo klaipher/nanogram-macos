@@ -83,3 +83,20 @@ OTHER_SWIFT_FLAGS = $(inherited) -strict-concurrency=complete $(NANOGRAM_SWIFT_F
 // without one still links. M17 (no runtime exclusivity checks in Release) is a command-line setting there too.
 NANOGRAM_ORDER_FILE_Telegram = $(NANOGRAM_ORDER_FILE)
 ORDER_FILE[config=Release] = $(NANOGRAM_ORDER_FILE_$(TARGET_NAME):default=$(inherited))
+
+// Memory-safety hardening for the C, C++ and Objective-C the build compiles (the iOS app's .bazelrc sets the same three):
+// automatic variables start zeroed, libc++ traps on out-of-bounds container access in constant time, and every
+// function with a local array or address-taken local gets a stack canary. Libraries built by their own scripts
+// (dav1d, libvpx, opus, libwebp, libjpeg-turbo) take their flags from those scripts; FFmpeg's adds the stack protector.
+// Debug C++ already compiles with Xcode's own _LIBCPP_HARDENING_MODE_DEBUG; a second definition would be a redefinition warning.
+OTHER_CFLAGS = $(inherited) -ftrivial-auto-var-init=zero -fstack-protector-strong
+OTHER_CPLUSPLUSFLAGS = $(inherited) -ftrivial-auto-var-init=zero -fstack-protector-strong
+GCC_PREPROCESSOR_DEFINITIONS[config=Release] = $(inherited) _LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST
+
+// Apple Enhanced Security in soft mode (tools/dev/nanogram/enhanced_security.py): off unless the build is given
+// NANOGRAM_ENHANCED_SECURITY_REQUEST=YES, because the App ID needs the Enhanced Security capability and a new
+// profile first. The editions append the suffix to the entitlement file name.
+NANOGRAM_ENHANCED_SECURITY = $(NANOGRAM_ENHANCED_SECURITY_REQUEST:default=NO)
+NANOGRAM_ENTITLEMENTS_SUFFIX_YES = -EnhancedSecurity
+NANOGRAM_ENTITLEMENTS_SUFFIX_NO =
+NANOGRAM_ENTITLEMENTS_SUFFIX = $(NANOGRAM_ENTITLEMENTS_SUFFIX_$(NANOGRAM_ENHANCED_SECURITY))
