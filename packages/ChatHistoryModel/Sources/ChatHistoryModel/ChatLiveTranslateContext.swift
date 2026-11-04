@@ -11,6 +11,9 @@ import TelegramUtils
 import TelegramTheme
 import Localization
 
+/// Translation bookkeeping is background work: it runs at utility QoS on its own serial queue.
+private let liveTranslateQueue = Queue(name: "LiveTranslateQueue", qos: .utility)
+
 
 
 public struct ChatTranslationState: Codable {
@@ -522,7 +525,7 @@ public final class ChatLiveTranslateContext {
 
 
         
-        let should: Signal<(ChatTranslationState?, Appearance, Bool, Bool), NoError> = combineLatest(queue: prepareQueue, cachedData, translationState, baseAppSettings(accountManager: context.sharedContext.accountManager), appearanceSignal, getPeerView(peerId: context.peerId, postbox: context.account.postbox), autoTranslate) |> map { cachedData, translationState, settings, appearance, peer, autoTranslate in
+        let should: Signal<(ChatTranslationState?, Appearance, Bool, Bool), NoError> = combineLatest(queue: liveTranslateQueue, cachedData, translationState, baseAppSettings(accountManager: context.sharedContext.accountManager), appearanceSignal, getPeerView(peerId: context.peerId, postbox: context.account.postbox), autoTranslate) |> map { cachedData, translationState, settings, appearance, peer, autoTranslate in
             
             var isHidden: Bool
             if let cachedData = cachedData as? CachedChannelData {
@@ -596,7 +599,7 @@ public final class ChatLiveTranslateContext {
             }
         }))
         actionsDisposable.add(state.start(next: { [weak self] state in
-            prepareQueue.justDispatch {
+            liveTranslateQueue.justDispatch {
                 if !state.queued.isEmpty {
                     var textCount: Int = 0
                     var count: Int = 0
@@ -652,7 +655,7 @@ public final class ChatLiveTranslateContext {
 
     private func activateTranscriptionTranslation(for messageId: MessageId, text: String, state: State) -> Void {
         let signal = context.engine.messages.translate(text: text, toLang: state.to, entities: [], tone: state.tone)
-        |> deliverOn(prepareQueue)
+        |> deliverOn(liveTranslateQueue)
 
         actionsDisposable.add(signal.start(next: { [weak self] result in
             self?.updateState { current in
@@ -684,7 +687,7 @@ public final class ChatLiveTranslateContext {
         let toLang: String? = state.to
         let context = self.context
         let signal = context.engine.messages.summarizeMessage(messageId: message.id, translateToLang: toLang)
-        |> deliverOn(prepareQueue)
+        |> deliverOn(liveTranslateQueue)
 
         actionsDisposable.add(signal.start(error: { [weak self] error in
             self?.updateState { current in
@@ -726,7 +729,7 @@ public final class ChatLiveTranslateContext {
     }
 
     public func summarize(_ message: Message) {
-        prepareQueue.justDispatch { [weak self] in
+        liveTranslateQueue.justDispatch { [weak self] in
             guard let self = self else {
                 return
             }
@@ -758,7 +761,7 @@ public final class ChatLiveTranslateContext {
     }
 
     public func clearSummarize(_ messageId: MessageId) {
-        prepareQueue.justDispatch { [weak self] in
+        liveTranslateQueue.justDispatch { [weak self] in
             self?.updateState { current in
                 var current = current
                 current.summarizeResult.removeValue(forKey: .Key(id: messageId))
@@ -791,7 +794,7 @@ public final class ChatLiveTranslateContext {
     private var holder: [MessageId: ChatTranslationSource] = [:]
     
     public func translate(_ message: [Message], replies: [Message] = []) {
-        prepareQueue.justDispatch { [weak self] in
+        liveTranslateQueue.justDispatch { [weak self] in
             guard let `self` = self else {
                 return
             }
@@ -811,7 +814,7 @@ public final class ChatLiveTranslateContext {
             let sources = Dictionary(uniqueKeysWithValues: msgs.map { ($0.id, ChatTranslationSource($0)) })
             if self.holder != sources {
                 self.holder = sources
-                let signal = Signal<Void, NoError>.complete() |> delay(0.01, queue: prepareQueue)
+                let signal = Signal<Void, NoError>.complete() |> delay(0.01, queue: liveTranslateQueue)
                 
                 self.holderDisposable.set(signal.start(completed: { [weak self] in
                     guard let `self` = self else {
@@ -860,7 +863,7 @@ public final class ChatLiveTranslateContext {
     }
 
     public func translateTranscription(_ messages: [Message]) {
-        prepareQueue.justDispatch { [weak self] in
+        liveTranslateQueue.justDispatch { [weak self] in
             guard let `self` = self else {
                 return
             }
