@@ -13,12 +13,19 @@ public enum CallVideoDebugOptions {
 
     public static let screencastHardwareEncoder = NanogramDebugOption.toggle(id: "calls.screencastHardwareEncoder", section: CallVideoDebugOptions.section, title: "Screen share hardware encoder", detail: "Encodes group-call screen shares with the video chip instead of the CPU when H.264 is negotiated. Text may look softer. Default: off. Applies to the next share.", defaultValue: false)
 
+    public static let groupVideoCap = NanogramDebugOption.toggle(id: "calls.groupVideoCap", section: CallVideoDebugOptions.section, title: "Group calls: ask for at most 10 remote videos", detail: "Experiment: requests video for 10 remote channels at most, dominant speakers and screen shares first. Participants after the 10th get no video even when their tile is on screen. Off: every video participant is requested. Default: off.", defaultValue: false)
+
     public static let all: [NanogramDebugOption] = [
+        CallVideoDebugOptions.groupVideoCap,
         CallVideoDebugOptions.livestreamHardwareDecoding,
         CallVideoDebugOptions.hardwareCrop,
         CallVideoDebugOptions.nativeDecodeFormat,
         CallVideoDebugOptions.screencastHardwareEncoder
     ]
+
+    public static func isGroupVideoCapEnabled(in settings: NanogramDebugSettings = NanogramDebugSettings.shared) -> Bool {
+        return settings.bool(CallVideoDebugOptions.groupVideoCap.id)
+    }
 
     public static func applyNativeOptions(from settings: NanogramDebugSettings) {
         TGCallsRuntimeOptionsBridge.setHardwareCropEnabled(settings.bool(CallVideoDebugOptions.hardwareCrop.id))
@@ -35,7 +42,7 @@ public enum CallVideoDebugOptions {
         settings.migrate(from: "calls.thermalLadder", to: CallSystemDebugOptions.thermalVideoLadder.id, transform: { stored in
             return (stored as? String) == "uiAndVideo" ? true : nil
         })
-        for removed in ["calls.backgroundGradientIdle", "calls.cameraFormatV2", "calls.encoderLowLatency", "calls.groupVideoCap", "calls.groupNarrowbandProcessing", "calls.micGainMode", "calls.opusComplexity", "calls.apmRate", "calls.suspendHiddenLivestream", "calls.audioWorkgroup", "calls.threadQoS"] {
+        for removed in ["calls.backgroundGradientIdle", "calls.cameraFormatV2", "calls.encoderLowLatency", "calls.groupNarrowbandProcessing", "calls.micGainMode", "calls.opusComplexity", "calls.apmRate", "calls.suspendHiddenLivestream", "calls.audioWorkgroup", "calls.threadQoS"] {
             settings.migrate(from: removed, to: removed + ".removed", transform: { _ in nil })
         }
     }

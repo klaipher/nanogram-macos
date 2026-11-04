@@ -5,8 +5,11 @@ public struct GroupVideoChannelCandidate: Equatable {
     public var isDominant: Bool
     public var isScreencast: Bool
     public var isLocal: Bool
+    /// The tile is on screen (or within a row of it). Visible channels are never dropped by the cap.
+    public var isVisible: Bool
 
-    public init(endpointId: String, isDominant: Bool, isScreencast: Bool, isLocal: Bool) {
+    public init(endpointId: String, isDominant: Bool, isScreencast: Bool, isLocal: Bool, isVisible: Bool = false) {
+        self.isVisible = isVisible
         self.endpointId = endpointId
         self.isDominant = isDominant
         self.isScreencast = isScreencast
@@ -34,9 +37,13 @@ public enum GroupVideoChannelSelection {
             if lhs.element.isScreencast != rhs.element.isScreencast {
                 return lhs.element.isScreencast
             }
+            if lhs.element.isVisible != rhs.element.isVisible {
+                return lhs.element.isVisible
+            }
             return lhs.offset < rhs.offset
         })
-        for entry in ordered.prefix(max(0, remoteLimit)) {
+        let visibleCount = remote.filter { $0.element.isVisible }.count
+        for entry in ordered.prefix(max(0, remoteLimit, visibleCount)) {
             selected.insert(entry.element.endpointId)
         }
         return selected

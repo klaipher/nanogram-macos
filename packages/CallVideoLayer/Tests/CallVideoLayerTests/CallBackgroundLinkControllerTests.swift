@@ -116,6 +116,16 @@ final class CallVideoDebugOptionsTests: XCTestCase {
         XCTAssertFalse(settings.bool("calls.nativeDecodeFormat"))
         XCTAssertFalse(settings.bool("calls.livestreamHardwareDecoding"))
         XCTAssertFalse(settings.bool("calls.screencastHardwareEncoder"))
+        XCTAssertFalse(settings.bool("calls.groupVideoCap"))
+        XCTAssertFalse(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+    }
+
+    func testGroupVideoCapOverride() {
+        let settings = self.makeSettings()
+        let observations = CallVideoDebugOptions.install(in: settings)
+        settings.set("calls.groupVideoCap", bool: true)
+        XCTAssertTrue(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+        withExtendedLifetime(observations) {}
     }
 
     func testSectionIsStreamsAndCalls() {
@@ -193,6 +203,20 @@ final class GroupVideoChannelSelectionTests: XCTestCase {
         XCTAssertTrue(selected.contains("me"))
         XCTAssertTrue(selected.contains("myScreen"))
         XCTAssertEqual(selected.count, 12)
+    }
+
+    func testVisibleTilesAreNeverDroppedByTheCap() {
+        let candidates = (0 ..< 30).map { GroupVideoChannelCandidate(endpointId: "v\($0)", isDominant: false, isScreencast: false, isLocal: false, isVisible: $0 >= 5 && $0 < 17) }
+        let selected = GroupVideoChannelSelection.select(candidates)
+        XCTAssertEqual(selected, Set((5 ..< 17).map { "v\($0)" }))
+    }
+
+    func testVisibleTilesComeBeforeOffscreenOnesWhenThereIsRoom() {
+        let candidates = (0 ..< 30).map { GroupVideoChannelCandidate(endpointId: "v\($0)", isDominant: false, isScreencast: false, isLocal: false, isVisible: $0 >= 20 && $0 < 23) }
+        let selected = GroupVideoChannelSelection.select(candidates)
+        XCTAssertEqual(selected.count, 10)
+        XCTAssertTrue(selected.isSuperset(of: ["v20", "v21", "v22", "v0", "v6"]))
+        XCTAssertFalse(selected.contains("v7"))
     }
 
     func testZeroLimitKeepsOnlyLocal() {
