@@ -69,6 +69,9 @@ cmd_sparkle_key() {
 cmd_localfixes() { py localfixes || die "cannot apply local submodule fixes"; }
 
 cmd_setup() {
+  # Recorded conflict resolutions are replayed on the next upstream merge (tg sync-upstream).
+  git config rerere.enabled true
+  git config rerere.autoupdate true
   say "Fetching submodules"
   git submodule sync --recursive >/dev/null
   git submodule update --init --recursive --jobs 8
@@ -172,6 +175,11 @@ cmd_warnings() {
   fi
   py warnings --log "$log" ${args[@]+"${args[@]}"}
 }
+
+# tg upstream-sync --tag <upstream tag> [--offline] [--json]: dry run of an upstream release merge (conflicts by area,
+# bumped pins against our fork branches) in a scratch repository; changes and fetches nothing in this repo. The real
+# merge is tg sync-upstream below.
+cmd_upstream_sync() { python3 "$ROOT/tools/dev/upstream-sync/sync.py" --repo "$ROOT" "$@"; }
 
 # tg sync-upstream [--no-build] [--after-merge]: fast-forward `upstream` to telegram/master (real history),
 # merge it into the current branch (tools/dev/nanogram/sync.py; stops on conflicts, never resolves them), then
@@ -348,7 +356,8 @@ usage() {
   cat <<USAGE
 usage: tools/dev/tg <command> [options]
 
-  setup            submodules, Rust toolchain, native libraries
+  setup            submodules, Rust toolchain, native libraries, git rerere
+  upstream-sync    dry run of an upstream release merge: conflicts by area, bumped pins (changes nothing)
   doctor           check prerequisites
   frameworks       native libraries (arm64): current, restored from the shared cache, or built [--no-cache] [--verify-only]
   credentials      generate NanogramSecrets.swift from ~/.config/telegram-ios/api-credentials.json
@@ -381,6 +390,7 @@ main() {
   case "$cmd" in
     doctor) cmd_doctor "$@" ;;
     setup) cmd_setup "$@" ;;
+    upstream-sync) cmd_upstream_sync "$@" ;;
     frameworks) cmd_frameworks "$@" ;;
     clean) cmd_clean "$@" ;;
     prune) cmd_prune "$@" ;;

@@ -1,0 +1,102 @@
+{
+ "description": "Settings for tools/dev/upstream-sync/sync.py (the upstream sync dry run). base_commit is the upstream commit our tree was imported from (the 13.1 merge). The real merge is still tg sync-upstream; this only reports, in a scratch repository, what that merge would conflict on and which pins upstream bumped.",
+ "upstream_url": "https://github.com/TelegramMessenger/telegram-macos.git",
+ "base_commit": "24295527",
+ "base_label": "13.1",
+ "branch": "main",
+ "areas": [
+  {
+   "name": "Localization",
+   "prefixes": [
+    "Telegram-Mac/Resources/",
+    "Telegram-Mac/en.lproj/",
+    "Telegram-Mac/ru.lproj/"
+   ]
+  },
+  {
+   "name": "Calls and WebRTC",
+   "prefixes": [
+    "submodules/tgcalls",
+    "submodules/tg_owt",
+    "packages/TelegramCallsCore/",
+    "packages/CallsUI/",
+    "Telegram-Mac/Calls"
+   ]
+  },
+  {
+   "name": "Settings and debug screens",
+   "prefixes": [
+    "Telegram-Mac/Account",
+    "Telegram-Mac/Settings",
+    "Telegram-Mac/Debug",
+    "packages/InAppSettings/"
+   ]
+  },
+  {
+   "name": "Native libraries",
+   "prefixes": [
+    "core-xprojects/",
+    "submodules/",
+    "third-party/"
+   ]
+  },
+  {
+   "name": "Swift packages",
+   "prefixes": [
+    "packages/"
+   ]
+  },
+  {
+   "name": "App target, project and branding",
+   "prefixes": [
+    "Telegram-Mac/",
+    "Telegram-Mac.xcodeproj/",
+    "Telegram.xcworkspace/",
+    "nanogram/"
+   ]
+  }
+ ],
+ "pins": [
+  {
+   "name": "telegram-ios",
+   "path": "submodules/telegram-ios",
+   "upstream_url": "https://github.com/TelegramMessenger/Telegram-iOS.git"
+  },
+  {
+   "name": "tgcalls",
+   "path": "submodules/tgcalls",
+   "upstream_url": "https://github.com/TelegramMessenger/tgcalls.git",
+   "fork_url": "https://github.com/klaipher/tgcalls.git",
+   "fork_branch": "nanogram-shared"
+  },
+  {
+   "name": "tg_owt",
+   "path": "submodules/tg_owt",
+   "upstream_url": "https://github.com/macosswift/tg_owt.git",
+   "fork_url": "https://github.com/klaipher/tg_owt.git",
+   "fork_branch": "nanogram-mac"
+  },
+  {
+   "name": "rlottie",
+   "path": "submodules/rlottie",
+   "upstream_url": "https://github.com/macosswift/rlottie.git",
+   "fork_url": "https://github.com/klaipher/rlottie.git",
+   "fork_branch": "nanogram-mac"
+  },
+  {
+   "name": "Sparkle",
+   "path": "submodules/Sparkle",
+   "upstream_url": "https://github.com/macosswift/sparkle.git"
+  },
+  {
+   "name": "libprisma",
+   "path": "submodules/libprisma",
+   "upstream_url": "https://github.com/desktop-app/libprisma.git"
+  },
+  {
+   "name": "tlottie",
+   "path": "submodules/tlottie",
+   "upstream_url": "https://github.com/dkaraush/tlottie.git"
+  }
+ ]
+}
