@@ -93,24 +93,108 @@ static NSString *telegramApplicationSecretKey = @"telegramApplicationSecretKey_v
     NSString * _Nonnull _rootPath;
     NSData * _Nonnull key;
     NSData * _Nonnull iv;
+    NSString * _Nullable _passcode;
+    NanogramKeyVault * _Nullable _vault;
 }
 
 @end
 
 @implementation AppEncryptionParameters
 
+static id<NanogramWrapKeyStore> sharedWrapKeyStore = nil;
+static NSObject *sharedWrapKeyStoreLock = nil;
+
++(void)initialize {
+    if (self == [AppEncryptionParameters class]) {
+        sharedWrapKeyStoreLock = [[NSObject alloc] init];
+    }
+}
+
++(void)setSharedWrapKeyStore:(id<NanogramWrapKeyStore>)store {
+    @synchronized (sharedWrapKeyStoreLock) {
+        sharedWrapKeyStore = store;
+    }
+}
+
++(id<NanogramWrapKeyStore>)currentSharedWrapKeyStore {
+    @synchronized (sharedWrapKeyStoreLock) {
+        return sharedWrapKeyStore;
+    }
+}
+
++(BOOL)enableKeychainWrappingWithAccessGroup:(NSString *)accessGroup {
+    NanogramKeychainWrapKeyStore *store = [[NanogramKeychainWrapKeyStore alloc] initWithService:@"org.nanogram.database-key.v1" accessGroup:accessGroup];
+    if (![store probe]) {
+        [self setSharedWrapKeyStore:nil];
+        return NO;
+    }
+    [self setSharedWrapKeyStore:store];
+    return YES;
+}
+
 -(id _Nonnull)initWithPath:(NSString * _Nonnull)path {
+    return [self initWithPath:path wrapKeyStore:[AppEncryptionParameters currentSharedWrapKeyStore] iterations:[NanogramKeyVault defaultIterations]];
+}
+
+-(id _Nonnull)initWithPath:(NSString * _Nonnull)path wrapKeyStore:(id<NanogramWrapKeyStore> _Nullable)store iterations:(uint32_t)iterations {
     self = [super init];
     if (self != nil) {
         self->_rootPath = path;
         if (![NSFileManager.defaultManager fileExistsAtPath:path]) {
             [NSFileManager.defaultManager createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
         }
+        if (store != nil) {
+            self->_vault = [[NanogramKeyVault alloc] initWithPath:[self vaultPath] store:store iterations:iterations];
+        }
         [self applyPasscode:AppEncryptionParameters.defaultKey];
         [self upgradeLegacyIfNeeded];
-        [self initializeIfNeeded];
+        if (self->_vault != nil) {
+            [self adoptIntoVaultIfNeeded];
+        } else {
+            [self initializeIfNeeded];
+        }
     }
     return self;
+}
+
+-(NSString *)vaultPath {
+    return [self->_rootPath stringByAppendingPathComponent:@".tempkeyVault"];
+}
+
+-(NSData * _Nullable)legacyPayload {
+    DeviceSpecificEncryptionParameters *parameters = [self decryptLegacy];
+    if (parameters == nil) {
+        return nil;
+    }
+    NSMutableData *payload = [[NSMutableData alloc] initWithData:parameters.key];
+    [payload appendData:parameters.salt];
+    return payload;
+}
+
+-(DeviceSpecificEncryptionParameters * _Nullable)resolveVaultCreating:(BOOL)create {
+    NanogramKeyVaultResult *result = [self->_vault resolveWithPasscode:self->_passcode legacyExists:^BOOL{
+        return [[NSFileManager defaultManager] fileExistsAtPath:self.path];
+    } legacyPayload:^NSData * _Nullable{
+        return [self legacyPayload];
+    } removeLegacy:^{
+        [[NSFileManager defaultManager] removeItemAtPath:self.path error:nil];
+    } create:create];
+    if (result.outcome != NanogramVaultOutcomeOK || result.payload.length != 48) {
+        return nil;
+    }
+    return [[DeviceSpecificEncryptionParameters alloc] initWithKey:[result.payload subdataWithRange:NSMakeRange(0, 32)] salt:[result.payload subdataWithRange:NSMakeRange(32, 16)]];
+}
+
+-(void)adoptIntoVaultIfNeeded {
+    BOOL legacyExists = [[NSFileManager defaultManager] fileExistsAtPath:self.path];
+    BOOL vaultExists = [self->_vault fileExists];
+    if (!legacyExists && !vaultExists) {
+        if ([self resolveVaultCreating:YES] == nil) {
+            [self initializeIfNeeded];
+        }
+    } else if (legacyExists && !vaultExists) {
+        [self resolveVaultCreating:NO];
+    }
 }
 
 +(NSString * _Nonnull)defaultKey {
@@ -118,6 +202,7 @@ static NSString *telegramApplicationSecretKey = @"telegramApplicationSecretKey_v
 }
 
 -(void)applyPasscode:(NSString * _Nonnull)passcode {
+    self->_passcode = [passcode isEqualToString:AppEncryptionParameters.defaultKey] ? nil : [passcode copy];
     NSData *keyData = [passcode dataUsingEncoding:NSUTF8StringEncoding];
     NSData *sha512 = CryptoSHA512(keyData.bytes, keyData.length);
     self->key = [sha512 subdataWithRange:NSMakeRange(0, 32)];
@@ -158,16 +243,33 @@ static NSString *telegramApplicationSecretKey = @"telegramApplicationSecretKey_v
     return [self->_rootPath stringByAppendingPathComponent:@".tempkey"];
 }
 
--(void)change:(NSString * _Nonnull)passcode {
+-(BOOL)rewrapVaultWithPasscode:(NSString * _Nonnull)passcode {
+    DeviceSpecificEncryptionParameters *parameters = [self resolveVaultCreating:NO];
+    if (parameters == nil) {
+        return NO;
+    }
+    NSString *previous = self->_passcode == nil ? AppEncryptionParameters.defaultKey : self->_passcode;
+    [self applyPasscode:passcode];
+    NSMutableData *payload = [[NSMutableData alloc] initWithData:parameters.key];
+    [payload appendData:parameters.salt];
+    if ([self->_vault writePayload:payload passcode:self->_passcode] != NanogramVaultOutcomeOK) {
+        [self applyPasscode:previous];
+        return NO;
+    }
+    return YES;
+}
+
+-(BOOL)change:(NSString * _Nonnull)passcode {
+    if (self->_vault != nil && [self->_vault fileExists]) {
+        return [self rewrapVaultWithPasscode:passcode];
+    }
     DeviceSpecificEncryptionParameters *parameters = [self decrypt];
     [self applyPasscode:passcode];
     [self reencrypt: parameters];
-
+    return YES;
 }
--(void)remove {
-    DeviceSpecificEncryptionParameters *parameters = [self decrypt];
-    [self applyPasscode:[AppEncryptionParameters defaultKey]];
-    [self reencrypt: parameters];
+-(BOOL)remove {
+    return [self change:[AppEncryptionParameters defaultKey]];
 }
 
 -(NSData * _Nullable)encryptData:(NSData * _Nonnull)data {
@@ -246,11 +348,21 @@ static NSString *telegramApplicationSecretKey = @"telegramApplicationSecretKey_v
 }
 
 -(BOOL)hasPasscode {
-    AppEncryptionParameters *params = [[AppEncryptionParameters alloc] initWithPath:self->_rootPath];
+    if (self->_vault != nil && [self->_vault fileExists]) {
+        return [self->_vault hasPasscode];
+    }
+    AppEncryptionParameters *params = [[AppEncryptionParameters alloc] initWithPath:self->_rootPath wrapKeyStore:nil iterations:[NanogramKeyVault defaultIterations]];
     return [params decrypt] == nil;
 }
 
 -(DeviceSpecificEncryptionParameters * _Nullable)decrypt {
+    if (self->_vault != nil && ([self->_vault fileExists] || [[NSFileManager defaultManager] fileExistsAtPath:self.path])) {
+        return [self resolveVaultCreating:NO];
+    }
+    return [self decryptLegacy];
+}
+
+-(DeviceSpecificEncryptionParameters * _Nullable)decryptLegacy {
     NSData *currentData = [NSData dataWithContentsOfFile:self.path];
     NSData *decrypted = CryptoAES(NO, self->key, self->iv, currentData);
     if (decrypted == nil || decrypted.length < 32 + 16 + 4) {

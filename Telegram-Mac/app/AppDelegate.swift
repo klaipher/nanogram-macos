@@ -364,6 +364,8 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         self.containerUrl = containerUrl.path
 
         try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: ApiEnvironment.group, processRole: .mainApp, biometricKeychainService: walletBiometricKeychainService, keychainScope: PasscodeKeychainScope.channelScope(prefix: ApiEnvironment.prefix, isAppStoreEdition: isAppStoreEdition)), privateAccessGroup: { ApiEnvironment.group })
+        let databaseKeyWrapping = AppEncryptionParameters.enableKeychainWrapping(withAccessGroup: ApiEnvironment.group)
+        NSLog("DatabaseKey: keychain wrapping %@", databaseKeyWrapping ? "enabled" : "unavailable, using the legacy key file")
         
         TempBox.initializeShared(basePath: self.containerUrl, processType: "app", launchSpecificId: arc4random64())
         

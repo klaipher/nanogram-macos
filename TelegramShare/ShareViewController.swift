@@ -37,6 +37,8 @@ class ShareViewController: NSViewController {
             return
         }
         try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: ApiEnvironment.group, processRole: .appExtension, keychainScope: PasscodeKeychainScope.channelScope(prefix: ApiEnvironment.prefix, isAppStoreEdition: isAppStoreEdition)))
+        let databaseKeyWrapping = AppEncryptionParameters.enableKeychainWrapping(withAccessGroup: ApiEnvironment.group)
+        NSLog("DatabaseKey: keychain wrapping %@", databaseKeyWrapping ? "enabled" : "unavailable, using the legacy key file")
         initializeAccountManagement()
 
         
