@@ -378,7 +378,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   Time Profiler on `TableAnimationInterface.animate` in a busy group.
 - **iOS cross-ref**: none.
 
-### M15. dav1d is built without its DotProd/I8MM kernels because of a wrong `cpu_family` — `todo`, verified
+### M15. dav1d is built without its DotProd/I8MM kernels because of a wrong `cpu_family` — `done (69381d0a: dav1d 1.5.0-23 → 1.5.4 with its DotProd/I8MM kernels)`
 
 - **Evidence**: `core-xprojects/dav1d/dav1d-arm64.meson`: `cpu_family = 'arm64'` (Meson's name is `aarch64`), so
   dav1d's `meson.build` skips the extension probes; `core-xprojects/dav1d/build/arm64/config.h:64,70`:
@@ -451,7 +451,7 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
   `result().size()` stays 0 after the fix.
 - **iOS cross-ref**: R4 (`in progress` on iOS, tgcalls working tree). Land once in the shared tgcalls.
 
-### M19. libopus is built `-Os` — `todo`, verified
+### M19. libopus is built `-Os` — `done (bfeb43f0: opus 1.3.1 → 1.6.1, built -O2, fixed point kept)`
 
 - **Evidence**: `core-xprojects/libopus/libopus/build.sh:60` (`-Os -DNDEBUG`, fixed point, NEON intrinsics kept);
   consumers: TelegramCallsCore (`Package.swift:17`), webrtc, voice messages (`AudioRecorder.swift`, `DataItem.swift`).
@@ -1055,7 +1055,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   old items are gone, using synthetic peers and no account.
 - **Confidence**: high.
 
-### H10. FFmpeg's I8MM kernels are dropped because gas-preprocessor comments out `.arch` lines; assemble with clang directly — `todo`
+### H10. FFmpeg's I8MM kernels are dropped because gas-preprocessor comments out `.arch` lines; assemble with clang directly — `done (e0198d5a: FFmpeg 8.1.2 → 9.0.2; arm64 assembled with clang so the I8MM kernels build)`
 
 - **Evidence**: `core-xprojects/ffmpeg/ffmpeg/build.sh:126-131` (arm64 `AS="$GAS_PREPROCESSOR_PATH -arch aarch64 -- $CC"`).
   `submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg/gas-preprocessor.pl:1099` comments out `.arch` lines for clang.
@@ -1161,7 +1161,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   DecodeBench (libvpx vs VT) and compare frames with `compare_rgba.py`.
 - **Confidence**: medium → high for M4 (probed); medium for older chips.
 
-### H15. libvpx is v1.11.0 (2021) with runtime CPU detection off and no DotProd/I8MM kernels; update to v1.17.0 (iOS `9b3a7a94`) — `todo`
+### H15. libvpx is v1.11.0 (2021) with runtime CPU detection off and no DotProd/I8MM kernels; update to v1.17.0 (iOS `9b3a7a94`) — `done (eb33a0a5: libvpx 1.11.0 → 1.17.0 with runtime CPU detection)`
 
 - **Evidence**: `core-xprojects/libvpx/source/CHANGELOG:1` (`2021-09-27 v1.11.0`), `build/arm64/vpx_config.h:18,56` (`HAVE_NEON 1`,
   `CONFIG_RUNTIME_CPU_DETECT 0`), `build/arm64/libs-arm64-darwin20-gcc.mk:25` (`-march=armv8-a -O3`), and `nm libvpx.a | grep -ci dotprod` → 0.
@@ -1347,7 +1347,7 @@ Some SwiftPM packages still declare `.macOS(.v10_13)`, so they need an `#availab
   Postbox-transaction count per viewed photo (PostboxCacheLab pattern).
 - **Confidence**: medium.
 
-### H24. Notifications use an avatar attachment and a single app stack; post communication notifications (`INSendMessageIntent`) with per-chat threads (iOS `397ac282`) — `partial (0eb0950): code done; needs the Communication Notifications capability + entitlement (owner step); the < 10.14 NSUserNotificationCenter path is kept while the shipped deployment target is 10.13`
+### H24. Notifications use an avatar attachment and a single app stack; post communication notifications (`INSendMessageIntent`) with per-chat threads (iOS `397ac282`) — `partial (0eb0950): code done; the entitlement `com.apple.developer.usernotifications.communication` is already in the MAS and MAS-EnhancedSecurity entitlements; only the Direct edition (Nanogram-Direct*.entitlements) still lacks it, which also needs a Direct provisioning profile with the capability (owner step); the < 10.14 NSUserNotificationCenter path is kept while the shipped deployment target is 10.13`
 
 - **Evidence**: `Telegram-Mac/utils/UNUserNotifications.swift:285-330` (no `threadIdentifier`, `interruptionLevel` or intent) and `:388-405` (each avatar is written as
   `tiffRepresentation(using: .jpeg, factor: 1)`, TIFF data in a `.jpeg` file, into a new `globallyUniqueString` temp folder per notification that is never removed).
