@@ -16,6 +16,7 @@ Read the matching document before starting the task.
 | Task | Document |
 |---|---|
 | Creating a new screen or controller | [docs/swift/TemplateController/README.md](docs/swift/TemplateController/README.md), template in [TemplateController.swift](docs/swift/TemplateController/TemplateController.swift) |
+| Checking whether a feature exists on iOS, on the Mac or in official Telegram | [docs/feature-parity.md](docs/feature-parity.md) (identical in both repos; update the row when a feature lands) |
 
 
 ## Architecture Overview

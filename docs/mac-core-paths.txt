@@ -91,6 +91,7 @@ share submodules/HardenedMedia
 # A change to one side must land on the other the same day.
 mirror ios=submodules/AnimatedStickerNode/VP9Hardware/Sources/VP9HardwareDecoder.swift mac=packages/VP9Hardware/Sources/VP9Hardware/VP9HardwareDecoder.swift
 mirror ios=submodules/AnimatedStickerNode/VP9Hardware/Sources/WebMStickerDemuxer.swift mac=packages/VP9Hardware/Sources/VP9Hardware/WebMStickerDemuxer.swift
+mirror ios=docs/feature-parity.md mac=docs/feature-parity.md
 
 # Intended WebRTC differences
 allow webrtc api/peer_connection_interface.cc | iOS TGCALLS seam (disable_payload_type_demuxing, external transport security, dtls factory)

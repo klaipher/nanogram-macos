@@ -104,7 +104,7 @@ class ConfigTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[3]
         config = parity.load_config(root)
         names = {m.ios.rsplit("/", 1)[-1] for m in config.mirrors}
-        self.assertEqual(names, {"VP9HardwareDecoder.swift", "WebMStickerDemuxer.swift"})
+        self.assertEqual(names, {"VP9HardwareDecoder.swift", "WebMStickerDemuxer.swift", "feature-parity.md"})
         for mirror in config.mirrors:
             self.assertEqual(mirror.ios.rsplit("/", 1)[-1], mirror.mac.rsplit("/", 1)[-1])
 
