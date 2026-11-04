@@ -880,6 +880,13 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
     
     public static let pushReadyTimeout: Double = 2.0
 
+    public private(set) var pendingController: ViewController?
+
+    public func cancelPendingPush() {
+        pendingController = nil
+        pushDisposable.set(nil)
+    }
+
     open func push(_ controller:ViewController, _ animated:Bool = true, style: ViewControllerStyle? = nil, clearStack: Bool = false) -> Void {
         
 //        if isLocked {
@@ -898,9 +905,13 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
         controller.loadViewIfNeeded(self.bounds)
         self.controller.readyToDetach()
         let pushSignpost = PerformanceSignposts.OneShot("navigationPushToReady")
+        self.pendingController = controller
         self.pushDisposable.set((controller.ready.get() |> take(1) |> timeout(NavigationViewController.pushReadyTimeout, queue: .mainQueue(), alternate: .single(true))).start(next: {[weak self] _ in
             pushSignpost.end()
             if let strongSelf = self {
+                if strongSelf.pendingController === controller {
+                    strongSelf.pendingController = nil
+                }
                 controller.navigationController = strongSelf
                 
                 if let index = strongSelf.stack.firstIndex(of: controller) {

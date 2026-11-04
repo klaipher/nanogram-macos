@@ -826,6 +826,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }
         
         if changedFolder {
+            self.cancelPendingForumPush(newLocationPeerId: nil, folderChanged: true)
             self.removeRevealStateIfNeeded(nil)
             self.genericView.tableView.scroll(to: .up(true))
             self.folderUpdatesDisposable.set(context.engine.peers.pollChatFolderUpdates(folderId: ChatListUIHooks.shared.chatListFilterId(data.filter)).start())
@@ -833,6 +834,18 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }
 
         setCenterTitle(self.defaultBarTitle)
+    }
+    
+    private func cancelPendingForumPush(newLocationPeerId: PeerId?, folderChanged: Bool) {
+        guard let navigation = self.navigationController, navigation.controller === self else {
+            return
+        }
+        guard let pending = navigation.pendingController as? ChatListControllerKind else {
+            return
+        }
+        if ChatListPendingPushPolicy.cancels(pendingMode: pending.mode, newLocationPeerId: newLocationPeerId, folderChanged: folderChanged) {
+            navigation.cancelPendingPush()
+        }
     }
     
     private let previousChatList:Atomic<EngineChatList?> = Atomic(value: nil)
@@ -882,7 +895,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let initialSize = self.atomicSize
         let context = self.context
-        DispatchQueue.main.asyncAfter(deadline: .now() + ChatListReadiness.fallbackDelay, execute: { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + ChatListReadiness.fallbackDelay(mode: self.mode), execute: { [weak self] in
             self?.readyOnce()
         })
         let pressureSource = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
@@ -1024,6 +1037,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         globalPeerDisposable.set(context.globalPeerHandler.get().start(next: { [weak self] location in
             if previousLocation.swap(location) != location {
                 self?.removeRevealStateIfNeeded(nil)
+                self?.cancelPendingForumPush(newLocationPeerId: location?.peerId, folderChanged: false)
             }
             
             self?.removeHighlightEvents()
@@ -1038,33 +1052,61 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let recentViews = self.recentViews
         let folderSwitchSignpost = self.folderSwitchSignpost
-        let chatHistoryView: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?), NoError> = filterSignal |> distinctUntilChanged(isEqual: { lhs, rhs in
+        let replayedCached = Atomic<Bool>(value: false)
+        let chatHistoryView: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool), NoError> = filterSignal |> distinctUntilChanged(isEqual: { lhs, rhs in
             return lhs.filter == rhs.filter && lhs.request == rhs.request
         }) |> mapToSignal { data in
             
             let folderUpdates: Signal<ChatFolderUpdates?, NoError> = .single(nil) |> then(context.engine.peers.subscribedChatFolderUpdates(folderId: ChatListUIHooks.shared.chatListFilterId(data.filter)))
             let signal = combineLatest(folderUpdates, chatListViewForLocation(chatListLocation: mode.location, location: data.request, filter: data.filter, account: context.account))
-            let live: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?), NoError> = signal |> map { updates, view in
+            let live: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool), NoError> = signal |> map { updates, view in
                 if case .Initial = data.request {
+                    let now = CACurrentMediaTime()
                     _ = recentViews.modify { cache in
                         var cache = cache
-                        cache.put(data.filter, view)
+                        cache.put(data.filter, view, at: now)
                         return cache
                     }
                 }
-                return (view, data, false, updates)
+                return (view, data, false, updates, false)
+            }
+            let usesCache: Bool
+            switch data.request {
+            case let .Initial(_, scrollState):
+                usesCache = ChatListCachedReplay.usesCache(isInitialRequest: true, hasScrollPosition: scrollState != nil)
+            case .Index:
+                usesCache = false
             }
             var cached: ChatListViewUpdate?
-            if case .Initial = data.request {
-                cached = recentViews.with { $0.peek(data.filter) }
+            if usesCache {
+                let now = CACurrentMediaTime()
+                cached = recentViews.with { $0.fresh(data.filter, now: now, maxAge: ChatListCachedReplay.maxAge) }
             }
             let isSwitch = chatListAppliedOnce.with { $0 }
             if let cached, !cached.list.items.isEmpty {
                 if isSwitch {
                     _ = folderSwitchSignpost.swap(PerformanceSignposts.OneShot("chatListFolderSwitchCached"))?.end()
                 }
-                let first: Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?), NoError> = .single((cached, data, false, nil))
-                return first |> then(live)
+                let cachedValue: (ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool) = (cached, data, false, nil, true)
+                return Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool), NoError> { subscriber in
+                    var gate = ChatListCachedReplayGate()
+                    let cachedDisposable = (Signal<Void, NoError>.single(Void()) |> delay(ChatListCachedReplay.delay, queue: prepareQueue)).start(next: { _ in
+                        if gate.shouldEmitCached() {
+                            subscriber.putNext(cachedValue)
+                        }
+                    })
+                    let liveDisposable = (live |> deliverOn(prepareQueue)).start(next: { value in
+                        gate.liveArrived()
+                        cachedDisposable.dispose()
+                        subscriber.putNext(value)
+                    }, completed: {
+                        subscriber.putCompletion()
+                    })
+                    return ActionDisposable {
+                        cachedDisposable.dispose()
+                        liveDisposable.dispose()
+                    }
+                }
             }
             if isSwitch {
                 _ = folderSwitchSignpost.swap(PerformanceSignposts.OneShot("chatListFolderSwitchLive"))?.end()
@@ -1308,6 +1350,12 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             var animated = animated.swap(true)
 
             if catchesUpAfterHidden {
+                animated = false
+            }
+
+            if value.4 {
+                _ = replayedCached.swap(true)
+            } else if replayedCached.swap(false) {
                 animated = false
             }
                         
