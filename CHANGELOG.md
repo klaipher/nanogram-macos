@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- Latency (investigation `perf/chat-open-latency`): the shared `prepareQueue` (chat list, forum topics, chat history side lists, panels: ~130 call sites) ran at `.utility` QoS, so row/text preparation for first display was scheduled on efficiency cores and starved under load; it now runs at `.userInitiated`. Microbenchmark of 400 CoreText layouts on this Mac under heavy load (load average ~50): `.utility` median 30.3-65.9 ms, max 1383 ms; `.userInitiated` median 15.5-18.1 ms, max 20 ms. Test `ChatListUITests/PrepareQueueQosTests`.
+- Signposts (subsystem = bundle id, category Performance): `chatOpenToReady` (ChatController init to `ready`), `chatListToFirstTransition` (ChatListController, also forum topics, init to first applied transition), `tableMerge` (every `TableView.merge`), next to the existing `chatListPrepareEntries` and `chatHistoryEntriesForView`. Record with `xctrace record --template 'Time Profiler' --instrument os_signpost`.
 - Chat input: the sticker/emoji button no longer stays highlighted after the panel is closed with the same button (the button state now follows the requested open/closed state, not the sidebar that is still animating out).
 
 ### App icon

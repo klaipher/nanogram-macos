@@ -1301,8 +1301,10 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         
         
+        let firstListSignpost = PerformanceSignposts.OneShot("chatListToFirstTransition")
         let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition, pageWindow, pageKey -> Signal<Void, NoError> in
             self?.enqueueTransition(transition)
+            firstListSignpost.end()
             _ = chatListAppliedOnce.swap(true)
             self?.chatListPageApplied(window: pageWindow, key: pageKey)
             return .complete()

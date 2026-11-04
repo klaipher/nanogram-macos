@@ -8875,8 +8875,13 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         //self.ready.set(.single(true))
         
+        let openSignpost = PerformanceSignposts.OneShot("chatOpenToReady")
         self.ready.set(combine |> map { (hReady, appearanceReady, _, iReady, monoforumReady) in
-            return hReady && iReady && appearanceReady && monoforumReady
+            let isReady = hReady && iReady && appearanceReady && monoforumReady
+            if isReady {
+                openSignpost.end()
+            }
+            return isReady
         })
         
         
