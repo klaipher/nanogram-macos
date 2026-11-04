@@ -1726,6 +1726,7 @@ public class GalleryViewer: NSResponder {
         readyDispose.set(nil)
         didSetReady = false
         NotificationCenter.default.removeObserver(self)
+        (pager.selectedItem as? MGalleryVideoItem)?.deactivateMediaControls()
         if animated {
             let presentationGeneration = self.presentationGeneration
             closeSequence.close(startAnimation: {

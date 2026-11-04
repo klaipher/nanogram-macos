@@ -243,6 +243,7 @@ fileprivate class ModernPictureInPictureVideoWindow: NSPanel {
         window = nil
         if control.isPictureInPicture {
             control.pause()
+            control.didExit()
         }
     }
 
