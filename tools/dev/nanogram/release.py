@@ -339,7 +339,8 @@ def set_build_number(archive_path: Path, build: str, app_entitlements: Path | No
     re-signed with the identity they had (the app with `app_entitlements` when given); export signs them for
     distribution."""
     app = archived_app(archive_path)
-    for bundle in sorted((app / "Contents" / "PlugIns").glob("*.appex")) + [app]:
+    nested = sorted((app / "Contents" / "PlugIns").glob("*.appex")) + sorted((app / "Contents" / "XPCServices").glob("*.xpc"))
+    for bundle in nested + [app]:
         _set_plist_value(bundle / "Contents" / "Info.plist", ("CFBundleVersion",), build)
         _resign(bundle, app_entitlements if bundle == app else None)
     _set_plist_value(Path(archive_path) / "Info.plist", ("ApplicationProperties", "CFBundleVersion"), build)

@@ -205,6 +205,24 @@ class BuildNumberStampTests(unittest.TestCase):
             self.assertEqual([c.args for c in resign.call_args_list], [(appex, None), (app, entitlements)])
 
 
+class DecoderServiceStampTests(unittest.TestCase):
+    def test_set_build_number_stamps_and_resigns_the_decoder_service_before_the_app(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "Nanogram.xcarchive"
+            app = archive / "Products" / "Applications" / "Nanogram.app"
+            xpc = app / "Contents" / "XPCServices" / "NanogramDecoder.xpc"
+            for bundle in (app, xpc):
+                (bundle / "Contents").mkdir(parents=True)
+                (bundle / "Contents" / "Info.plist").write_bytes(plistlib.dumps({"CFBundleVersion": "283357"}))
+            (archive / "Info.plist").write_bytes(plistlib.dumps(
+                {"ApplicationProperties": {"CFBundleVersion": "283357", "ApplicationPath": "Applications/Nanogram.app"}}))
+            entitlements = Path(tmp) / "MAS.entitlements"
+            with mock.patch.object(release, "_resign") as resign:
+                release.set_build_number(archive, "4242", entitlements)
+            self.assertEqual(plistlib.loads((xpc / "Contents" / "Info.plist").read_bytes())["CFBundleVersion"], "4242")
+            self.assertEqual([c.args for c in resign.call_args_list], [(xpc, None), (app, entitlements)])
+
+
 def fake_app(root: Path) -> Path:
     app = root / "Nanogram.app"
     for path in ("Contents/MacOS/Nanogram", "Contents/PlugIns/Share.appex/Contents/MacOS/Share"):

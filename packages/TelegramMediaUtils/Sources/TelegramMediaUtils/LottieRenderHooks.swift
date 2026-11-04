@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 public protocol LottieFrameRenderer: AnyObject {
     func renderFrame(with index: Int32, into buffer: UnsafeMutablePointer<UInt8>, width: Int32, height: Int32, bytesPerRow: Int32)
@@ -22,6 +23,20 @@ public struct LottieRenderHooks {
     }
 
     public static func install(_ hooks: LottieRenderHooks) {
+        installed = hooks
+    }
+}
+
+public struct StickerImageDecodeHooks {
+    public let decodeFitting: (Data, CGSize) -> CGImage?
+
+    public init(decodeFitting: @escaping (Data, CGSize) -> CGImage?) {
+        self.decodeFitting = decodeFitting
+    }
+
+    public private(set) static var installed: StickerImageDecodeHooks?
+
+    public static func install(_ hooks: StickerImageDecodeHooks?) {
         installed = hooks
     }
 }

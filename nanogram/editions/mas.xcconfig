@@ -10,6 +10,7 @@
 NANOGRAM_MAS_ENTITLEMENTS = nanogram/entitlements/Nanogram-MAS-Development.entitlements
 NANOGRAM_ENTITLEMENTS_Telegram = $(NANOGRAM_MAS_ENTITLEMENTS)
 NANOGRAM_ENTITLEMENTS_TelegramShare = nanogram/entitlements/NanogramShare.entitlements
+NANOGRAM_ENTITLEMENTS_NanogramDecoder = nanogram/entitlements/NanogramDecoder.entitlements
 CODE_SIGN_ENTITLEMENTS = $(NANOGRAM_ENTITLEMENTS_$(TARGET_NAME):default=$(inherited))
 
 NANOGRAM_EDITION_EXCLUDED_FILES = Sparkle.framework
