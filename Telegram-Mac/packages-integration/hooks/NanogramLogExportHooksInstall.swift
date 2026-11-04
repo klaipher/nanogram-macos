@@ -165,8 +165,10 @@ private func nanogramLogCollector(_ kind: NanogramLogExportKind) -> NanogramLogC
             return nanogramCrashReportStore.allReports().map { $0.url }
         }
     case .metricKit:
+        let logs = ApiEnvironment.containerURL?.appendingPathComponent("logs", isDirectory: true)
+        let ledger = logs.map { NanogramLogExportSpec.current(.metricKit).ledgerSources(logsDirectory: $0) } ?? []
         return {
-            return MetricReportStore.shared.reports().map { URL(fileURLWithPath: $0.path) }
+            return MetricReportStore.shared.reports().map { URL(fileURLWithPath: $0.path) } + ledger
         }
     }
 }

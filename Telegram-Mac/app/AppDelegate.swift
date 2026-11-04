@@ -252,6 +252,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     private var memoryPressureMonitor: MemoryPressureMonitor?
     private var cacheMaintenanceScheduler: CacheMaintenanceScheduler?
     private var rustEngineCrash: CrashedRun?
+    private var diskWriteReports: DiskWriteReports?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         TGUIKitAccessibility.isEnabled = FastSettings.accessibilityTreeEffective
@@ -337,6 +338,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
             self.containerUrl = containerUrl.path
             setupLogger(containerPath: containerUrl.path)
             recoverFromCrashOnLaunchIfNeeded(containerPath: containerUrl.path)
+            startDiskWriteReports(containerPath: containerUrl.path)
         }
         
         initializeSelectManager()
@@ -1446,6 +1448,16 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         Logger.setSharedLogger(logger)
     }
     
+    /// The shared Postbox counts every write (DiskWriteAccounting); this logs the counters and keeps the per-day ledger
+    /// `logs/disk-writes.json`, which Send MetricKit Reports exports (as on iOS).
+    private func startDiskWriteReports(containerPath: String) {
+        let reports = DiskWriteReports(ledgerPath: DiskWriteReportSchedule.ledgerPath(containerPath: containerPath), log: { line in
+            Logger.shared.log("App", line)
+        })
+        reports.start()
+        self.diskWriteReports = reports
+    }
+    
     private func recoverFromCrashOnLaunchIfNeeded(containerPath: String) {
         let marker = readCrashMarker(folder: containerPath)
         self.rustEngineCrash = marker?.crashedRun(onThread: rustEngineOwnsThread(named:), orQueue: rustEngineOwnsQueue(label:))
@@ -1559,6 +1571,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     func applicationDidBecomeActive(_ notification: Notification) {
         updatePeerPresence()
+        self.diskWriteReports?.report(reason: "foreground")
     }
     
     func tryApplyAutologinToken(_ url: String) -> String? {
@@ -1675,6 +1688,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     func applicationDidResignActive(_ notification: Notification) {
         updatePeerPresence()
+        self.diskWriteReports?.report(reason: "background")
 
         if viewer != nil, NSScreen.main == viewer?.window.screen {
             viewer?.window.orderOut(nil)
