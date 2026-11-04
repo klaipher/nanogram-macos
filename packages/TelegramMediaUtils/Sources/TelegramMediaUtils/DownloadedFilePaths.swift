@@ -8,8 +8,11 @@ import InAppSettings
 import TelegramTheme
 
 public func copyToDownloads(_ file: TelegramMediaFile, postbox: Postbox, saveAnyway: Bool = false) -> Signal<String?, NoError>  {
-    let path = downloadFilePath(file, postbox)
-    return combineLatest(queue: resourcesQueue, path, downloadedFilePaths(postbox)) |> map { (expanded, paths) in
+    let path = downloadFilePath(file, postbox) |> mapToSignal { expanded -> Signal<((String, String)?, AutomaticMediaDownloadSettings), NoError> in
+        return automaticDownloadSettings(postbox: postbox) |> take(1) |> map { (expanded, $0) }
+    }
+    return combineLatest(queue: resourcesQueue, path, downloadedFilePaths(postbox)) |> map { (expandedAndSettings, paths) in
+        let (expanded, settings) = expandedAndSettings
         guard case (let boxPath, var adopted)? = expanded else {
             return nil
         }
@@ -20,15 +23,19 @@ public func copyToDownloads(_ file: TelegramMediaFile, postbox: Postbox, saveAny
                 return path.downloadedPath
             }
         }
-        var i:Int = 1
-        let deletedPathExt = adopted.nsstring.deletingPathExtension
-        while FileManager.default.fileExists(atPath: adopted, isDirectory: nil) {
-            let ext = adopted.nsstring.pathExtension
-            adopted = "\(deletedPathExt) (\(i)).\(ext)"
-            i += 1
-        }
-        
-        try? FileManager.default.copyItem(atPath: boxPath, toPath: adopted)
+        DownloadFolderAccess.withAccess(settings, refreshed: { data in
+            DownloadFolderAccess.storeRefreshed(data, forFolder: settings.downloadFolder, postbox: postbox)
+        }, {
+            var i:Int = 1
+            let deletedPathExt = adopted.nsstring.deletingPathExtension
+            while FileManager.default.fileExists(atPath: adopted, isDirectory: nil) {
+                let ext = adopted.nsstring.pathExtension
+                adopted = "\(deletedPathExt) (\(i)).\(ext)"
+                i += 1
+            }
+            
+            try? FileManager.default.copyItem(atPath: boxPath, toPath: adopted)
+        })
 
         let quarantineData = "does not really matter what is here".cString(using: String.Encoding.utf8)!
         _ = Int(strlen(quarantineData))

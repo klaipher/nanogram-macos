@@ -63,6 +63,23 @@ class CompilerHardeningTests(unittest.TestCase):
         self.assertIn("av1_videotoolbox", re.search(r"--enable-hwaccel=(\S+)", script).group(1))
 
 
+class DownloadFolderBookmarkTests(unittest.TestCase):
+    def test_sandboxed_editions_can_keep_a_security_scoped_download_folder(self):
+        for base in BASES:
+            for suffix in ("", "-EnhancedSecurity"):
+                name = base + suffix
+                path = ENTITLEMENTS / f"{name}.entitlements"
+                if not path.exists():
+                    continue
+                self.assertIs(entitlements(name).get("com.apple.security.files.bookmarks.app-scope"), True, name)
+
+    def test_folder_picker_stores_a_bookmark(self):
+        panels = (ROOT / "packages" / "FilePanels" / "Sources" / "FilePanels" / "FilePanels.swift").read_text()
+        self.assertIn("bookmarkData(options: .withSecurityScope", panels)
+        data_ui = (ROOT / "packages" / "DataUsageUI" / "Sources" / "DataUsageUI" / "DataAndStorageViewController.swift").read_text()
+        self.assertIn("selectFolderWithBookmark", data_ui)
+
+
 class EnhancedSecurityTests(unittest.TestCase):
     def test_variants_are_the_base_plus_the_soft_mode_keys(self):
         for base in BASES:
