@@ -95,6 +95,8 @@ static NSString *telegramApplicationSecretKey = @"telegramApplicationSecretKey_v
     NSData * _Nonnull iv;
     NSString * _Nullable _passcode;
     NanogramKeyVault * _Nullable _vault;
+    BOOL _storeUnavailable;
+    NanogramVaultOutcome _lastOutcome;
 }
 
 @end
@@ -148,6 +150,7 @@ static NSObject *sharedWrapKeyStoreLock = nil;
         } else if ([NSFileManager.defaultManager fileExistsAtPath:[self vaultPath]]) {
             NanogramMemoryWrapKeyStore *unavailable = [[NanogramMemoryWrapKeyStore alloc] init];
             unavailable.unavailable = YES;
+            self->_storeUnavailable = YES;
             self->_vault = [[NanogramKeyVault alloc] initWithPath:[self vaultPath] store:unavailable iterations:iterations];
             NSLog(@"DatabaseKey: the key vault exists but the keychain is not available in this process");
         }
@@ -160,6 +163,10 @@ static NSObject *sharedWrapKeyStoreLock = nil;
         }
     }
     return self;
+}
+
+-(BOOL)keychainUnavailable {
+    return (self->_vault != nil && self->_storeUnavailable) || self->_lastOutcome == NanogramVaultOutcomeKeychainUnavailable;
 }
 
 -(NSString *)vaultPath {
@@ -184,6 +191,7 @@ static NSObject *sharedWrapKeyStoreLock = nil;
     } removeLegacy:^{
         [[NSFileManager defaultManager] removeItemAtPath:self.path error:nil];
     } create:create];
+    self->_lastOutcome = result.outcome;
     if (result.outcome != NanogramVaultOutcomeOK || result.payload.length != 48) {
         return nil;
     }

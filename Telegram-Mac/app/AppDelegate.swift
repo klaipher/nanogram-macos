@@ -446,8 +446,6 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         System.updateScaleFactor(window.backingScaleFactor)
         window.minSize = NSMakeSize(400, 550)
         
-        let appEncryption = AppEncryptionParameters(path: rootPath)
-
         let accountManager = AccountManager<TelegramAccountManagerTypes>(basePath: containerUrl + "/accounts-metadata", isTemporary: false, isReadOnly: false, useCaches: true, removeDatabaseOnError: true, accessChallenge: makeAccountManagerAccessChallenge(basePath: containerUrl + "/accounts-metadata", isTemporary: false, isReadOnly: false))
 
         if let crash = self.rustEngineCrash {
@@ -455,9 +453,34 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
             let _ = recordRustEngineCrash(accountManager: accountManager, appVersion: ApiEnvironment.version, crashedBundleVersion: crash.bundleVersion, timestamp: crash.timestamp).startStandalone()
         }
 
+        self.unlockAndLaunch(rootPath: rootPath, window: window, accountManager: accountManager)
+    }
+    
+    /// Opens the database key and starts the app. The passcode screen is only for a real passcode: when the
+    /// key vault exists but the Keychain cannot be reached, the user gets Retry / Quit, never the passcode
+    /// screen (where no passcode works and logging out would delete the whole container).
+    private func unlockAndLaunch(rootPath: String, window: Window, accountManager: AccountManager<TelegramAccountManagerTypes>) {
+        let appEncryption = AppEncryptionParameters(path: rootPath)
         if let deviceSpecificEncryptionParameters = appEncryption.decrypt() {
             let parameters = ValueBoxEncryptionParameters(forceEncryptionIfNoSet: true, key: ValueBoxEncryptionParameters.Key(data: deviceSpecificEncryptionParameters.key)!, salt: ValueBoxEncryptionParameters.Salt(data: deviceSpecificEncryptionParameters.salt)!)
             self.launchApp(accountManager: accountManager, encryptionParameters: parameters, appEncryption: appEncryption)
+        } else if appEncryption.keychainUnavailable {
+            self.window.makeKeyAndOrderFront(self)
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.alertStyle = .critical
+            alert.messageText = "Nanogram can't access its key in the Keychain"
+            alert.informativeText = "Your data is safe and has not been changed. Make sure you are logged in and the Keychain is unlocked, then try again."
+            alert.addButton(withTitle: "Retry")
+            alert.addButton(withTitle: "Quit")
+            if alert.runModal() == .alertFirstButtonReturn {
+                _ = AppEncryptionParameters.enableKeychainWrapping(withAccessGroup: ApiEnvironment.group)
+                DispatchQueue.main.async { [weak self] in
+                    self?.unlockAndLaunch(rootPath: rootPath, window: window, accountManager: accountManager)
+                }
+            } else {
+                NSApp.terminate(nil)
+            }
         } else {
             
             
