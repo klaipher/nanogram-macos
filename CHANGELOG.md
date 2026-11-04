@@ -2,6 +2,44 @@
 
 Nanogram for macOS releases, newest first.
 
+## 13.1.0 (202611041127) — 2026-11-04
+
+Source: `nanogram/integration` @ de638f4e · core `klaipher/nanogram` `main` @ 7a042ffd (was `mac/core` d3e0d01029; `mac/core` retired as `mac/core-legacy`) · tgcalls `klaipher/tgcalls` `nanogram-shared` @ 54220d6c (was `nanogram-mac` a598e27) · tg_owt `klaipher/tg_owt` `nanogram-mac` @ b6161528 (was c31956f2).
+Artifacts: `Nanogram-13.1.0-202611041127.dmg` (Developer ID, notarized, stapled; Sparkle EdDSA-signed), `appcast.xml`, `Nanogram-13.1.0-202611041127-source.tar.gz`. No Mac TestFlight upload (direct edition only, by owner decision).
+Marketing version back to 13.1.0 to match upstream Telegram for macOS (8631ca5c); Sparkle compares the build number, so 202611041127 updates 13.1.1 (202611032053).
+Changes since 13.1.1 (2468ea83): `git log 2468ea83..de638f4e`; core: the Mac now builds the shared iOS core (`klaipher/nanogram` main), see that repo's CHANGELOG.md for the core changes.
+
+### Shared codebase (one core, one tgcalls for iOS and Mac)
+- Core: Mac core merged into iOS main (43 conflicting files, Mac-only behaviour behind `#if os(macOS)`), Mac pinned to iOS main; `mac/core` kept as `mac/core-legacy` with a verified bundle backup; Telegram-history refs deleted from the local core gitdirs (32,367 → 417 commits, ~1.7 GB) (c0665cfa, db7a954d).
+- tgcalls: iOS and Mac branches merged into `nanogram-shared`; one switch class `CallsRuntimeSwitches`, one Streams & Calls Debug Settings section, low-risk fixes always on (ad0e3fb5).
+- Parity gate `tg parity` (tools/dev/parity, docs/mac-core-paths.txt): history roots, published pins, equal tgcalls/rlottie/tlottie SHAs, core lag, shared-file and WebRTC allow-lists; catches drift in cherry-picks and merges (c37a0ac6, b7df3fa3, 28bfa39b, 607cf483).
+- Shared native-library versions and flags (`native-libs.json`) with drift check; per-module Swift settings table (7148e7fa); flatc 25.12.19 to match the merged FlatBuffers.
+- Shared cache cleanup `tools/dev/cachegc`, run after build/test commands, no scheduled job; keeps released builds and dSYMs (b752019e, b7df3fa3).
+- tg_owt from the public fork `klaipher/tg_owt` (630edb80); 12 tg_owt security/crash fixes are now also on iOS WebRTC.
+
+### Keychain
+- No more prompt from official Telegram: each edition has its own keychain scope, mini apps stop sharing Telegram's names, release builds keep their items apart from official Telegram's (4fd4449e, 94830dab).
+
+### Calls
+- Batch A video: call background stops animating behind video, camera/decoder options, group remote video capped (c500ab1e); Batch B audio: group noise mode, mic gain, workgroup (3e497072); Batch C: hidden call windows pause video, thermal and Low Power steps, livestream decode suspend, calmer animation timers (0eb6c224); urgent Mac call fixes (864c2d8c); hidden-livestream flush fix (09abd2c3); review fixes (20cfaacc); IO workgroup join removed by owner decision (db7a954d).
+
+### Media and UI
+- GIFs: MPEG-4 Part 2 GIFs play in the GIF panel, inline results and shared media (0abaa144); small silent videos stay GIFs, silent videos over 10 MB go as videos (c077d8d3, b327a6cb).
+- Gallery: no flicker while a history update is queued (e13af489), Live Text button works (166e3c56), deferred release schedule (c39e688f), viewer preload uses the message location (92ee340c, c7072bf1).
+- Tab bar switches instantly instead of crossfading two transparent panes (fe3870f9).
+- Chat list reveal relayout cut, emoji images off main, scroll hover work, same-frame settings pane (79375150); review fixes (e73fde7b).
+- HLS: ChunkMediaPlayerV2 plays MediaBox-range parts, matching the core's write-once HLS (de638f4e).
+
+### Sending and memory
+- Pending sends never hang (thumbnail, transform, lost answer), with logging (0bc0378a, 8ca218e7, 7806a648, cc84f86a).
+- Leak fixes ported from iOS: view-once video subscription (ff8325d2), member-list admins disposable (6c1381b8), external video loader (d41f94c2), inline custom emoji cache cap and purge (c8890965); share extension maps files and downsamples without full decodes (2de7059a).
+
+### Launch
+- Launch order file effective: 371 of 373 functions lead (4cc4a3d4, 92ee340c).
+
+### Checks
+- `tools/dev/tests/run.sh`: 464 passed, 11 skipped; `orderfile.py --check` on the dSYM: 371/373 leading; Gatekeeper: accepted, Notarized Developer ID.
+
 ## 13.1.1 (202611032053) — 2026-11-03
 
 Source: `nanogram/integration` @ 2468ea83 · core `klaipher/nanogram` `mac/core` @ d3e0d01029 (was a1f42cdb0d) · tgcalls `klaipher/tgcalls` `nanogram-mac` @ a598e27 · tg_owt c31956f2 (all unchanged except the core).
