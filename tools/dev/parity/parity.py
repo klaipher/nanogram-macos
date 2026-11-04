@@ -10,6 +10,9 @@ identical in both. Standard library only.
   parity.py push    [--root DIR] REMOTE [URL]               pre-push hook body (reads refs on stdin)
   parity.py suggest-allow [--root DIR]                      print webrtc allow lines for the current differences
 
+`mirror ios=<file> mac=<file>` lines in the paths file name files that exist as identical copies in both repos
+(blob ids are compared: an error on the Mac side, a warning on the iOS side).
+
 The side is detected from the checkout: a Mac checkout has the core submodule at the path of the `core` directive.
 Exit status 1 when any check reports an error.
 """
@@ -51,6 +54,13 @@ class Pin:
 
 
 @dataclass
+class Mirror:
+    ios: str
+    mac: str
+    warn_until: datetime.date | None = None
+
+
+@dataclass
 class Config:
     core_path: str = "submodules/telegram-ios"
     core_roots: list[str] = field(default_factory=list)
@@ -63,6 +73,7 @@ class Config:
     block_from: datetime.date | None = None
     pins: list[Pin] = field(default_factory=list)
     shares: list[str] = field(default_factory=list)
+    mirrors: list[Mirror] = field(default_factory=list)
     allows: list[Allow] = field(default_factory=list)
     webrtc_mac_root: str = "src"
     webrtc_ios_root: str = ""
@@ -120,6 +131,13 @@ def parse_config(text: str) -> Config:
                                    datetime.date.fromisoformat(until) if until else None))
         elif key == "share":
             config.shares.append(rest[0].rstrip("/"))
+        elif key == "mirror":
+            options = dict(item.split("=", 1) for item in rest if "=" in item)
+            if not options.get("ios") or not options.get("mac"):
+                raise bad("mirror ios=<file in the iOS repo> mac=<file in the Mac repo> [warn-until=YYYY-MM-DD]")
+            until = options.get("warn-until")
+            config.mirrors.append(Mirror(options["ios"].rstrip("/"), options["mac"].rstrip("/"),
+                                         datetime.date.fromisoformat(until) if until else None))
         elif key == "webrtc-root":
             options = dict(item.split("=", 1) for item in rest)
             config.webrtc_mac_root = options.get("mac", config.webrtc_mac_root).strip("/")
@@ -187,6 +205,36 @@ def gitlink(repo: Path, ref: str, path: str) -> str | None:
         return None
     mode, kind, sha = out.split(None, 3)[:3]
     return sha if mode == "160000" else None
+
+
+def blob_at(repo: Path, ref: str, path: str) -> str | None:
+    """The blob id of a regular file at `ref`, or None when the path is missing or not a file."""
+    out = git(repo, "ls-tree", ref, "--", path, check=False).strip()
+    if not out:
+        return None
+    meta = out.split("\t", 1)[0].split()
+    return meta[2] if len(meta) == 3 and meta[0] in ("100644", "100755") and meta[1] == "blob" else None
+
+
+def mirror_name(mirror: Mirror) -> str:
+    return "mirror-" + mirror.ios.rsplit("/", 1)[-1]
+
+
+def check_mirror(report: Report, mirror: Mirror, ios_blob: str | None, mac_blob: str | None, today: datetime.date,
+                 blocking: bool) -> None:
+    """Two files that are meant to stay byte-identical (copies kept in both repos, e.g. VP9Hardware)."""
+    name = mirror_name(mirror)
+    if ios_blob is None or mac_blob is None:
+        missing = [label for label, blob in (("iOS", ios_blob), ("Mac", mac_blob)) if blob is None]
+        report.warn(name, f"cannot compare {mirror.ios} with {mirror.mac}: not readable on the {' and '.join(missing)} side")
+    elif ios_blob == mac_blob:
+        report.ok(name, f"{mirror.ios} and {mirror.mac} are identical ({ios_blob[:10]})")
+    else:
+        soft = mirror.warn_until is not None and today <= mirror.warn_until
+        message = (f"{mirror.ios} (iOS {ios_blob[:10]}) and {mirror.mac} (Mac {mac_blob[:10]}) must stay identical; "
+                   "port the change to the other side"
+                   + (f" (warning until {mirror.warn_until})" if soft else ""))
+        (report.warn if soft or not blocking else report.error)(name, message)
 
 
 def file_exists_at(repo: Path, ref: str, path: str) -> str | None:
@@ -501,6 +549,10 @@ def check_mac(root: Path, config: Config, today: datetime.date, release: bool = 
                 "pin-equal-" + entry.name, f"{entry.name} differs: Mac {mac_sha[:10]}, iOS {theirs[:10]} ({source}); bring them to one SHA"
                 + (f" (warning until {entry.warn_until})" if soft_pin else ""))
 
+    for mirror in config.mirrors:
+        # The iOS side is the core at the pin: that is the copy this Mac build would use.
+        check_mirror(report, mirror, blob_at(core, pin, mirror.ios), blob_at(root, "HEAD", mirror.mac), today, True)
+
     web = next((p for p in config.pins if p.name == "webrtc"), None)
     if web:
         mac_sha = gitlink(root, "HEAD", web.mac)
@@ -545,12 +597,21 @@ def ios_pins_published(report: Report, root: Path, config: Config, ref: str = "H
             report.warn("pin-" + entry.name, f"{sha[:10]} is not on a {config.remote_owner} remote ({where})")
 
 
-def check_ios(root: Path, config: Config, mac_repo: Path | None = None, revs: list[str] | None = None) -> Report:
+def check_ios(root: Path, config: Config, mac_repo: Path | None = None, revs: list[str] | None = None,
+              today: datetime.date | None = None) -> Report:
     report = Report()
     check_roots(report, "history-root", root, revs or ["HEAD"], config.repo_roots.get("ios", []))
     ios_pins_published(report, root, config)
     mac_repo = mac_repo or default_mac_repo(root)
     if mac_repo is not None:
+        for mirror in config.mirrors:
+            theirs = None
+            for ref in ("nanogram/integration", "HEAD"):
+                theirs = blob_at(mac_repo, ref, mirror.mac)
+                if theirs:
+                    break
+            # Never blocks iOS: the Mac side fails its own check until it takes the same file.
+            check_mirror(report, mirror, blob_at(root, "HEAD", mirror.ios), theirs, today or datetime.date.today(), False)
         for entry in config.pins:
             if entry.name == "webrtc" or not entry.ios or not entry.mac or entry.external:
                 continue
@@ -608,6 +669,11 @@ def push_hook(root: Path, remote: str, stdin_text: str, today: datetime.date) ->
             ios_pins_published(report, root, config, local_sha, base)
             if base:
                 shared = touches_shared(root, config, base, local_sha)
+                changed = set(git(root, "diff", "--name-only", "--no-renames", base, local_sha, check=False).split("\n"))
+                copied = [m.ios for m in config.mirrors if m.ios in changed]
+                if copied:
+                    report.warn("mirror-paths", f"this push changes {len(copied)} file(s) the Mac keeps an identical copy of "
+                                f"(e.g. {copied[0]}); apply the same change on the Mac side")
                 if shared:
                     report.warn("shared-paths", f"this push changes {len(shared)} path(s) the Mac shares (e.g. {shared[0]}); "
                                 "run tools/dev/tg core-bump on the Mac side the same day")
@@ -668,10 +734,10 @@ def main(argv: list[str] | None = None) -> int:
             repo = root / config.core_path if args.side == "mac-core" else root
             check_roots(report, "roots", repo, args.revs, allowed)
         elif args.command == "fast":
-            report = check_ios(root, config, args.mac_repo)
+            report = check_ios(root, config, args.mac_repo, today=args.today)
         else:
             if not (root / config.core_path / ".git").exists():
-                report = check_ios(root, config)
+                report = check_ios(root, config, today=args.today)
             else:
                 report = check_mac(root, config, args.today, args.release, args.pin, args.ios_repo, args.ios_ref)
     except ParityError as error:

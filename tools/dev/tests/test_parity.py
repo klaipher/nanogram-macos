@@ -68,6 +68,16 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.shares, ["submodules/Postbox", "submodules/TelegramCore"])
         self.assertEqual(config.allows[-1].until, datetime.date(2026, 12, 1))
 
+    def test_mirror_lines_name_both_files(self):
+        config = parity.parse_config(config_text("mirror ios=a/X.swift mac=b/X.swift warn-until=2026-12-01\nmirror ios=a/Y.swift mac=b/Y.swift"))
+        self.assertEqual([(m.ios, m.mac, m.warn_until) for m in config.mirrors],
+                         [("a/X.swift", "b/X.swift", datetime.date(2026, 12, 1)), ("a/Y.swift", "b/Y.swift", None)])
+
+    def test_mirror_needs_both_sides(self):
+        for text in ("mirror ios=a/X.swift", "mirror mac=b/X.swift", "mirror a b"):
+            with self.assertRaises(parity.ParityError):
+                parity.parse_config(text)
+
     def test_allow_needs_a_reason(self):
         with self.assertRaises(parity.ParityError):
             parity.parse_config("allow core submodules/Postbox/X.swift")
@@ -89,6 +99,14 @@ class ConfigTests(unittest.TestCase):
         config = parity.load_config(root)
         self.assertTrue(config.core_roots and config.shares and config.pins)
         self.assertTrue(all(a.reason for a in config.allows))
+
+    def test_repository_mirrors_name_the_vp9_copies(self):
+        root = Path(__file__).resolve().parents[3]
+        config = parity.load_config(root)
+        names = {m.ios.rsplit("/", 1)[-1] for m in config.mirrors}
+        self.assertEqual(names, {"VP9HardwareDecoder.swift", "WebMStickerDemuxer.swift"})
+        for mirror in config.mirrors:
+            self.assertEqual(mirror.ios.rsplit("/", 1)[-1], mirror.mac.rsplit("/", 1)[-1])
 
 
 class CoreRepoCase(unittest.TestCase):
@@ -388,6 +406,40 @@ class MacCheckTests(unittest.TestCase):
         self.assertEqual(levels["pin-equal-tgcalls"], "error")
         self.assertTrue(report.failed)
 
+    def add_mirror(self, ios_text="same\n", mac_text="same\n", extra=""):
+        commit(self.core, {"submodules/Copy/X.swift": ios_text}, "core copy")
+        new_pin = run(self.core, "rev-parse", "HEAD")
+        run(self.core, "update-ref", "refs/remotes/origin/main", new_pin)
+        commit(self.mac, {"packages/Copy/X.swift": mac_text}, "mac copy")
+        run(self.mac, "add", "submodules/telegram-ios")
+        run(self.mac, "commit", "-q", "-m", "bump core")
+        self.text += f"\nmirror ios=submodules/Copy/X.swift mac=packages/Copy/X.swift {extra}\n"
+
+    def test_identical_mirror_passes(self):
+        self.add_mirror()
+        report, levels = self.check()
+        self.assertEqual(levels["mirror-X.swift"], "ok")
+        self.assertFalse(report.failed, report.lines())
+
+    def test_drifted_mirror_fails_on_the_mac_side(self):
+        self.add_mirror(mac_text="edited on the Mac\n")
+        report, levels = self.check()
+        self.assertEqual(levels["mirror-X.swift"], "error")
+        self.assertTrue(report.failed)
+        self.assertIn("port the change", [m for l, n, m in report.items if n == "mirror-X.swift"][0])
+
+    def test_mirror_warning_window_makes_it_soft(self):
+        self.add_mirror(mac_text="edited on the Mac\n", extra="warn-until=2026-12-01")
+        report, levels = self.check()
+        self.assertEqual(levels["mirror-X.swift"], "warning")
+        self.assertFalse(report.failed, report.lines())
+
+    def test_unreadable_mirror_only_warns(self):
+        self.text += "\nmirror ios=submodules/Nope/X.swift mac=packages/Nope/X.swift\n"
+        report, levels = self.check()
+        self.assertEqual(levels["mirror-X.swift"], "warning")
+        self.assertFalse(report.failed, report.lines())
+
     def test_pin_warning_window_makes_it_soft(self):
         newer = commit(self.mac / "submodules/tgcalls", {"x.cc": "y\n"}, "mac moves")
         run(self.mac / "submodules/tgcalls", "update-ref", "refs/remotes/origin/main", newer)
@@ -536,6 +588,41 @@ class IosSideTests(unittest.TestCase):
         code, _, err = self.hook(run(self.ios, "rev-parse", "HEAD"), parity.ZERO_SHA, ref="refs/heads/bump")
         self.assertEqual(code, 1)
         self.assertIn("unpublished", err)
+
+    def mac_with_copy(self, text):
+        mac = Path(self.tmp.name) / "mac"
+        init(mac)
+        commit(mac, {"packages/Copy/X.swift": text}, "mac")
+        return mac
+
+    def mirrored(self, ios_text):
+        commit(self.ios, {"submodules/Copy/X.swift": ios_text}, "copy")
+        text = self.text + "\nmirror ios=submodules/Copy/X.swift mac=packages/Copy/X.swift\n"
+        return parity.parse_config(text)
+
+    def test_mirror_drift_never_blocks_ios(self):
+        config = self.mirrored("ios\n")
+        report = parity.check_ios(self.ios, config, mac_repo=self.mac_with_copy("mac\n"), today=TODAY)
+        self.assertFalse(report.failed, report.lines())
+        self.assertEqual([level for level, name, _ in report.items if name == "mirror-X.swift"], ["warning"])
+
+    def test_identical_mirror_is_ok_on_ios(self):
+        config = self.mirrored("same\n")
+        report = parity.check_ios(self.ios, config, mac_repo=self.mac_with_copy("same\n"), today=TODAY)
+        self.assertEqual([level for level, name, _ in report.items if name == "mirror-X.swift"], ["ok"])
+
+    def test_push_touching_a_mirrored_file_notes_the_mac_copy(self):
+        config = self.mirrored("one\n")
+        self.text += "\nmirror ios=submodules/Copy/X.swift mac=packages/Copy/X.swift\n"
+        (self.ios / "docs/mac-core-paths.txt").write_text(self.text)
+        run(self.ios, "add", "docs")
+        run(self.ios, "commit", "-q", "-m", "paths")
+        before = run(self.ios, "rev-parse", "HEAD")
+        after = commit(self.ios, {"submodules/Copy/X.swift": "two\n"}, "edit")
+        code, out, err = self.hook(after, before)
+        self.assertEqual(code, 0, err)
+        self.assertIn("identical copy", out)
+        self.assertEqual(config.mirrors[0].ios, "submodules/Copy/X.swift")
 
     def test_fast_never_reads_the_mac_to_block(self):
         report = parity.check_ios(self.ios, self.config, mac_repo=None)
