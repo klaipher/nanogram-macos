@@ -85,7 +85,13 @@ share third-party/ogg
 # Intended WebRTC differences
 allow webrtc api/peer_connection_interface.cc | iOS TGCALLS seam (disable_payload_type_demuxing, external transport security, dtls factory)
 allow webrtc api/peer_connection_interface.h | iOS TGCALLS seam
-allow webrtc pc | iOS TGCALLS seam edits in peer_connection, sdp, srtp, external_hmac
+allow webrtc pc/external_hmac.cc | iOS TGCALLS seam (external transport security)
+allow webrtc pc/external_hmac.h | iOS TGCALLS seam (external transport security)
+allow webrtc pc/peer_connection.cc | iOS TGCALLS seam (payload-type demuxing, dtls factory)
+allow webrtc pc/peer_connection.h | iOS TGCALLS seam (payload-type demuxing, dtls factory)
+allow webrtc pc/peer_connection_internal.h | iOS TGCALLS seam (OnUnDemuxableRtpPacket)
+allow webrtc pc/sdp_offer_answer.cc | iOS TGCALLS seam (payload-type demuxing; the tg_owt d1cf250e fix is applied on both)
+allow webrtc pc/srtp_session.cc | iOS TGCALLS seam (external transport security)
 allow webrtc modules/desktop_capture | Windows, Linux and desktop screen capture code is not built on iOS
 allow webrtc modules/video_capture | Windows and Linux capture code is not built on iOS
 allow webrtc modules/audio_device | per-platform audio device code; iOS uses its own, the Mac uses CoreAudio
