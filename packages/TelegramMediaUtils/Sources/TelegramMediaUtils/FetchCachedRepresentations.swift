@@ -450,7 +450,7 @@ private func fetchCachedAnimatedStickerRepresentation(account: Account, resource
                     CGImageDestinationSetProperties(colorDestination, [:] as CFDictionary)
                     CGImageDestinationAddImage(colorDestination, image, nil)
                     if CGImageDestinationFinalize(colorDestination)  {
-                        try? colorData.write(to: url, options: .atomic)
+                        try? colorData.write(to: url)
                         return .single(.temporaryPath(path))
                     }
                 } else {
@@ -532,7 +532,7 @@ private func fetchCachedStickerAJpegRepresentation(account: Account, resource: M
                         
                         CGImageDestinationAddImage(colorDestination, colorImage, options as CFDictionary)
                         if CGImageDestinationFinalize(colorDestination) {
-                            let _ = try? colorData.write(to: url, options: [.atomic])
+                            let _ = try? colorData.write(to: url)
                             subscriber.putNext(.temporaryPath(path))
                             subscriber.putCompletion()
                         }
@@ -747,7 +747,7 @@ private func fetchCachedSlotRepresentation(account: Account, data: [(Data, Int32
             options.setObject(colorQuality as NSNumber, forKey: kCGImageDestinationLossyCompressionQuality as NSString)
             CGImageDestinationAddImage(colorDestination, colorImage, options as CFDictionary)
             if CGImageDestinationFinalize(colorDestination)  {
-                try? colorData.write(to: url, options: .atomic)
+                try? colorData.write(to: url)
                 subscriber.putNext(.temporaryPath(path))
                 subscriber.putCompletion()
             }
@@ -800,7 +800,7 @@ private func fetchCachedDiceRepresentation(account: Account, data: Data, represe
                     options.setObject(colorQuality as NSNumber, forKey: kCGImageDestinationLossyCompressionQuality as NSString)
                     CGImageDestinationAddImage(colorDestination, colorImage, options as CFDictionary)
                     if CGImageDestinationFinalize(colorDestination)  {
-                        try? colorData.write(to: url, options: .atomic)
+                        try? colorData.write(to: url)
                         subscriber.putNext(.temporaryPath(path))
                         subscriber.putCompletion()
                     }
