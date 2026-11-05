@@ -76,7 +76,12 @@ private final class LocationPinView : View {
 }
 
 private final class LocationMapView : View {
-    fileprivate let mapView: MKMapView = MKMapView()
+    fileprivate private(set) var mapView: MKMapView?
+    fileprivate var showsUserLocation: Bool = false {
+        didSet {
+            mapView?.showsUserLocation = showsUserLocation
+        }
+    }
     private let expandContainer: Control = Control(frame: NSMakeRect(0, 0, 0, 50))
     private let expandButton: TextButton = TextButton()
     private var state: LocationViewState = .normal(.user(nil))
@@ -91,20 +96,6 @@ private final class LocationMapView : View {
 
     required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        addSubview(mapView)
-
-        mapView.mapType = .standard
-        mapView.isZoomEnabled = true
-        mapView.isScrollEnabled = true
-        if #available(macOS 11.0, *) {
-            mapView.showsZoomControls = false
-            let zoomControl = MKZoomControl(mapView: mapView)
-            addSubview(zoomControl)
-            self.zoomControl = zoomControl
-        } else {
-            mapView.showsZoomControls = true
-        }
-        mapView.wantsLayer = true
         addSubview(dismiss)
         addSubview(locateButton)
         addSubview(tableView)
@@ -125,7 +116,34 @@ private final class LocationMapView : View {
         locateButton.setAccessibilityLabel(strings().voiceOverCommonLocation)
     }
     
+    fileprivate func installMap() -> MKMapView {
+        if let mapView {
+            return mapView
+        }
+        let mapView = MKMapView()
+        addSubview(mapView, positioned: .below, relativeTo: subviews.first)
+        mapView.mapType = .standard
+        mapView.isZoomEnabled = true
+        mapView.isScrollEnabled = true
+        if #available(macOS 11.0, *) {
+            mapView.showsZoomControls = false
+            let zoomControl = MKZoomControl(mapView: mapView)
+            addSubview(zoomControl, positioned: .above, relativeTo: mapView)
+            self.zoomControl = zoomControl
+        } else {
+            mapView.showsZoomControls = true
+        }
+        mapView.wantsLayer = true
+        mapView.showsUserLocation = showsUserLocation
+        self.mapView = mapView
+        needsLayout = true
+        return mapView
+    }
+    
     fileprivate func getSelectedLocation() -> CLLocation? {
+        guard let mapView else {
+            return nil
+        }
         let windowLocation = locationPinView.convert(NSMakePoint(locationPinView.frame.width / 2, locationPinView.frame.height - 2), to: nil)
         let coordinate = mapView.convert(windowLocation, toCoordinateFrom: nil)
         return CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
@@ -133,6 +151,9 @@ private final class LocationMapView : View {
     
     fileprivate func hitsMapWhileExpanded(_ event: NSEvent) -> Bool {
         guard case .expanded = state, let contentView = window?.contentView else {
+            return false
+        }
+        guard let mapView else {
             return false
         }
         return contentView.hitTest(event.locationInWindow)?.isDescendant(of: mapView) == true
@@ -204,7 +225,7 @@ private final class LocationMapView : View {
             let tableHeight = min(tableView.listHeight, frame.height - (hasExpand ? expandContainer.frame.height : 0) - 50)
             tableView.change(size: NSMakeSize(frame.width, tableHeight), animated: animated, duration: duration, timingFunction: timingFunction)
             tableView.change(pos: NSMakePoint(0, frame.height - (hasExpand ? expandContainer.frame.height : 0) - tableHeight), animated: animated, duration: duration, timingFunction: timingFunction)
-            mapY = -(mapView.frame.height / 2) + 50 / 2
+            mapY = -(frame.height / 2) + 50 / 2
         }
         expandContainer.change(pos: NSMakePoint(0, hasExpand ? frame.height - expandContainer.frame.height : frame.height), animated: animated, duration: duration, timingFunction: timingFunction)
         if let zoomControl {
@@ -213,8 +234,8 @@ private final class LocationMapView : View {
         _ = locateButton.sizeToFit()
         
         
-        mapView._change(pos: NSMakePoint(0, mapY), animated: animated, duration: duration, timingFunction: timingFunction)
-        let finalMapFrame = NSMakeRect(0, mapY, frame.width, mapView.frame.height)
+        mapView?._change(pos: NSMakePoint(0, mapY), animated: animated, duration: duration, timingFunction: timingFunction)
+        let finalMapFrame = NSMakeRect(0, mapY, frame.width, frame.height)
         let pinPoint = finalMapFrame.focus(NSMakeSize(locationPinView.frame.width, 4))
         locationPinView.change(pos: NSMakePoint(pinPoint.minX, pinPoint.midY - locationPinView.frame.height), animated: animated, duration: 0.2, timingFunction: CAMediaTimingFunctionName.linear)
 
@@ -227,9 +248,9 @@ private final class LocationMapView : View {
                 guard let `self` = self else {return}
                 switch state {
                 case .normal:
-                    toggleExpand(.expanded(self.mapView.userLocation.location))
+                    toggleExpand(.expanded(self.mapView?.userLocation.location))
                 case .expanded:
-                    toggleExpand(.normal(.user(self.mapView.userLocation.location)))
+                    toggleExpand(.normal(.user(self.mapView?.userLocation.location)))
                 }
             }, for: .Click)
         }
@@ -256,20 +277,22 @@ private final class LocationMapView : View {
             tableView.frame = NSMakeRect(0, frame.height - (hasExpand ? expandContainer.frame.height : 0) - tableHeight, frame.width, tableHeight)
             mapY = -(mapHeight / 2) + 50 / 2
         }
-        let delegate = mapView.delegate
-        mapView.delegate = nil
-        mapView.frame = NSMakeRect(0, mapY, frame.width, mapHeight)
-        mapView.delegate = delegate
+        let mapFrame = NSMakeRect(0, mapY, frame.width, mapHeight)
+        if let mapView {
+            let delegate = mapView.delegate
+            mapView.delegate = nil
+            mapView.frame = mapFrame
+            mapView.delegate = delegate
+        }
         
-        let pinPoint = mapView.frame.focus(NSMakeSize(4, 4))
+        let pinPoint = mapFrame.focus(NSMakeSize(4, 4))
         locationPinView.centerX(y: pinPoint.midY - locationPinView.frame.height)
 
         
         expandButton.center()
         loadingView.center()
         
-        let zoomControls = ObjcUtils.findElements(byClass: "MKZoomSegmentedControl", in: mapView).first
-        if let zoomControls = zoomControls {
+        if let mapView, let zoomControls = ObjcUtils.findElements(byClass: "MKZoomSegmentedControl", in: mapView).first {
             zoomControls.setFrameOrigin(20, 20)
         }
     }
@@ -555,12 +578,15 @@ public class LocationModalController: ModalViewController {
     
     public override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        genericView.mapView.showsUserLocation = false
+        genericView.showsUserLocation = false
         window?.removeAllHandlers(for: self)
     }
     
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        DispatchQueue.main.async { [weak self] in
+            self?.attachMap()
+        }
         window?.set(mouseHandler: { [weak self] _ -> KeyHandlerResult in
             guard let self else { return .rejected }
             self.delegate.isPinRaised = true
@@ -576,6 +602,27 @@ public class LocationModalController: ModalViewController {
         }
         window?.set(mouseHandler: collapseOnMapEvent, with: self, for: .leftMouseDown, priority: .modal)
         window?.set(mouseHandler: collapseOnMapEvent, with: self, for: .scrollWheel, priority: .modal)
+    }
+    
+    private func attachMap() {
+        guard !isClosed, genericView.mapView == nil else {
+            return
+        }
+        let mapView = genericView.installMap()
+        mapView.delegate = delegate
+        if mapView.userLocation.location != nil {
+            delegate.location.set(.single(mapView.userLocation))
+            delegate.focusUserLocation(mapView)
+        }
+        switch destination {
+        case let .business(coordinate):
+            if let coordinate = coordinate {
+                delegate.focusVenue(mapView: mapView, coordinate)
+                self.delegate.isPinRaised = true
+            }
+        default:
+            break
+        }
     }
     
     public override func close(animationType: ModalAnimationCloseBehaviour = .common) {
@@ -623,34 +670,20 @@ public class LocationModalController: ModalViewController {
     public override func viewDidLoad() {
         super.viewDidLoad()
                 
-        genericView.mapView.delegate = delegate
         genericView.dismiss.set(handler: { [weak self] _ in
             self?.close()
         }, for: .Click)
         
-        let state: ValuePromise<LocationViewState> = ValuePromise(.normal(.user(genericView.mapView.userLocation.location)), ignoreRepeated: true)
+        let state: ValuePromise<LocationViewState> = ValuePromise(.normal(.user(nil)), ignoreRepeated: true)
         statePromise.set(state.get())
         
         genericView.locateButton.set(handler: { [weak self] _ in
             guard let `self` = self else {return}
-            self.delegate.focusUserLocation(self.genericView.mapView)
+            if let mapView = self.genericView.mapView {
+                self.delegate.focusUserLocation(mapView)
+            }
             self.delegate.isPinRaised = false
         }, for: .Click)
-        
-        if let _ = genericView.mapView.userLocation.location {
-            delegate.location.set(.single(genericView.mapView.userLocation))
-            delegate.focusUserLocation(genericView.mapView)
-        }
-        
-        switch destination {
-        case let .business(coordinate):
-            if let coordinate = coordinate {
-                delegate.focusVenue(mapView: genericView.mapView, coordinate)
-                self.delegate.isPinRaised = true
-            }
-        default:
-            break
-        }
         
         var handleRegion: Bool = true
         
@@ -659,7 +692,7 @@ public class LocationModalController: ModalViewController {
             if self.delegate.isPinRaised {
                 state.set(.normal(.custom(nil, named: nil)))
             } else {
-                state.set(.normal(.user(self.genericView.mapView.userLocation.location)))
+                state.set(.normal(.user(self.genericView.mapView?.userLocation.location)))
             }
         }
         delegate.didChangeRegion = { [weak self] in
@@ -667,7 +700,7 @@ public class LocationModalController: ModalViewController {
             if self.delegate.isPinRaised {
                 state.set(.normal(.custom(self.genericView.getSelectedLocation(), named: nil)))
             } else {
-                state.set(.normal(.user(self.genericView.mapView.userLocation.location)))
+                state.set(.normal(.user(self.genericView.mapView?.userLocation.location)))
             }
         }
         
@@ -770,7 +803,7 @@ public class LocationModalController: ModalViewController {
             guard let self else {
                 return
             }
-            toggleExpand(.normal(.user(self.genericView.mapView.userLocation.location)))
+            toggleExpand(.normal(.user(self.genericView.mapView?.userLocation.location)))
         }
         
         disposable.set((transition).start(next: { [weak self] transition, loading, expanded, hasVenues in
@@ -788,7 +821,7 @@ public class LocationModalController: ModalViewController {
 
         let request = requestUserLocation() |> deliverOnMainQueue
         requestDisposable.set((request).start(next: { [weak self] result in
-            self?.genericView.mapView.showsUserLocation = true
+            self?.genericView.showsUserLocation = true
         }, error: { [weak self] error in
             self?.delegate.cancelRequestLocation()
         }))
