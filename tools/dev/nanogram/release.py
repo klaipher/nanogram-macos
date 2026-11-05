@@ -55,7 +55,7 @@ EXPORT_TIMEOUT = 600
 
 __all__ = ["AscKey", "asc_key", "build_number", "marketing_version", "conditions", "release_settings", "distribution_entitlements", "enhanced_security_requested",
            "archive_command", "archive", "export_options", "export", "set_build_number", "ensure_mac_platform",
-           "upload_mas", "unsign_resource_bundles", "check_distribution_signing", "check_exported_app", "testflight", "notarize", "make_dmg", "appcast_entry", "appcast", "source_archive",
+           "upload_mas", "unsign_resource_bundles", "check_distribution_signing", "check_exported_app", "enhanced_security_problems", "testflight", "notarize", "make_dmg", "appcast_entry", "appcast", "source_archive",
            "release_direct"]
 
 
@@ -315,9 +315,51 @@ def apple_fonts(app: Path) -> list[str]:
                   if path.suffix.lower() in FONT_SUFFIXES and path.name.startswith(APPLE_FONT_PREFIXES))
 
 
-def check_exported_app(app: Path, edition: str) -> None:
+def signed_entitlements(bundle: Path) -> dict:
+    result = subprocess.run(["codesign", "-d", "--entitlements", "-", "--xml", str(bundle)], capture_output=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        return {}
+    try:
+        return plistlib.loads(result.stdout)
+    except (plistlib.InvalidFileException, ValueError):
+        return {}
+
+
+def embedded_profile_entitlements(app: Path) -> dict | None:
+    path = Path(app) / "Contents" / "embedded.provisionprofile"
+    if not path.is_file():
+        return None
+    result = subprocess.run(["security", "cms", "-D", "-i", str(path)], capture_output=True)
+    if result.returncode != 0:
+        return {}
+    try:
+        return plistlib.loads(result.stdout).get("Entitlements", {})
+    except (plistlib.InvalidFileException, ValueError):
+        return {}
+
+
+def enhanced_security_problems(app: Path, entitlements_of=signed_entitlements,
+                               profile_of=embedded_profile_entitlements) -> list[str]:
+    name = Path(app).name
+    grant = enhanced_security_module.PREFIX
+    signed = entitlements_of(Path(app))
+    problems = [f"{name} is signed without {key} = {value!r} (Enhanced Security was requested)"
+                for key, value in enhanced_security_module.SOFT_MODE_KEYS.items() if signed.get(key) != value]
+    profile = profile_of(Path(app))
+    if profile is None:
+        problems.append(f"{name} embeds no provisioning profile that could grant {grant}")
+    elif profile.get(grant) is not True:
+        problems.append(f"the provisioning profile of {name} does not grant {grant}")
+    return problems
+
+
+def check_exported_app(app: Path, edition: str, enhanced_security: bool | None = None) -> None:
+    if enhanced_security is None:
+        enhanced_security = enhanced_security_requested()
     problems = check_distribution_signing(app, edition)
     problems += [f"Apple system font in the bundle (ITMS-91182): {font}" for font in apple_fonts(app)]
+    if enhanced_security:
+        problems += enhanced_security_problems(app)
     if problems:
         for problem in problems:
             print(f"release: {problem}", file=sys.stderr)

@@ -591,5 +591,51 @@ class DirectReleaseTests(unittest.TestCase):
             self.assertIn("notarization-abc.json", str(caught.exception))
 
 
+class EnhancedSecurityExportTests(unittest.TestCase):
+    KEYS = dict(release.enhanced_security_module.SOFT_MODE_KEYS)
+    GRANT = {release.enhanced_security_module.PREFIX: True}
+
+    def problems(self, signed, profile):
+        return release.enhanced_security_problems(Path("/x/Nanogram.app"), entitlements_of=lambda path: signed,
+                                                  profile_of=lambda path: profile)
+
+    def test_kept_keys_and_a_granting_profile_pass(self):
+        self.assertEqual(self.problems(self.KEYS, self.GRANT), [])
+
+    def test_each_dropped_key_is_named(self):
+        signed = dict(self.KEYS)
+        del signed[f"{release.enhanced_security_module.PREFIX}.checked-allocations.soft-mode"]
+        problems = self.problems(signed, self.GRANT)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("checked-allocations.soft-mode", problems[0])
+
+    def test_a_missing_or_non_granting_profile_is_named(self):
+        self.assertIn("embeds no provisioning profile", self.problems(self.KEYS, None)[0])
+        self.assertIn("does not grant", self.problems(self.KEYS, {})[0])
+
+    def test_the_export_check_runs_only_when_enhanced_security_was_requested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            release.unsign_resource_bundles(app)
+            with mock.patch.object(release, "_authority", return_value=DISTRIBUTION), \
+                    mock.patch.object(release, "enhanced_security_problems", return_value=["dropped"]) as check:
+                with mock.patch("sys.stdout"):
+                    release.check_exported_app(app, "mas", enhanced_security=False)
+                check.assert_not_called()
+                with self.assertRaises(release.ReleaseError), mock.patch("sys.stderr"):
+                    release.check_exported_app(app, "mas", enhanced_security=True)
+                check.assert_called_once_with(app)
+
+    def test_the_export_check_follows_the_release_switch_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            release.unsign_resource_bundles(app)
+            with mock.patch.object(release, "_authority", return_value=DISTRIBUTION), \
+                    mock.patch.object(release, "enhanced_security_problems", return_value=["dropped"]), \
+                    mock.patch.dict(os.environ, {release.ENHANCED_SECURITY_ENV: "1"}):
+                with self.assertRaises(release.ReleaseError), mock.patch("sys.stderr"):
+                    release.check_exported_app(app, "mas")
+
+
 if __name__ == "__main__":
     unittest.main()
