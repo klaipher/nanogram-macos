@@ -51,3 +51,15 @@ not re-verified against the code; correct them on the next change in that area.
 ### Branding
 - What: Nanogram name and Sphere app icon in both editions, Telegram-owned endpoints removed; a lint keeps Telegram's name and logo out.
 - Where: `nanogram/NanogramAppIcons`, `tools/dev/lint/branding.py` (check).
+
+### Early upstream picks
+- What: 15 telegram-macos master commits taken before their release (#117, #188, #205, #211, #212, #214, #216, #223,
+  #225, #231, #233, #235, #237, #238, #239), and our fixes on top: code-block copy refused for protected layouts in the
+  chat layer engine, IME keys never reach window key handlers, wider Quick Look warning list, the peer-to-peer call
+  rule is sent to the server, DevicesContext removes its listeners on `devicesQueue`.
+- Why: content protection, privacy and data-safety fixes worth having before upstream's next release.
+- Where: branch `upstream-picks` (b300aee8..5907a07b); review `nanogram-macos-recon/2026-11-05-upstream-picks-review.md`.
+- Upstream: the picks are upstream's; our five fixes could be sent as is.
+- Sync: at the next release merge the picks resolve as already applied (`git cherry` shows them); keep our follow-ups
+  (`Window.keyBelongsToInputMethod`, `TextViewLayout.copyableBlockQuoteText`, the `.voiceCallsP2P` request) and re-run
+  `tools/tests/{privacy-page-save,translate-copy-restriction,file-preview-warning}` and `TGUIKitTests`.
