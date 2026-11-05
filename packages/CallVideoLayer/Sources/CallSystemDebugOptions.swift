@@ -3,7 +3,7 @@ import NanogramDebug
 import TgVoipWebrtc
 
 public enum CallSystemDebugOptions {
-    public static let thermalVideoLadder = NanogramDebugOption.toggle(id: "calls.thermalVideoLadder", section: CallVideoDebugOptions.section, title: "Thermal video limits", detail: "When the Mac runs hot, your outgoing camera video gets smaller and slower (540p at 20 fps serious, 360p at 15 fps critical). Dimming and slower animation always happen. Steps down at once, restores after 30 s. Default: off.", defaultValue: false)
+    public static let thermalVideoLadder = NanogramDebugOption.toggle(id: "calls.thermalVideoLadder", section: CallVideoDebugOptions.section, title: "Thermal video limits", detail: "When the Mac runs hot, your outgoing camera video gets smaller and slower (540p at 20 fps serious, 360p at 15 fps critical). Dimming and slower animation always happen. Steps down at once, restores after 30 s. Default: on.", defaultValue: true)
 
     public static let all: [NanogramDebugOption] = [
         CallSystemDebugOptions.thermalVideoLadder

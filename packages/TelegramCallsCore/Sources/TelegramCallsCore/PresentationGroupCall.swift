@@ -1170,7 +1170,10 @@ public final class PresentationGroupCallImpl: PresentationGroupCall {
             }
         }
         let devicesUpdates = DisposableSet()
-        devicesUpdates.add((devicesContext.updater() |> deliverOnMainQueue).start(next: { devices in
+        devicesUpdates.add((devicesContext.updater() |> deliverOnMainQueue).start(next: { [weak self] devices in
+            if let id = devices.camera {
+                self?.videoCapturer?.switchVideoInput(id)
+            }
             if let id = devices.input {
                 pendingInputDeviceId = id
             }
@@ -2772,6 +2775,22 @@ public final class PresentationGroupCallImpl: PresentationGroupCall {
         }
     }
 
+    private func releaseCapturers() {
+        if let videoCapturer = self.videoCapturer {
+            self.videoCapturer = nil
+            videoCapturer.setIsVideoEnabled(false)
+        }
+        if let screenCapturer = self.screenCapturer {
+            self.screenCapturer = nil
+            screenCapturer.setIsVideoEnabled(false)
+        }
+        self.hasVideo = false
+        self.hasScreencast = false
+        self.stateValue.sources.video = nil
+        self.stateValue.sources.screencast = nil
+        self.stateValue.presentationEndpointId = nil
+    }
+
     private func markAsCanBeRemoved() {
         if self.markedAsCanBeRemoved {
             return
@@ -2792,6 +2811,7 @@ public final class PresentationGroupCallImpl: PresentationGroupCall {
         self.typingDisposable.dispose()
         self.genericCallContext?.stop(account: account, reportCallId: nil, debugLog: .init(nil))
         self.screencastCallContext?.stop(account: account, reportCallId: nil, debugLog: .init(nil))
+        self.releaseCapturers()
         self._canBeRemoved.set(.single(true))
     }
     
@@ -3017,8 +3037,12 @@ public final class PresentationGroupCallImpl: PresentationGroupCall {
         
         self.stateValue.sources.screencast = source
         
-        self.screenCapturer?.setOnFatalError({ [weak self] in
-            self?.mustStopSharing?()
+        deviceId.setOnFatalError({ [weak self, weak deviceId] in
+            guard let self, let deviceId, self.screenCapturer === deviceId else {
+                return
+            }
+            self.disableScreencast()
+            self.mustStopSharing?()
         })
         
         self.screenCapturer?.setOnPause({ [weak self] paused in
@@ -3117,6 +3141,7 @@ public final class PresentationGroupCallImpl: PresentationGroupCall {
         self.hasScreencast = false
         
         self.stateValue.presentationEndpointId = nil
+        self.screenCapturer?.setIsVideoEnabled(false)
         if let screencastCallContext = self.screencastCallContext {
             self.screencastJoinDisposable.set(nil)
             self.screencastCallContext = nil
@@ -3149,8 +3174,12 @@ public final class PresentationGroupCallImpl: PresentationGroupCall {
         }
         self.videoCapturer = deviceId
 
-        self.videoCapturer?.setOnFatalError({ [weak self] in
-            self?.mustStopVideo?()
+        deviceId.setOnFatalError({ [weak self, weak deviceId] in
+            guard let self, let deviceId, self.videoCapturer === deviceId else {
+                return
+            }
+            self.disableVideo()
+            self.mustStopVideo?()
         })
         self.hasVideo = true
         self.genericCallContext?.requestVideo(deviceId)
@@ -3171,7 +3200,8 @@ public final class PresentationGroupCallImpl: PresentationGroupCall {
     
     public func disableVideo() {
         self.hasVideo = false
-        if let _ = self.videoCapturer {
+        if let videoCapturer = self.videoCapturer {
+            videoCapturer.setIsVideoEnabled(false)
             self.videoCapturer = nil
             self.genericCallContext?.disableVideo()
             self.participantsContext?.updateVideoState(peerId: self.joinAsPeerId, isVideoMuted: true, isVideoPaused: false, isPresentationPaused: nil)

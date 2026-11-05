@@ -570,11 +570,15 @@ public class PCallSession {
             )
         }
         
+        if let videoCapturer = self.videoCapturer {
+            self.installFailureHandler(videoCapturer)
+        }
+        
         devicesDisposable.set(self.devicesContext.updater().start(next: { [weak self] values in
             guard let `self` = self else {
                 return
             }
-            if isVideoAvailable, self.isVideo, !self.isOutgoingVideoPaused, let id = values.camera {
+            if let id = callCameraSwitchTarget(newCameraId: values.camera, hasCapturer: self.videoCapturer != nil, isScreenCapture: self.isScreenCapture, isVideoAvailable: isVideoAvailable) {
                 self.videoCapturer?.switchVideoInput(id)
             }
             if let id = values.input {
@@ -763,6 +767,15 @@ public class PCallSession {
         self.sessionState = sessionState
         self.callContextState = callContextState
         self.reception = reception
+        
+        if callSessionReleasesCapture(sessionState.state) {
+            self.captureSelectWindow?.close()
+            self.releaseVideoCapturer()
+            self.videoIsForceDisabled = true
+            self.screenCaptureSource = nil
+            self.isScreenCapture = false
+            self.isOutgoingVideoPaused = true
+        }
         
         
         var presentationState: CallState?
@@ -955,7 +968,7 @@ public class PCallSession {
                     var initialOutput: GroupCallInitialOutput = .init(isMuted: self.isMuted)
                     
                     if self.videoCapturer != nil {
-                        if let screenCaptureSource {
+                        if self.isScreenCapture, let screenCaptureSource {
                             initialOutput.screencast = .init(capturer: OngoingCallVideoCapturer(screenCaptureSource.deviceIdKey()), source: screenCaptureSource)
                         } else {
                             let device = self.devices.camera.first(where: { self.devicesContext.currentCameraId == $0.uniqueID })
@@ -1022,6 +1035,10 @@ public class PCallSession {
                         }
                         
                         self.ongoingContextStateDisposable?.dispose()
+                        
+                        self.releaseVideoCapturer()
+                        self.screenCaptureSource = nil
+                        self.isScreenCapture = false
                         
                         self.conferenceStateValue = .ready
                         
@@ -1126,6 +1143,7 @@ public class PCallSession {
         default:
             break
         }
+
         if case let .terminated(_, reason, _) = sessionState.state, !wasTerminated {
             if !self.didSetCanBeRemoved {
                 if reason.recall {
@@ -1189,18 +1207,51 @@ public class PCallSession {
     }
     
     
+    private func installFailureHandler(_ capturer: OngoingCallVideoCapturer) {
+        capturer.setOnFatalError({ [weak self, weak capturer] in
+            guard let self, let capturer else {
+                return
+            }
+            self.captureFailed(capturer)
+        })
+    }
+    
+    private func captureFailed(_ capturer: OngoingCallVideoCapturer) {
+        switch callCaptureFailureAction(isCurrentCapturer: self.videoCapturer === capturer, isScreenCapture: self.isScreenCapture) {
+        case .ignore:
+            break
+        case .stopScreenCapture:
+            CallDiagnostics.log("call \(self.internalId) screen capture stopped by the system, turning the share off")
+            self.disableScreenCapture()
+        case .stopVideo:
+            CallDiagnostics.log("call \(self.internalId) camera capture failed, turning the camera off")
+            self.disableVideo()
+        }
+    }
+    
+    private func releaseVideoCapturer() {
+        guard let capturer = self.videoCapturer else {
+            return
+        }
+        self.videoCapturer = nil
+        capturer.setIsVideoEnabled(false)
+        self.ongoingContext?.disableVideo()
+    }
+    
     public func requestVideo() {
         if isVideoAvailable {
             let requestVideo: Bool = self.videoCapturer == nil
             if self.videoCapturer == nil {
                 let videoCapturer = OngoingCallVideoCapturer(devicesContext.currentCameraId ?? "")
                 self.videoCapturer = videoCapturer
+                self.installFailureHandler(videoCapturer)
                 self.videoIsForceDisabled = false
             }
             if self.isScreenCapture {
                 self.videoCapturer?.switchVideoInput(devicesContext.currentCameraId ?? "")
             }
             self.isScreenCapture = false
+            self.screenCaptureSource = nil
             self.isOutgoingVideoPaused = false
             
             if let videoCapturer = self.videoCapturer, requestVideo {
@@ -1214,6 +1265,9 @@ public class PCallSession {
     }
     
     public func enableScreenCapture(_ source: VideoSourceMac) {
+        guard callSessionAllowsCapture(self.sessionState?.state) else {
+            return
+        }
         
         let id = source.deviceIdKey()
         
@@ -1221,6 +1275,7 @@ public class PCallSession {
         if self.videoCapturer == nil {
             let videoCapturer = OngoingCallVideoCapturer(id)
             self.videoCapturer = videoCapturer
+            self.installFailureHandler(videoCapturer)
             self.videoIsForceDisabled = false
         }
         
@@ -1241,10 +1296,8 @@ public class PCallSession {
         }
     }
     public func disableScreenCapture() {
-        self.videoCapturer?.switchVideoInput(devicesContext.currentCameraId ?? "")
-        if let _ = self.videoCapturer {
-            self.videoCapturer = nil
-            self.ongoingContext?.disableVideo()
+        if self.videoCapturer != nil {
+            self.releaseVideoCapturer()
             self.videoIsForceDisabled = true
         }
         self.isOutgoingVideoPaused = true
@@ -1274,11 +1327,11 @@ public class PCallSession {
     }
     
     public func disableVideo() {
-        if let _ = self.videoCapturer {
-            self.videoCapturer = nil
-            self.ongoingContext?.disableVideo()
+        if self.videoCapturer != nil {
+            self.releaseVideoCapturer()
             self.videoIsForceDisabled = true
         }
+        self.screenCaptureSource = nil
         self.isScreenCapture = false
         self.isOutgoingVideoPaused = true
         if let state = self.sessionState {

@@ -112,19 +112,61 @@ final class CallVideoDebugOptionsTests: XCTestCase {
     func testDefaults() {
         let settings = self.makeSettings()
         _ = CallVideoDebugOptions.install(in: settings)
+        XCTAssertTrue(settings.bool("calls.hardwareCrop"))
+        XCTAssertTrue(settings.bool("calls.nativeDecodeFormat"))
+        XCTAssertTrue(settings.bool("calls.livestreamHardwareDecoding"))
+        XCTAssertTrue(settings.bool("calls.screencastHardwareEncoder"))
+        XCTAssertTrue(settings.bool("calls.groupVideoCap"))
+        XCTAssertTrue(settings.bool("calls.thermalVideoLadder"))
+        XCTAssertTrue(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+    }
+
+    func testInstallWithNothingStoredTakesTheNewDefaults() {
+        let settings = self.makeSettings()
+        let ids = ["calls.hardwareCrop", "calls.nativeDecodeFormat", "calls.livestreamHardwareDecoding", "calls.screencastHardwareEncoder", "calls.groupVideoCap", "calls.thermalVideoLadder"]
+        for id in ids {
+            XCTAssertFalse(settings.isOverridden(id), id)
+        }
+        _ = CallVideoDebugOptions.install(in: settings)
+        for id in ids {
+            XCTAssertTrue(settings.bool(id), id)
+            XCTAssertFalse(settings.isOverridden(id), id)
+        }
+        XCTAssertEqual(settings.choice("calls.groupNoiseMode"), "rnnoise")
+    }
+
+    func testAnExplicitOffChoiceIsKept() {
+        let settings = self.makeSettings()
+        settings.set("calls.hardwareCrop", bool: false)
+        settings.set("calls.groupNoiseMode", choice: "both")
+        _ = CallVideoDebugOptions.install(in: settings)
         XCTAssertFalse(settings.bool("calls.hardwareCrop"))
-        XCTAssertFalse(settings.bool("calls.nativeDecodeFormat"))
-        XCTAssertFalse(settings.bool("calls.livestreamHardwareDecoding"))
-        XCTAssertFalse(settings.bool("calls.screencastHardwareEncoder"))
-        XCTAssertFalse(settings.bool("calls.groupVideoCap"))
+        XCTAssertEqual(settings.choice("calls.groupNoiseMode"), "both")
+    }
+
+    func testDefaultOnOptionsCanBeSwitchedOffAndReset() {
+        let settings = self.makeSettings()
+        let observations = CallVideoDebugOptions.install(in: settings)
+        settings.set("calls.groupVideoCap", bool: false)
         XCTAssertFalse(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+        settings.reset("calls.groupVideoCap")
+        XCTAssertTrue(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+        withExtendedLifetime(observations) {}
+    }
+
+    func testDetailsNameTheCurrentDefault() {
+        for option in CallVideoDebugOptions.all + CallSystemDebugOptions.all {
+            XCTAssertTrue(option.detail?.contains("Default: on.") ?? false, option.id)
+            XCTAssertFalse(option.detail?.contains("Default: off.") ?? true, option.id)
+        }
+        XCTAssertTrue(CallAudioDebugOptions.groupNoiseMode.detail?.contains("Default: RNNoise only.") ?? false)
     }
 
     func testGroupVideoCapOverride() {
         let settings = self.makeSettings()
         let observations = CallVideoDebugOptions.install(in: settings)
-        settings.set("calls.groupVideoCap", bool: true)
-        XCTAssertTrue(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
+        settings.set("calls.groupVideoCap", bool: false)
+        XCTAssertFalse(CallVideoDebugOptions.isGroupVideoCapEnabled(in: settings))
         withExtendedLifetime(observations) {}
     }
 
@@ -160,8 +202,8 @@ final class CallVideoDebugOptionsTests: XCTestCase {
     func testOverrideReachesSettings() {
         let settings = self.makeSettings()
         let observations = CallVideoDebugOptions.install(in: settings)
-        settings.set("calls.hardwareCrop", bool: true)
-        XCTAssertTrue(settings.bool("calls.hardwareCrop"))
+        settings.set("calls.hardwareCrop", bool: false)
+        XCTAssertFalse(settings.bool("calls.hardwareCrop"))
         withExtendedLifetime(observations) {}
     }
 }

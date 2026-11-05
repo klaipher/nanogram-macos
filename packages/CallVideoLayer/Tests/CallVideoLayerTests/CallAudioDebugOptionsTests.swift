@@ -17,10 +17,10 @@ final class CallAudioDebugOptionsTests: XCTestCase {
         }
     }
 
-    func testEveryDefaultKeepsToday() {
+    func testGroupNoiseDefaultsToRNNoiseOnly() {
         let settings = self.makeSettings()
         _ = CallVideoDebugOptions.install(in: settings)
-        XCTAssertEqual(settings.choice("calls.groupNoiseMode"), "both")
+        XCTAssertEqual(settings.choice("calls.groupNoiseMode"), "rnnoise")
     }
 
     func testExperimentsTheOwnerRemovedAreGoneWithTheirStoredValues() {
@@ -57,8 +57,8 @@ final class CallAudioDebugOptionsTests: XCTestCase {
     func testOverrideReachesSettings() {
         let settings = self.makeSettings()
         let observations = CallVideoDebugOptions.install(in: settings)
-        settings.set("calls.groupNoiseMode", choice: "rnnoise")
-        XCTAssertEqual(settings.choice("calls.groupNoiseMode"), "rnnoise")
+        settings.set("calls.groupNoiseMode", choice: "both")
+        XCTAssertEqual(settings.choice("calls.groupNoiseMode"), "both")
         withExtendedLifetime(observations) {}
     }
 }

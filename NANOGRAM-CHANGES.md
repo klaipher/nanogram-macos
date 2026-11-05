@@ -47,6 +47,9 @@ not re-verified against the code; correct them on the next change in that area.
 - What: Nanogram Debug Settings window (experiments off by default except on-device voice transcription), HTML
   message widgets, iOS-style first display, accessibility work. (check)
 - Where: `packages/NanogramDebug`, `packages/NanogramRuntime`, `packages/NanogramKit`, docs/accessibility/.
+- Call experiments (hardware decode, hardware crop, native decode format, screen-share hardware encoder, thermal video limits,
+  10-video cap in group calls, RNNoise-only group noise suppression) default to on in the Mac app; each can still be switched
+  off in the Debug Settings window. Upstream has none of these. `packages/CallVideoLayer`.
 
 ### Branding
 - What: Nanogram name and Sphere app icon in both editions, Telegram-owned endpoints removed; a lint keeps Telegram's name and logo out.
