@@ -212,6 +212,7 @@ final class TRLotData {
             if let handle = self.writeHandle {
                 writeHandle = handle
             } else {
+                createLottieCacheFileIfMissing(atPath: self.dataPath)
                 writeHandle = FileHandle(forWritingAtPath: self.dataPath)
                 self.writeHandle = writeHandle
             }
@@ -285,15 +286,8 @@ final class TRLotData {
         
         
         let deferr:(TRLotData)->Void = { data in
-            if !FileManager.default.fileExists(atPath: data.mapPath) {
-                FileManager.default.createFile(atPath: data.mapPath, contents: nil, attributes: nil)
-            }
-            if !FileManager.default.fileExists(atPath: data.dataPath) {
-                FileManager.default.createFile(atPath: data.dataPath, contents: nil, attributes: nil)
-            }
-            try? FileManager.default.setAttributes([.modificationDate : Date()], ofItemAtPath: data.mapPath)
-            try? FileManager.default.setAttributes([.modificationDate : Date()], ofItemAtPath: data.dataPath)
-
+            touchLottieCacheFileIfStale(atPath: data.mapPath)
+            touchLottieCacheFileIfStale(atPath: data.dataPath)
         }
         
         guard FileManager.default.isReadableFile(atPath: self.mapPath) else {
