@@ -292,6 +292,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         LaunchTrace.begin()
+        LaunchUsableSignpost.begin()
 
         installInvalidFrameDetector()
         memoryPressureMonitor = MemoryPressureMonitor()

@@ -1885,7 +1885,7 @@ final class ChatToasterView: Control {
 
 
 
-fileprivate func prepareEntries(from fromView:ChatHistoryView?, to toView:ChatHistoryView, timeDifference: TimeInterval, initialSize:NSSize, interaction:ChatInteraction, animated:Bool, scrollPosition:ChatHistoryViewScrollPosition?, reason:ChatHistoryViewUpdateType, animationInterface:TableAnimationInterface?, side: TableSavingSide?, messagesViewQueue: Queue) -> Signal<TableUpdateTransition, NoError> {
+fileprivate func prepareEntries(from fromView:ChatHistoryView?, to toView:ChatHistoryView, timeDifference: TimeInterval, initialSize:NSSize, interaction:ChatInteraction, animated:Bool, scrollPosition:ChatHistoryViewScrollPosition?, reason:ChatHistoryViewUpdateType, animationInterface:TableAnimationInterface?, side: TableSavingSide?, messagesViewQueue: Queue, buildsViewportFirst: Bool) -> Signal<TableUpdateTransition, NoError> {
     return Signal { subscriber in
     
         
@@ -2010,7 +2010,7 @@ fileprivate func prepareEntries(from fromView:ChatHistoryView?, to toView:ChatHi
             return item;
         }
         
-        let firstTransition = Queue.mainQueue().isCurrent()
+        let firstTransition = buildsViewportFirst
         let cancelled = Atomic(value: false)
         
         let prevIsLoading = fromView?.originalView == nil || fromView?.originalView?.isLoading == true 
@@ -3958,7 +3958,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                             |> map {
                                 $0?.count
                             }
-                            |> deliverOnMainQueue
+                            |> coalesceOnMain
                     } else {
                         let countViewKey: PostboxViewKey = .historyTagSummaryView(tag: MessageTags(), peerId: peerId, threadId: threadId, namespace: Namespaces.Message.Cloud, customTag: nil)
                         let localCountViewKey: PostboxViewKey = .historyTagSummaryView(tag: MessageTags(), peerId: peerId, threadId: threadId, namespace: Namespaces.Message.Local, customTag: nil)
@@ -3977,7 +3977,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                                 messageCount += Int(count)
                             }
                             return Int32(messageCount)
-                        } |> map(Optional.init) |> deliverOnMainQueue
+                        } |> map(Optional.init) |> coalesceOnMain
                     }
                 default:
                     answersCount = .single(nil)
@@ -3989,9 +3989,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             
             switch onlineCounterMode {
             case 2:
-                onlineMemberCount = whileVisible(context.peerChannelMemberCategoriesContextsManager.recentOnline(peerId: peerId), visible: countersVisibility)  |> map(Optional.init) |> deliverOnMainQueue
+                onlineMemberCount = whileVisible(context.peerChannelMemberCategoriesContextsManager.recentOnline(peerId: peerId), visible: countersVisibility)  |> map(Optional.init) |> coalesceOnMain
             case 1:
-                onlineMemberCount = whileVisible(context.peerChannelMemberCategoriesContextsManager.recentOnlineSmall(peerId: peerId), visible: countersVisibility)  |> map(Optional.init) |> deliverOnMainQueue
+                onlineMemberCount = whileVisible(context.peerChannelMemberCategoriesContextsManager.recentOnlineSmall(peerId: peerId), visible: countersVisibility)  |> map(Optional.init) |> coalesceOnMain
             default:
                 onlineMemberCount = .single(nil)
             }
@@ -3999,7 +3999,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             return combineLatest(answersCount, onlineMemberCount) |> map {
                 return .init(replies: $0, online: $1)
             }
-        } |> deliverOnMainQueue
+        } |> coalesceOnMain
         
         
         
@@ -4137,7 +4137,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                                                   historyPeerView,
                                                   recommendedChannels,
                                                   historyVisibility.get()
-    ) |> mapToQueue { update, appearance, maxReadIndex, searchState, animatedEmojiStickers, messageEffects, savedMessageTags, customChannelDiscussionReadState, customThreadOutgoingReadState, updatingMedia, adMessages, reactions, uiState, peerView, recommendedChannels, isVisible -> Signal<(TableUpdateTransition, MessageHistoryView?, ChatHistoryCombinedInitialData, Bool, ChatHistoryView), NoError> in
+    ) |> mapToQueue { [weak self] update, appearance, maxReadIndex, searchState, animatedEmojiStickers, messageEffects, savedMessageTags, customChannelDiscussionReadState, customThreadOutgoingReadState, updatingMedia, adMessages, reactions, uiState, peerView, recommendedChannels, isVisible -> Signal<(TableUpdateTransition, MessageHistoryView?, ChatHistoryCombinedInitialData, Bool, ChatHistoryView), NoError> in
                                     
             let pollAnswersLoading = uiState.pollAnswers
             let threadLoading = uiState.threadLoading
@@ -4203,13 +4203,18 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             // against the just-emitted value yields no theme change, which
             // is the correct behaviour during shutdown.
             let pAppearance = previousAppearance.swap(appearance) ?? appearance
-            var prepareOnMainQueue = pAppearance.presentation != appearance.presentation
+            let themeChanged = pAppearance.presentation != appearance.presentation
+            let isInitialUpdate: Bool
+            let followsLoadingUpdate: Bool
             switch updateType {
             case .Initial:
-                prepareOnMainQueue = firstInitialUpdate.swap(isLoading) || prepareOnMainQueue
+                isInitialUpdate = true
+                followsLoadingUpdate = firstInitialUpdate.swap(isLoading)
             default:
-                break
+                isInitialUpdate = false
+                followsLoadingUpdate = false
             }
+            let placement = ChatHistoryPreparePolicy.placement(themeChanged: themeChanged, isInitialUpdate: isInitialUpdate, followsLoadingUpdate: followsLoadingUpdate)
             
             let animationInterface: TableAnimationInterface? = catchesUpAfterHidden ? nil : TableAnimationInterface(nextTransaction.isExutable && view?.laterId == nil, true, animatedRows)
             let timeDifference = context.timeDifference
@@ -4222,7 +4227,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     if case let .cacheEntry(id, data) = additionalEntry {
                         if id == cachedChannelAdminRanksEntryId(peerId: peerId), let data = data?.get(CachedChannelAdminRanks.self)  {
                             ranks = data
-                            self.currentRanks = data
+                            self?.currentRanks = data
                         }
                         break
                     }
@@ -4279,9 +4284,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 proccesedView = ChatHistoryView(originalView: nil, filteredEntries: [], theme: chatTheme)
             }
 
-            return prepareEntries(from: previousView.swap(proccesedView), to: proccesedView, timeDifference: timeDifference, initialSize: atomicSize.with { $0 }, interaction: chatInteraction, animated: false, scrollPosition:scrollPosition, reason: updateType, animationInterface: animationInterface, side: update.1, messagesViewQueue: queue) |> map { transition in
+            return prepareEntries(from: previousView.swap(proccesedView), to: proccesedView, timeDifference: timeDifference, initialSize: atomicSize.with { $0 }, interaction: chatInteraction, animated: false, scrollPosition:scrollPosition, reason: updateType, animationInterface: animationInterface, side: update.1, messagesViewQueue: queue, buildsViewportFirst: placement.buildsViewportFirst) |> map { transition in
                 return (transition, view, initialData, isLoading, proccesedView)
-            } |> runOn(prepareOnMainQueue ? Queue.mainQueue(): queue)
+            } |> runOn(placement.runsOnMainQueue ? Queue.mainQueue(): queue)
             
         } |> deliverOnMainQueue
         
@@ -8594,7 +8599,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         }
 
         var botStartCheckedOnPeer = false
-        peerDisposable.set(combineLatest(queue: .mainQueue(), topPinnedMessage, peerView.get(), titlePeerView, availableGroupCall, attach, threadInfo, stateValue.get(), tagsAndFiles, getPeerView(peerId: context.peerId, postbox: context.account.postbox), savedChatsAsTopics, shortcuts, connectedBot, updaterPromise.get(), ApplicationSpecificNotice.playedMessageEffects(accountManager: context.sharedContext.accountManager), adMessages, context.starsContext.state, monoforumTopics.get()).start(next: { [weak self] pinnedMsg, postboxView, titlePeerView, groupCallData, attachItems, threadInfo, uiState, savedMessageTags, accountPeer, displaySavedChatsAsTopics, shortcuts, connectedBot, _, playedMessageEffects, adMessages, starsState, monoforumTopics in
+        peerDisposable.set((combineLatest(queue: .mainQueue(), topPinnedMessage, peerView.get(), titlePeerView, availableGroupCall, attach, threadInfo, stateValue.get(), tagsAndFiles, getPeerView(peerId: context.peerId, postbox: context.account.postbox), savedChatsAsTopics, shortcuts, connectedBot, updaterPromise.get(), ApplicationSpecificNotice.playedMessageEffects(accountManager: context.sharedContext.accountManager), adMessages, context.starsContext.state, monoforumTopics.get()) |> coalesceOnMain).start(next: { [weak self] pinnedMsg, postboxView, titlePeerView, groupCallData, attachItems, threadInfo, uiState, savedMessageTags, accountPeer, displaySavedChatsAsTopics, shortcuts, connectedBot, _, playedMessageEffects, adMessages, starsState, monoforumTopics in
             
             
             let firstTime = isFirst.swap(false)
@@ -8875,7 +8880,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         }
         
         
-        let connectionStatus = combineLatest(queue: .mainQueue(), connecting, updating) |> deliverOnMainQueue |> beforeNext { [weak self] status, isUpdating -> Void in
+        let connectionStatus = combineLatest(queue: .mainQueue(), connecting, updating) |> coalesceOnMain |> beforeNext { [weak self] status, isUpdating -> Void in
             var status = status
             switch status {
             case let .online(proxyAddress):
@@ -10830,6 +10835,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
     deinit {
         cleanup()
+        ChatControllerLifetime.deinitialized()
     }
 
 
@@ -11509,6 +11515,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             return takeTableItem?(msgId)
         })
         super.init(context)
+        ChatControllerLifetime.created()
         if mode.isSavedMessagesThread {
             SavedChatControllerRegistry.shared.add(self)
         }
