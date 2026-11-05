@@ -449,10 +449,10 @@ private func fetchCachedAnimatedStickerRepresentation(account: Account, resource
                 if let image = image, let colorDestination = CGImageDestinationCreateWithData(colorData as CFMutableData, kUTTypePNG, 1, nil) {
                     CGImageDestinationSetProperties(colorDestination, [:] as CFDictionary)
                     CGImageDestinationAddImage(colorDestination, image, nil)
-                    if CGImageDestinationFinalize(colorDestination)  {
-                        try? colorData.write(to: url)
+                    if CGImageDestinationFinalize(colorDestination), writeTemporaryRepresentation(colorData as Data, to: url) {
                         return .single(.temporaryPath(path))
                     }
+                    return .complete()
                 } else {
                     return .complete()
                 }
@@ -531,9 +531,10 @@ private func fetchCachedStickerAJpegRepresentation(account: Account, resource: M
                         options.setObject(colorQuality as NSNumber, forKey: kCGImageDestinationLossyCompressionQuality as NSString)
                         
                         CGImageDestinationAddImage(colorDestination, colorImage, options as CFDictionary)
-                        if CGImageDestinationFinalize(colorDestination) {
-                            let _ = try? colorData.write(to: url)
+                        if CGImageDestinationFinalize(colorDestination), writeTemporaryRepresentation(colorData as Data, to: url) {
                             subscriber.putNext(.temporaryPath(path))
+                            subscriber.putCompletion()
+                        } else {
                             subscriber.putCompletion()
                         }
                     } else {
@@ -746,9 +747,10 @@ private func fetchCachedSlotRepresentation(account: Account, data: [(Data, Int32
             let options = NSMutableDictionary()
             options.setObject(colorQuality as NSNumber, forKey: kCGImageDestinationLossyCompressionQuality as NSString)
             CGImageDestinationAddImage(colorDestination, colorImage, options as CFDictionary)
-            if CGImageDestinationFinalize(colorDestination)  {
-                try? colorData.write(to: url)
+            if CGImageDestinationFinalize(colorDestination), writeTemporaryRepresentation(colorData as Data, to: url) {
                 subscriber.putNext(.temporaryPath(path))
+                subscriber.putCompletion()
+            } else {
                 subscriber.putCompletion()
             }
         } else {
@@ -799,9 +801,10 @@ private func fetchCachedDiceRepresentation(account: Account, data: Data, represe
                     let options = NSMutableDictionary()
                     options.setObject(colorQuality as NSNumber, forKey: kCGImageDestinationLossyCompressionQuality as NSString)
                     CGImageDestinationAddImage(colorDestination, colorImage, options as CFDictionary)
-                    if CGImageDestinationFinalize(colorDestination)  {
-                        try? colorData.write(to: url)
+                    if CGImageDestinationFinalize(colorDestination), writeTemporaryRepresentation(colorData as Data, to: url) {
                         subscriber.putNext(.temporaryPath(path))
+                        subscriber.putCompletion()
+                    } else {
                         subscriber.putCompletion()
                     }
                 } else {
