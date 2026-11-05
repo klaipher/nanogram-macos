@@ -493,6 +493,9 @@ public class PCallSession {
         self.updatedNetworkType = account.networkType
         self.isOutgoing = isOutgoing
         self.incomingConferenceSource = incomingConferenceSource
+        if isOutgoing {
+            PerformanceSignposts.beginPending(.callConnect)
+        }
         
         if let _ = incomingConferenceSource {
             self.conferenceStableId = Int64.random(in: Int64.min ..< Int64.max)
@@ -690,6 +693,7 @@ public class PCallSession {
     
     public func acceptCallSession() {
         CallDiagnostics.log("call \(self.internalId) answer requested")
+        PerformanceSignposts.beginPending(.callConnect)
         let window = self.alertWindow
         requestMicroAccessDisposable.set((requestMicrophonePermission() |> deliverOnMainQueue).start(next: { [weak self] access in
             if access {
@@ -886,6 +890,7 @@ public class PCallSession {
                     CallDiagnostics.log("call \(self.internalId) the call context failed to start or lost its connection, dropping as disconnect")
                     self.callSessionManager.drop(internalId: self.internalId, reason: .disconnect, debugLog: .single(nil))
                 case .connected:
+                    PerformanceSignposts.endPending(.callConnect)
                     let timestamp: Double
                     if let activeTimestamp = self.activeTimestamp {
                         timestamp = activeTimestamp

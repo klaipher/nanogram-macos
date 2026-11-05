@@ -904,7 +904,7 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
         controller.navigationController = self
         controller.loadViewIfNeeded(self.bounds)
         self.controller.readyToDetach()
-        let pushSignpost = PerformanceSignposts.OneShot("navigationPushToReady")
+        let pushSignpost = PerformanceSignposts.OneShot(.navigationPushToReady)
         self.pendingController = controller
         self.pushDisposable.set((controller.ready.get() |> take(1) |> timeout(NavigationViewController.pushReadyTimeout, queue: .mainQueue(), alternate: .single(true))).start(next: {[weak self] _ in
             pushSignpost.end()

@@ -291,6 +291,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
 
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        LaunchTrace.begin()
 
         installInvalidFrameDetector()
         memoryPressureMonitor = MemoryPressureMonitor()
@@ -1110,6 +1111,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                         self.contextValue = context
                                                 
                         if let context = context {
+                            LaunchTrace.end(.accountLoad)
                             context.context.isCurrent = true
                             context.applyNewTheme()
                             self.window.contentView?.addSubview(context.rootView, positioned: .below, relativeTo: self.window.contentView?.subviews.first)

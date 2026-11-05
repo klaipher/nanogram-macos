@@ -183,28 +183,42 @@ A dSYM only symbolicates the binary with the same UUID (`dwarfdump --uuid`). iOS
 
 ## Signposts
 
-Both apps have `PerformanceSignposts` (iOS: `Display`, Mac: `TGUIKit`): an `OSSignposter` with subsystem =
-the bundle id and category `Performance`. Intervals today:
+Both apps use one set of signposts from the shared core (SwiftSignalKit: `NanogramSignposts`, `UserSignpost`,
+`PerformanceSignpostName`, `LaunchTrace`). `PerformanceSignposts` in each app (iOS: `Display`, Mac: `TGUIKit`) is a
+typealias of `NanogramSignposts`, so the call sites look the same and the names cannot drift. Subsystem = the
+bundle id.
 
-| Interval | iOS | Mac |
-|---|---|---|
-| `chatHistoryEntriesForView` | ChatHistoryListNode | ChatController |
-| `composerKeystroke` / `composerTextDidChange` | ChatTextInputPanelNode | ChatInputTextView |
-| `chatOpenToReady` | — | ChatController |
-| `navigationPushToReady` | — | NavigationViewController |
-| `chatListToFirstTransition`, `chatListFolderSwitchCached/Live`, `chatListPrepareEntries` | — | ChatListController |
-| `tableMerge`, `lottieRenderFrame` | — | TableView, LottiePlayer |
-| `WAL checkpoint` (own log, shared core) | Postbox | Postbox |
+**User-level intervals** (at most 6; emitted in category `Performance` **and** in `.pointsOfInterest`, so they show
+in every Instruments template and give Run Comparisons a range):
+
+| Interval | Starts | Ends | iOS | Mac |
+|---|---|---|---|---|
+| `launchToChatListReady` | `LaunchTrace.begin()` first thing in `didFinishLaunching` | the main window shows the chat list (`LaunchPhase.firstFrame`) | AppDelegate (begin, "Launch to ready") | AppDelegate (begin), ChatListController first applied transition |
+| `chatOpenToReady` | tap on a chat | first messages drawn | SharedAccountContext.navigateToChatController, ChatHistoryListNode first ready | ChatController init, `ready` |
+| `navigationPushToReady` | a push is requested | iOS: the push completed; Mac: the pushed screen is ready | NavigationController.pushViewController | NavigationViewController.push |
+| `chatListFirstFrame` | a chat list is created | its first rows are applied | ChatListControllerImpl.init, ChatListNode first ready | ChatListController init, first transition |
+| `chatListFolderSwitch` | a folder is selected | its list is applied | ChatListContainerNode.switchToFilter | ChatListController (cached or live path) |
+| `callConnect` | outgoing call tap / incoming answer | the call is connected | PresentationCallManager.requestCall, PresentationCall.answer, `.connected` | PCallSession init (outgoing) / acceptCallSession, `.connected` |
+
+**Hot paths** (category `Performance` only; can run per frame or keystroke): `chatHistoryEntriesForView`,
+`chatListPrepareEntries`, `composerKeystroke` (iOS) / `composerTextDidChange` (Mac), `tableMerge`,
+`lottieRenderFrame`. Plus `WAL checkpoint` (its own log in Postbox, shared core).
 
 Category `Performance` is **not** shown by the Points of Interest instrument that the Time Profiler, System
 Trace, CPU Profiler, Processor Trace and Allocations templates carry (Animation Hitches has none); add
-`--instrument os_signpost` to see it. Intervals a person
-would name ("open chat", "launch to chat list") belong in `.pointsOfInterest` so they show in every template
-and give Run Comparisons a range. Rules: `StaticString` names; begin and end on the same signposter; one
-interval per user action, not per frame, in Points of Interest; per-frame intervals stay in `Performance`.
-When nothing records, an interval costs one enabled check.
+`--instrument os_signpost` to see it, or look at the user-level intervals, which are in both.
 
-`XCTOSSignpostMetric(subsystem:category:name:)` measures the same intervals in tests (below).
+API (identical on both apps): `PerformanceSignposts.interval(name) { }`, `begin(name)` / `end(name, state)`,
+`OneShot(name)` (ended once from any thread), and for an interval whose start and end are in different modules
+`beginPending(.userSignpost)` / `endPending(.userSignpost)` (one open interval per name; beginning again closes the
+previous one; ending without a begin does nothing). Rules: names are `StaticString` constants from the core, never
+literals at the call site; begin and end on the same signposter; one interval per user action, not per frame, in
+Points of Interest; **no metadata at all** (the API has none: no ids, names or text; if one is ever added it is a
+count or a hashed id, never a name or message text). When nothing records, an interval costs one enabled check per
+signposter. To add a user-level interval, add it to `UserSignpost.all` (the test caps the list at 6) and to the
+table above.
+
+`XCTOSSignpostMetric(subsystem:category:name:)` measures the same intervals in UI tests (below).
 
 ## Tests that measure
 
@@ -212,11 +226,51 @@ XCTest performance tests (`measure(metrics:options:block:)`) take `XCTClockMetri
 `XCTMemoryMetric`, `XCTStorageMetric` (bytes written), `XCTOSSignpostMetric` (one of our intervals), and in UI
 tests `XCTApplicationLaunchMetric(waitUntilResponsive: true)` and `XCTHitchMetric(application:)` (Xcode 26+,
 iOS and macOS). Xcode keeps baselines in `xcshareddata/xcbaselines` per machine, which neither Bazel nor
-`swift test` reads, so ours are in the repo: the test prints its measurements, `xcresulttool get test-results
-metrics` (Xcode) or the XCTest log line (`swift test`, Bazel) gives the numbers, and a comparator checks them
-against a baseline file keyed by machine model (`sysctl hw.model`). A measurement without a baseline for this
-machine is recorded, never failed. Run performance tests with code coverage and sanitizers off, Release
-where the runner allows it, nothing else running.
+`swift test` reads, so ours are in the repo: `tools/dev/perf/baselines.json`, keyed by machine model
+(`sysctl hw.model`), compared by `tools/dev/perfgate.py`. Run performance tests with code coverage and
+sanitizers off, Release where the runner allows it, nothing else running.
+
+### The tests
+
+Pure, deterministic hot paths that need no app and no account. Each measures `XCTClockMetric`, `XCTCPUMetric`
+and `XCTMemoryMetric` over 5 to 10 iterations, and is skipped unless `TG_PERF=1` (so normal test runs stay fast
+and free of timing noise).
+
+| Test | What | iOS / core target | Mac target |
+|---|---|---|---|
+| `PostboxReadPerformanceTests` | read the newest 2500 of 10000 messages of a chat from an in-memory database | `submodules/Postbox/Tests` (SwiftPM `swift test`, Bazel `PostboxTests`) | the same, through the core pin: `submodules/telegram-ios/submodules/Postbox` |
+| `ChatListDiffPerformanceTests` | diff of a 10000-row chat list after an update (`mergeListsStableWithUpdates`) | `ChatListUITests` (Bazel) | `TGUIKitPerformanceTests.testDiffChatListAfterAnUpdate` (`swift test` in `packages/TGUIKit`) |
+| `TextLayoutPerformanceTests` | layout of a 48,000-character message | `DisplayTests` (Bazel, `TextNode`) | `TGUIKitPerformanceTests.testLayoutLongMessage` (`TextViewLayout`) |
+| `SyntaxHighlightPerformanceTests` | libprisma highlighting of a 2400-line Swift block | `TextFormatTests` (Bazel) | none: the Mac has no test target around libprisma yet (it compiles the same copy; see `CodeSyntax`) |
+
+### Running them
+
+- `tools/dev/tg perf run` runs the SwiftPM ones on this machine (iOS: Postbox; Mac: TGUIKit and the core's
+  Postbox), then compares with the baselines. `--package DIR` picks other packages.
+- The Bazel `ios_unit_test` ones (ChatListUITests, DisplayTests, TextFormatTests) run on the simulator, which
+  reports the host Mac's `hw.model`; run them with `TG_PERF=1` in the test environment and give the log
+  to `tools/dev/tg perf check --log bazel-testlogs/.../test.log --suite ios-sim`. On an iPhone, run the same
+  tests from Xcode and give the result bundle: `tg perf check --xcresult X.xcresult --suite iphone --model iPhone18,2`.
+- Nothing here is in `tg check` or the pre-push hook yet; a wall-clock gate would flake until the baselines
+  have a few runs behind them.
+
+### perfgate (`tools/dev/perfgate.py`, pure Python, tests in `tools/dev/tests/test_perfgate.py`)
+
+- Input: the XCTest log lines (`Test Case '-[C t]' measured [Time, seconds] average: ..., values: [...]`, from
+  `swift test`, `xcodebuild` and Bazel `test.log`), a result bundle (`--xcresult`, read with
+  `xcrun xcresulttool get test-results metrics`), or JSON (that tool's output, or `{"measurements": [...]}`).
+- Key: `<suite>/<Class.test>/<metric id>` under the machine model. `--suite` keeps the same test of different
+  bundles apart (`swift-host` is the default of `tg perf run`).
+- Baselines: `tools/dev/perf/baselines.json`, `owner_models` = `Mac16,1` (MacBook Pro M4) and `iPhone18,2`
+  (iPhone 17 Pro Max). **Only owner devices get stored baselines.** Other machines are compared when a baseline
+  for their model exists, otherwise skipped.
+- A missing baseline is recorded (on an owner device, with a note to commit the file), never a failure.
+- A regression is a measured average more than `--tolerance` percent (15) above the baseline and also more than
+  the unit's absolute floor (0.5 ms, 256 kB, 500 kC/kI), so noise on tiny numbers cannot fail. A baseline entry can
+  carry its own `tolerance_percent`. Improvements are reported, not stored (`record` rewrites baselines).
+- Exit: 0 pass, 1 regression, 2 no measurements or unreadable input.
+- Re-baselining after an intended change: `tg perf run`, then `tg perf record` with the same input on the owner
+  device and commit `baselines.json` with the change that moved the numbers.
 
 ## Checkers while developing
 
@@ -236,10 +290,16 @@ these as failures instead of warnings.
 - **Xcode Organizer** (App Store Connect builds): hang rate (iOS, macOS), hitches (iOS), disk writes, launch,
   memory, battery, storage; Xcode 27 adds metric goals and an insights overview, and "Generate
   Recommendations" on a hang/disk-write/launch report.
+- **Launch tasks** (iOS/macOS 27 only, `if #available`): `LaunchTrace` in the shared core adopts
+  `MetricManager.trackLaunchTask(id:onTrackingError:_:)`, which brackets an operation and extends the launch
+  measurement until the tasks end. Three tasks open together in `didFinishLaunching` (the first must start
+  there; the rest before the last one ends) and each ends where its phase finishes: `account-load` (the account
+  context exists), `chat-list-first-data` (the chat list applied its first rows) and `first-frame` (the window
+  shows the chat list; also ends the `launchToChatListReady` interval). They show up in the MetricKit launch
+  metrics that both apps already store locally; nothing is sent anywhere. A tracking error (for example the task
+  started past the deadline) is logged as the task id and the reason code only. Older systems do nothing.
 - **Not used yet**: `StateReporting` (iOS/macOS 27: which screen/mode a metric came from; also shows in
-  Points of Interest), `MetricManager.trackLaunchTask(id:)` (extended launch: time until the chat list is
-  usable, not just first frame), `MetricManager.logHandle(category:)` (signposts that MetricKit aggregates
-  per day).
+  Points of Interest), `MetricManager.logHandle(category:)` (signposts that MetricKit aggregates per day).
 - **Mac hang forensics**: `sudo spindump Nanogram 10 -o ~/traces/` samples every thread for 10 s; `tailspin`
   is off by default (`tailspin info`), and `sudo tailspin save -o ~/traces/x.tailspin` only has data while it
   is enabled.
@@ -249,9 +309,9 @@ these as failures instead of warnings.
 - Mac `Telegram` scheme: Profile action uses the Debug configuration and Run's `CA_DEBUG_TRANSACTIONS=1`
   (`shouldUseLaunchSchemeArgsEnv = YES`). Product ▸ Profile therefore measures `-Onone` with transaction
   backtraces.
-- No performance tests and no baselines in either repo.
-- iOS has none of the Mac's user-level intervals (chat open, navigation push, chat list first frame, folder
-  switch); the shared core has only the WAL checkpoint.
+- The performance tests exist (above) but no baselines are recorded yet: the first `tg perf run` on `Mac16,1`
+  and the first iPhone 17 Pro Max run record them. No UI performance tests (they need a signed-in test account).
+- Core signposts for Postbox transactions and account updates are not added.
 - PerfLab runs Debug only.
 
 ## References

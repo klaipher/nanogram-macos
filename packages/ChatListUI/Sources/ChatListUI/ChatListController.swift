@@ -585,7 +585,7 @@ fileprivate func prepareEntries(from:[AppearanceWrapperEntry<UIChatListEntry>]?,
         }
         
         
-        let (deleted,inserted,updated) = PerformanceSignposts.interval("chatListPrepareEntries") { proccessEntries(from, right: to, { entry -> TableRowItem in
+        let (deleted,inserted,updated) = PerformanceSignposts.interval(PerformanceSignpostName.chatListPrepareEntries) { proccessEntries(from, right: to, { entry -> TableRowItem in
             let item = makeItem(entry)
             if type(of: item) == ChatListRowItem.self {
                 item.premeasuredWidth = initialSize.width
@@ -1085,7 +1085,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             let isSwitch = chatListAppliedOnce.with { $0 }
             if let cached, !cached.list.items.isEmpty {
                 if isSwitch {
-                    _ = folderSwitchSignpost.swap(PerformanceSignposts.OneShot("chatListFolderSwitchCached"))?.end()
+                    _ = folderSwitchSignpost.swap(PerformanceSignposts.OneShot(.chatListFolderSwitch))?.end()
                 }
                 let cachedValue: (ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool) = (cached, data, false, nil, true)
                 return Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool), NoError> { subscriber in
@@ -1112,7 +1112,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 }
             }
             if isSwitch {
-                _ = folderSwitchSignpost.swap(PerformanceSignposts.OneShot("chatListFolderSwitchLive"))?.end()
+                _ = folderSwitchSignpost.swap(PerformanceSignposts.OneShot(.chatListFolderSwitch))?.end()
             }
             return live
         }
@@ -1398,10 +1398,16 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         
         
-        let firstListSignpost = PerformanceSignposts.OneShot("chatListToFirstTransition")
+        let firstListSignpost = PerformanceSignposts.OneShot(.chatListFirstFrame)
         let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition, pageWindow, pageKey, isReady -> Signal<Void, NoError> in
             self?.enqueueTransition(transition, isReady: isReady)
             firstListSignpost.end()
+            if isReady {
+                LaunchTrace.end(.chatListFirstData)
+                Queue.mainQueue().async {
+                    LaunchTrace.end(.firstFrame)
+                }
+            }
             folderSwitchSignpost.swap(nil)?.end()
             _ = chatListAppliedOnce.swap(true)
             self?.chatListPageApplied(window: pageWindow, key: pageKey)

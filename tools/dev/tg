@@ -396,6 +396,7 @@ usage: tools/dev/tg <command> [options]
   lint             SwiftLint on changed Swift lines [--base REV | --commits A..B] [--strict]
   warnings         clean debug build, compare upstream warnings with the baseline [--update] [--log FILE]
   check            tests, lint, clean build + warnings, package tests (pre-push gate) [--base REV]
+  perf             performance tests with repository baselines per machine model: run|check|record|model (tools/dev/perfgate.py; not part of check)
   parity           iOS/macOS parity gate: roots, published pins, shared SHAs, core pin lag, shared files [--release]
   core-bump        move the core pin to a newer iOS main commit, test, gate, commit [REF|SHA] [--dry-run] [--commit]
   sync-upstream    fast-forward upstream, merge it, rebuild, update the warning baseline [--no-build] [--after-merge]
@@ -408,6 +409,37 @@ usage: tools/dev/tg <command> [options]
   native           drift check: native-libs.json and module-settings.json against the build files; local manifest paths
   tests-audit      list tools/tests runners and check, without compiling, that their sources and anchors still exist (report only, not part of check)
 USAGE
+}
+
+# tg perf run [--package DIR ...] | check | record | model [perfgate options]: the performance tests that need no app
+# (docs/profiling.md, "Tests that measure"). `run` runs the *PerformanceTests of the SwiftPM packages (default: TGUIKit and
+# the core's Postbox) on this machine with TG_PERF=1 and compares the numbers with tools/dev/perf/baselines.json
+# (tools/dev/perfgate.py); a missing baseline is recorded on the owner's devices, never a failure. Not part of
+# `tg check` or the pre-push gate.
+cmd_perf() {
+  local sub="${1:-}"
+  case "$sub" in
+    check|record|model) python3 "$ROOT/tools/dev/perfgate.py" "$@" ;;
+    run)
+      shift
+      local packages=() gate_args=() log package
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --package) [ $# -ge 2 ] || die "--package needs a directory"; packages+=("$2"); shift ;;
+          *) gate_args+=("$1") ;;
+        esac
+        shift
+      done
+      [ ${#packages[@]} -gt 0 ] || packages=(packages/TGUIKit submodules/telegram-ios/submodules/Postbox)
+      log="$(mktemp -t tg-perf.XXXXXX)"
+      for package in "${packages[@]}"; do
+        say "Performance tests in $package"
+        TG_PERF=1 swift test --package-path "$ROOT/$package" --filter PerformanceTests 2>&1 | tee -a "$log"
+      done
+      python3 "$ROOT/tools/dev/perfgate.py" check --suite swift-host --log "$log" ${gate_args[@]+"${gate_args[@]}"}
+      ;;
+    *) die "usage: tools/dev/tg perf run [--package DIR ...] [perfgate options] | check|record|model [perfgate options]" ;;
+  esac
 }
 
 main() {
@@ -440,6 +472,7 @@ main() {
     test) cmd_test "$@" ;;
     check) cmd_check "$@" ;;
     parity) cmd_parity "$@" ;;
+    perf) cmd_perf "$@" ;;
     core-bump) cmd_core_bump "$@" ;;
     testflight) cmd_testflight "$@" ;;
     release-direct) cmd_release_direct "$@" ;;
