@@ -667,6 +667,9 @@ public class QuickSwitcherModalController: ModalViewController, TableViewDelegat
 
 
         let digitKeys: [KeyboardKey] = [.One, .Two, .Three, .Four, .Five, .Six, .Seven, .Eight, .Nine]
+        guard let modal = modal else {
+            return
+        }
         for (index, key) in digitKeys.enumerated() {
             self.window?.set(handler: { [weak self] _ -> KeyHandlerResult in
                 guard let self, self.genericView.searchView.query.isEmpty else {
@@ -674,7 +677,7 @@ public class QuickSwitcherModalController: ModalViewController, TableViewDelegat
                 }
                 self.genericView.activeTableView.selectAt(index)
                 return .invoked
-            }, with: modal!, for: key, priority: .modal, modifierFlags: [.command])
+            }, with: modal, for: key, priority: .modal, modifierFlags: [.command])
         }
         
     }
