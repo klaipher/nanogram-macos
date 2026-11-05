@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Share extension no longer crashes when the account databases cannot be opened** (RH3, iOS spec I-26, ed04ea21). `TelegramShare/ShareViewController.swift` opened `accounts-metadata` through `AccountManager(... removeDatabaseOnError: true)`, which traps on a failed open; it now calls `AccountManager.openForExtension` (the core pin 3819d287 has it) and, on nil, shows the existing unauthorized screen with the default theme and a close button. Guarded by `tools/dev/tests/test_extension_database_open.py`; no Swift test seam in the extension. Mac Enhanced Security was researched and not enabled: `/Users/klaipher/Projects/nanogram-macos-recon/2026-11-06-mac-enhanced-security.md`.
+
 ## 13.1.0 (202611052243) — 2026-11-05
 
 Source: `nanogram/integration` @ ea818724 · core `klaipher/nanogram` `main` @ 3819d287 (pin 7169e49b; was 7a042ffd at the last release) · tgcalls `klaipher/tgcalls` `nanogram-shared` @ 6f45f0cc · tg_owt `klaipher/tg_owt` `nanogram-mac` @ 655db2eb · rlottie `telegram-ios-dev` @ 083f19a.
