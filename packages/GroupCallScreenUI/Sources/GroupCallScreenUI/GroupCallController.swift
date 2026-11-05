@@ -1120,9 +1120,9 @@ public final class GroupCallUIController : ViewController {
                 let text: String
                 switch mode {
                 case .screencast:
-                    text = strings().voiceChatShareVideoMutedError
-                case .video:
                     text = strings().voiceChatShareScreenMutedError
+                case .video:
+                    text = strings().voiceChatShareVideoMutedError
                 }
                 alert(for: window, info: text)
                 return
