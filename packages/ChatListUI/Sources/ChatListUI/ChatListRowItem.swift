@@ -1135,7 +1135,7 @@ public class ChatListRowItem: TableRowItem {
         
       
         if self.isOnline == true, let presence = peerPresence?._asPresence() {
-            presenceManager = PeerPresenceStatusManager(update: { [weak self] in
+            presenceManager = PeerPresenceStatusManager(mode: .onlineState, update: { [weak self] in
                 self?.isOnline = false
                 self?.redraw(animated: true)
             })

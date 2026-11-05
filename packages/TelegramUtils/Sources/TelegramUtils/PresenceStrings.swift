@@ -122,36 +122,47 @@ public func userPresenceText(_ presence: TelegramUserPresence, timeDifference: T
     }
 }
 
-public func userPresenceStringRefreshTimeout(_ presence: TelegramUserPresence, timeDifference: Int32, relativeTo timestamp: Int32) -> Double {
+public enum PeerPresenceStatusRefreshMode {
+    case statusText
+    case onlineState
+}
+
+public func peerPresenceStatusRefreshTimeout(_ presence: TelegramUserPresence, timeDifference: Int32, relativeTo timestamp: Double, mode: PeerPresenceStatusRefreshMode) -> Double {
+    guard timestamp.isFinite, abs(timestamp) < 1e15 else {
+        return Double.infinity
+    }
+    func until(_ second: Int64) -> Double {
+        return max(0.05, Double(second) - timestamp)
+    }
+    let now = Int64(timestamp)
     switch presence.status {
     case let .present(statusTimestamp):
-
-        let statusTimestampInt: Int = Int(statusTimestamp)
-        let statusTimestamp = Int32(min(statusTimestampInt, Int(INT32_MAX)))
-
-        if statusTimestamp > INT32_MAX - 1 {
+        if statusTimestamp >= Int32.max {
             return Double.infinity
         }
-        if statusTimestamp >= timestamp {
-            return Double(statusTimestamp - timestamp)
+        let adjusted = Int64(statusTimestamp) - Int64(timeDifference)
+        if adjusted > now {
+            return until(adjusted)
+        }
+        if case .onlineState = mode {
+            return Double.infinity
+        }
+        let difference = now - adjusted
+        if difference < 59 {
+            return until(adjusted + 59)
+        } else if difference < 60 * 60 {
+            let next = difference < 120 ? 120 : (difference / 60 + 1) * 60
+            return until(adjusted + next)
         } else {
-            let difference = timestamp - statusTimestamp
-            if difference < 30 {
-                return Double((30 - difference) + 1)
-            } else if difference < 60 * 60 {
-                return Double((difference % 60) + 1)
-            } else {
-                return Double.infinity
-            }
+            return Double.infinity
         }
     case .recently:
-        let activeUntil = presence.lastActivity - timeDifference + 30
-        if activeUntil >= timestamp {
-            return Double(activeUntil - timestamp + 1)
+        let activeUntil = Int64(presence.lastActivity) - Int64(timeDifference) + 30
+        if activeUntil >= now {
+            return until(activeUntil + 1)
         } else {
             return Double.infinity
         }
-
     case .none, .lastWeek, .lastMonth:
         return Double.infinity
     }
