@@ -25,6 +25,26 @@ final class NanogramLogExportTests: XCTestCase {
         XCTAssertEqual(spec.packaging, .archive)
     }
 
+    func testMetricKitExportListsTheDiskWriteLedger() {
+        let logs = URL(fileURLWithPath: "/tmp/container/logs", isDirectory: true)
+        let metricKit = NanogramLogExportSpec(kind: .metricKit, appVersion: self.version, buildNumber: self.build)
+        XCTAssertEqual(metricKit.ledgerSources(logsDirectory: logs).map { $0.path }, ["/tmp/container/logs/disk-writes.json"])
+        for kind in [NanogramLogExportKind.appLogs, .callLogs, .crashReports] {
+            let spec = NanogramLogExportSpec(kind: kind, appVersion: self.version, buildNumber: self.build)
+            XCTAssertEqual(spec.ledgerSources(logsDirectory: logs), [], "\(kind)")
+        }
+    }
+
+    func testMissingLedgerDoesNotBreakTheMetricKitArchive() throws {
+        let report = self.directory.appendingPathComponent("report.json")
+        try Data("{}".utf8).write(to: report)
+        let spec = NanogramLogExportSpec(kind: .metricKit, appVersion: self.version, buildNumber: self.build)
+        let sources = [report] + spec.ledgerSources(logsDirectory: self.directory.appendingPathComponent("logs", isDirectory: true))
+        let output = try NanogramLogExportFiles.makeDirectory(root: self.directory.appendingPathComponent("out", isDirectory: true))
+        let files = try NanogramLogExportFiles.prepare(spec: spec, sources: sources, in: output)
+        XCTAssertEqual(files.map { $0.lastPathComponent }, ["nanogram-logs-metrickit.zip"])
+    }
+
     func testEveryKindIsNamedNanogram() {
         var baseNames = Set<String>()
         for kind in NanogramLogExportKind.allCases {

@@ -2,13 +2,23 @@
 set -e
 set -x
 
+# Resolve before any cd, $0 can be relative.
+SCRIPT_LOCATION="$(cd "$(dirname "$0")" && pwd -P)"
+
 
 SRC_DIR="$1"
 BUILD_DIR=$(echo "$(cd "$(dirname "$3")"; pwd -P)/$(basename "$3")")
 
 
 
-SOURCE_DIR="${BUILD_DIR}source"
+# libvpx is built from the core's libvpx submodule (one copy for iOS and Mac).
+# The source is copied into the build directory below; nothing is written into the submodule.
+SOURCE_DIR="$(cd "${SCRIPT_LOCATION}/../../../submodules/telegram-ios/third-party/libvpx/libvpx" 2>/dev/null && pwd -P)" || SOURCE_DIR=""
+if [ -z "$SOURCE_DIR" ] || [ ! -f "$SOURCE_DIR/configure" ]; then
+  echo "error: libvpx source not found in submodules/telegram-ios/third-party/libvpx/libvpx" >&2
+  echo "       run: git submodule update --init --recursive" >&2
+  exit 1
+fi
 
 
 pushd "$BUILD_DIR"

@@ -2,6 +2,9 @@
 set -e
 set -x
 
+# Resolve before any cd, $0 can be relative.
+SCRIPT_LOCATION="$(cd "$(dirname "$0")" && pwd -P)"
+
 
 SRC_DIR="$1"
 BUILD_DIR=$(echo "$(cd "$(dirname "$3")"; pwd -P)/$(basename "$3")")
@@ -23,7 +26,13 @@ CROSS_SDK_MAC="MacOSX.sdk"
 
 
 SOURCE_DIR="$OUT_DIR/opus-1.6.1"
-SOURCE_ARCHIVE="$SRC_DIR/opus-1.6.1.tar.gz"
+# The tarball is the core's copy (one file for iOS and Mac).
+SOURCE_ARCHIVE="${SCRIPT_LOCATION}/../../../submodules/telegram-ios/third-party/opus/opus-1.6.1.tar.gz"
+if [ ! -f "$SOURCE_ARCHIVE" ]; then
+  echo "error: $SOURCE_ARCHIVE not found" >&2
+  echo "       run: git submodule update --init --recursive" >&2
+  exit 1
+fi
 SOURCE_SHA256="6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1"
 
 echo "$SOURCE_SHA256  $SOURCE_ARCHIVE" | shasum -a 256 -c -

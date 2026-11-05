@@ -36,7 +36,7 @@ let package = Package(
         .package(name: "TelegramLinks", path: "../TelegramLinks"),
         .package(name: "PremiumStatusUI", path: "../PremiumStatusUI"),
         .package(name: "SystemPermissions", path: "../SystemPermissions"),
-        .package(name: "Svg", path: "../../submodules/telegram-ios/submodules/Svg"),
+        .package(name: "Svg", path: "../Svg"),
         .package(name: "InlineStickerLayer", path: "../InlineStickerLayer"),
         .package(name: "InstantPageUI", path: "../InstantPageUI"),
         .package(name: "PasscodeCore", path: "../../submodules/telegram-ios/submodules/PasscodeCore"),

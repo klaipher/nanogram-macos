@@ -17,6 +17,8 @@
 #   share <path>            a shared path inside the core
 #   webrtc-root mac=<dir> ios=<dir>   where the WebRTC sources start in the tg_owt and webrtc trees
 #   allow core|webrtc <path-prefix> [until=DATE] | reason   an intended difference, with its reason
+#   mirror ios=<file> mac=<file> [warn-until=DATE]   a file kept as an identical copy in both repos (blob ids are
+#                           compared on every check: an error on the Mac side, a warning on the iOS side)
 #
 # Process: a fix to anything listed under `share` is committed to iOS main first; the same day run
 # tools/dev/tg core-bump on the Mac (or cherry-pick -x into mac/core-lts). Mac-only code in shared
@@ -84,6 +86,12 @@ share third-party/ogg
 share third-party/libprisma
 share third-party/boost_regex
 share submodules/HardenedMedia
+
+# Files that exist as identical copies in both repos (the Mac has no Package.swift for the core module yet).
+# A change to one side must land on the other the same day.
+mirror ios=submodules/AnimatedStickerNode/VP9Hardware/Sources/VP9HardwareDecoder.swift mac=packages/VP9Hardware/Sources/VP9Hardware/VP9HardwareDecoder.swift
+mirror ios=submodules/AnimatedStickerNode/VP9Hardware/Sources/WebMStickerDemuxer.swift mac=packages/VP9Hardware/Sources/VP9Hardware/WebMStickerDemuxer.swift
+mirror ios=docs/feature-parity.md mac=docs/feature-parity.md
 
 # Intended WebRTC differences
 allow webrtc api/peer_connection_interface.cc | iOS TGCALLS seam (disable_payload_type_demuxing, external transport security, dtls factory)

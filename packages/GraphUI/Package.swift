@@ -16,7 +16,7 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
         .package(name: "TGUIKit", path: "../TGUIKit"),
-        .package(name: "GraphCore", path: "../GraphCore"),
+        .package(name: "GraphCore", path: "../../submodules/telegram-ios/submodules/GraphCore"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
     ],
     targets: [

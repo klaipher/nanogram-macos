@@ -190,14 +190,14 @@
       "id": "tarball",
       "what": "version",
       "kind": "filename",
-      "file": "core-xprojects/libopus/opus-*.tar.gz",
+      "file": "submodules/telegram-ios/third-party/opus/opus-*.tar.gz",
       "regex": "^opus-([\\d.]+)\\.tar\\.gz$"
      },
      {
       "id": "tarball",
       "what": "sha256",
       "kind": "sha256",
-      "file": "core-xprojects/libopus/opus-*.tar.gz"
+      "file": "submodules/telegram-ios/third-party/opus/opus-*.tar.gz"
      },
      {
       "id": "configure",
@@ -257,7 +257,7 @@
       "id": "CHANGELOG",
       "what": "version",
       "kind": "regex",
-      "file": "core-xprojects/libvpx/source/CHANGELOG",
+      "file": "submodules/telegram-ios/third-party/libvpx/libvpx/CHANGELOG",
       "regex": "^\\S+ v([\\d.]+)"
      },
      {

@@ -20,6 +20,8 @@
   "spm_scratch_total": 20,
   "cache_root_total": 40
  },
+ "free_space_floor_gb": 25,
+ "bazel_disk_cache_min_age_minutes": 15,
  "bazel_disk_cache_gc": {
   "max_size": "20G",
   "max_age": "14d"

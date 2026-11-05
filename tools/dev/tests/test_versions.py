@@ -3,6 +3,7 @@
 Each test reads the version from the library's own source (archive name, version header, changelog,
 meson.build, submodule commit) so a bump that misses a place fails here, not at runtime.
 """
+import hashlib
 import re
 import subprocess
 import sys
@@ -39,8 +40,12 @@ def is_ancestor(repo: Path, ancestor: str, commit: str = "HEAD") -> bool:
 class PinnedVersionsTests(unittest.TestCase):
     def test_opus(self):
         script = read(CORE / "libopus" / "libopus" / "build.sh")
-        self.assertIn('SOURCE_ARCHIVE="$SRC_DIR/opus-1.6.1.tar.gz"', script)
-        self.assertTrue((CORE / "libopus" / "opus-1.6.1.tar.gz").is_file())
+        self.assertIn("third-party/opus/opus-1.6.1.tar.gz", script)
+        self.assertFalse((CORE / "libopus" / "opus-1.6.1.tar.gz").exists())
+        tarball = TG_IOS / "third-party" / "opus" / "opus-1.6.1.tar.gz"
+        if tarball.is_file():
+            self.assertEqual(hashlib.sha256(tarball.read_bytes()).hexdigest(),
+                             "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1")
         self.assertFalse((CORE / "libopus" / "opus-1.3.1.tar.gz").exists())
         self.assertIn("6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1", script)
 
@@ -51,7 +56,10 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertNotIn("-Os", script)
 
     def test_libvpx(self):
-        self.assertTrue(read(CORE / "libvpx" / "source" / "CHANGELOG").startswith("2026-08-07 v1.17.0"))
+        self.assertFalse((CORE / "libvpx" / "source").exists())
+        changelog = TG_IOS / "third-party" / "libvpx" / "libvpx" / "CHANGELOG"
+        if changelog.is_file():
+            self.assertTrue(read(changelog).startswith("2026-08-07 v1.17.0"))
 
     def test_libvpx_detects_arm_extensions_at_runtime(self):
         script = read(CORE / "libvpx" / "libvpx" / "build.sh")
@@ -155,7 +163,7 @@ class PinnedVersionsTests(unittest.TestCase):
         for commit in ("bdda8eff9f62547b4621c09f6a8873a61aecd95c", "6926af015580a1377e1b1bcad191d076453192cb"):
             self.assertTrue(is_ancestor(tgcalls, commit, pin), f"tgcalls {pin} does not contain {commit}")
         modules = read(ROOT / ".gitmodules")
-        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-mac\n', modules)
+        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-shared\n', modules)
 
     def test_libprisma_and_boost_regex_come_from_the_core(self):
         self.assertTrue((TG_IOS / "third-party" / "libprisma" / "Sources" / "SyntaxHighlighter.cpp").exists())

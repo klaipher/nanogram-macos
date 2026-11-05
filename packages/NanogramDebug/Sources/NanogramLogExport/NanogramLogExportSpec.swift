@@ -56,6 +56,20 @@ public struct NanogramLogExportSpec: Equatable, Sendable {
         }
     }
 
+    /// The per-day disk-write ledger (DiskWriteAccounting), kept next to the app logs.
+    public static let diskWriteLedgerFileName = "disk-writes.json"
+
+    /// Files that go into the export on top of what the collector returns. The MetricKit export carries the
+    /// disk-write ledger, as on iOS (the other kinds either have no use for it or already export the whole logs folder).
+    public func ledgerSources(logsDirectory: URL) -> [URL] {
+        switch self.kind {
+        case .metricKit:
+            return [logsDirectory.appendingPathComponent(NanogramLogExportSpec.diskWriteLedgerFileName)]
+        case .appLogs, .callLogs, .crashReports:
+            return []
+        }
+    }
+
     public var archiveName: String {
         return self.fileBaseName + ".zip"
     }
