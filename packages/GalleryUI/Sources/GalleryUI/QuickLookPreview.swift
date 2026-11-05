@@ -12,7 +12,38 @@ import TelegramTheme
 import TelegramContext
 import TelegramMediaUtils
 import ChatModeTypes
+import AlertsUI
 
+
+/// Extensions that get the "this file may be harmful" confirmation before Quick Look. Upstream's list,
+/// plus the other formats Quick Look renders with WebKit (webarchive, xht, svgz) and the ones it does not
+/// preview, which go to `NSWorkspace.openFile` and can run or install something (Terminal and Automator
+/// files, AppleScript, Java archives, Finder locations, configuration profiles, preference panes).
+let previewWarningExtensions: Set<String> = [
+    "sh", "bash", "zsh", "csh", "tcsh", "command", "tool", "terminal",
+    "svg", "svgz", "html", "htm", "shtml", "xhtml", "xht", "webarchive",
+    "app", "exe", "bin", "run", "pkg", "mpkg", "dmg", "iso",
+    "docm", "xlsm", "pptm",
+    "alias", "lnk", "fileloc", "inetloc",
+    "plist", "conf", "ini", "md",
+    "scpt", "scptd", "applescript", "workflow", "action", "jar",
+    "mobileconfig", "prefpane",
+]
+
+func needsPreviewWarning(fileName: String?, mimeType: String) -> Bool {
+    let fileName = (fileName ?? "").lowercased()
+    if previewWarningExtensions.contains(where: { fileName.hasSuffix("." + $0) }) {
+        return true
+    }
+    guard fileName.nsstring.pathExtension.isEmpty, let ext = fileExt(mimeType.lowercased()) else {
+        return false
+    }
+    return previewWarningExtensions.contains(ext.lowercased())
+}
+
+private func needsPreviewWarning(_ file: TelegramMediaFile) -> Bool {
+    return needsPreviewWarning(fileName: file.fileName, mimeType: file.mimeType)
+}
 
 private class QuickLookPreviewItem : NSObject, QLPreviewItem {
     let media:Media
@@ -62,6 +93,16 @@ public class QuickLookPreview : NSObject, QLPreviewPanelDelegate, QLPreviewPanel
     }
     
     public func show(context: any AccountContextProtocol, with media:Media, stableId:ChatHistoryEntryId?,  _ delegate:InteractionContentViewProtocol? = nil) {
+        if let file = media as? TelegramMediaFile, needsPreviewWarning(file) {
+            verifyAlert_button(for: context.window, information: strings().chatFileQuickLookMalf, successHandler: { [weak self] _ in
+                self?.present(context: context, with: media, stableId: stableId, delegate)
+            })
+        } else {
+            self.present(context: context, with: media, stableId: stableId, delegate)
+        }
+    }
+
+    private func present(context: any AccountContextProtocol, with media:Media, stableId:ChatHistoryEntryId?,  _ delegate:InteractionContentViewProtocol?) {
         self.context = context
         self.media = media
         self.delegate = delegate

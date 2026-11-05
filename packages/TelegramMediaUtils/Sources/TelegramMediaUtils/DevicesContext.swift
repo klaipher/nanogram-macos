@@ -234,13 +234,11 @@ public final class DevicesContext : NSObject {
         NotificationCenter.default.addObserver(forName: NSNotification.Name.AVCaptureDeviceWasDisconnected, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
         })
-        AudioListener.retainOutputListener()
-        
-
-        
-        AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
-        
-        AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
+        devicesQueue.async {
+            AudioListener.retainOutputListener()
+            AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
+            AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
+        }
         
         NotificationCenter.default.addObserver(forName: AudioNotification.audioDevicesDidChange.notificationName, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
@@ -394,9 +392,13 @@ public final class DevicesContext : NSObject {
     
     deinit {
         NotificationCenter.default.removeObserver(self)
-        AudioListener.releaseOutputListener()
-        AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
-        AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
+        // The listeners are added on devicesQueue (init), so they are removed there too: the serial queue
+        // runs the removal after a registration that has not run yet, which would otherwise outlive us.
+        devicesQueue.async {
+            AudioListener.releaseOutputListener()
+            AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
+            AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
+        }
         disposable.dispose()
         updateSampler.dispose()
     }

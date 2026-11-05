@@ -871,6 +871,14 @@ public final class TextViewLayout : Equatable {
         return (attributedString.string as NSString).substring(with: NSRange(location: range.location, length: end - range.location))
     }
 
+    /// What a code-block header click copies. Nil when the layout forbids copying (`mayItems` is off
+    /// for copy-protected messages and the Translate window of one), so every renderer of the header
+    /// (TextView, the chat layer engine) refuses the copy the same way.
+    public func copyableBlockQuoteText(startingWith range: NSRange) -> String? {
+        guard mayItems else { return nil }
+        return blockQuoteText(startingWith: range)
+    }
+
     public fileprivate(set) var isPerfectSized:Bool = true
     public var maximumNumberOfLines:Int32
     public let truncationType:CTLineTruncationType
@@ -3600,7 +3608,8 @@ open class TextView: Control, NSViewToolTipOwner, ViewDisplayDelegate {
                 return
             }
             if let blockHeader = blockHeaderRects.first(where: { $0.0.contains(point) }) {
-                if let string = layout.blockQuoteText(startingWith: blockHeader.1) {
+                // A protected layout swallows the click: no copy, and no fall-through into selection.
+                if let string = layout.copyableBlockQuoteText(startingWith: blockHeader.1) {
                     _ = layout.interactions.copyToClipboard?(string)
                     showModalText(for: window, text: localizedString("Share.Link.Copied"))
                 }

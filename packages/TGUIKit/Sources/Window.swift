@@ -823,6 +823,20 @@ open class Window: NSWindow {
         return hitView !== contentView && !hitView.isDescendant(of: contentView)
     }
 
+    /// True while an input method is composing in the first responder (it has marked text) and the key
+    /// has no Command modifier. Such a key belongs to the input method: Return or Enter confirm the
+    /// candidate, Escape cancels it, Space and the arrows pick candidates. Window key handlers (send on
+    /// Return in modals such as the media sender or Share, close on Escape, gallery arrows) must not run.
+    static func keyBelongsToInputMethod(_ event: NSEvent, firstResponder: NSResponder?) -> Bool {
+        guard event.type == .keyDown, !event.modifierFlags.contains(.command) else {
+            return false
+        }
+        guard let client = firstResponder as? NSTextInputClient else {
+            return false
+        }
+        return client.hasMarkedText()
+    }
+
     open override func sendEvent(_ event: NSEvent) {
         
         //        let testEvent = NSEvent.EventType.init(rawValue: 36)!
@@ -854,6 +868,11 @@ open class Window: NSWindow {
             if eventType == .keyDown {
                 
                 applyResponderIfNeeded(event)
+                
+                if Window.keyBelongsToInputMethod(event, firstResponder: self.firstResponder) {
+                    super.sendEvent(event)
+                    return
+                }
                 
                 cleanUndefinedHandlers()
                 
