@@ -9,7 +9,7 @@ Rule: every local dependency path in packages/*/Package.swift and submodules/*/P
 directory that contains a Package.swift. A manifest must also not list two different directories with the same
 last path component (SwiftPM derives the package identity from it).
 
-Pure text analysis; nothing is built. `python3 tools/dev/nanogram/manifestpaths.py [--root ROOT]` exits 1 on a problem.
+Pure text analysis; nothing is built. `python3 -m nanogram.manifestpaths [--root ROOT]` (from tools/dev, or `tg native`) exits 1 on a problem.
 Paths into a submodule that is not checked out (empty directory, as in a fresh worktree) are skipped.
 """
 import argparse
