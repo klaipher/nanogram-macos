@@ -240,4 +240,15 @@ final class DisplayLinkPlanTests: XCTestCase {
         spawned.removeAll()
         XCTAssertEqual(source.run(seconds: 0.1), 0)
     }
+
+    func testTimerSourceDeliversFramesWithoutAScreen() {
+        let driver = SharedDisplayLinkDriver(makeSource: { nil })
+        driver.useTimerSource(true)
+        let frames = expectation(description: "timer frames")
+        frames.expectedFulfillmentCount = 3
+        frames.assertForOverFulfill = false
+        let link = driver.add(framesPerSecond: .fps(60)) { _ in frames.fulfill() }
+        wait(for: [frames], timeout: 2)
+        link.invalidate()
+    }
 }

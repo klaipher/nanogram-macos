@@ -86,6 +86,54 @@ func makeDefaultSharedDisplayLinkSource() -> SharedDisplayLinkSource? {
     return nil
 }
 
+/// A vsync stand-in that ticks from a main-queue timer. A real display link never fires while the display is asleep
+/// or locked, so tests that wait for lottie frames to advance use this one (SharedDisplayLinkDriver.useTimerSource).
+final class TimerDisplayLinkSource: SharedDisplayLinkSource {
+    var onFrame: ((Double, Double) -> Void)?
+    let maximumFramesPerSecond: Int = 60
+    private var timer: DispatchSourceTimer?
+    private var framesPerSecond = 60
+
+    var isPaused: Bool = true {
+        didSet {
+            if self.isPaused != oldValue {
+                self.restart()
+            }
+        }
+    }
+
+    deinit {
+        self.timer?.cancel()
+    }
+
+    func setScreen(_ screen: NSScreen?) {
+    }
+
+    func apply(_ plan: DisplayLinkRatePlan) {
+        if self.framesPerSecond != plan.preferred {
+            self.framesPerSecond = max(1, plan.preferred)
+            self.restart()
+        }
+    }
+
+    private func restart() {
+        self.timer?.cancel()
+        self.timer = nil
+        guard !self.isPaused else {
+            return
+        }
+        let interval = 1.0 / Double(self.framesPerSecond)
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + interval, repeating: interval)
+        timer.setEventHandler { [weak self] in
+            let now = ProcessInfo.processInfo.systemUptime
+            self?.onFrame?(now, now + interval)
+        }
+        timer.resume()
+        self.timer = timer
+    }
+}
+
 @available(macOS 14.0, *)
 final class ScreenDisplayLinkSource: SharedDisplayLinkSource {
     private final class Target: NSObject {

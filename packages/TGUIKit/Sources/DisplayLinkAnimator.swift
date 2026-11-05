@@ -78,7 +78,7 @@ public final class SharedDisplayLinkDriver {
         }
     }
     
-    private let makeSource: () -> SharedDisplayLinkSource?
+    private var makeSource: () -> SharedDisplayLinkSource?
     private var source: SharedDisplayLinkSource?
     private var requests: [RequestContext] = []
     private(set) var deliveredEvents: Int = 0
@@ -135,6 +135,15 @@ public final class SharedDisplayLinkDriver {
         self.requestUpdate()
     }
     
+    /// Test aid: drive the shared clock from a timer instead of the screen's display link, which stays silent while
+    /// the display is asleep or locked. Pass false to go back to the screen's display link.
+    public func useTimerSource(_ enabled: Bool) {
+        self.source?.isPaused = true
+        self.source = nil
+        self.makeSource = enabled ? { TimerDisplayLinkSource() } : makeDefaultSharedDisplayLinkSource
+        self.requestUpdate()
+    }
+
     public func updateForegroundState(_ isActive: Bool) {
         if self.isInForeground != isActive {
             self.isInForeground = isActive

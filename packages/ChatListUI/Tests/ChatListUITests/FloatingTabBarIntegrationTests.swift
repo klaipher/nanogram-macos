@@ -47,6 +47,13 @@ final class FloatingTabBarIntegrationTests: XCTestCase {
     override func setUp() {
         super.setUp()
         UITestBootstrap.install()
+        // Lottie frames advance on the shared display link, which never fires while the host's display is asleep.
+        SharedDisplayLinkDriver.shared.useTimerSource(true)
+    }
+
+    override func tearDown() {
+        SharedDisplayLinkDriver.shared.useTimerSource(false)
+        super.tearDown()
     }
 
     func testPeerListsComposeBottomPaddingWithTheirHeaderInsets() {
