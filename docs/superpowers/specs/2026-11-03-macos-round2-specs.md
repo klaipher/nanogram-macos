@@ -622,7 +622,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 
 ## libs: external libraries
 
-### R2-25. Stage 1's FFmpeg 9.0.2 bump drops M27's VideoToolbox patch, so the merge silently undoes M27's FFmpeg half — `done` (group: libs)
+### R2-25. Stage 1's FFmpeg 9.0.2 bump drops M27's VideoToolbox patch, so the merge silently undoes M27's FFmpeg half — `done (M27's patch is carried through the stage-1/runtime merge 0e580364; no separate commit)` (group: libs)
 
 - **Status**: done: the stage-1/runtime merge already carries M27's patch in ffmpeg-9.0.2 (2 `Local patch (Nanogram)` hunks, lavc 63 headers); FFmpeg rebuilt with this round's flags and FFMpegVideoToolboxAttachmentTests, FFMpegFileReaderPixelBufferReuseTests, FFMpegHardwareFallbackTests pass.
 
@@ -646,7 +646,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-26. Software video decode, AV1 included, is single-threaded because no codec context sets `thread_count` — `partial` (group: libs)
+### R2-26. Software video decode, AV1 included, is single-threaded because no codec context sets `thread_count` — `partial (core 3afbf70868)` (group: libs)
 
 - **Status**: partial: AV1 at 1280x720 and above gets min(cores, 8) dav1d threads in FFMpegFileReader, FFMpegMediaFrameSourceContext and UniversalSoftwareVideoSource (core 3afbf70868, FFMpegSoftwareDecodeThreadsTests); H.264/HEVC scrub previews keep one thread (frame threading delays output in their lockstep decode), and there is no AV1 fixture or encoder on this machine for a DecodeBench fps A/B.
 
@@ -671,7 +671,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-27. FFmpeg is configured with components the Mac never uses and two component names that do not exist — `done` (group: libs)
+### R2-27. FFmpeg is configured with components the Mac never uses and two component names that do not exist — `done (8559624b)` (group: libs)
 
 - **Status**: done: muxers, encoders, bogus libopus names and the autodetected network/SecureTransport/bzlib/iconv/AppKit/AVFoundation/CoreImage/Metal/SDL2 glue are off (8559624b); libavformat.a 1469 -> 901 KB, no ff_*_muxer symbols, CONFIG_NETWORK 0; the app links.
 
@@ -694,7 +694,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-28. Native library builds run serial makes, OpenSSL's feature list is dead code, and two libraries clone from GitHub on every rebuild — `partial` (group: libs)
+### R2-28. Native library builds run serial makes, OpenSSL's feature list is dead code, and two libraries clone from GitHub on every rebuild — `partial (8559624b)` (group: libs)
 
 - **Status**: partial: parallel makes through MAKEFLAGS from tg frameworks and a curated OpenSSL Configure list (8559624b; libcrypto.a 8677 -> 6766 KB, libssl.a 1610 -> 1049 KB, no ossl_ml_dsa); tg_owt stays at 14.0 because its desktop_capture sources fail to build at 15.0 (CGDisplayCreateImage/CGDisplayStream* obsoleted); tarball vendoring dropped (the OpenSSL 3.5.9 tarball is 53 MB, over GitHub's 50 MB warning) and the pinned shallow clones keep their commit checks; the dead OpenSSL flag arrays stay to keep the upstream script's diff small.
 
@@ -721,7 +721,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-29. Group calls run RNNoise every 10 ms even with noise suppression off; the non-48 kHz path allocates per frame and drops its output — `done` (group: libs)
+### R2-29. Group calls run RNNoise every 10 ms even with noise suppression off; the non-48 kHz path allocates per frame and drops its output — `done (tgcalls a598e27, pinned by 6e528e30)` (group: libs)
 
 - **Status**: done: tgcalls a598e27: NS off skips RNNoise (~550 us per 10 ms frame here) and drives the speaking state from an adaptive peak detector (84-96% agreement with RNNoise's VAD on synthesized speech plus noise); non-48 kHz capture resamples with kept PushSincResamplers and writes the result back; tests/group_audio host tests.
 
@@ -744,7 +744,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-30. WebRTC's debug-log threshold is `LS_INFO` in release for 1:1 calls, so every INFO line is formatted and does a CFPreferences lookup — `done` (group: libs)
+### R2-30. WebRTC's debug-log threshold is `LS_INFO` in release for 1:1 calls, so every INFO line is formatted and does a CFPreferences lookup — `done (tgcalls 013adcb, pinned by 6e528e30)` (group: libs)
 
 - **Status**: done: tgcalls 013adcb: configureDebugLogging sets LS_NONE outside DEBUG for every instance type; INFO with no sink 580 ns -> 1.3 ns per line; tests/log_sink covers release and DEBUG.
 
@@ -766,7 +766,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-31. Rust profiles: tlottie alone unwinds, and wallet-engine builds crate types nobody links — `done` (group: libs)
+### R2-31. Rust profiles: tlottie alone unwinds, and wallet-engine builds crate types nobody links — `done (8559624b)` (group: libs)
 
 - **Status**: done: 8559624b: tlottie panic=abort (__eh_frame 133736 -> 103656 bytes), wallet-engine `cargo rustc --lib --crate-type staticlib`; the app links.
 
@@ -790,7 +790,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: medium
 
-### R2-32. Sparkle checks hourly and again on every emission of the network-settings preference — `done` (group: libs)
+### R2-32. Sparkle checks hourly and again on every emission of the network-settings preference — `done (ecb53118)` (group: libs)
 
 - **Status**: done: updater_resetWithUpdaterSource checks only when Sparkle's lastUpdateCheckDate is a day old (UpdateCheckSchedule, NanogramKit tests: five emissions -> one check); interval one day (assigned in code so installs that persisted 3600 migrate); opening the update screen checks immediately.
 
@@ -813,7 +813,7 @@ Merged from two reviewers (CPU and modern-API areas). The dead NSUserNotificatio
 - **Size**: S
 - **Confidence**: high
 
-### R2-33. Profile-guided optimization for tlottie, the one hot native library where a profile needs no account — `dropped` (group: libs)
+### R2-33. Profile-guided optimization for tlottie, the one hot native library where a profile needs no account — `dropped (not cheap: needs rustup llvm-tools, a render harness over the .tgs corpus and a pinned .profdata; left for a later round)` (group: libs)
 
 - **Status**: dropped: not cheap: needs rustup llvm-tools, an instrumented tlottie-cli render harness over the .tgs corpus, a pinned .profdata and a bench to prove the estimated 5-15%; left for a later round.
 
