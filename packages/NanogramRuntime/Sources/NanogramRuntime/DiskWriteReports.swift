@@ -17,9 +17,30 @@ public enum DiskWriteReportSchedule {
     }
 }
 
+public struct DiskWriteReportThrottle: Sendable {
+    public static let hourlyReason = "hourly"
+    public static let minimumInterval: TimeInterval = 5.0 * 60.0
+
+    private var lastAccepted: Date?
+
+    public init() {
+    }
+
+    public mutating func shouldReport(reason: String, at date: Date) -> Bool {
+        if reason != DiskWriteReportThrottle.hourlyReason, let last = self.lastAccepted, date.timeIntervalSince(last) >= 0, date.timeIntervalSince(last) < DiskWriteReportThrottle.minimumInterval {
+            return false
+        }
+        self.lastAccepted = date
+        return true
+    }
+}
+
 public final class DiskWriteReports {
     private let reporter: DiskWriteAccountingReporter
     private let log: (String) -> Void
+    private let throttleLock = NSLock()
+    private var throttle = DiskWriteReportThrottle()
+    private let now: () -> Date
     private let queue = DispatchQueue(label: "org.klaipher.nanogram.disk-write-reports", qos: .utility)
     private var timer: Foundation.Timer?
 
@@ -30,9 +51,10 @@ public final class DiskWriteReports {
         self.init(reporter: DiskWriteAccountingReporting.install(ledgerPath: ledgerPath), log: log)
     }
 
-    public init(reporter: DiskWriteAccountingReporter, log: @escaping (String) -> Void) {
+    public init(reporter: DiskWriteAccountingReporter, log: @escaping (String) -> Void, now: @escaping () -> Date = { Date() }) {
         self.reporter = reporter
         self.log = log
+        self.now = now
     }
 
     deinit {
@@ -43,7 +65,7 @@ public final class DiskWriteReports {
     public func start() {
         self.timer?.invalidate()
         let timer = Foundation.Timer(timeInterval: DiskWriteReportSchedule.interval, repeats: true, block: { [weak self] _ in
-            self?.report(reason: "hourly")
+            self?.report(reason: DiskWriteReportThrottle.hourlyReason)
         })
         timer.tolerance = DiskWriteReportSchedule.tolerance
         RunLoop.main.add(timer, forMode: .common)
@@ -57,6 +79,12 @@ public final class DiskWriteReports {
 
     /// Accounts what was written since the last report and logs the line. Runs off the calling thread.
     public func report(reason: String) {
+        self.throttleLock.lock()
+        let accepted = self.throttle.shouldReport(reason: reason, at: self.now())
+        self.throttleLock.unlock()
+        if !accepted {
+            return
+        }
         let reporter = self.reporter
         let log = self.log
         self.queue.async {
