@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **rlottie on the iOS line** (083f19a, branch `telegram-ios-dev`): the Mac now pins the same rlottie commit as iOS; the only difference left (`LOTTIE_THREAD_SAFE`) moved into the shared line. `nanogram-mac` is retired.
+
 - **Exact device and channel statistics back** (owner, 2026-11-05): the app and the share extension send the real Mac model again (`deviceModelPretty()`), and `MessageReadMetricsManager` measures channel reading again so channel owners see our readers. Reverts 446a1a07 (device part and the manager), 5013bdc8 and 53ee7af9. Music listening reports, call-log uploads and analytics stay off.
 
 - Night review fixes (2026-11-05, branch `night/review-fixes`; nothing built or run yet, tests added for the combined build).
