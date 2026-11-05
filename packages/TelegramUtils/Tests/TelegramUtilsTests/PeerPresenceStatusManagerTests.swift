@@ -80,7 +80,7 @@ private func present(_ until: Int32, lastActivity: Int32 = 0) -> TelegramUserPre
 
 private func isOnline(_ presence: TelegramUserPresence, at timestamp: Double, timeDifference: Int32 = 0) -> Bool {
     if case let .present(until) = presence.status {
-        return Int64(until) - Int64(timeDifference) > Int64(timestamp)
+        return Int64(until) - Int64(timeDifference) >= Int64(timestamp)
     }
     return false
 }
@@ -153,13 +153,29 @@ final class PeerPresenceStatusManagerTests: XCTestCase {
         let presence = present(1_000_010)
         let row = self.makeRow(environment: environment, presence: presence, mode: .onlineState, layoutCost: 0.0)
 
-        environment.advance(to: 1_000_009.99)
+        environment.advance(to: 1_000_010.99)
         XCTAssertTrue(row.shownOnline())
         XCTAssertEqual(row.updates(), 0)
-        environment.advance(to: 1_000_010.0)
+        environment.advance(to: 1_000_011.0)
         XCTAssertFalse(row.shownOnline())
         XCTAssertEqual(row.updates(), 1)
         withExtendedLifetime(row.manager) {}
+    }
+
+    func testOnlineDotBuiltInTheExpirySecondIsCleared() {
+        for fraction in [0.0, 0.4, 0.999] {
+            let environment = FakeEnvironment(timestamp: 1_000_000.0 + fraction)
+            var updates = 0
+            let manager = PeerPresenceStatusManager(mode: .onlineState, environment: environment, update: {
+                updates += 1
+            })
+            manager.reset(presence: present(1_000_000), timeDifference: 0)
+            XCTAssertEqual(environment.pendingTimerCount, 1, "fraction \(fraction)")
+            environment.advance(to: 1_000_002.0)
+            XCTAssertEqual(updates, 1, "fraction \(fraction)")
+            XCTAssertEqual(environment.pendingTimerCount, 0)
+            withExtendedLifetime(manager) {}
+        }
     }
 
     func testTimeDifferenceShiftsTheDeadline() {
@@ -167,7 +183,7 @@ final class PeerPresenceStatusManagerTests: XCTestCase {
         let presence = present(1_000_110)
         let row = self.makeRow(environment: environment, presence: presence, mode: .onlineState, timeDifference: 100, layoutCost: 0.0)
         XCTAssertTrue(row.shownOnline())
-        XCTAssertEqual(environment.nextDeadline ?? 0.0, 1_000_010.0, accuracy: 0.001)
+        XCTAssertEqual(environment.nextDeadline ?? 0.0, 1_000_011.0, accuracy: 0.001)
         environment.advance(to: 1_000_020.0)
         XCTAssertEqual(row.updates(), 1)
         XCTAssertFalse(row.shownOnline())
@@ -323,7 +339,7 @@ final class PeerPresenceStatusManagerTests: XCTestCase {
         environment.isApplicationInBackground = false
         XCTAssertEqual(row.updates(), 0)
         XCTAssertEqual(environment.pendingTimerCount, 1)
-        XCTAssertEqual(environment.nextDeadline ?? 0.0, 1_000_100.0, accuracy: 0.001)
+        XCTAssertEqual(environment.nextDeadline ?? 0.0, 1_000_101.0, accuracy: 0.001)
 
         environment.advance(to: 1_000_200.0)
         XCTAssertEqual(row.updates(), 1)

@@ -141,11 +141,11 @@ public func peerPresenceStatusRefreshTimeout(_ presence: TelegramUserPresence, t
             return Double.infinity
         }
         let adjusted = Int64(statusTimestamp) - Int64(timeDifference)
+        if case .onlineState = mode {
+            return adjusted >= now ? until(adjusted + 1) : Double.infinity
+        }
         if adjusted > now {
             return until(adjusted)
-        }
-        if case .onlineState = mode {
-            return Double.infinity
         }
         let difference = now - adjusted
         if difference < 59 {
