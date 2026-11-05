@@ -12,7 +12,7 @@ import TelegramTheme
 import Localization
 
 /// Translation bookkeeping is background work: it runs at utility QoS on its own serial queue.
-private let liveTranslateQueue = Queue(name: "LiveTranslateQueue", qos: .utility)
+nonisolated(unsafe) private let liveTranslateQueue = Queue(name: "LiveTranslateQueue", qos: .utility)
 
 
 

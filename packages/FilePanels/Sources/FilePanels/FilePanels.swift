@@ -74,18 +74,10 @@ public func selectFolder(for window:Window, completion:@escaping (String)->Void)
 
 /// Like `selectFolder`, and also hands over a security-scoped bookmark so the folder stays writable after a relaunch in the sandbox.
 public func selectFolderWithBookmark(for window:Window, completion:@escaping (String, Data?)->Void) {
-    delay(0.01, closure: {
-        let panel:NSOpenPanel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.beginSheetModal(for: window) { (response) in
-            if response == .OK, let url = panel.urls.first {
-                let bookmark = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
-                completion(url.path, bookmark)
-            }
-        }
+    // The panel hands the app access to the chosen folder; the bookmark is made from that path while it is granted.
+    selectFolder(for: window, completion: { path in
+        let bookmark = try? URL(fileURLWithPath: path, isDirectory: true).bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        completion(path, bookmark)
     })
 }
 
