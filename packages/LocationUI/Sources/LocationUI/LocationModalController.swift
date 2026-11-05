@@ -137,6 +137,7 @@ private final class LocationMapView : View {
         mapView.showsUserLocation = showsUserLocation
         self.mapView = mapView
         needsLayout = true
+        layoutSubtreeIfNeeded()
         return mapView
     }
     
