@@ -1360,9 +1360,12 @@ public class NStickersViewController<Context: AccountContextProtocol>: TelegramG
                 return
             }
             let item = self.genericView.tableView.item(at: position.visibleRows.location)
+            if self.genericView.packsView.selectedItem()?.stableId == item.stableId {
+                return
+            }
             self.genericView.packsView.changeSelection(stableId: item.stableId)
             self.genericView.packsView.scroll(to: .center(id: item.stableId, innerId: nil, animated: true, focus: .init(focus: false), inset: 0))
-            self.genericView.updateSelectionState(animated: true)
+            self.genericView.updateSelectionState(animated: true, retheme: false)
         })
 
         self.genericView.packsView.delegate = self

@@ -1959,10 +1959,13 @@ public final class AnimatedEmojiesView : Control {
             }
         }
         if let stableId = _stableId, let item = packsView.item(stableId: stableId) {
+            if packsView.selectedItem()?.stableId == item.stableId {
+                return _segment
+            }
             _ = self.packsView.select(item: item)
             self.packsView.scroll(to: .center(id: stableId, innerId: nil, animated: true, focus: .init(focus: false), inset: 0))
         }
-        updateSelectionState(animated: true)
+        updateSelectionState(animated: true, retheme: false)
         return _segment
     }
     

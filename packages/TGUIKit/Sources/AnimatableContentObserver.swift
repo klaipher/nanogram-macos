@@ -11,6 +11,114 @@ public struct AnimatableContentObserverOptions: OptionSet {
     public static let ownBounds = AnimatableContentObserverOptions(rawValue: 1 << 3)
 }
 
+final class AnimatableContentHub {
+    static let shared = AnimatableContentHub()
+
+    final class Subscription {
+        fileprivate let key: SourceKey
+        fileprivate let handler: (NSNotification) -> Void
+        fileprivate init(key: SourceKey, handler: @escaping (NSNotification) -> Void) {
+            self.key = key
+            self.handler = handler
+        }
+    }
+
+    fileprivate struct SourceKey: Hashable {
+        let object: ObjectIdentifier?
+        let name: Notification.Name
+    }
+
+    private final class Source {
+        weak var object: AnyObject?
+        var token: NSObjectProtocol?
+        var listeners: [ObjectIdentifier: Subscription] = [:]
+        var order: [ObjectIdentifier] = []
+    }
+
+    private let lock = NSLock()
+    private var sources: [SourceKey: Source] = [:]
+
+    var centerObserverCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return sources.count
+    }
+
+    func subscribe(name: Notification.Name, object: AnyObject?, handler: @escaping (NSNotification) -> Void) -> Subscription {
+        let key = SourceKey(object: object.map { ObjectIdentifier($0) }, name: name)
+        let subscription = Subscription(key: key, handler: handler)
+        var staleToken: NSObjectProtocol?
+        lock.lock()
+        defer {
+            lock.unlock()
+            if let staleToken {
+                NotificationCenter.default.removeObserver(staleToken)
+            }
+        }
+        var source = sources[key]
+        if let existing = source, existing.object !== object {
+            staleToken = existing.token
+            source = nil
+        }
+        let target: Source
+        if let source {
+            target = source
+        } else {
+            target = Source()
+            target.object = object
+            target.token = NotificationCenter.default.addObserver(forName: name, object: object, queue: nil, using: { [weak self] notification in
+                self?.deliver(notification, key: key)
+            })
+            sources[key] = target
+        }
+        let id = ObjectIdentifier(subscription)
+        target.listeners[id] = subscription
+        target.order.append(id)
+        return subscription
+    }
+
+    func unsubscribe(_ subscription: Subscription) {
+        var staleToken: NSObjectProtocol?
+        lock.lock()
+        defer {
+            lock.unlock()
+            if let staleToken {
+                NotificationCenter.default.removeObserver(staleToken)
+            }
+        }
+        guard let source = sources[subscription.key] else {
+            return
+        }
+        let id = ObjectIdentifier(subscription)
+        guard source.listeners.removeValue(forKey: id) != nil else {
+            return
+        }
+        source.order.removeAll(where: { $0 == id })
+        if source.listeners.isEmpty {
+            staleToken = source.token
+            sources[subscription.key] = nil
+        }
+    }
+
+    private func deliver(_ notification: Notification, key: SourceKey) {
+        lock.lock()
+        let listeners: [Subscription]
+        if let source = sources[key] {
+            listeners = source.order.compactMap { source.listeners[$0] }
+        } else {
+            listeners = []
+        }
+        lock.unlock()
+        guard !listeners.isEmpty else {
+            return
+        }
+        let bridged = notification as NSNotification
+        for listener in listeners {
+            listener.handler(bridged)
+        }
+    }
+}
+
 private final class AnimatableContentNotificationTarget: NSObject {
     weak var target: AnyObject?
     var selector: Selector?
@@ -31,6 +139,7 @@ public final class AnimatableContentObserver {
     private lazy var notificationTarget = AnimatableContentNotificationTarget()
     private var observedOptions: AnimatableContentObserverOptions = []
     private var registered = false
+    private var subscriptions: [AnimatableContentHub.Subscription] = []
 
     public init() {
     }
@@ -63,16 +172,19 @@ public final class AnimatableContentObserver {
         notificationTarget.target = target
         notificationTarget.selector = selector
 
-        let center = NotificationCenter.default
-        func add(_ name: Notification.Name, _ object: AnyObject) {
-            center.addObserver(notificationTarget, selector: #selector(AnimatableContentNotificationTarget.forwardNotification(_:)), name: name, object: object)
+        let hub = AnimatableContentHub.shared
+        let forwarder = notificationTarget
+        func add(_ name: Notification.Name, _ object: AnyObject?) {
+            subscriptions.append(hub.subscribe(name: name, object: object, handler: { [weak forwarder] notification in
+                forwarder?.forwardNotification(notification)
+            }))
         }
         add(NSWindow.didBecomeKeyNotification, window)
         add(NSWindow.didResignKeyNotification, window)
         add(NSWindow.didChangeOcclusionStateNotification, window)
-        center.addObserver(notificationTarget, selector: #selector(AnimatableContentNotificationTarget.forwardNotification(_:)), name: NSApplication.didHideNotification, object: nil)
-        center.addObserver(notificationTarget, selector: #selector(AnimatableContentNotificationTarget.forwardNotification(_:)), name: NSApplication.didUnhideNotification, object: nil)
-        center.addObserver(notificationTarget, selector: #selector(AnimatableContentNotificationTarget.forwardNotification(_:)), name: PlaybackVisibility.didChangeNotification, object: nil)
+        add(NSApplication.didHideNotification, nil)
+        add(NSApplication.didUnhideNotification, nil)
+        add(PlaybackVisibility.didChangeNotification, nil)
         if options.contains(.contentBounds), let contentView {
             add(NSView.boundsDidChangeNotification, contentView)
         }
@@ -100,7 +212,10 @@ public final class AnimatableContentObserver {
         guard registered else {
             return
         }
-        NotificationCenter.default.removeObserver(notificationTarget)
+        for subscription in subscriptions {
+            AnimatableContentHub.shared.unsubscribe(subscription)
+        }
+        subscriptions.removeAll()
         notificationTarget.target = nil
         notificationTarget.selector = nil
         observedWindow = nil
@@ -120,7 +235,7 @@ public final class AnimatableContentTokenObserver {
     private weak var observedWindow: NSWindow?
     private weak var observedContentView: NSView?
     private weak var observedDocumentView: NSView?
-    private var tokens: [NSObjectProtocol] = []
+    private var tokens: [AnimatableContentHub.Subscription] = []
     private var handler: ((Notification) -> Void)?
     private var generation = 0
 
@@ -145,11 +260,19 @@ public final class AnimatableContentTokenObserver {
         removeObservers()
         self.handler = handler
         let generation = self.generation
-        let callback: (Notification) -> Void = { [weak self] notification in
+        let deliver: (Notification) -> Void = { [weak self] notification in
             guard let self, self.generation == generation else {
                 return
             }
             self.handler?(notification)
+        }
+        let callback: (NSNotification) -> Void = { source in
+            let notification = source as Notification
+            if Thread.isMainThread {
+                deliver(notification)
+            } else {
+                DispatchQueue.main.async { deliver(notification) }
+            }
         }
         var observed: [(Notification.Name, AnyObject?)] = [
             (NSWindow.didBecomeKeyNotification, window),
@@ -168,9 +291,8 @@ public final class AnimatableContentTokenObserver {
         if contentView == nil || documentView == nil {
             observed.append((NSWindow.didResizeNotification, window))
         }
-        let center = NotificationCenter.default
         for (name, object) in observed {
-            tokens.append(center.addObserver(forName: name, object: object, queue: .main, using: callback))
+            tokens.append(AnimatableContentHub.shared.subscribe(name: name, object: object, handler: callback))
         }
         observedWindow = window
         observedContentView = contentView
@@ -179,9 +301,8 @@ public final class AnimatableContentTokenObserver {
 
     public func removeObservers() {
         generation &+= 1
-        let center = NotificationCenter.default
         for token in tokens {
-            center.removeObserver(token)
+            AnimatableContentHub.shared.unsubscribe(token)
         }
         tokens.removeAll()
         handler = nil

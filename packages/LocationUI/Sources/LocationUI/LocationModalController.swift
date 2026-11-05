@@ -75,6 +75,29 @@ private final class LocationPinView : View {
     }
 }
 
+private final class LocationMapPool {
+    static let shared = LocationMapPool()
+    private var parked: MKMapView?
+
+    func take() -> MKMapView {
+        if let mapView = parked {
+            parked = nil
+            return mapView
+        }
+        return MKMapView()
+    }
+
+    func recycle(_ mapView: MKMapView) {
+        mapView.delegate = nil
+        mapView.showsUserLocation = false
+        mapView.removeFromSuperview()
+        mapView.removeAnnotations(mapView.annotations)
+        mapView.removeOverlays(mapView.overlays)
+        mapView.setVisibleMapRect(MKMapRect.world, animated: false)
+        parked = mapView
+    }
+}
+
 private final class LocationMapView : View {
     fileprivate private(set) var mapView: MKMapView?
     fileprivate var showsUserLocation: Bool = false {
@@ -120,7 +143,7 @@ private final class LocationMapView : View {
         if let mapView {
             return mapView
         }
-        let mapView = MKMapView()
+        let mapView = LocationMapPool.shared.take()
         addSubview(mapView, positioned: .below, relativeTo: subviews.first)
         mapView.mapType = .standard
         mapView.isZoomEnabled = true
@@ -141,6 +164,15 @@ private final class LocationMapView : View {
         return mapView
     }
     
+    fileprivate func releaseMap() {
+        zoomControl?.removeFromSuperview()
+        zoomControl = nil
+        if let mapView {
+            self.mapView = nil
+            LocationMapPool.shared.recycle(mapView)
+        }
+    }
+
     fileprivate func getSelectedLocation() -> CLLocation? {
         guard let mapView else {
             return nil
@@ -833,6 +865,9 @@ public class LocationModalController: ModalViewController {
         disposable.dispose()
         sendDisposable.dispose()
         requestDisposable.dispose()
+        if isLoaded() {
+            genericView.releaseMap()
+        }
     }
     
     private var genericView: LocationMapView {

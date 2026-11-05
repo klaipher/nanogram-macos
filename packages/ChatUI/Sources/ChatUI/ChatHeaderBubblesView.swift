@@ -939,13 +939,21 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         return result
     }
 
+    private struct StatusTextKey: Equatable {
+        let title: NSAttributedString
+        let status: NSAttributedString
+        let width: CGFloat
+        let showActivities: Bool
+        let textColor: NSColor
+    }
+    private var appliedStatusTextKey: StatusTextKey?
+
     private func updateStatusText(presentation: ChatPresentationInterfaceState, force: Bool = false) {
-        defer {
-            needsLayout = true
-        }
         guard let result = computeTitleStatus(presentation: presentation) else {
+            appliedStatusTextKey = nil
             titleView.update(nil)
             statusView.update(nil)
+            needsLayout = true
             return
         }
 
@@ -958,18 +966,26 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         statusString.append(result.status)
         statusString.addAttribute(.font, value: NSFont.normal(.small), range: statusString.range)
 
-        let titleLayout = TextViewLayout(titleString, maximumNumberOfLines: 1, truncationType: .end, alignment: .left)
-        titleLayout.measure(width: max(60, frame.width - sideInsetForCenterContent()))
-        titleView.update(titleLayout)
+        let textWidth = max(60, frame.width - sideInsetForCenterContent())
+        let key = StatusTextKey(title: titleString, status: statusString, width: textWidth, showActivities: showActivities, textColor: theme.colors.text)
 
-        if statusString.length > 0 {
-            let statusLayout = TextViewLayout(statusString, maximumNumberOfLines: 1, truncationType: .end, alignment: .left)
-            statusLayout.measure(width: max(60, frame.width - sideInsetForCenterContent()))
-            statusView.update(statusLayout)
-            statusView.isHidden = showActivities
-        } else {
-            statusView.update(nil)
-            statusView.isHidden = true
+        if force || appliedStatusTextKey != key {
+            appliedStatusTextKey = key
+
+            let titleLayout = TextViewLayout(titleString, maximumNumberOfLines: 1, truncationType: .end, alignment: .left)
+            titleLayout.measure(width: textWidth)
+            titleView.update(titleLayout)
+
+            if statusString.length > 0 {
+                let statusLayout = TextViewLayout(statusString, maximumNumberOfLines: 1, truncationType: .end, alignment: .left)
+                statusLayout.measure(width: textWidth)
+                statusView.update(statusLayout)
+                statusView.isHidden = showActivities
+            } else {
+                statusView.update(nil)
+                statusView.isHidden = true
+            }
+            needsLayout = true
         }
 
         if let presence = result.presence {

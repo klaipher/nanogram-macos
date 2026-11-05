@@ -8898,7 +8898,11 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         self.ready.set(combine |> map { (hReady, appearanceReady, _, iReady, monoforumReady) in
             let isReady = hReady && iReady && appearanceReady && monoforumReady
             if isReady {
-                openSignpost.end()
+                DispatchQueue.main.async {
+                    CATransaction.setCompletionBlock {
+                        openSignpost.end()
+                    }
+                }
             }
             return isReady
         })
