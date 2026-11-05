@@ -51,17 +51,22 @@ final class LiveInstanceCounter: @unchecked Sendable {
 enum ChatControllerLifetime {
     static let counter = LiveInstanceCounter()
 
+    @available(macOS 11.0, *)
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Telegram", category: "ChatControllerLifetime")
 
     static func created() {
         let snapshot = counter.instanceCreated()
         NanogramSignposts.event(PerformanceSignpostName.chatControllerCreated)
-        logger.info("chat controller created live=\(snapshot.live, privacy: .public) created=\(snapshot.created, privacy: .public) deinit=\(snapshot.deinitialized, privacy: .public) peak=\(snapshot.peak, privacy: .public)")
+        if #available(macOS 11.0, *) {
+            logger.info("chat controller created live=\(snapshot.live, privacy: .public) created=\(snapshot.created, privacy: .public) deinit=\(snapshot.deinitialized, privacy: .public) peak=\(snapshot.peak, privacy: .public)")
+        }
     }
 
     static func deinitialized() {
         let snapshot = counter.instanceDeinitialized()
         NanogramSignposts.event(PerformanceSignpostName.chatControllerDeinit)
-        logger.info("chat controller deinit live=\(snapshot.live, privacy: .public) created=\(snapshot.created, privacy: .public) deinit=\(snapshot.deinitialized, privacy: .public) peak=\(snapshot.peak, privacy: .public)")
+        if #available(macOS 11.0, *) {
+            logger.info("chat controller deinit live=\(snapshot.live, privacy: .public) created=\(snapshot.created, privacy: .public) deinit=\(snapshot.deinitialized, privacy: .public) peak=\(snapshot.peak, privacy: .public)")
+        }
     }
 }
