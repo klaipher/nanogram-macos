@@ -27,6 +27,7 @@ let package = Package(
         .package(name: "TelegramCore", path: "../../submodules/telegram-ios/submodules/TelegramCore"),
         .package(name: "Postbox", path: "../../submodules/telegram-ios/submodules/Postbox"),
         .package(name: "TelegramMediaPlayer", path: "../../submodules/telegram-ios/submodules/MediaPlayer"),
+        .package(name: "rnoise", path: "../../submodules/telegram-ios/third-party/rnnoise"),
     ] + deps.map { .package(name: $0.0, path: $0.1) },
     targets: [
         .target(
@@ -45,6 +46,7 @@ let package = Package(
                 .product(name: "SwiftSignalKit", package: "SSignalKit"),
                 .product(name: "Postbox", package: "Postbox"),
                 .product(name: "TelegramMediaPlayer", package: "TelegramMediaPlayer"),
+                .product(name: "rnoise", package: "rnoise"),
             ],
             path: "Tests/AudioPlayerCoreTests"),
     ]

@@ -54,6 +54,7 @@ let package = Package(
         .package(name: "TelegramCore", path: "../../submodules/telegram-ios/submodules/TelegramCore"),
         .package(name: "Postbox", path: "../../submodules/telegram-ios/submodules/Postbox"),
         .package(name: "InputView", path: "../InputView"),
+        .package(name: "rnoise", path: "../../submodules/telegram-ios/third-party/rnnoise"),
     ] + deps.map { .package(name: $0.0, path: $0.1) },
     targets: [
         .target(
@@ -71,6 +72,7 @@ let package = Package(
                 .product(name: "TGUIKit", package: "TGUIKit", condition: nil),
                 .product(name: "KeyboardKey", package: "KeyboardKey", condition: nil),
                 .product(name: "InputView", package: "InputView", condition: nil),
+                .product(name: "rnoise", package: "rnoise", condition: nil),
             ],
             path: "Tests/GalleryUITests"),
     ]
