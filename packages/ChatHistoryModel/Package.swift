@@ -43,6 +43,7 @@ let package = Package(
         .package(name: "DiceCache", path: "../DiceCache"),
         .package(name: "EmojiReplacements", path: "../EmojiReplacements"),
         .package(name: "AvatarUI", path: "../AvatarUI"),
+        .package(name: "rnoise", path: "../../submodules/telegram-ios/third-party/rnnoise"),
     ],
     targets: [
         .target(
@@ -90,6 +91,8 @@ let package = Package(
                 "ChatHistoryModel",
                 .product(name: "TelegramCore", package: "TelegramCore"),
                 .product(name: "Postbox", package: "Postbox"),
+                // tgcalls (reached through TelegramContext) needs rnnoise, which only the test bundle links.
+                .product(name: "rnoise", package: "rnoise"),
             ],
             path: "Tests/ChatHistoryModelTests"),
     ]
