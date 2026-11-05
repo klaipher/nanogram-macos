@@ -466,7 +466,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         if let deviceSpecificEncryptionParameters = appEncryption.decrypt() {
             let parameters = ValueBoxEncryptionParameters(forceEncryptionIfNoSet: true, key: ValueBoxEncryptionParameters.Key(data: deviceSpecificEncryptionParameters.key)!, salt: ValueBoxEncryptionParameters.Salt(data: deviceSpecificEncryptionParameters.salt)!)
             self.launchApp(accountManager: accountManager, encryptionParameters: parameters, appEncryption: appEncryption)
-        } else if appEncryption.keychainUnavailable {
+        } else if appEncryption.keychainUnavailable() {
             self.window.makeKeyAndOrderFront(self)
             NSApp.activate(ignoringOtherApps: true)
             let alert = NSAlert()

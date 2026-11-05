@@ -57,7 +57,10 @@ class CompilerHardeningTests(unittest.TestCase):
 
     def test_ffmpeg_has_the_native_av1_decoder_for_the_videotoolbox_hwaccel(self):
         script = (ROOT / "core-xprojects" / "ffmpeg" / "ffmpeg" / "build.sh").read_text()
-        decoders = re.search(r"--enable-decoder=(\S+)", script).group(1).rstrip("\\").split(",")
+        # The decoder list is the shared one (the core's ffmpeg-common-flags.sh, sourced by build.sh).
+        shared = (ROOT / "submodules" / "telegram-ios" / "submodules" / "ffmpeg" / "Sources" / "FFMpeg"
+                  / "ffmpeg-common-flags.sh").read_text()
+        decoders = re.search(r"--enable-decoder=(\S+)", shared).group(1).rstrip("\\").split(",")
         self.assertIn("av1", decoders)
         self.assertIn("libdav1d", decoders)
         self.assertIn("av1_videotoolbox", re.search(r"--enable-hwaccel=(\S+)", script).group(1))
