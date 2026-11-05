@@ -288,7 +288,9 @@ cmd_core_bump() {
   local failed=()
   if [ "$test" = 1 ]; then (cmd_test) || failed+=(test); fi
   if [ "$build" = 1 ]; then (cmd_build) || failed+=(build); fi
-  (cmd_parity) || failed+=(parity)
+  # Parity checks the staged pin: HEAD still records the old one, and a mirror file changed on both sides
+  # matches only the new core.
+  (cmd_parity --pin "$(git rev-parse :submodules/telegram-ios)") || failed+=(parity)
   if [ ${#failed[@]} != 0 ]; then
     py sync core-bump --revert "$old"
     die "core-bump stopped (${failed[*]} failed); the pin is back at ${old:0:10}"
