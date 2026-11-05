@@ -1,5 +1,7 @@
 # Building Telegram for macOS
 
+> **Upstream's guide, not our build flow.** Nanogram builds with `tools/dev/tg` (Apple Silicon only, macOS 15 deployment target, Xcode 27): see [docs/local-development.md](docs/local-development.md). The text below is Telegram for macOS's own and is kept for reference; Rosetta, Intel and the 10.13 target do not apply to us.
+
 The app is an Xcode workspace (`Telegram-Mac.xcworkspace`) that links a set of native
 libraries built once from `core-xprojects/` and a collection of local Swift packages
 from `packages/` and `submodules/telegram-ios/submodules/`. There are no remote Swift

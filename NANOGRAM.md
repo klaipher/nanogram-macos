@@ -26,12 +26,13 @@ It is the Mac sibling of Nanogram for iOS: the same app, tuned to build faster a
   warning count (`nanogram/warnings-baseline.json`). `tg check` is the pre-push gate (crash-risk lint on changed
   lines, the warning baseline, package tests).
 - Telegram core: `submodules/telegram-ios` comes from our iOS repository
-  [klaipher/nanogram](https://github.com/klaipher/nanogram), branch `mac/core`, which carries no Telegram history.
+  [klaipher/nanogram](https://github.com/klaipher/nanogram), branch `main`, which carries no Telegram history.
 - Upstream sync: only released code. macOS up to a shipped build-number bump (telegram-macos has no tags); the core
   from official Telegram-iOS `release-*` tags, imported as snapshots.
 - Experiments ship behind switches in **Nanogram → Debug Settings…**; all but on-device voice transcription are off by default.
 
 Developer entry point: `tools/dev/tg` and [docs/local-development.md](docs/local-development.md).
-Design and plans: `docs/superpowers/specs/`, `docs/superpowers/plans/`.
+Documentation index: [docs/README.md](docs/README.md). Design records: `docs/superpowers/specs/` (finished plans are deleted).
+What differs from upstream: [NANOGRAM-CHANGES.md](NANOGRAM-CHANGES.md); builds: [CHANGELOG.md](CHANGELOG.md).
 
 Licensed under GPL-2.0 like the upstream project. Not affiliated with Telegram.

@@ -1,3 +1,7 @@
+> **Nanogram for macOS.** This is the Nanogram fork of Telegram for macOS (unofficial, not affiliated with Telegram). Start with
+> [NANOGRAM.md](NANOGRAM.md), [docs/local-development.md](docs/local-development.md) and `tools/dev/tg setup`. What differs
+> from upstream: [NANOGRAM-CHANGES.md](NANOGRAM-CHANGES.md). The rest of this page is upstream's README.
+
 <div align="center">
   <img src="Telegram-Mac/Assets.xcassets/AppIcon.appiconset/Logo_1024.png"
       width="125" 
