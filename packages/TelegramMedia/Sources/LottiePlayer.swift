@@ -1951,9 +1951,8 @@ public final class LottieAnimation : Equatable {
                 case .none:
                     fileSupplyment = nil
                 }
-                let reusePixelBuffers = fileSupplyment == nil
                 return WebmRenderer(animation: self, makeDecoder: {
-                    return SoftwareVideoSource(path: path, hintVP9: true, unpremultiplyAlpha: premultiply, reusePixelBuffers: reusePixelBuffers)
+                    return SoftwareVideoSource(path: path, hintVP9: true, unpremultiplyAlpha: premultiply, reusePixelBuffers: true)
                 }, makeHardwareReader: {
                     return VP9HardwareStickerReader(path: path, unpremultiplyAlpha: premultiply)
                 }, fileSupplyment: fileSupplyment)
