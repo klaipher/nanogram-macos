@@ -4,7 +4,7 @@ Identical in both repos (`nanogram-ios/docs/feature-parity.md`, `nanogram-macos/
 before adding a feature to one app, and update the matching row when a feature lands, so the next agent does not have
 to re-derive it. Written 2026-11-05 from code reading only (nothing was built or run) at iOS `origin/main` 6e6664c6 and
 Mac `sec/integration` 5d01908d. The Mac integration branch `nanogram/integration` (31030f3c) was behind it and did not
-yet have Lockdown Mode or the key vault.
+yet have Lockdown Mode. (The database key vault of that time was removed again on 2026-11-05.)
 
 Paths start with `ios:` (the iOS repo) or `mac:` (the Mac repo). Marks: `yes`, `partial`, `no`, and `gap` for an
 upstream gap (official Telegram has the same gap on that platform).
@@ -80,7 +80,6 @@ upstream gap (official Telegram has the same gap on that platform).
 | VP9 hardware sticker decode | yes (ios:AnimatedStickerNode/VP9Hardware) | yes (mac:packages/VP9Hardware) | Decoder and demuxer are byte-identical copies, listed as `mirror` lines in docs/mac-core-paths.txt |
 | Wide-gamut JPEG send | no | yes, switch, off (mac:Telegram-Mac/app/AppDelegate.swift) | |
 | Frame-rate cap | yes (tablet display-link cap) | yes (display.maxFrameRate) | |
-| Database key vault | yes (ios:BuildConfig/Sources/NanogramKeyVault.m) | yes (3366e52d on sec/integration) | Two identical copies today; one core module is the plan |
 | Isolated sticker decoding (XPC) | n/a | yes, switch, off | |
 | Show calls in Phone Recents | yes | n/a | |
 | App icons (Sphere default) | yes | yes (mac:packages/NanogramAppIcons) | |

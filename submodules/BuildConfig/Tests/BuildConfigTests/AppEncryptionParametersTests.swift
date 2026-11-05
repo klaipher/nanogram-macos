@@ -2,231 +2,82 @@ import Foundation
 import XCTest
 import BuildConfig
 
+/// The database key is the `.tempkeyEncrypted` file beside the database, as upstream: AES with the default key, or
+/// with the passcode. No keychain is involved, so a restored backup or a migrated account folder opens anywhere.
 final class AppEncryptionParametersTests: XCTestCase {
     private var root: URL!
-    private var store: NanogramMemoryWrapKeyStore!
 
     override func setUpWithError() throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("app-encryption-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        store = NanogramMemoryWrapKeyStore()
     }
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: root)
     }
 
-    private var legacyFile: URL { root.appendingPathComponent(".tempkeyEncrypted") }
-    private var vaultFile: URL { root.appendingPathComponent(".tempkeyVault") }
-
-    private func legacy() -> AppEncryptionParameters {
-        return AppEncryptionParameters(path: root.path, wrapKeyStore: nil, iterations: 1000)
-    }
-
-    private func wrapped() -> AppEncryptionParameters {
-        return AppEncryptionParameters(path: root.path, wrapKeyStore: store, iterations: 1000)
-    }
+    private var keyFile: URL { root.appendingPathComponent(".tempkeyEncrypted") }
+    private var plainFile: URL { root.appendingPathComponent(".tempkey") }
 
     private func bytes(_ parameters: DeviceSpecificEncryptionParameters?) throws -> Data {
         let parameters = try XCTUnwrap(parameters)
         return parameters.key + parameters.salt
     }
 
-    func testFreshInstallWritesOnlyTheVault() throws {
-        let encryption = wrapped()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: vaultFile.path))
+    func testFreshInstallWritesOnlyTheKeyFile() throws {
+        let encryption = AppEncryptionParameters(path: root.path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: keyFile.path))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [".tempkeyEncrypted"])
         XCTAssertFalse(encryption.hasPasscode())
         XCTAssertEqual(try bytes(encryption.decrypt()).count, 48)
-        XCTAssertEqual(try bytes(wrapped().decrypt()), try bytes(encryption.decrypt()))
     }
 
-    func testWithoutAStoreTheLegacyFormatIsUnchanged() throws {
-        let encryption = legacy()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyFile.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultFile.path))
-        XCTAssertNotNil(encryption.decrypt())
+    func testTheKeyIsStableAcrossLaunches() throws {
+        let first = try bytes(AppEncryptionParameters(path: root.path).decrypt())
+        XCTAssertEqual(try bytes(AppEncryptionParameters(path: root.path).decrypt()), first)
     }
 
-    func testLegacyKeyWithoutPasscodeMigratesOnFirstLaunchKeepingTheSameKey() throws {
-        let original = try bytes(legacy().decrypt())
-        let encryption = wrapped()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: vaultFile.path))
-        XCTAssertEqual(try bytes(encryption.decrypt()), original)
-        XCTAssertFalse(encryption.hasPasscode())
-    }
-
-    func testLegacyKeyWithPasscodeStaysLockedUntilUnlockedThenMigrates() throws {
-        let old = legacy()
-        let original = try bytes(old.decrypt())
-        XCTAssertTrue(old.change("1234"))
-        let locked = wrapped()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyFile.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultFile.path))
+    func testPasscodeChangeAndRemovalKeepTheSameKey() throws {
+        let encryption = AppEncryptionParameters(path: root.path)
+        let original = try bytes(encryption.decrypt())
+        encryption.change("1234")
+        let locked = AppEncryptionParameters(path: root.path)
         XCTAssertTrue(locked.hasPasscode())
         XCTAssertNil(locked.decrypt())
         locked.applyPasscode("0000")
         XCTAssertNil(locked.decrypt())
         locked.applyPasscode("1234")
         XCTAssertEqual(try bytes(locked.decrypt()), original)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-        let relaunched = wrapped()
-        XCTAssertTrue(relaunched.hasPasscode())
-        XCTAssertNil(relaunched.decrypt())
-        relaunched.applyPasscode("1234")
-        XCTAssertEqual(try bytes(relaunched.decrypt()), original)
+        locked.remove()
+        XCTAssertFalse(AppEncryptionParameters(path: root.path).hasPasscode())
+        XCTAssertEqual(try bytes(AppEncryptionParameters(path: root.path).decrypt()), original)
     }
 
-    func testPasscodeChangeAndRemovalRewrapTheSameKey() throws {
-        let encryption = wrapped()
-        let original = try bytes(encryption.decrypt())
-        XCTAssertTrue(encryption.change("1111"))
-        XCTAssertTrue(wrapped().hasPasscode())
-        XCTAssertTrue(encryption.change("2222"))
-        let reopened = wrapped()
-        reopened.applyPasscode("1111")
-        XCTAssertNil(reopened.decrypt())
-        reopened.applyPasscode("2222")
-        XCTAssertEqual(try bytes(reopened.decrypt()), original)
-        XCTAssertTrue(reopened.remove())
-        XCTAssertFalse(wrapped().hasPasscode())
-        XCTAssertEqual(try bytes(wrapped().decrypt()), original)
-        XCTAssertEqual(store.keyIds.count, 1)
-    }
-
-    func testFailedRewrapKeepsTheOldPasscodeInForce() throws {
-        let encryption = wrapped()
-        XCTAssertTrue(encryption.change("1111"))
-        let original = try bytes(encryption.decrypt())
-        store.failWrites = true
-        XCTAssertFalse(encryption.change("2222"))
-        store.failWrites = false
-        let reopened = wrapped()
-        reopened.applyPasscode("1111")
-        XCTAssertEqual(try bytes(reopened.decrypt()), original)
-        XCTAssertEqual(try bytes(encryption.decrypt()), original)
-    }
-
-    func testKeychainRefusingMigrationLeavesTheLegacyFileWorking() throws {
-        let original = try bytes(legacy().decrypt())
-        store.failWrites = true
-        let encryption = wrapped()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyFile.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultFile.path))
-        XCTAssertEqual(try bytes(encryption.decrypt()), original)
-        XCTAssertFalse(encryption.hasPasscode())
-        XCTAssertTrue(encryption.change("9999"))
-        store.failWrites = false
-        let later = wrapped()
-        XCTAssertTrue(later.hasPasscode())
-        later.applyPasscode("9999")
-        XCTAssertEqual(try bytes(later.decrypt()), original)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-    }
-
-    func testLockedKeychainDoesNotRegenerateOrDeleteAnything() throws {
-        let original = try bytes(wrapped().decrypt())
-        let before = try Data(contentsOf: vaultFile)
-        store.unavailable = true
-        let encryption = wrapped()
-        XCTAssertNil(encryption.decrypt())
-        XCTAssertFalse(encryption.change("1234"))
-        XCTAssertEqual(try Data(contentsOf: vaultFile), before)
-        store.unavailable = false
-        XCTAssertEqual(try bytes(wrapped().decrypt()), original)
-    }
-
-    func testCrashAfterTheVaultWasWrittenButBeforeTheLegacyFileWasRemoved() throws {
-        let original = try bytes(legacy().decrypt())
-        let vault = NanogramKeyVault(path: vaultFile.path, store: store, iterations: 1000)
-        XCTAssertEqual(vault.writePayload(original, passcode: nil), .OK)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyFile.path))
-        let relaunched = wrapped()
-        XCTAssertEqual(try bytes(relaunched.decrypt()), original)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-        XCTAssertEqual(try bytes(wrapped().decrypt()), original)
-    }
-
-    func testCrashBeforeTheVaultFileWasWrittenLeavesLegacyAuthoritative() throws {
-        let original = try bytes(legacy().decrypt())
-        XCTAssertTrue(store.writeWrapKey(Data(repeating: 5, count: 32), withId: "orphan"))
-        let relaunched = wrapped()
-        XCTAssertEqual(try bytes(relaunched.decrypt()), original)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-    }
-
-    func testVaultWithLostWrapKeyAndNoLegacyIsReportedAsLockedNotRegenerated() throws {
-        let encryption = wrapped()
-        _ = encryption
-        let before = try Data(contentsOf: vaultFile)
-        for id in store.keyIds { store.deleteWrapKey(withId: id) }
-        let relaunched = wrapped()
-        XCTAssertNil(relaunched.decrypt())
-        XCTAssertEqual(try Data(contentsOf: vaultFile), before)
-    }
-
-    func testProcessWithoutTheKeychainNeverReplacesAnExistingVault() throws {
-        let original = try bytes(wrapped().decrypt())
-        let before = try Data(contentsOf: vaultFile)
-        let fallback = legacy()
-        XCTAssertNil(fallback.decrypt())
-        XCTAssertFalse(fallback.hasPasscode())
-        XCTAssertFalse(fallback.change("1234"))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-        XCTAssertEqual(try Data(contentsOf: vaultFile), before)
-        XCTAssertEqual(try bytes(wrapped().decrypt()), original)
-    }
-
-    func testProcessWithoutTheKeychainReadsThePasscodeFlagFromTheVault() throws {
-        let encryption = wrapped()
-        XCTAssertTrue(encryption.change("1234"))
-        XCTAssertTrue(legacy().hasPasscode())
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-    }
-
-    func testPasscodeChangeAfterADelayedMigrationRewrapsTheVaultOnly() throws {
-        let original = try bytes(legacy().decrypt())
-        store.failWrites = true
-        let encryption = wrapped()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultFile.path))
-        store.failWrites = false
-        XCTAssertTrue(encryption.change("1234"))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
-        let relaunched = wrapped()
-        XCTAssertTrue(relaunched.hasPasscode())
-        XCTAssertNil(relaunched.decrypt())
-        relaunched.applyPasscode("1234")
-        XCTAssertEqual(try bytes(relaunched.decrypt()), original)
-    }
-
-    func testAnExistingVaultWithoutAKeychainIsReportedAsKeychainUnavailable() throws {
-        _ = wrapped()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: vaultFile.path))
-        let encryption = legacy()
-        XCTAssertNil(encryption.decrypt())
-        XCTAssertTrue(encryption.keychainUnavailable())
-    }
-
-    func testAHealthyKeychainIsNeverReportedAsUnavailable() throws {
-        let encryption = wrapped()
-        XCTAssertNotNil(encryption.decrypt())
-        XCTAssertFalse(encryption.keychainUnavailable())
-    }
-
-    func testAWrongPasscodeIsNotAKeychainProblem() throws {
-        let encryption = wrapped()
-        XCTAssertTrue(encryption.change("1234"))
-        let locked = wrapped()
+    func testOpeningALockedKeyNeverReplacesIt() throws {
+        let encryption = AppEncryptionParameters(path: root.path)
+        encryption.change("1234")
+        let before = try Data(contentsOf: keyFile)
+        let locked = AppEncryptionParameters(path: root.path)
         XCTAssertNil(locked.decrypt())
-        XCTAssertFalse(locked.keychainUnavailable())
         locked.applyPasscode("wrong")
         XCTAssertNil(locked.decrypt())
-        XCTAssertFalse(locked.keychainUnavailable())
+        XCTAssertEqual(try Data(contentsOf: keyFile), before)
     }
 
-    func testNoVaultAndNoKeychainIsNotReportedAsUnavailable() throws {
-        let encryption = legacy()
-        XCTAssertFalse(encryption.keychainUnavailable())
+    func testAPlainTempkeyIsUpgradedKeepingItsKey() throws {
+        let plain = Data((0..<48).map { UInt8($0) })
+        try plain.write(to: plainFile)
+        let encryption = AppEncryptionParameters(path: root.path)
+        XCTAssertEqual(try bytes(encryption.decrypt()), plain)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: plainFile.path))
+    }
+
+    func testAForeignVaultFileIsIgnoredAndLeftAlone() throws {
+        let vault = root.appendingPathComponent(".tempkeyVault")
+        let content = Data(repeating: 7, count: 100)
+        try content.write(to: vault)
+        let encryption = AppEncryptionParameters(path: root.path)
+        XCTAssertNotNil(encryption.decrypt())
+        XCTAssertEqual(try Data(contentsOf: vault), content)
     }
 }

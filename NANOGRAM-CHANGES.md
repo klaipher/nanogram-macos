@@ -34,7 +34,7 @@ not re-verified against the code; correct them on the next change in that area.
 
 ### Security hardening
 - What: sandboxed direct edition and hardened Sparkle updates, sticker/emoji decoding in an isolated XPC helper (Debug
-  Settings switch), database key vault, Lockdown Mode policy, memory-safety C flags, optional Enhanced Security entitlements.
+  Settings switch), Lockdown Mode policy, memory-safety C flags, optional Enhanced Security entitlements.
 - Where: `packages/NanogramDecoder`, `nanogram/entitlements/`, docs/decoder-isolation.md, docs/security-audit/.
 - Upstream: partly.
 

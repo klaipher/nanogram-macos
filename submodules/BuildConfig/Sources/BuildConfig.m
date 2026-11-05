@@ -93,121 +93,24 @@ static NSString *telegramApplicationSecretKey = @"telegramApplicationSecretKey_v
     NSString * _Nonnull _rootPath;
     NSData * _Nonnull key;
     NSData * _Nonnull iv;
-    NSString * _Nullable _passcode;
-    NanogramKeyVault * _Nullable _vault;
-    BOOL _storeUnavailable;
-    NanogramVaultOutcome _lastOutcome;
 }
 
 @end
 
 @implementation AppEncryptionParameters
 
-static id<NanogramWrapKeyStore> sharedWrapKeyStore = nil;
-static NSObject *sharedWrapKeyStoreLock = nil;
-
-+(void)initialize {
-    if (self == [AppEncryptionParameters class]) {
-        sharedWrapKeyStoreLock = [[NSObject alloc] init];
-    }
-}
-
-+(void)setSharedWrapKeyStore:(id<NanogramWrapKeyStore>)store {
-    @synchronized (sharedWrapKeyStoreLock) {
-        sharedWrapKeyStore = store;
-    }
-}
-
-+(id<NanogramWrapKeyStore>)currentSharedWrapKeyStore {
-    @synchronized (sharedWrapKeyStoreLock) {
-        return sharedWrapKeyStore;
-    }
-}
-
-+(BOOL)enableKeychainWrappingWithAccessGroup:(NSString *)accessGroup {
-    NanogramKeychainWrapKeyStore *store = [[NanogramKeychainWrapKeyStore alloc] initWithService:@"org.nanogram.database-key.v1" accessGroup:accessGroup];
-    if (![store probe]) {
-        [self setSharedWrapKeyStore:nil];
-        return NO;
-    }
-    [self setSharedWrapKeyStore:store];
-    return YES;
-}
-
 -(id _Nonnull)initWithPath:(NSString * _Nonnull)path {
-    return [self initWithPath:path wrapKeyStore:[AppEncryptionParameters currentSharedWrapKeyStore] iterations:[NanogramKeyVault defaultIterations]];
-}
-
--(id _Nonnull)initWithPath:(NSString * _Nonnull)path wrapKeyStore:(id<NanogramWrapKeyStore> _Nullable)store iterations:(uint32_t)iterations {
     self = [super init];
     if (self != nil) {
         self->_rootPath = path;
         if (![NSFileManager.defaultManager fileExistsAtPath:path]) {
             [NSFileManager.defaultManager createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
         }
-        if (store != nil) {
-            self->_vault = [[NanogramKeyVault alloc] initWithPath:[self vaultPath] store:store iterations:iterations];
-        } else if ([NSFileManager.defaultManager fileExistsAtPath:[self vaultPath]]) {
-            NanogramMemoryWrapKeyStore *unavailable = [[NanogramMemoryWrapKeyStore alloc] init];
-            unavailable.unavailable = YES;
-            self->_storeUnavailable = YES;
-            self->_vault = [[NanogramKeyVault alloc] initWithPath:[self vaultPath] store:unavailable iterations:iterations];
-            NSLog(@"DatabaseKey: the key vault exists but the keychain is not available in this process");
-        }
         [self applyPasscode:AppEncryptionParameters.defaultKey];
         [self upgradeLegacyIfNeeded];
-        if (self->_vault != nil) {
-            [self adoptIntoVaultIfNeeded];
-        } else {
-            [self initializeIfNeeded];
-        }
+        [self initializeIfNeeded];
     }
     return self;
-}
-
--(BOOL)keychainUnavailable {
-    return (self->_vault != nil && self->_storeUnavailable) || self->_lastOutcome == NanogramVaultOutcomeKeychainUnavailable;
-}
-
--(NSString *)vaultPath {
-    return [self->_rootPath stringByAppendingPathComponent:@".tempkeyVault"];
-}
-
--(NSData * _Nullable)legacyPayload {
-    DeviceSpecificEncryptionParameters *parameters = [self decryptLegacy];
-    if (parameters == nil) {
-        return nil;
-    }
-    NSMutableData *payload = [[NSMutableData alloc] initWithData:parameters.key];
-    [payload appendData:parameters.salt];
-    return payload;
-}
-
--(DeviceSpecificEncryptionParameters * _Nullable)resolveVaultCreating:(BOOL)create {
-    NanogramKeyVaultResult *result = [self->_vault resolveWithPasscode:self->_passcode legacyExists:^BOOL{
-        return [[NSFileManager defaultManager] fileExistsAtPath:self.path];
-    } legacyPayload:^NSData * _Nullable{
-        return [self legacyPayload];
-    } removeLegacy:^{
-        [[NSFileManager defaultManager] removeItemAtPath:self.path error:nil];
-    } create:create];
-    self->_lastOutcome = result.outcome;
-    if (result.outcome != NanogramVaultOutcomeOK || result.payload.length != 48) {
-        return nil;
-    }
-    return [[DeviceSpecificEncryptionParameters alloc] initWithKey:[result.payload subdataWithRange:NSMakeRange(0, 32)] salt:[result.payload subdataWithRange:NSMakeRange(32, 16)]];
-}
-
--(void)adoptIntoVaultIfNeeded {
-    BOOL legacyExists = [[NSFileManager defaultManager] fileExistsAtPath:self.path];
-    BOOL vaultExists = [self->_vault fileExists];
-    if (!legacyExists && !vaultExists) {
-        if ([self resolveVaultCreating:YES] == nil) {
-            [self initializeIfNeeded];
-        }
-    } else if (legacyExists && !vaultExists) {
-        [self resolveVaultCreating:NO];
-    }
 }
 
 +(NSString * _Nonnull)defaultKey {
@@ -215,7 +118,6 @@ static NSObject *sharedWrapKeyStoreLock = nil;
 }
 
 -(void)applyPasscode:(NSString * _Nonnull)passcode {
-    self->_passcode = [passcode isEqualToString:AppEncryptionParameters.defaultKey] ? nil : [passcode copy];
     NSData *keyData = [passcode dataUsingEncoding:NSUTF8StringEncoding];
     NSData *sha512 = CryptoSHA512(keyData.bytes, keyData.length);
     self->key = [sha512 subdataWithRange:NSMakeRange(0, 32)];
@@ -256,36 +158,16 @@ static NSObject *sharedWrapKeyStoreLock = nil;
     return [self->_rootPath stringByAppendingPathComponent:@".tempkey"];
 }
 
--(BOOL)rewrapVaultWithPasscode:(NSString * _Nonnull)passcode {
-    DeviceSpecificEncryptionParameters *parameters = [self resolveVaultCreating:NO];
-    if (parameters == nil) {
-        return NO;
-    }
-    NSString *previous = self->_passcode == nil ? AppEncryptionParameters.defaultKey : self->_passcode;
-    [self applyPasscode:passcode];
-    NSMutableData *payload = [[NSMutableData alloc] initWithData:parameters.key];
-    [payload appendData:parameters.salt];
-    if ([self->_vault writePayload:payload passcode:self->_passcode] != NanogramVaultOutcomeOK) {
-        [self applyPasscode:previous];
-        return NO;
-    }
-    return YES;
-}
-
--(BOOL)change:(NSString * _Nonnull)passcode {
-    if (self->_vault != nil && [self->_vault fileExists]) {
-        return [self rewrapVaultWithPasscode:passcode];
-    }
+-(void)change:(NSString * _Nonnull)passcode {
     DeviceSpecificEncryptionParameters *parameters = [self decrypt];
-    if (self->_vault != nil && [self->_vault fileExists]) {
-        return [self rewrapVaultWithPasscode:passcode];
-    }
     [self applyPasscode:passcode];
     [self reencrypt: parameters];
-    return YES;
+
 }
--(BOOL)remove {
-    return [self change:[AppEncryptionParameters defaultKey]];
+-(void)remove {
+    DeviceSpecificEncryptionParameters *parameters = [self decrypt];
+    [self applyPasscode:[AppEncryptionParameters defaultKey]];
+    [self reencrypt: parameters];
 }
 
 -(NSData * _Nullable)encryptData:(NSData * _Nonnull)data {
@@ -323,16 +205,18 @@ static NSObject *sharedWrapKeyStoreLock = nil;
         }
         
         NSData *encrypted = CryptoAES(YES, self->key, self->iv, finalData);
-        [encrypted writeToFile:self.path atomically:YES];
-        [[NSFileManager defaultManager] removeItemAtPath:self.legacyPath error:nil];
+        // The old plain file is only removed once the encrypted copy is on disk.
+        if ([encrypted writeToFile:self.path atomically:YES]) {
+            [[NSFileManager defaultManager] removeItemAtPath:self.legacyPath error:nil];
+        }
     }
 }
 
 -(void)reencrypt:(DeviceSpecificEncryptionParameters * _Nullable)parameters {
     
     if (parameters == nil) {
-        [[NSFileManager defaultManager] removeItemAtPath:self.path error:nil];
-        [self initializeIfNeeded];
+        // Nothing to re-encrypt: never replace the stored key with a new one.
+        return;
     }
     
     NSMutableData *resultData = [[NSMutableData alloc] init];
@@ -364,21 +248,11 @@ static NSObject *sharedWrapKeyStoreLock = nil;
 }
 
 -(BOOL)hasPasscode {
-    if (self->_vault != nil && [self->_vault fileExists]) {
-        return [self->_vault hasPasscode];
-    }
-    AppEncryptionParameters *params = [[AppEncryptionParameters alloc] initWithPath:self->_rootPath wrapKeyStore:nil iterations:[NanogramKeyVault defaultIterations]];
+    AppEncryptionParameters *params = [[AppEncryptionParameters alloc] initWithPath:self->_rootPath];
     return [params decrypt] == nil;
 }
 
 -(DeviceSpecificEncryptionParameters * _Nullable)decrypt {
-    if (self->_vault != nil && ([self->_vault fileExists] || [[NSFileManager defaultManager] fileExistsAtPath:self.path])) {
-        return [self resolveVaultCreating:NO];
-    }
-    return [self decryptLegacy];
-}
-
--(DeviceSpecificEncryptionParameters * _Nullable)decryptLegacy {
     NSData *currentData = [NSData dataWithContentsOfFile:self.path];
     NSData *decrypted = CryptoAES(NO, self->key, self->iv, currentData);
     if (decrypted == nil || decrypted.length < 32 + 16 + 4) {

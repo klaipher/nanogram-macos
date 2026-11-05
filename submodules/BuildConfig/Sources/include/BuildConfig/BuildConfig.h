@@ -1,5 +1,4 @@
 #import <Foundation/Foundation.h>
-#import <BuildConfig/NanogramKeyVault.h>
 
 @interface DeviceSpecificEncryptionParameters : NSObject
 
@@ -11,20 +10,15 @@
 
 @interface AppEncryptionParameters : NSObject
 
-+(BOOL)enableKeychainWrappingWithAccessGroup:(NSString * _Nonnull)accessGroup;
-+(void)setSharedWrapKeyStore:(id<NanogramWrapKeyStore> _Nullable)store;
 -(id _Nonnull)initWithPath:(NSString * _Nonnull)path;
--(id _Nonnull)initWithPath:(NSString * _Nonnull)path wrapKeyStore:(id<NanogramWrapKeyStore> _Nullable)store iterations:(uint32_t)iterations;
 -(void)applyPasscode:(NSString * _Nonnull)passcode;
--(BOOL)change:(NSString * _Nonnull)passcode;
--(BOOL)remove;
+-(void)change:(NSString * _Nonnull)passcode;
+-(void)remove;
 -(DeviceSpecificEncryptionParameters * _Nullable)decrypt;
 
 -(NSData * _Nullable)encryptData:(NSData * _Nonnull)data;
 -(NSData * _Nullable)decryptData:(NSData * _Nonnull)data;
 -(BOOL)hasPasscode;
-/// YES when a key vault exists but the Keychain could not be reached. Not a passcode problem: the caller must offer Retry, never a passcode prompt or logout.
--(BOOL)keychainUnavailable;
 @end
 
 @interface LocalPrivateKey : NSObject {
