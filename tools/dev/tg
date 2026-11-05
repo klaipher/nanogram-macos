@@ -31,7 +31,7 @@ cmd_doctor() { py doctor; }
 # scheduled job.
 cmd_cache_cleanup() {
   case "${1:-}" in
-    verify|report) python3 "$ROOT/tools/dev/cachegc/cachegc.py" "$1" --repo "$ROOT" ;;
+    verify|report|guard) python3 "$ROOT/tools/dev/cachegc/cachegc.py" "$1" --repo "$ROOT" ;;
     *) python3 "$ROOT/tools/dev/cachegc/cachegc.py" run --repo "$ROOT" "$@" ;;
   esac
 }
@@ -40,6 +40,24 @@ cache_cleanup_auto() {
   [ -z "${NANOGRAM_TG_LOCKED:-}" ] || return 0
   python3 "$ROOT/tools/dev/cachegc/cachegc.py" auto --repo "$ROOT" || true
 }
+
+# Runs before every build command (not throttled): enforces the hard caps and removes what deleted checkouts left behind,
+# and refuses to start a build below the hard free-space floor (cache-policy.json; TG_ALLOW_LOW_DISK=1 overrides).
+# A command that calls another tg command (check -> build) is guarded once; so is everything under buildlock.
+cache_guard() {
+  [ -z "${NANOGRAM_TG_LOCKED:-}" ] || return 0
+  [ -z "${TG_CACHE_GUARDED:-}" ] || return 0
+  export TG_CACHE_GUARDED=1
+  [ -f "$ROOT/tools/dev/cachegc/cachegc.py" ] || return 0
+  local status=0
+  python3 "$ROOT/tools/dev/cachegc/cachegc.py" guard --repo "$ROOT" || status=$?
+  # Exit 1 is the refusal (too little free disk); any other failure of the guard itself must not stop a build.
+  [ "$status" -ne 1 ] || exit 1
+}
+
+# tg worktree add <name> [--branch B] [--from REF] | remove <name> [--force]: tools/dev/worktree/worktree.py (the same
+# module in both repos). Nothing is built.
+cmd_worktree() { python3 "$ROOT/tools/dev/worktree/worktree.py" --repo "$ROOT" --flavor mac "$@"; }
 
 cmd_native() { python3 "$ROOT/tools/dev/native/check_native_libs.py" "$@" && python3 "$ROOT/tools/dev/native/module_settings.py" --check; }
 
@@ -367,7 +385,8 @@ usage: tools/dev/tg <command> [options]
   release-direct   notarized dmg + appcast for the direct edition (local)
   clean            remove this checkout's build products [--all]
   prune            list caches and build files, remove stale ones [--dry-run] [--max-gb N]
-  cache-cleanup    shared cache cleanup (Bazel, Xcode, SwiftPM, builds, worktrees) [--dry-run] [--only A,B] | verify | report
+  cache-cleanup    shared cache cleanup (Bazel, Xcode, SwiftPM, builds, worktrees) [--dry-run] [--only A,B] | verify | report | guard
+  worktree         add <name> [--branch B] [--from REF] | remove <name> [--force]: parallel checkout with its caches
   native           drift check: native-libs.json and module-settings.json against the build files
 USAGE
 }
@@ -379,12 +398,16 @@ main() {
     build|test|check|warnings|frameworks|testflight|release-direct|core-bump) trap cache_cleanup_auto EXIT ;;
   esac
   case "$cmd" in
+    build|test|check|warnings|testflight|release-direct) cache_guard ;;
+  esac
+  case "$cmd" in
     doctor) cmd_doctor "$@" ;;
     setup) cmd_setup "$@" ;;
     frameworks) cmd_frameworks "$@" ;;
     clean) cmd_clean "$@" ;;
     prune) cmd_prune "$@" ;;
     cache-cleanup) cmd_cache_cleanup "$@" ;;
+    worktree) cmd_worktree "$@" ;;
     native) cmd_native "$@" ;;
     credentials) cmd_credentials ;;
     build) cmd_build "$@" ;;
