@@ -163,7 +163,7 @@ class PinnedVersionsTests(unittest.TestCase):
         for commit in ("bdda8eff9f62547b4621c09f6a8873a61aecd95c", "6926af015580a1377e1b1bcad191d076453192cb"):
             self.assertTrue(is_ancestor(tgcalls, commit, pin), f"tgcalls {pin} does not contain {commit}")
         modules = read(ROOT / ".gitmodules")
-        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-mac\n', modules)
+        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-shared\n', modules)
 
     def test_libprisma_and_boost_regex_come_from_the_core(self):
         self.assertTrue((TG_IOS / "third-party" / "libprisma" / "Sources" / "SyntaxHighlighter.cpp").exists())

@@ -12,7 +12,7 @@
 [submodule "submodules/tgcalls"]
 	path = submodules/tgcalls
 	url = https://github.com/klaipher/tgcalls
-	branch = nanogram-mac
+	branch = nanogram-shared
 [submodule "submodules/tg_owt"]
 	path = submodules/tg_owt
 	url = https://github.com/klaipher/tg_owt

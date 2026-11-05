@@ -406,6 +406,49 @@ class MacCheckTests(unittest.TestCase):
         self.assertEqual(levels["pin-equal-tgcalls"], "error")
         self.assertTrue(report.failed)
 
+    def write_gitmodules(self, mac_branch, ios_branch, mac_url="https://github.com/klaipher/tgcalls",
+                         ios_url="https://github.com/klaipher/tgcalls.git"):
+        (self.mac / ".gitmodules").write_text(
+            f'[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = {mac_url}\n\tbranch = {mac_branch}\n')
+        (self.ios / ".gitmodules").write_text(f'[submodule "submodules/TgVoipWebrtc/tgcalls"]\n\tpath = submodules/TgVoipWebrtc/tgcalls\n'
+                                              f'\turl = {ios_url}\n\tbranch = {ios_branch}\n')
+        run(self.ios, "add", ".gitmodules")
+        if subprocess.run(["git", "-C", str(self.ios), "diff", "--cached", "--quiet"]).returncode != 0:
+            run(self.ios, "commit", "-q", "-m", "ios modules")
+
+    def test_gitmodules_branch_must_match_for_the_same_fork(self):
+        self.write_gitmodules("nanogram-shared", "nanogram-shared")
+        report, levels = self.check()
+        self.assertEqual(levels["gitmodules-branch-tgcalls"], "ok")
+        self.write_gitmodules("nanogram-mac", "nanogram-shared")
+        report, levels = self.check()
+        self.assertEqual(levels["gitmodules-branch-tgcalls"], "error")
+        self.assertTrue(report.failed)
+
+    def test_gitmodules_branch_mismatch_is_soft_inside_the_warning_window(self):
+        self.write_gitmodules("nanogram-mac", "nanogram-shared")
+        self.text = self.text.replace("pin tgcalls ios=submodules/TgVoipWebrtc/tgcalls mac=submodules/tgcalls\n",
+                                      "pin tgcalls ios=submodules/TgVoipWebrtc/tgcalls mac=submodules/tgcalls warn-until=2026-12-01\n", 1)
+        _, levels = self.check()
+        self.assertEqual(levels["gitmodules-branch-tgcalls"], "warning")
+
+    def test_gitmodules_branches_of_different_repositories_are_not_compared(self):
+        self.write_gitmodules("nanogram-mac", "nanogram-shared", ios_url="https://github.com/klaipher/webrtc.git")
+        report, levels = self.check()
+        self.assertNotIn("gitmodules-branch-tgcalls", levels)
+
+    def test_unreadable_ios_gitmodules_only_warns(self):
+        (self.mac / ".gitmodules").write_text('[submodule "submodules/tgcalls"]\n\tbranch = nanogram-mac\n')
+        report, levels = self.check()
+        self.assertEqual(levels["gitmodules-branch"], "warning")
+        self.assertFalse(report.failed, report.lines())
+
+    def test_parse_gitmodules_and_url_normalisation(self):
+        modules = parity.parse_gitmodules('[submodule "a/b"]\n\tpath = a/b\n\turl = https://x/y.git\n# c\n[submodule "c"]\n\tbranch = m\n')
+        self.assertEqual(modules, {"a/b": {"path": "a/b", "url": "https://x/y.git"}, "c": {"branch": "m"}})
+        self.assertTrue(parity.same_repository("https://github.com/K/tgcalls", "https://github.com/k/tgcalls.git/"))
+        self.assertFalse(parity.same_repository("", ""))
+
     def add_mirror(self, ios_text="same\n", mac_text="same\n", extra=""):
         commit(self.core, {"submodules/Copy/X.swift": ios_text}, "core copy")
         new_pin = run(self.core, "rev-parse", "HEAD")

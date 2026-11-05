@@ -216,6 +216,52 @@ def blob_at(repo: Path, ref: str, path: str) -> str | None:
     return meta[2] if len(meta) == 3 and meta[0] in ("100644", "100755") and meta[1] == "blob" else None
 
 
+def parse_gitmodules(text: str) -> dict[str, dict[str, str]]:
+    """{submodule path: {key: value}} of a .gitmodules file."""
+    modules: dict[str, dict[str, str]] = {}
+    current: dict[str, str] | None = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        header = re.match(r'^\[submodule\s+"(.*)"\]$', line)
+        if header:
+            current = {}
+            modules[header.group(1)] = current
+        elif current is not None and "=" in line and not line.startswith(("#", ";")):
+            key, _, value = line.partition("=")
+            current[key.strip()] = value.strip()
+    return modules
+
+
+def same_repository(left: str, right: str) -> bool:
+    def normal(url: str) -> str:
+        return re.sub(r"(\.git)?/*$", "", url.strip()).lower()
+    return bool(left) and normal(left) == normal(right)
+
+
+def check_gitmodules_branches(report: Report, config: Config, mac_text: str, ios_text: str | None, today: datetime.date) -> None:
+    """A fork that both apps pin from the same repository must track the same branch in .gitmodules: with a
+    different one, `git submodule update --remote` would move one app to the other app's line of work."""
+    if ios_text is None:
+        report.warn("gitmodules-branch", ".gitmodules of the iOS side is not readable; branch names not compared")
+        return
+    mac_modules, ios_modules = parse_gitmodules(mac_text), parse_gitmodules(ios_text)
+    for entry in config.pins:
+        if not entry.ios or not entry.mac or entry.external:
+            continue
+        mac, ios = mac_modules.get(entry.mac, {}), ios_modules.get(entry.ios, {})
+        if not same_repository(mac.get("url", ""), ios.get("url", "")) or not mac.get("branch") or not ios.get("branch"):
+            continue
+        name = "gitmodules-branch-" + entry.name
+        if mac["branch"] == ios["branch"]:
+            report.ok(name, f"{entry.name} tracks {mac['branch']} on both sides")
+            continue
+        soft = entry.warn_until is not None and today <= entry.warn_until
+        (report.warn if soft else report.error)(
+            name, f"{entry.name}: .gitmodules tracks {mac['branch']} on the Mac and {ios['branch']} on iOS; "
+                  "git submodule update --remote would move the Mac off the shared branch"
+                  + (f" (warning until {entry.warn_until})" if soft else ""))
+
+
 def mirror_name(mirror: Mirror) -> str:
     return "mirror-" + mirror.ios.rsplit("/", 1)[-1]
 
@@ -548,6 +594,13 @@ def check_mac(root: Path, config: Config, today: datetime.date, release: bool = 
             (report.warn if soft_pin else report.error)(
                 "pin-equal-" + entry.name, f"{entry.name} differs: Mac {mac_sha[:10]}, iOS {theirs[:10]} ({source}); bring them to one SHA"
                 + (f" (warning until {entry.warn_until})" if soft_pin else ""))
+
+    mac_modules_file = root / ".gitmodules"
+    if mac_modules_file.is_file():
+        ios_modules = git(core, "show", f"{pin}:.gitmodules", check=False) or None
+        if ios_modules is None and ios_repo is not None and (ios_repo / ".git").exists():
+            ios_modules = git(ios_repo, "show", f"{ios_ref}:.gitmodules", check=False) or None
+        check_gitmodules_branches(report, config, mac_modules_file.read_text(), ios_modules, today)
 
     for mirror in config.mirrors:
         # The iOS side is the core at the pin: that is the copy this Mac build would use.

@@ -586,8 +586,8 @@ Upstream's Mac app pins a Telegram-iOS commit, not a tag. Move the core to the n
 contains that pin (`git tag --contains <pin>` in a Telegram-iOS clone, or the first release after it), never to a
 commit past the newest tag.
 
-Other forks we pin: `submodules/tgcalls` = `klaipher/tgcalls` branch `nanogram-mac` (the iOS fork's tgcalls plus
-two Mac build commits), `submodules/rlottie` = `klaipher/rlottie` branch `nanogram-mac`. Run
+Other forks we pin: `submodules/tgcalls` = `klaipher/tgcalls` branch `nanogram-shared` (one branch for iOS and the Mac, pin b499ac4;
+the parity check compares the `.gitmodules` branch names of both repos), `submodules/rlottie` = `klaipher/rlottie` branch `nanogram-mac`. Run
 `git submodule sync --recursive` after `.gitmodules` URLs change; existing checkouts keep their old remotes until then.
 
 ## Parity gate and `tg core-bump`
