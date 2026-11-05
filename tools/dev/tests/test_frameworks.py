@@ -297,6 +297,11 @@ class NativeBuildFlagTests(unittest.TestCase):
 
     def test_ffmpeg_builds_no_muxers_encoders_or_network(self):
         text = self.script("core-xprojects/ffmpeg/ffmpeg/build.sh")
+        self.assertIn("ffmpeg-common-flags.sh", text)
+        common = config.ROOT / "submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg/ffmpeg-common-flags.sh"
+        if not common.is_file():
+            self.skipTest("the shared flag list comes with the telegram-ios submodule at the pin that adds it")
+        text += common.read_text()
         self.assertNotIn("--enable-muxer", text)
         self.assertNotIn("--enable-encoder", text)
         self.assertNotRegex(text, r"--enable-(demuxer|parser)=[^ ]*libopus")
