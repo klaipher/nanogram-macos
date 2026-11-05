@@ -1400,9 +1400,6 @@ private final class WebPRenderer : RenderContainer {
     }
 }
 
-/// Registers the VP9 counters with the system log once per process. Debug builds always log; a release build
-/// logs when `defaults write <bundle id> nanogram.vp9StatsLog -bool YES` is set, so a profiling session can read
-/// them without a special build. The decoder reports at most once a minute and only when a counter changed.
 private let vp9StatsReporterRegistration: Void = {
     #if DEBUG
     let enabled = true
@@ -1497,7 +1494,6 @@ final class WebmRenderer : RenderContainer {
         if let hardwareReader = self.hardwareReader {
             if !hardwareReader.hasMoreFrames {
                 self.reachedEnd(at: frameIndex)
-                // The stream is read once and never rewound, so the VideoToolbox sessions are free from here on.
                 self.releaseHardwareReaderIfPossible(streamEnded: true, frameCacheComplete: fileSupplyment?.isFinished == true)
                 return nil
             }
@@ -1579,7 +1575,6 @@ final class WebmRenderer : RenderContainer {
             return nil
         }
     }
-    /// Gives the capped VideoToolbox sessions back as soon as nothing can read from this reader again.
     private func releaseHardwareReaderIfPossible(streamEnded: Bool, frameCacheComplete: Bool) {
         guard self.hardwareReader != nil, VP9SessionHoldPolicy.shouldRelease(streamEnded: streamEnded, frameCacheComplete: frameCacheComplete, hiddenFor: nil) else {
             return
