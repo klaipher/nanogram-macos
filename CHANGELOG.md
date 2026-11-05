@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Exact device and channel statistics back** (owner, 2026-11-05): the app and the share extension send the real Mac model again (`deviceModelPretty()`), and `MessageReadMetricsManager` measures channel reading again so channel owners see our readers. Reverts 446a1a07 (device part and the manager), 5013bdc8 and 53ee7af9. Music listening reports, call-log uploads and analytics stay off.
+
 - Night review fixes (2026-11-05, branch `night/review-fixes`; nothing built or run yet, tests added for the combined build).
   - **Chat list**: a remembered folder view is no longer replaced by a live loading placeholder; the live value is held back until it has rows or is definitively empty (`ChatListCachedReplayGate.acceptLive`, tests in `ChatListFirstDisplayTests`). The chat list, forum topics and saved-messages lists run on their own `chatListPrepareQueue` (user-initiated); the shared `prepareQueue` is back to `.utility`, and `ChatLiveTranslateContext` uses a private utility queue (`PrepareQueueQosTests` checks both).
   - **Reactions**: the effect file download is owned by `ReactionEffectFetches` (one per file, 30 s cap) and no longer dies with the 1.5 s wait; the first four reactions also prefetch `effectAnimation` and `activateAnimation`.

@@ -2785,6 +2785,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     private let seenLiveLocationProcessingManager = ChatMessageThrottledProcessingManager()
     private let refreshMediaProcessingManager = ChatMessageThrottledProcessingManager()
     private let factCheckProcessingManager = ChatMessageThrottledProcessingManager(submitInterval: 1.0)
+    private var readMetricsManager: MessageReadMetricsManager?
 
 
 
@@ -9137,6 +9138,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 
                 var allVisibleAnchorMessageIds: [(MessageId, Int)] = []
 
+                var visibleMessageInfos: [MessageReadMetricsManager.VisibleMessageInfo] = []
+
                 var readAds:[Data] = []
                 
                 tableView.enumerateVisibleItems(with: { item in
@@ -9144,6 +9147,19 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                         let height = item.view?.visibleRect.height ?? 0
                         if message == nil, height >= (item.height - 10) {
                             message = item.lastMessage
+                        }
+
+                        if let view = item.view {
+                            for msg in item.messages {
+                                if msg.id.namespace == Namespaces.Message.Cloud {
+                                    visibleMessageInfos.append(.init(
+                                        messageId: msg.id,
+                                        itemHeight: item.height,
+                                        visibleRect: view.visibleRect,
+                                        viewportHeight: tableView.frame.height
+                                    ))
+                                }
+                            }
                         }
 
                         for message in item.messages {
@@ -9379,6 +9395,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     self?.adMessages?.update(items: allVisibleAnchorMessageIds, tableView: tableView, position: position)
                 }
 
+                strongSelf.readMetricsManager?.updateVisibleMessages(visibleMessageInfos)
+                strongSelf.readMetricsManager?.recordUserActivity()
 
                 }
             }
@@ -9561,6 +9579,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         updateInteractiveReading()
         chatInteraction.saveState(scrollState: immediateScrollState())
         self.genericView.tableView.notifyScrollHandlers()
+        readMetricsManager?.resume()
         setVisibleRefreshActive(true)
     }
     public override func windowDidResignKey() {
@@ -9568,6 +9587,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         updateInteractiveReading()
         chatInteraction.saveState(scrollState:immediateScrollState())
       // self.genericView.tableView.notifyScrollHandlers()
+        readMetricsManager?.pause()
         setVisibleRefreshActive(false)
     }
     
@@ -10679,6 +10699,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
         heavyScrollWorkItem?.cancel()
         heavyScrollWorkItem = nil
+        readMetricsManager?.finalizeAll()
         failedMessageEventsDisposable.dispose()
         historyDisposable.dispose()
         peerDisposable.dispose()
@@ -10783,6 +10804,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         // top of the chat keeps the chat's wallpaper visible behind it.
         isPushedGlobalBackground = false
 
+        readMetricsManager?.pause()
         setVisibleRefreshActive(false)
 
         self.emojiEffects.removeAll()
@@ -11130,6 +11152,11 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             return .invoked
         }, with: self, for: .K, priority: .medium, modifierFlags: [.command, .shift])
 
+        self.context.window.set(mouseHandler: { [weak self] _ in
+            self?.readMetricsManager?.recordUserActivity()
+            return .rejected
+        }, with: self, for: .mouseMoved, priority: .low)
+
         self.context.window.add(swipe: { [weak self] direction, _ -> SwipeHandlerResult in
             guard let `self` = self, let window = self.window, self.chatInteraction.presentation.canReplyInRestrictedMode else {return .failed}
             let swipeState: SwipeState?
@@ -11348,6 +11375,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         super.viewWillAppear(animated)
         
 
+        readMetricsManager?.resume()
         setVisibleRefreshActive(true)
 
         updateBubblesBackButton()
@@ -11494,6 +11522,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         self.reactionsMessageProcessingManager.process = { messageIds in
             context.account.viewTracker.updateReactionsForMessageIds(messageIds: messageIds.filter({$0.namespace == Namespaces.Message.Cloud}))
         }
+
+        self.readMetricsManager = MessageReadMetricsManager(context: context, peerId: chatInteraction.peerId)
 
         chatInteraction.contextHolder = { [weak self] in
             return self?.chatLocationContextHolder ?? Atomic(value: nil)

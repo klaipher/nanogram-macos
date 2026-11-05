@@ -1,5 +1,5 @@
-"""Privacy guards on the Mac sources (no build). The shared core's side of this (no read metrics, music
-listening, call logs, analytics events; trimmed connection fingerprint) is checked by the core's own
+"""Privacy guards on the Mac sources (no build). The shared core's side of this (no music listening,
+call logs, analytics events, time zone offset) is checked by the core's own
 tools/dev/tests/test_privacy.py; this file covers what lives only in the Mac app.
 """
 import re
@@ -34,32 +34,23 @@ def lines_matching(pattern):
 
 
 class MacPrivacyTests(unittest.TestCase):
-    def test_read_metrics_manager_is_gone(self):
-        self.assertEqual(lines_matching(r"MessageReadMetricsManager|readMetricsManager"), [])
-        self.assertFalse((ROOT / "packages/ChatUI/Sources/ChatUI/MessageReadMetricsManager.swift").exists())
+    def test_channel_read_metrics_are_measured_as_upstream(self):
+        # Channel owners see their statistics as usual (owner, 2026-11-05).
+        self.assertNotEqual(lines_matching(r"MessageReadMetricsManager\(context:"), [])
+        self.assertTrue((ROOT / "packages/ChatUI/Sources/ChatUI/MessageReadMetricsManager.swift").exists())
 
-    def test_nothing_reports_read_metrics_or_music(self):
-        self.assertEqual(lines_matching(r"reportPeerReadMetrics|reportMusicListened"), [])
+    def test_nothing_reports_music(self):
+        self.assertEqual(lines_matching(r"reportMusicListened"), [])
 
     def test_calls_do_not_upload_logs(self):
         self.assertEqual(lines_matching(r"\bsaveCallDebugLog\(|saveCompleteCallDebugLog\("), [])
 
-    def test_device_model_is_the_family_unless_the_user_renamed_it(self):
+    def test_device_model_is_the_real_model(self):
+        # The owner wants the exact model in the session list (2026-11-05), in the app and the share extension.
         source = (ROOT / "Telegram-Mac/app/AppDelegate.swift").read_text(encoding="utf-8")
-        self.assertIn('let systemDeviceModel = "Mac"', source)
-        self.assertNotIn("let systemDeviceModel = deviceModelPretty()", source)
-
-    def test_no_network_is_given_the_exact_model(self):
-        # The share extension opens its own connection; it must send the same family the app does.
+        self.assertIn("let systemDeviceModel = deviceModelPretty()", source)
         share = (ROOT / "TelegramShare/ShareViewController.swift").read_text(encoding="utf-8")
-        self.assertIn('deviceModelName: ApiEnvironment.customDeviceModel ?? "Mac"', share)
-        found = []
-        for path in list(swift_sources()) + [ROOT / "TelegramShare/ShareViewController.swift"]:
-            for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-                if re.search(r"deviceModelName:[^,]*deviceModelPretty\(\)", line):
-                    found.append("%s:%d" % (path.relative_to(ROOT), number))
-        self.assertEqual(found, [])
-
+        self.assertIn("deviceModelName: ApiEnvironment.customDeviceModel ?? deviceModelPretty()", share)
 
 if __name__ == "__main__":
     unittest.main()
