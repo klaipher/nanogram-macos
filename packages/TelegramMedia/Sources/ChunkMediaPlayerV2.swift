@@ -1109,18 +1109,15 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
     }
 
     private func emitStatus(_ status: MediaPlayerStatus, isPlayingLike: Bool, now: Double) {
-        let shouldEmit: Bool
-        if let lastEmittedStatus = self.lastEmittedStatus {
-            if ChunkMediaPlayerV2.differsBeyondTiming(status, lastEmittedStatus) {
-                shouldEmit = true
-            } else if isPlayingLike {
-                shouldEmit = now - self.lastStatusEmitTimestamp >= 1.0 / 10.0
-            } else {
-                shouldEmit = status.timestamp != lastEmittedStatus.timestamp
-            }
-        } else {
-            shouldEmit = true
-        }
+        let previous = self.lastEmittedStatus
+        let shouldEmit = StatusEmissionPolicy.shouldEmit(
+            hasPreviousStatus: previous != nil,
+            differsBeyondTiming: previous.map { ChunkMediaPlayerV2.differsBeyondTiming(status, $0) } ?? false,
+            isPlayingLike: isPlayingLike,
+            now: now,
+            lastEmitTimestamp: self.lastStatusEmitTimestamp,
+            timestampChanged: previous.map { status.timestamp != $0.timestamp } ?? false
+        )
         if !shouldEmit {
             return
         }

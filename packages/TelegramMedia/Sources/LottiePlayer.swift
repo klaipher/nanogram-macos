@@ -1400,6 +1400,22 @@ private final class WebPRenderer : RenderContainer {
     }
 }
 
+/// Registers the VP9 counters with the system log once per process. Debug builds always log; a release build
+/// logs when `defaults write <bundle id> nanogram.vp9StatsLog -bool YES` is set, so a profiling session can read
+/// them without a special build. The decoder reports at most once a minute and only when a counter changed.
+private let vp9StatsReporterRegistration: Void = {
+    #if DEBUG
+    let enabled = true
+    #else
+    let enabled = UserDefaults.standard.bool(forKey: "nanogram.vp9StatsLog")
+    #endif
+    if enabled {
+        VP9HardwareDecoding.setStatsReporter { line in
+            NSLog("[VP9Hardware] %@", line)
+        }
+    }
+}()
+
 final class WebmRenderer : RenderContainer {
     
     private let animation: LottieAnimation
@@ -1408,6 +1424,7 @@ final class WebmRenderer : RenderContainer {
     private var hardwareReader: VP9HardwareStickerReader?
     private var makeHardwareReader: (() -> VP9HardwareStickerReader?)?
     private var hardwareFramesRead: Int = 0
+    private var hardwareStreamEnded = false
     private let framerate: Int
     
     
@@ -1417,6 +1434,7 @@ final class WebmRenderer : RenderContainer {
     private let detectedEndFrame: Atomic<Int32?>
 
     init(animation: LottieAnimation, makeDecoder: @escaping () -> SoftwareVideoSource, makeHardwareReader: (() -> VP9HardwareStickerReader?)? = nil, fileSupplyment: TRLotFileSupplyment?) {
+        _ = vp9StatsReporterRegistration
         self.animation = animation
         if let fileSupplyment = fileSupplyment, fileSupplyment.isFinished, fileSupplyment.fps > 0 {
             self.framerate = Int(fileSupplyment.fps)
@@ -1462,8 +1480,14 @@ final class WebmRenderer : RenderContainer {
             }
             if fileSupplyment.isFinished {
                 self.reachedEnd(at: frameIndex)
+                self.releaseHardwareReaderIfPossible(streamEnded: false, frameCacheComplete: true)
                 return nil
             }
+        }
+
+        if self.hardwareStreamEnded {
+            self.reachedEnd(at: frameIndex)
+            return nil
         }
 
         if self.decoder == nil, self.hardwareReader == nil, let makeHardwareReader = self.makeHardwareReader {
@@ -1473,6 +1497,8 @@ final class WebmRenderer : RenderContainer {
         if let hardwareReader = self.hardwareReader {
             if !hardwareReader.hasMoreFrames {
                 self.reachedEnd(at: frameIndex)
+                // The stream is read once and never rewound, so the VideoToolbox sessions are free from here on.
+                self.releaseHardwareReaderIfPossible(streamEnded: true, frameCacheComplete: fileSupplyment?.isFinished == true)
                 return nil
             }
             var data: Data?
@@ -1551,6 +1577,16 @@ final class WebmRenderer : RenderContainer {
             return RenderedWebmFrame(key: animation.key, frame: frameIndex, fps: self.fps, size: animation.size, data: data, backingScale: animation.backingScale)
         } else {
             return nil
+        }
+    }
+    /// Gives the capped VideoToolbox sessions back as soon as nothing can read from this reader again.
+    private func releaseHardwareReaderIfPossible(streamEnded: Bool, frameCacheComplete: Bool) {
+        guard self.hardwareReader != nil, VP9SessionHoldPolicy.shouldRelease(streamEnded: streamEnded, frameCacheComplete: frameCacheComplete, hiddenFor: nil) else {
+            return
+        }
+        self.hardwareReader = nil
+        if streamEnded {
+            self.hardwareStreamEnded = true
         }
     }
     func cacheFrame(_ previous: RenderedFrame?, _ current: RenderedFrame) {
