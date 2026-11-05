@@ -392,9 +392,13 @@ public final class DevicesContext : NSObject {
     
     deinit {
         NotificationCenter.default.removeObserver(self)
-        AudioListener.releaseOutputListener()
-        AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
-        AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
+        // The listeners are added on devicesQueue (init), so they are removed there too: the serial queue
+        // runs the removal after a registration that has not run yet, which would otherwise outlive us.
+        devicesQueue.async {
+            AudioListener.releaseOutputListener()
+            AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
+            AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
+        }
         disposable.dispose()
         updateSampler.dispose()
     }
