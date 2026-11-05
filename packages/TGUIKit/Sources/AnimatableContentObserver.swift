@@ -11,18 +11,13 @@ public struct AnimatableContentObserverOptions: OptionSet {
     public static let ownBounds = AnimatableContentObserverOptions(rawValue: 1 << 3)
 }
 
-/// One `NotificationCenter` observer per (object, notification name), shared by every `AnimatableContentObserver`
-/// and `AnimatableContentTokenObserver` watching that source. Each chat row used to add up to eight observers of its own
-/// (all on the same window, scroll view and app notifications), so the center's registration list grew with the row count
-/// and every scroll tick walked it. With the hub the center holds a few observers per window and scroll view,
-/// and the hub forwards each notification to its listeners.
 final class AnimatableContentHub {
     static let shared = AnimatableContentHub()
 
     final class Subscription {
         fileprivate let key: SourceKey
-        fileprivate let handler: (Notification) -> Void
-        fileprivate init(key: SourceKey, handler: @escaping (Notification) -> Void) {
+        fileprivate let handler: (NSNotification) -> Void
+        fileprivate init(key: SourceKey, handler: @escaping (NSNotification) -> Void) {
             self.key = key
             self.handler = handler
         }
@@ -43,24 +38,26 @@ final class AnimatableContentHub {
     private let lock = NSLock()
     private var sources: [SourceKey: Source] = [:]
 
-    /// Number of live `NotificationCenter` observers owned by the hub.
     var centerObserverCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return sources.count
     }
 
-    func subscribe(name: Notification.Name, object: AnyObject?, handler: @escaping (Notification) -> Void) -> Subscription {
+    func subscribe(name: Notification.Name, object: AnyObject?, handler: @escaping (NSNotification) -> Void) -> Subscription {
         let key = SourceKey(object: object.map { ObjectIdentifier($0) }, name: name)
         let subscription = Subscription(key: key, handler: handler)
+        var staleToken: NSObjectProtocol?
         lock.lock()
-        defer { lock.unlock() }
+        defer {
+            lock.unlock()
+            if let staleToken {
+                NotificationCenter.default.removeObserver(staleToken)
+            }
+        }
         var source = sources[key]
         if let existing = source, existing.object !== object {
-            // The identifier was reused by a new object after the old one died.
-            if let token = existing.token {
-                NotificationCenter.default.removeObserver(token)
-            }
+            staleToken = existing.token
             source = nil
         }
         let target: Source
@@ -81,8 +78,14 @@ final class AnimatableContentHub {
     }
 
     func unsubscribe(_ subscription: Subscription) {
+        var staleToken: NSObjectProtocol?
         lock.lock()
-        defer { lock.unlock() }
+        defer {
+            lock.unlock()
+            if let staleToken {
+                NotificationCenter.default.removeObserver(staleToken)
+            }
+        }
         guard let source = sources[subscription.key] else {
             return
         }
@@ -92,9 +95,7 @@ final class AnimatableContentHub {
         }
         source.order.removeAll(where: { $0 == id })
         if source.listeners.isEmpty {
-            if let token = source.token {
-                NotificationCenter.default.removeObserver(token)
-            }
+            staleToken = source.token
             sources[subscription.key] = nil
         }
     }
@@ -108,8 +109,12 @@ final class AnimatableContentHub {
             listeners = []
         }
         lock.unlock()
+        guard !listeners.isEmpty else {
+            return
+        }
+        let bridged = notification as NSNotification
         for listener in listeners {
-            listener.handler(notification)
+            listener.handler(bridged)
         }
     }
 }
@@ -171,7 +176,7 @@ public final class AnimatableContentObserver {
         let forwarder = notificationTarget
         func add(_ name: Notification.Name, _ object: AnyObject?) {
             subscriptions.append(hub.subscribe(name: name, object: object, handler: { [weak forwarder] notification in
-                forwarder?.forwardNotification(notification as NSNotification)
+                forwarder?.forwardNotification(notification)
             }))
         }
         add(NSWindow.didBecomeKeyNotification, window)
@@ -261,7 +266,8 @@ public final class AnimatableContentTokenObserver {
             }
             self.handler?(notification)
         }
-        let callback: (Notification) -> Void = { notification in
+        let callback: (NSNotification) -> Void = { source in
+            let notification = source as Notification
             if Thread.isMainThread {
                 deliver(notification)
             } else {

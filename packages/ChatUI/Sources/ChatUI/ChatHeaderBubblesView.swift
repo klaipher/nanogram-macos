@@ -939,8 +939,6 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         return result
     }
 
-    /// Everything that decides how the title/status text looks. When it is unchanged the text layouts are
-    /// rebuilt to identical results, so `updateStatusText` skips the rebuild and the relayout (called on every presentation update).
     private struct StatusTextKey: Equatable {
         let title: NSAttributedString
         let status: NSAttributedString

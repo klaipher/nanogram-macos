@@ -75,9 +75,6 @@ private final class LocationPinView : View {
     }
 }
 
-/// Keeps one `MKMapView` for the whole app session. Creating a map view costs tens of milliseconds
-/// (MapKit loads its renderer and style data), so a Location modal reuses the previous one, reset to a neutral state.
-/// Main thread only. At most one map is parked; a modal that opens while another is still showing gets a fresh one.
 private final class LocationMapPool {
     static let shared = LocationMapPool()
     private var parked: MKMapView?
@@ -167,9 +164,11 @@ private final class LocationMapView : View {
         return mapView
     }
     
-    deinit {
+    fileprivate func releaseMap() {
         zoomControl?.removeFromSuperview()
+        zoomControl = nil
         if let mapView {
+            self.mapView = nil
             LocationMapPool.shared.recycle(mapView)
         }
     }
@@ -866,6 +865,9 @@ public class LocationModalController: ModalViewController {
         disposable.dispose()
         sendDisposable.dispose()
         requestDisposable.dispose()
+        if isLoaded() {
+            genericView.releaseMap()
+        }
     }
     
     private var genericView: LocationMapView {

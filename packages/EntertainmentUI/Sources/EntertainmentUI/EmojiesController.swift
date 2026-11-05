@@ -1960,7 +1960,6 @@ public final class AnimatedEmojiesView : Control {
         }
         if let stableId = _stableId, let item = packsView.item(stableId: stableId) {
             if packsView.selectedItem()?.stableId == item.stableId {
-                // Same pack as before: nothing to select, scroll or restyle (this runs on every visible-range change).
                 return _segment
             }
             _ = self.packsView.select(item: item)

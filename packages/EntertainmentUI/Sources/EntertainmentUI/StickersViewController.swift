@@ -1361,7 +1361,6 @@ public class NStickersViewController<Context: AccountContextProtocol>: TelegramG
             }
             let item = self.genericView.tableView.item(at: position.visibleRows.location)
             if self.genericView.packsView.selectedItem()?.stableId == item.stableId {
-                // Same pack as before: nothing to select, scroll or restyle (this runs on every visible-range change).
                 return
             }
             self.genericView.packsView.changeSelection(stableId: item.stableId)

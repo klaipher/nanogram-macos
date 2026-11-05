@@ -8898,7 +8898,6 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         self.ready.set(combine |> map { (hReady, appearanceReady, _, iReady, monoforumReady) in
             let isReady = hReady && iReady && appearanceReady && monoforumReady
             if isReady {
-                // End after the first frame that shows the ready chat is committed, not when the signal fires.
                 DispatchQueue.main.async {
                     CATransaction.setCompletionBlock {
                         openSignpost.end()
