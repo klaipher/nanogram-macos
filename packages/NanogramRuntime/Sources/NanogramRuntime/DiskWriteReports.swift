@@ -25,6 +25,8 @@ public final class DiskWriteReports {
 
     /// Installs the process-wide reporter (the first installation wins) for the ledger at `ledgerPath`.
     public convenience init(ledgerPath: String, log: @escaping (String) -> Void) {
+        // The ledger is written atomically into `logs/`, which does not exist before the first log file is created.
+        try? FileManager.default.createDirectory(atPath: (ledgerPath as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         self.init(reporter: DiskWriteAccountingReporting.install(ledgerPath: ledgerPath), log: log)
     }
 

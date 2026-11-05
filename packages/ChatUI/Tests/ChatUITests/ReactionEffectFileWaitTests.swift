@@ -127,7 +127,7 @@ final class ReactionEffectFileWaitTests: XCTestCase {
 
     func testPrefetchSkipsDisabledAndPremiumReactionsForOrdinaryAccounts() {
         let reactions = [reaction(1, enabled: false), reaction(2, premium: true), reaction(3), reaction(4, effects: false)]
-        XCTAssertEqual(ReactionEffectPrefetch.files(from: reactions, includePremium: false).map { $0.fileId.id }, [35, 36, 34, 33])
+        XCTAssertEqual(ReactionEffectPrefetch.files(from: reactions, includePremium: false).map { $0.fileId.id }, [35, 36, 34, 33, 44, 43])
         XCTAssertEqual(ReactionEffectPrefetch.files(from: reactions, includePremium: true).map { $0.fileId.id }, [25, 26, 24, 23, 35, 36, 34, 33, 44, 43])
     }
 

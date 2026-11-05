@@ -27,7 +27,9 @@ final class DiskWriteReportsTests: XCTestCase {
     func testReportLogsALineAndWritesTheLedger() {
         let accounting = DiskWriteAccounting()
         accounting.add("logs", bytes: 4096)
-        let ledger = self.directory.appendingPathComponent("logs", isDirectory: true).appendingPathComponent("disk-writes.json").path
+        let logs = self.directory.appendingPathComponent("logs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        let ledger = logs.appendingPathComponent("disk-writes.json").path
         let reporter = DiskWriteAccountingReporter(accounting: accounting, ledgerPath: ledger)
         let logged = expectation(description: "line logged")
         let lock = NSLock()
