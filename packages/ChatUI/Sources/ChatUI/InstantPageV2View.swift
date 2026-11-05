@@ -381,7 +381,16 @@ public final class InstantPageV2View: View, NSViewToolTipOwner, HorizontalScroll
     private var selectedRanges: [SelectedText] = []
     private var selectedFormulaIds: Set<ObjectIdentifier> = []
     private var hasLocalSelection: Bool = false
-    public var canCopy: Bool = true
+    /// Off for a copy-protected message: no word/paragraph selection and no code-block copy.
+    /// Expanded `<details>` bodies are nested InstantPageV2Views and follow this value.
+    public var canCopy: Bool = true {
+        didSet {
+            guard canCopy != oldValue else { return }
+            for body in detailsBodies.values {
+                body.canCopy = canCopy
+            }
+        }
+    }
 
     /// Snapshot of the chat theme's text-selection color, captured once per layout pass so
     /// the formula-selection highlight matches the per-line `selectRect` color that
@@ -1981,6 +1990,7 @@ public final class InstantPageV2View: View, NSViewToolTipOwner, HorizontalScroll
                     }
                     body.mediaContentConfig = self.mediaContentConfig
                     body.context = self.context
+                    body.canCopy = self.canCopy
                     body.buttonTapped = { [weak self] button in self?.buttonTapped?(button) }
                     body.frame = CGRect(
                         x: d.frame.minX,

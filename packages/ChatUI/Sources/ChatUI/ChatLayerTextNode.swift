@@ -321,7 +321,8 @@ final class ChatLayerTextNode: ChatLayerNode {
             return
         }
         var headers: [ChatLayerNode] = []
-        for (quoteIndex, quote) in textLayout.blockQuotes.enumerated() where quote.header != nil {
+        // A copy-protected layout (mayItems off) gets no Copy hit targets: TextView ignores the same click.
+        for (quoteIndex, quote) in textLayout.blockQuotes.enumerated() where quote.header != nil && textLayout.mayItems {
             let index = headers.count
             let id = HeaderId(parent: id, index: quoteIndex)
             let header = index < children.count ? children[index] as? ChatLayerButtonNode : nil
@@ -337,7 +338,7 @@ final class ChatLayerTextNode: ChatLayerNode {
     }
 
     private func copyBlockQuote(at index: Int) {
-        guard let layout = textLayout, layout.blockQuotes.indices.contains(index), let text = layout.blockQuoteText(startingWith: layout.blockQuotes[index].range) else { return }
+        guard let layout = textLayout, layout.blockQuotes.indices.contains(index), let text = layout.copyableBlockQuoteText(startingWith: layout.blockQuotes[index].range) else { return }
         if let copy = layout.interactions.copyToClipboard { _ = copy(text) }
         else {
             NSPasteboard.general.clearContents()
