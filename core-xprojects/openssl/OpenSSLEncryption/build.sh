@@ -21,8 +21,13 @@ NAME="openssl-3.5.9";
 CROSS_TOP_MAC="$(xcode-select -p)/Platforms/MacOSX.platform"
 CROSS_SDK_MAC="MacOSX.sdk"
 
+# The tag is checked against the commit it named when it was pinned; a moved tag stops the build.
+OPENSSL_COMMIT="45e844fa2a14ec92d146bd8f5778ac130b6625fb"
 git clone -b openssl-3.5.9 --depth 1 https://github.com/openssl/openssl build/${NAME}
-[ "$(git -C build/${NAME} rev-parse HEAD)" = "45e844fa2a14ec92d146bd8f5778ac130b6625fb" ]
+if [ "$(git -C build/${NAME} rev-parse HEAD)" != "$OPENSSL_COMMIT" ]; then
+  echo "error: openssl-3.5.9 is $(git -C build/${NAME} rev-parse HEAD), expected $OPENSSL_COMMIT" >&2
+  exit 1
+fi
 
 
 SOURCE_DIR="$OUT_DIR/${NAME}"
@@ -148,7 +153,10 @@ function build_for ()
     "no-tests" \
   )
 
-  ./Configure $PLATFORM -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET no-shared no-tests \
+  # The memory-safety hardening Nanogram.xcconfig gives the app's own C (Configure passes unknown
+  # dash options to the compiler).
+  ./Configure $PLATFORM -mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET -ftrivial-auto-var-init=zero -fstack-protector-strong \
+    no-shared no-tests \
     no-quic no-engine no-dso no-autoload-config no-legacy no-sm2 no-sm3 no-sm4 no-aria no-camellia no-seed \
     no-idea no-bf no-cast no-rc2 no-rc4 no-rc5 no-mdc2 no-whirlpool no-srp no-gost no-ct no-cms no-ts no-ssl3 \
     no-comp no-docs no-ml-dsa no-slh-dsa \
