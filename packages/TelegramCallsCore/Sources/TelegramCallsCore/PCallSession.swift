@@ -1239,6 +1239,9 @@ public class PCallSession {
     }
     
     public func requestVideo() {
+        guard callSessionAllowsCapture(self.sessionState?.state) else {
+            return
+        }
         if isVideoAvailable {
             let requestVideo: Bool = self.videoCapturer == nil
             if self.videoCapturer == nil {

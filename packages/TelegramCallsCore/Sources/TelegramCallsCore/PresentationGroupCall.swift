@@ -2784,6 +2784,10 @@ public final class PresentationGroupCallImpl: PresentationGroupCall {
             self.screenCapturer = nil
             screenCapturer.setIsVideoEnabled(false)
         }
+        self.initialOutput.video?.capturer.setIsVideoEnabled(false)
+        self.initialOutput.screencast?.capturer.setIsVideoEnabled(false)
+        self.initialOutput.video = nil
+        self.initialOutput.screencast = nil
         self.hasVideo = false
         self.hasScreencast = false
         self.stateValue.sources.video = nil
