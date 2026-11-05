@@ -537,10 +537,13 @@ public class ChatSelectText : NSObject {
         
         removeScrollListeners()
         
-        let mouseListener = TableScrollListener (dispatchWhenVisibleRangeUpdated: false, { [weak table] _ in
-            table?.enumerateVisibleViews(with: { view in
-                view.updateMouse(animated: true)
-            })
+        let hoveredRow = ChatHoveredRowTracker(table: table)
+
+        let mouseListener = TableScrollListener (dispatchWhenVisibleRangeUpdated: false, { [weak window] _ in
+            guard let window else {
+                return
+            }
+            hoveredRow.update(windowLocation: window.mouseLocationOutsideOfEventStream)
         })
 
         let selectionListener = TableScrollListener (dispatchWhenVisibleRangeUpdated: false, { [weak self, weak chatInteraction, weak window] _ in
@@ -567,11 +570,9 @@ public class ChatSelectText : NSObject {
         table.addScroll(listener: mouseListener)
         table.addScroll(listener: selectionListener)
 
-        window.set(mouseHandler: { [weak table] event -> KeyHandlerResult in
+        window.set(mouseHandler: { event -> KeyHandlerResult in
             
-            table?.enumerateVisibleViews(with: { view in
-                view.updateMouse(animated: true)
-            })
+            hoveredRow.update(windowLocation: event.locationInWindow)
             
             return .rejected
         }, with: self, for: .mouseMoved, priority:.medium)
