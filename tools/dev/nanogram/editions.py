@@ -64,6 +64,7 @@ class AppFacts:
     decoder_present: bool = False
     decoder_entitlements: dict = field(default_factory=dict)
     decoder_hardened_runtime: bool = True
+    embedded_versions: dict = field(default_factory=dict)
 
 
 def _entitlements(bundle: Path) -> dict:
@@ -97,6 +98,17 @@ def _sparkle_xpc_services(app: Path) -> list[str]:
     return sorted({path.name for path in framework.glob("Versions/*/XPCServices/*.xpc")})
 
 
+def _embedded_versions(app: Path) -> dict:
+    """CFBundleShortVersionString of every extension and XPC service inside the app, by bundle name."""
+    versions = {}
+    for bundle in sorted((app / "Contents" / "PlugIns").glob("*.appex")) + sorted((app / "Contents" / "XPCServices").glob("*.xpc")):
+        path = bundle / "Contents" / "Info.plist"
+        if path.exists():
+            with path.open("rb") as handle:
+                versions[bundle.name] = plistlib.load(handle).get("CFBundleShortVersionString", "")
+    return versions
+
+
 def inspect_app(app: Path) -> AppFacts:
     app = Path(app)
     with (app / "Contents" / "Info.plist").open("rb") as handle:
@@ -119,6 +131,7 @@ def inspect_app(app: Path) -> AppFacts:
         decoder_present=bool(decoders),
         decoder_entitlements=_entitlements(decoders[0]) if decoders else {},
         decoder_hardened_runtime=_hardened_runtime(decoders[0]) if decoders else True,
+        embedded_versions=_embedded_versions(app),
     )
 
 
@@ -144,10 +157,17 @@ def _check_decoder_service(facts: AppFacts) -> list[str]:
     return problems
 
 
+def _check_embedded_versions(facts: AppFacts) -> list[str]:
+    """Every embedded bundle reports the app's version (the decoder service used to keep a pinned one)."""
+    expected = facts.info.get("CFBundleShortVersionString", "")
+    return [f"{name} reports version {version!r}, the app reports {expected!r}"
+            for name, version in sorted(facts.embedded_versions.items()) if version != expected]
+
+
 def check_edition(facts: AppFacts, edition: str) -> list[str]:
     if edition not in EDITIONS:
         return [f"unknown edition {edition!r}"]
-    problems = []
+    problems = _check_embedded_versions(facts)
     if facts.bundle_id != BUNDLE_ID:
         problems.append(f"bundle identifier is {facts.bundle_id!r}, expected {BUNDLE_ID}")
     if APP_GROUP not in facts.entitlements.get(GROUPS, []):

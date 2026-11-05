@@ -74,5 +74,8 @@ extension BrandingStrings {
         "Login.New.Code.EnterCode": "Check your other devices",
         "Login.New.Code.CodeInfo": "We’ve sent the code to the app\nfor **%@** on your other device · [Edit]()",
         "Login.EnterCodeFromApp": "We've sent the code to the app on your other devices.",
+        "CrashReport.CardInfo": "Choose where to send the report to help fix it.",
+        "CrashReport.CardTitle": "Nanogram quit unexpectedly",
+        "CrashReport.CardTitleTimes_other": "Nanogram quit unexpectedly %1$d times",
     ]
 }

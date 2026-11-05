@@ -55,6 +55,30 @@ class CompilerHardeningTests(unittest.TestCase):
         script = (ROOT / "core-xprojects" / "ffmpeg" / "ffmpeg" / "build.sh").read_text()
         self.assertRegex(script, r'EXTRA_CFLAGS="[^"]*-fstack-protector-strong')
 
+    def test_ffmpeg_has_the_native_av1_decoder_for_the_videotoolbox_hwaccel(self):
+        script = (ROOT / "core-xprojects" / "ffmpeg" / "ffmpeg" / "build.sh").read_text()
+        decoders = re.search(r"--enable-decoder=(\S+)", script).group(1).rstrip("\\").split(",")
+        self.assertIn("av1", decoders)
+        self.assertIn("libdav1d", decoders)
+        self.assertIn("av1_videotoolbox", re.search(r"--enable-hwaccel=(\S+)", script).group(1))
+
+
+class DownloadFolderBookmarkTests(unittest.TestCase):
+    def test_sandboxed_editions_can_keep_a_security_scoped_download_folder(self):
+        for base in BASES:
+            for suffix in ("", "-EnhancedSecurity"):
+                name = base + suffix
+                path = ENTITLEMENTS / f"{name}.entitlements"
+                if not path.exists():
+                    continue
+                self.assertIs(entitlements(name).get("com.apple.security.files.bookmarks.app-scope"), True, name)
+
+    def test_folder_picker_stores_a_bookmark(self):
+        panels = (ROOT / "packages" / "FilePanels" / "Sources" / "FilePanels" / "FilePanels.swift").read_text()
+        self.assertIn("bookmarkData(options: .withSecurityScope", panels)
+        data_ui = (ROOT / "packages" / "DataUsageUI" / "Sources" / "DataUsageUI" / "DataAndStorageViewController.swift").read_text()
+        self.assertIn("selectFolderWithBookmark", data_ui)
+
 
 class EnhancedSecurityTests(unittest.TestCase):
     def test_variants_are_the_base_plus_the_soft_mode_keys(self):
@@ -113,3 +137,26 @@ class EnhancedSecurityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EmbeddedBundleVersionTests(unittest.TestCase):
+    """The decoder service must follow the app's version; upstream version bumps never touch it."""
+
+    def test_every_marketing_version_in_the_project_is_the_same(self):
+        text = (ROOT / "Telegram.xcodeproj" / "project.pbxproj").read_text()
+        self.assertEqual(len(set(re.findall(r"MARKETING_VERSION = ([0-9.]+);", text))), 1)
+        self.assertEqual(len(set(re.findall(r"CURRENT_PROJECT_VERSION = ([0-9.]+);", text))), 1)
+
+    def test_decoder_info_plist_takes_both_versions_from_build_settings(self):
+        info = plistlib.loads((ROOT / "NanogramDecoderService" / "Info.plist").read_bytes())
+        self.assertEqual(info["CFBundleShortVersionString"], "$(MARKETING_VERSION)")
+        self.assertEqual(info["CFBundleVersion"], "$(CURRENT_PROJECT_VERSION)")
+
+    def test_a_pinned_embedded_version_is_reported(self):
+        from nanogram import editions
+        facts = editions.AppFacts(bundle_id="", source="", sparkle_embedded=False, sparkle_symbols=[], entitlements={},
+                                  hardened_runtime=True, info={"CFBundleShortVersionString": "13.2.0"},
+                                  embedded_versions={"NanogramDecoder.xpc": "13.1.0", "Share.appex": "13.2.0"})
+        problems = editions._check_embedded_versions(facts)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("NanogramDecoder.xpc", problems[0])

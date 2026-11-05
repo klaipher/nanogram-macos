@@ -571,6 +571,15 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // Sandboxed: a download folder outside ~/Downloads that was picked without a security-scoped bookmark
+        // (before the sandbox) cannot be written to. Fall back to Downloads and tell the user once.
+        let context = self.context
+        _ = (DownloadFolderAccess.resetUnusableFolder(postbox: context.account.postbox) |> deliverOnMainQueue).start(next: { didReset in
+            if didReset {
+                alert(for: context.window, header: appName, info: "Nanogram can no longer write to your previous download folder, so downloads now go to Downloads. Choose the folder again in Settings > Data and Storage > Download Folder.")
+            }
+        })
                 
         tabController.navigationController = navigation
                 

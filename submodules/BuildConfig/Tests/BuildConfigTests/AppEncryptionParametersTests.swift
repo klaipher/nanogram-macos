@@ -199,4 +199,34 @@ final class AppEncryptionParametersTests: XCTestCase {
         relaunched.applyPasscode("1234")
         XCTAssertEqual(try bytes(relaunched.decrypt()), original)
     }
+
+    func testAnExistingVaultWithoutAKeychainIsReportedAsKeychainUnavailable() throws {
+        _ = wrapped()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: vaultFile.path))
+        let encryption = legacy()
+        XCTAssertNil(encryption.decrypt())
+        XCTAssertTrue(encryption.keychainUnavailable())
+    }
+
+    func testAHealthyKeychainIsNeverReportedAsUnavailable() throws {
+        let encryption = wrapped()
+        XCTAssertNotNil(encryption.decrypt())
+        XCTAssertFalse(encryption.keychainUnavailable())
+    }
+
+    func testAWrongPasscodeIsNotAKeychainProblem() throws {
+        let encryption = wrapped()
+        XCTAssertTrue(encryption.change("1234"))
+        let locked = wrapped()
+        XCTAssertNil(locked.decrypt())
+        XCTAssertFalse(locked.keychainUnavailable())
+        locked.applyPasscode("wrong")
+        XCTAssertNil(locked.decrypt())
+        XCTAssertFalse(locked.keychainUnavailable())
+    }
+
+    func testNoVaultAndNoKeychainIsNotReportedAsUnavailable() throws {
+        let encryption = legacy()
+        XCTAssertFalse(encryption.keychainUnavailable())
+    }
 }

@@ -663,9 +663,9 @@ open class DataAndStorageViewController<Context: AccountContextProtocol>: TableV
                 })
             }).start()
         }, selectDownloadFolder: {
-            selectFolder(for: context.window, completion: { newPath in
+            selectFolderWithBookmark(for: context.window, completion: { newPath, bookmark in
                 _ = updateMediaDownloadSettingsInteractively(postbox: context.account.postbox, { current -> AutomaticMediaDownloadSettings in
-                    return current.withUpdatedDownloadFolder(newPath)
+                    return current.withUpdatedDownloadFolder(newPath, bookmark: bookmark)
                 }).start()
             })
             

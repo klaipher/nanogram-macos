@@ -132,11 +132,20 @@ public struct CallPowerHysteresis {
             self.restoreCeiling = max(self.restoreCeiling, target)
             if now - start >= CallPowerHysteresis.restoreDelay {
                 let restored = self.restoreCeiling
-                self.restoreWindowStart = nil
+                var changed: CallPowerStep?
                 if restored < self.step {
                     self.step = restored
-                    return restored
+                    changed = restored
                 }
+                if target < self.step {
+                    // The real state is still lower than the restored step: open the next window so the
+                    // step keeps coming down without waiting for another system notification.
+                    self.restoreWindowStart = now
+                    self.restoreCeiling = target
+                } else {
+                    self.restoreWindowStart = nil
+                }
+                return changed
             }
         } else {
             self.restoreWindowStart = now

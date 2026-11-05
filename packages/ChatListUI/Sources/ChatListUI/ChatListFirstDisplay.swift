@@ -68,6 +68,16 @@ struct ChatListCachedReplayGate {
         liveEmitted = true
     }
 
+    /// Decides whether a live value may be forwarded. While the remembered view is pending or already shown,
+    /// a live loading placeholder (not ready) is dropped so it neither suppresses nor replaces the cached rows.
+    mutating func acceptLive(isReady: Bool) -> Bool {
+        if !isReady && !liveEmitted {
+            return false
+        }
+        liveEmitted = true
+        return true
+    }
+
     mutating func shouldEmitCached() -> Bool {
         if liveEmitted || cachedEmitted {
             return false

@@ -169,7 +169,7 @@ public func SavedPeersController(context: any AccountContextProtocol) -> InputDa
     
     let delegate = TableDelegate(arguments)
     
-    let signal = statePromise.get() |> deliverOnPrepareQueue |> map { state in
+    let signal = statePromise.get() |> deliverOnChatListPrepareQueue |> map { state in
         return InputDataSignalValue(entries: entries(state, arguments: arguments))
     }
     

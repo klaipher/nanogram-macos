@@ -23,6 +23,8 @@
 -(NSData * _Nullable)encryptData:(NSData * _Nonnull)data;
 -(NSData * _Nullable)decryptData:(NSData * _Nonnull)data;
 -(BOOL)hasPasscode;
+/// YES when a key vault exists but the Keychain could not be reached. Not a passcode problem: the caller must offer Retry, never a passcode prompt or logout.
+-(BOOL)keychainUnavailable;
 @end
 
 @interface LocalPrivateKey : NSObject {

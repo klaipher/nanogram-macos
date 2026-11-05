@@ -1090,13 +1090,16 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 let cachedValue: (ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool) = (cached, data, false, nil, true)
                 return Signal<(ChatListViewUpdate, FilterData, Bool, ChatFolderUpdates?, Bool), NoError> { subscriber in
                     var gate = ChatListCachedReplayGate()
-                    let cachedDisposable = (Signal<Void, NoError>.single(Void()) |> delay(ChatListCachedReplay.delay, queue: prepareQueue)).start(next: { _ in
+                    let cachedDisposable = (Signal<Void, NoError>.single(Void()) |> delay(ChatListCachedReplay.delay, queue: chatListPrepareQueue)).start(next: { _ in
                         if gate.shouldEmitCached() {
                             subscriber.putNext(cachedValue)
                         }
                     })
-                    let liveDisposable = (live |> deliverOn(prepareQueue)).start(next: { value in
-                        gate.liveArrived()
+                    let liveDisposable = (live |> deliverOn(chatListPrepareQueue)).start(next: { value in
+                        let isReady = ChatListReadiness.isReady(isLoading: value.0.list.isLoading, hasContent: !value.0.list.items.isEmpty)
+                        if !gate.acceptLive(isReady: isReady) {
+                            return
+                        }
                         cachedDisposable.dispose()
                         subscriber.putNext(value)
                     }, completed: {
@@ -1178,7 +1181,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         |> map { _ in Void() }
         let projectedState: Signal<ChatListStateProjection, NoError> = combineLatest(stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, activityTicks)
         |> map { state, _ in state }
-        let list:Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey, Bool), NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, projectedState, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, banners, subState, appConfiguration, giftAuctionState, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, bannerValues, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey, Bool), NoError> in
+        let list:Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey, Bool), NoError> = combineLatest(queue: chatListPrepareQueue, chatHistoryView, appearanceSignal, projectedState, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, banners, subState, appConfiguration, giftAuctionState, PendingChatRemovals.get(context).hiddenPeerIds, chatListVisibility.get()) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, bannerValues, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, isVisible -> Signal<(TableUpdateTransition, ChatListPageWindow<EngineChatList.Item.Index>, ChatListPageKey, Bool), NoError> in
             if !HistoryVisibilityGate.shouldApply(visible: isVisible, isPlainGenericUpdate: !value.2 && !scrollUp.with { $0 }, hasScrollPosition: scroll != nil, appliedOnce: chatListAppliedOnce.with { $0 }) {
                 _ = chatListSkippedWhileHidden.swap(true)
                 return .complete()
@@ -1683,7 +1686,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             }
         }
         if self.isOnScreen {
-            context.account.viewTracker.chatListPreloadItems.set(.single(preloadItems) |> delay(0.2, queue: prepareQueue))
+            context.account.viewTracker.chatListPreloadItems.set(.single(preloadItems) |> delay(0.2, queue: chatListPrepareQueue))
         }
     }
     

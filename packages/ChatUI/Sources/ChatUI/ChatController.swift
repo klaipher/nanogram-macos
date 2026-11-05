@@ -3598,7 +3598,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
 
         
-        let animatedEmojiStickers: Signal<[String: StickerPackItem], NoError> = .single([:]) |> then(context.diceCache.animatedEmojies)
+        let animatedEmojiStickers: Signal<[String: StickerPackItem], NoError> = AnimatedEmojiSeed.signal(source: context.diceCache.animatedEmojies)
         // Use the process-wide cache on `context.reactions` instead of
         // re-running the postbox transaction + Codable+FlatBuffer decode
         // (~15-20ms in release, ~85ms in debug) on every chat-open. The

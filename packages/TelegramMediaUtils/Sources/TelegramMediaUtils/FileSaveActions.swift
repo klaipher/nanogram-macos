@@ -213,10 +213,12 @@ private func saveMediaAs(resource: MediaResource, reference: AnyMediaReference, 
 }
 
 public func showInFinder(_ file:TelegramMediaFile, account:Account)  {
-    let path = downloadFilePath(file, account.postbox) |> deliverOnMainQueue
+    let path = (downloadFilePath(file, account.postbox) |> mapToSignal { expanded -> Signal<((String, String)?, AutomaticMediaDownloadSettings), NoError> in
+        return automaticDownloadSettings(postbox: account.postbox) |> take(1) |> map { (expanded, $0) }
+    }) |> deliverOnMainQueue
     
-    _ = combineLatest(queue: .mainQueue(), path, downloadedFilePaths(account.postbox)).start(next: { (expanded, paths) in
-        
+    _ = combineLatest(queue: .mainQueue(), path, downloadedFilePaths(account.postbox)).start(next: { (expandedAndSettings, paths) in
+        let (expanded, settings) = expandedAndSettings
         guard let (boxPath, adopted) = expanded else {
             return
         }
@@ -233,15 +235,19 @@ public func showInFinder(_ file:TelegramMediaFile, account:Account)  {
                 }
                 
                 var adopted = adopted
-                var i:Int = 1
-                let deletedPathExt = adopted.nsstring.deletingPathExtension
-                while FileManager.default.fileExists(atPath: adopted, isDirectory: nil) {
-                    let ext = adopted.nsstring.pathExtension
-                    adopted = "\(deletedPathExt) (\(i)).\(ext)"
-                    i += 1
-                }
-                
-                try? FileManager.default.copyItem(atPath: boxPath, toPath: adopted)
+                DownloadFolderAccess.withAccess(settings, refreshed: { data in
+                    DownloadFolderAccess.storeRefreshed(data, forFolder: settings.downloadFolder, postbox: account.postbox)
+                }, {
+                    var i:Int = 1
+                    let deletedPathExt = adopted.nsstring.deletingPathExtension
+                    while FileManager.default.fileExists(atPath: adopted, isDirectory: nil) {
+                        let ext = adopted.nsstring.pathExtension
+                        adopted = "\(deletedPathExt) (\(i)).\(ext)"
+                        i += 1
+                    }
+                    
+                    try? FileManager.default.copyItem(atPath: boxPath, toPath: adopted)
+                })
            
                 let quarantineData = "does not really matter what is here".cString(using: String.Encoding.utf8)!
                 _ = Int(strlen(quarantineData))
