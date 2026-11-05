@@ -17,7 +17,7 @@ public protocol PeerPresenceStatusManagerEnvironment: AnyObject {
     func addApplicationStateListener(_ f: @escaping () -> Void) -> Disposable
 }
 
-private final class DefaultPeerPresenceStatusManagerEnvironment: PeerPresenceStatusManagerEnvironment {
+private final class DefaultPeerPresenceStatusManagerEnvironment: PeerPresenceStatusManagerEnvironment, @unchecked Sendable {
     static let shared = DefaultPeerPresenceStatusManagerEnvironment()
 
     private let lock = NSLock()
@@ -28,14 +28,20 @@ private final class DefaultPeerPresenceStatusManagerEnvironment: PeerPresenceSta
     private init() {
         let center = NotificationCenter.default
         self.observers.append(center.addObserver(forName: NSApplication.didChangeOcclusionStateNotification, object: nil, queue: OperationQueue.main, using: { [weak self] _ in
-            self?.setInBackground(!NSApplication.shared.occlusionState.contains(.visible))
+            self?.setInBackground(!DefaultPeerPresenceStatusManagerEnvironment.isApplicationVisible())
         }))
         self.observers.append(center.addObserver(forName: NSApplication.didHideNotification, object: nil, queue: OperationQueue.main, using: { [weak self] _ in
             self?.setInBackground(true)
         }))
         self.observers.append(center.addObserver(forName: NSApplication.didUnhideNotification, object: nil, queue: OperationQueue.main, using: { [weak self] _ in
-            self?.setInBackground(!NSApplication.shared.occlusionState.contains(.visible))
+            self?.setInBackground(!DefaultPeerPresenceStatusManagerEnvironment.isApplicationVisible())
         }))
+    }
+
+    private static func isApplicationVisible() -> Bool {
+        return MainActor.assumeIsolated {
+            NSApplication.shared.occlusionState.contains(.visible)
+        }
     }
 
     private func setInBackground(_ value: Bool) {

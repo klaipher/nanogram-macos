@@ -11,7 +11,7 @@ public struct AnimatableContentObserverOptions: OptionSet {
     public static let ownBounds = AnimatableContentObserverOptions(rawValue: 1 << 3)
 }
 
-final class AnimatableContentHub {
+final class AnimatableContentHub: @unchecked Sendable {
     static let shared = AnimatableContentHub()
 
     final class Subscription {
@@ -271,7 +271,8 @@ public final class AnimatableContentTokenObserver {
             if Thread.isMainThread {
                 deliver(notification)
             } else {
-                DispatchQueue.main.async { deliver(notification) }
+                let delivery = MainThreadNotificationDelivery(deliver: deliver, notification: notification)
+                DispatchQueue.main.async { delivery.run() }
             }
         }
         var observed: [(Notification.Name, AnyObject?)] = [
@@ -313,5 +314,14 @@ public final class AnimatableContentTokenObserver {
 
     deinit {
         removeObservers()
+    }
+}
+
+private struct MainThreadNotificationDelivery: @unchecked Sendable {
+    let deliver: (Notification) -> Void
+    let notification: Notification
+
+    func run() {
+        deliver(notification)
     }
 }

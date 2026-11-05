@@ -75,6 +75,7 @@ private final class LocationPinView : View {
     }
 }
 
+@MainActor
 private final class LocationMapPool {
     static let shared = LocationMapPool()
     private var parked: MKMapView?
@@ -611,14 +612,19 @@ public class LocationModalController: ModalViewController {
     
     public override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        genericView.showsUserLocation = false
+        let genericView = self.genericView
+        MainActor.assumeIsolated {
+            genericView.showsUserLocation = false
+        }
         window?.removeAllHandlers(for: self)
     }
     
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        DispatchQueue.main.async { [weak self] in
-            self?.attachMap()
+        Queue.mainQueue().justDispatch { [weak self] in
+            MainActor.assumeIsolated {
+                self?.attachMap()
+            }
         }
         window?.set(mouseHandler: { [weak self] _ -> KeyHandlerResult in
             guard let self else { return .rejected }
@@ -637,6 +643,7 @@ public class LocationModalController: ModalViewController {
         window?.set(mouseHandler: collapseOnMapEvent, with: self, for: .scrollWheel, priority: .modal)
     }
     
+    @MainActor
     private func attachMap() {
         guard !isClosed, genericView.mapView == nil else {
             return
@@ -712,8 +719,10 @@ public class LocationModalController: ModalViewController {
         
         genericView.locateButton.set(handler: { [weak self] _ in
             guard let `self` = self else {return}
-            if let mapView = self.genericView.mapView {
-                self.delegate.focusUserLocation(mapView)
+            MainActor.assumeIsolated {
+                if let mapView = self.genericView.mapView {
+                    self.delegate.focusUserLocation(mapView)
+                }
             }
             self.delegate.isPinRaised = false
         }, for: .Click)
@@ -725,7 +734,7 @@ public class LocationModalController: ModalViewController {
             if self.delegate.isPinRaised {
                 state.set(.normal(.custom(nil, named: nil)))
             } else {
-                state.set(.normal(.user(self.genericView.mapView?.userLocation.location)))
+                state.set(.normal(.user(self.currentUserLocation())))
             }
         }
         delegate.didChangeRegion = { [weak self] in
@@ -733,7 +742,7 @@ public class LocationModalController: ModalViewController {
             if self.delegate.isPinRaised {
                 state.set(.normal(.custom(self.genericView.getSelectedLocation(), named: nil)))
             } else {
-                state.set(.normal(.user(self.genericView.mapView?.userLocation.location)))
+                state.set(.normal(.user(self.currentUserLocation())))
             }
         }
         
@@ -836,7 +845,7 @@ public class LocationModalController: ModalViewController {
             guard let self else {
                 return
             }
-            toggleExpand(.normal(.user(self.genericView.mapView?.userLocation.location)))
+            toggleExpand(.normal(.user(self.currentUserLocation())))
         }
         
         disposable.set((transition).start(next: { [weak self] transition, loading, expanded, hasVenues in
@@ -854,7 +863,12 @@ public class LocationModalController: ModalViewController {
 
         let request = requestUserLocation() |> deliverOnMainQueue
         requestDisposable.set((request).start(next: { [weak self] result in
-            self?.genericView.showsUserLocation = true
+            guard let genericView = self?.genericView else {
+                return
+            }
+            MainActor.assumeIsolated {
+                genericView.showsUserLocation = true
+            }
         }, error: { [weak self] error in
             self?.delegate.cancelRequestLocation()
         }))
@@ -865,8 +879,18 @@ public class LocationModalController: ModalViewController {
         disposable.dispose()
         sendDisposable.dispose()
         requestDisposable.dispose()
-        if isLoaded() {
-            genericView.releaseMap()
+        if isLoaded(), Thread.isMainThread {
+            let genericView = self.genericView
+            MainActor.assumeIsolated {
+                genericView.releaseMap()
+            }
+        }
+    }
+
+    private func currentUserLocation() -> CLLocation? {
+        let genericView = self.genericView
+        return MainActor.assumeIsolated {
+            genericView.mapView?.userLocation.location
         }
     }
     

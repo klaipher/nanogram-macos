@@ -37,7 +37,7 @@ final class GCChatListIndicatorTests: XCTestCase {
         return Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1e6 + Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1e6
     }
 
-    private func measure(_ make: () -> NSView) -> Double {
+    private func measure(_ make: () -> NSView) throws -> Double {
         let window = NSWindow(contentRect: NSMakeRect(0, 0, 400, 100), styleMask: [.borderless], backing: .buffered, defer: false)
         window.contentView = NSView(frame: NSMakeRect(0, 0, 400, 100))
         window.orderFrontRegardless()
@@ -49,6 +49,10 @@ final class GCChatListIndicatorTests: XCTestCase {
         let warm = expectation(description: "warm")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { warm.fulfill() }
         wait(for: [warm], timeout: 3)
+        guard window.occlusionState.contains(.visible) else {
+            window.orderOut(nil)
+            throw XCTSkip("the test window is not visible (screen locked or covered), so the display link does not run")
+        }
         let start = self.cpuSeconds()
         let done = expectation(description: "done")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { done.fulfill() }
@@ -59,9 +63,10 @@ final class GCChatListIndicatorTests: XCTestCase {
         return cpu
     }
 
-    func testCoreAnimationIndicatorCostsLessThanTheDisplayLinkOne() {
-        let legacy = self.measure { LegacyGCChatListIndicator(color: .white) }
-        let current = self.measure { GCChatListIndicator(color: .white) }
+    func testCoreAnimationIndicatorCostsLessThanTheDisplayLinkOne() throws {
+        try XCTSkipIf(CGDisplayIsAsleep(CGMainDisplayID()) != 0, "the display is asleep, so neither indicator draws")
+        let legacy = try self.measure { LegacyGCChatListIndicator(color: .white) }
+        let current = try self.measure { GCChatListIndicator(color: .white) }
         print(String(format: "GCChatListIndicator 20 visible: display link %.2f%% CPU, Core Animation %.2f%% CPU", legacy, current))
         XCTAssertLessThan(current, legacy)
     }
