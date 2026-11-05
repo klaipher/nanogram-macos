@@ -97,7 +97,7 @@ ThinLTO and dead-code stripping):
 `buildcheck` fails a Debug build whose log has a `VerifyModule`, `GenerateDSYMFile` or `ExtractAppIntentsMetadata` task.
 
 **Compilation caching** (Debug only): `COMPILATION_CACHE_ENABLE_CACHING = YES` with one CAS for every checkout,
-`~/.cache/nanogram-macos/CompilationCache`, capped at 10 GB (`COMPILATION_CACHE_LIMIT_SIZE` in bytes, plus the shared cleanup, see [cache-cleanup.md](cache-cleanup.md)). Adopted on
+`~/.cache/nanogram-macos/CompilationCache`, limited to 6 GB (`COMPILATION_CACHE_LIMIT_SIZE` in bytes: half of the 12 GB footprint cap, because the LLVM store keeps two generations and reached 15 GB against a 10 GB limit; the shared cleanup enforces the 12 GB, see [cache-cleanup.md](cache-cleanup.md)). Adopted on
 the numbers below (`build-output/stage2/task10/`, 2026-11-03, the three settings on the command line, otherwise the
 same `tg build --clean`; loaded Mac, so compare CPU seconds):
 
@@ -109,10 +109,9 @@ same `tg build --clean`; loaded Mac, so compare CPU seconds):
 | CAS size | — | 3.9 GB after the cold build, 4.0 GB after the warm and no-change builds |
 
 The adoption rule was: warm compile CPU ≤ 50 % of cold (it is 1.3 %), a no-change build ≤ 3 CPU s more (+0.2 s) and
-the CAS ≤ 10 GB. What it buys: a new worktree, `tg clean`, `tg warnings` or `tg check` (both start from a clean
+the CAS ≤ 10 GB (then; the limit is 6 GB now, 12 GB on disk at most). What it buys: a new worktree, `tg clean`, `tg warnings` or `tg check` (both start from a clean
 build) and any build after an xcconfig change compile mostly from the CAS. The warm run used the same checkout path;
-reuse of the CAS by a checkout at a different path was not measured. The 10 GB cap was never reached, so Xcode's
-eviction was not observed; `tg prune` removes the CAS last, only when the cache root is over its cap.
+reuse of the CAS by a checkout at a different path was not measured. The 10 GB cap was reached later (15 GB measured on 2026-11-05 with several worktrees), which is why the limit is half the footprint cap now; `tg prune` removes the CAS last, only when the cache root is over its cap.
 
 **Considered and not done:** run-script phases with declared outputs (6 phases cost 1.2–1.4 s per build; it means
 editing upstream's and Sparkle's projects), mergeable libraries and eager linking (the ~170 package modules already
@@ -437,6 +436,20 @@ hold it exclusively (`tools/dev/nanogram/checkoutlock.py`; `tg frameworks --veri
 and DerivedData never change under a running build; a waiting command prints `…: a build of this checkout is
 running; waiting`. Under `buildlock`, which holds the same file exclusively, they do not wait: buildlock exports
 `NANOGRAM_BUILDLOCK` and writes its pid into the file, and either one tells tg the lock is its parent's.
+
+**The guard and the worktree helper (2026-11-05).** Before `tg build`, `test`, `check`, `warnings`, `testflight` and
+`release-direct`, `cachegc guard` runs (not throttled, 60 s): it removes `DerivedData-<suffix>` and `spm-<checkout>-*`
+of checkouts that no longer exist, keeps the whole cache root under `cache_root_total` (40 GB, least recently used
+scratch first), and decides "in use" per directory (a running command naming it, a process working in it, the SwiftPM
+`.lock` or the checkout's build lock), so a build running in another worktree no longer stops the cleanup of the rest.
+Below 50 GB free it runs every rule; below 20 GB free it prints what uses the space and the build does not start
+(`TG_ALLOW_LOW_DISK=1` overrides). `tg worktree add <name>` makes `~/Projects/wt/mac-<name>` on `night/<name>` with its
+submodules borrowed (`--reference`) from this checkout's clones, then runs `tg credentials`, `tg localfixes` and
+`tg frameworks` (native libraries restored from the cache in seconds); `tg worktree remove <name>` deletes the
+worktree together with its DerivedData, scratch and Xcode DerivedData, and refuses a dirty or unpushed one, or one
+holding release archives. `tg prune` stays as the manual equivalent. Details: [cache-cleanup.md](cache-cleanup.md).
+Each checkout opened in Xcode also gets Xcode's own `~/Library/Developer/Xcode/DerivedData/Telegram-Mac-<hash>`
+(2.5 GB for one checkout): the `derived-data` category removes it once the checkout is gone, `tg worktree remove` at once.
 
 The Sparkle private key is not in the cache root: it lives in `~/.config/nanogram-macos/sparkle_ed25519`
 (see "Sparkle"); `~/.cache/nanogram-macos/sparkle-ed25519/` holds only the helper binary that signs with it, which

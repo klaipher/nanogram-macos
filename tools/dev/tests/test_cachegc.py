@@ -34,14 +34,37 @@ class OutputBases(unittest.TestCase):
     def test_existing_workspace_kept(self):
         self.assertEqual(self.plan([self.base()], existing={"/gone"}), [])
 
-    def test_running_server_kept(self):
+    def test_running_server_of_a_gone_workspace_is_stopped_then_removed(self):
+        plan = self.plan([self.base(server_alive=True, pid=4242)])
+        self.assertEqual([(r.action, r.pid) for r in plan], [("stop-and-rmtree", 4242)])
+
+    def test_running_server_without_a_pid_is_kept(self):
         self.assertEqual(self.plan([self.base(server_alive=True)]), [])
+
+    def test_existing_workspace_with_running_server_never_removed(self):
+        plan = gc.plan_output_bases([self.base(server_alive=True, pid=1, mtime=NOW - 30 * DAY)], lambda p: True,
+                                    lambda p: True, NOW, RECENT, 3)
+        self.assertEqual(plan, [])
+
+    def unused(self, **kw):
+        return gc.plan_output_bases([self.base(workspace="/ws/A", **kw)], lambda p: True, lambda p: True, NOW, RECENT,
+                                    3, kw.pop("keep", frozenset()))
+
+    def test_unused_base_of_an_existing_worktree_is_removed_after_n_days(self):
+        self.assertEqual(len(self.unused(mtime=NOW - 4 * DAY)), 1)
+        self.assertEqual(self.unused(mtime=NOW - 2 * DAY), [])
+
+    def test_unused_rule_is_off_without_a_setting_and_spares_the_current_checkout(self):
+        old = self.base(workspace="/ws/A", mtime=NOW - 9 * DAY)
+        self.assertEqual(gc.plan_output_bases([old], lambda p: True, lambda p: True, NOW, RECENT), [])
+        self.assertEqual(gc.plan_output_bases([old], lambda p: True, lambda p: True, NOW, RECENT, 3,
+                                              frozenset({"/ws/A"})), [])
 
     def test_unknown_workspace_kept(self):
         self.assertEqual(self.plan([self.base(workspace=None)]), [])
 
-    def test_recent_kept(self):
-        self.assertEqual(self.plan([self.base(mtime=NOW - 60)]), [])
+    def test_gone_workspace_is_removed_even_when_recent(self):
+        self.assertEqual(len(self.plan([self.base(mtime=NOW - 60)])), 1)
 
     def test_unmounted_volume_kept(self):
         plan = gc.plan_output_bases([self.base()], lambda p: False, lambda p: False, NOW, RECENT)
@@ -76,7 +99,7 @@ class DerivedData(unittest.TestCase):
         self.assertEqual(self.plan([self.entry()], busy={"/dd/A-abc"}), [])
         self.assertEqual(self.plan([self.entry(last_used=NOW - 60)]), [])
 
-    def test_age_rule_waits_while_build_tools_run(self):
+    def test_ide_gate_still_available_to_callers(self):
         self.assertEqual(self.plan([self.entry()], running=True, existing={"/ws/A"}), [])
 
 
@@ -92,9 +115,14 @@ class SpmBuild(unittest.TestCase):
         entries = [{"path": "/r/p/.build", "last_used": NOW - 10 * DAY, "size": 1},
                    {"path": "/r/q/.build", "last_used": NOW - 1 * DAY, "size": 1},
                    {"path": "/r/s/.build", "last_used": NOW - 30 * DAY, "size": 1}]
-        plan = gc.plan_spm_build(entries, NOW, 7, RECENT, {"/r/s/.build/x"}, False)
+        plan = gc.plan_spm_build(entries, NOW, 7, RECENT, {"/r/s/.build/x"})
         self.assertEqual([r.path for r in plan], ["/r/p/.build"])
-        self.assertEqual(gc.plan_spm_build(entries, NOW, 7, RECENT, set(), True), [])
+
+    def test_only_the_directory_in_use_is_skipped(self):
+        entries = [{"path": "/r/p/.build", "last_used": NOW - 10 * DAY, "size": 1},
+                   {"path": "/r/q/.build", "last_used": NOW - 10 * DAY, "size": 1}]
+        plan = gc.plan_spm_build(entries, NOW, 7, RECENT, set(), {"/r/p/.build"})
+        self.assertEqual([r.path for r in plan], ["/r/q/.build"])
 
 
 class SpmScratch(unittest.TestCase):
@@ -104,12 +132,21 @@ class SpmScratch(unittest.TestCase):
                    {"path": "/s/b", "last_used": NOW - 3 * DAY, "size": 4 * g},
                    {"path": "/s/c", "last_used": NOW - 2 * DAY, "size": 4 * g},
                    {"path": "/s/d", "last_used": NOW - 60, "size": 4 * g}]
-        plan = gc.plan_spm_scratch(entries, NOW, 7, 6 * g, RECENT, set(), False)
+        plan = gc.plan_spm_scratch(entries, NOW, 7, 6 * g, RECENT, set())
         self.assertEqual([r.path for r in plan], ["/s/a", "/s/b", "/s/c"])
 
-    def test_nothing_while_tools_run(self):
-        entries = [{"path": "/s/a", "last_used": NOW - 10 * DAY, "size": 1}]
-        self.assertEqual(gc.plan_spm_scratch(entries, NOW, 7, 0, RECENT, set(), True), [])
+    def test_only_the_directory_in_use_is_skipped(self):
+        entries = [{"path": "/s/a", "last_used": NOW - 10 * DAY, "size": 1},
+                   {"path": "/s/b", "last_used": NOW - 10 * DAY, "size": 1}]
+        plan = gc.plan_spm_scratch(entries, NOW, 7, 0, RECENT, {"/s/a"})
+        self.assertEqual([r.path for r in plan], ["/s/b"])
+
+    def test_orphan_goes_first_and_busy_orphan_stays(self):
+        entries = [{"path": "/s/a", "last_used": NOW - 3 * 3600, "size": 5, "orphan": True},
+                   {"path": "/s/b", "last_used": NOW - 3 * 3600, "size": 5, "orphan": True},
+                   {"path": "/s/c", "last_used": NOW - 3 * 3600, "size": 5}]
+        plan = gc.plan_spm_scratch(entries, NOW, 7, 100, RECENT, {"/s/b"})
+        self.assertEqual([(r.path, r.reason) for r in plan], [("/s/a", "its checkout no longer exists")])
 
 
 class Instruments(unittest.TestCase):
@@ -267,78 +304,10 @@ class MergedOutputBases(unittest.TestCase):
         self.assertEqual(gc.plan_merged_output_bases([self.base()], lambda p: False, NOW, RECENT, set()), [])
 
 
-class CacheRootTotal(unittest.TestCase):
-    G = 1024 ** 3
-
-    def entries(self):
-        return [{"path": "/c/DerivedData-a", "last_used": NOW - 10 * DAY},
-                {"path": "/c/spm-b", "last_used": NOW - 5 * DAY},
-                {"path": "/c/tgios-work", "last_used": NOW - 2 * DAY},
-                {"path": "/c/DerivedData-new", "last_used": NOW - 60}]
-
-    def test_oldest_first_until_under_the_cap_and_sized_lazily(self):
-        asked = []
-
-        def size_of(path, mtime):
-            asked.append(path)
-            return 5 * self.G
-
-        plan = gc.plan_cache_root_total(self.entries(), 52 * self.G, 40 * self.G, NOW, RECENT, set(), False, size_of)
-        self.assertEqual([r.path for r in plan], ["/c/DerivedData-a", "/c/spm-b", "/c/tgios-work"][:3])
-        self.assertEqual(asked, [r.path for r in plan])
-        self.assertTrue(all(r.category == "cache-root" for r in plan))
-
-    def test_stops_when_under_the_cap(self):
-        plan = gc.plan_cache_root_total(self.entries(), 44 * self.G, 40 * self.G, NOW, RECENT, set(), False,
-                                        lambda p, m: 5 * self.G)
-        self.assertEqual([r.path for r in plan], ["/c/DerivedData-a"])
-
-    def test_nothing_under_the_cap_busy_locked_or_recent(self):
-        size = lambda p, m: self.G  # noqa: E731
-        self.assertEqual(gc.plan_cache_root_total(self.entries(), 30 * self.G, 40 * self.G, NOW, RECENT, set(), False, size), [])
-        self.assertEqual(gc.plan_cache_root_total(self.entries(), 90 * self.G, 40 * self.G, NOW, RECENT, set(), True, size), [])
-        plan = gc.plan_cache_root_total(self.entries(), 90 * self.G, 40 * self.G, NOW, RECENT, {"/c/DerivedData-a"}, False, size)
-        self.assertNotIn("/c/DerivedData-a", [r.path for r in plan])
-        self.assertNotIn("/c/DerivedData-new", [r.path for r in plan])
 
 
-class SizeCaching(unittest.TestCase):
-    def test_measure_is_reused_until_the_directory_changes(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            directory = Path(tmp) / "d"
-            directory.mkdir()
-            (directory / "f").write_bytes(b"x" * 10000)
-            cache_file = Path(tmp) / "sizes.json"
-            cache = gc.SizeCache(cache_file)
-            mtime = gc.newest_mtime(directory)
-            self.assertIsNone(cache.lookup(str(directory), mtime))
-            self.assertEqual(cache.reported(str(directory), mtime), 0)
-            first = cache.measure(str(directory), mtime)
-            self.assertGreater(first, 0)
-            cache.save()
-            again = gc.SizeCache(cache_file)
-            self.assertEqual(again.lookup(str(directory), mtime), first)
-            self.assertIsNone(again.lookup(str(directory), mtime + 100))
-
-    def test_save_forgets_paths_that_are_gone(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            cache = gc.SizeCache(Path(tmp) / "sizes.json")
-            cache.data["/nonexistent/for/cachegc"] = [1.0, 5]
-            cache.save()
-            self.assertEqual(gc.SizeCache(Path(tmp) / "sizes.json").data, {})
 
 
-class LowSpace(unittest.TestCase):
-    def test_threshold_comes_from_the_policy(self):
-        pol = gc.load_policy()
-        self.assertGreater(pol.low_free_space_bytes, 0)
-        self.assertTrue(gc.low_on_space(pol, lambda p: pol.low_free_space_bytes - 1))
-        self.assertFalse(gc.low_on_space(pol, lambda p: pol.low_free_space_bytes))
-
-    def test_zero_switches_it_off(self):
-        data = json.loads(gc.POLICY_FILE.read_text())
-        data["low_free_space_gb"] = 0
-        self.assertFalse(gc.low_on_space(gc.Policy(data), lambda p: 0))
 
 
 def git_run(cwd, *args):
@@ -383,6 +352,7 @@ class MergeState(unittest.TestCase):
                 (base / "DO_NOT_BUILD_HERE").write_text(str(workspace))
             data = json.loads(gc.POLICY_FILE.read_text())
             data["repos"] = []
+            data.pop("bazel_output_base_unused_days", None)
             pol = gc.Policy(data, home, "u")
             later = time.time() + 10 * DAY
             result = gc.run(pol, {"bazel-output-base"}, dry_run=False, now=later, tmpdir=home / "t", quiet=True)
@@ -412,12 +382,276 @@ class PolicyFile(unittest.TestCase):
         self.assertNotIn("schedule", json.dumps(data).replace("schedule, the", ""))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class CompilationCache(unittest.TestCase):
     def test_whole_unit_only_when_over_cap_and_idle(self):
         self.assertEqual(gc.plan_module_cache("/c", 11, 10, False, "compilation-cache")[0].category, "compilation-cache")
         self.assertEqual(gc.plan_module_cache("/c", 11, 10, True, "compilation-cache"), [])
         self.assertEqual(gc.plan_module_cache("/c", 9, 10, False, "compilation-cache"), [])
+
+
+class DiskCacheTrim(unittest.TestCase):
+    def blobs(self, count, size=10, age=DAY):
+        return [(f"/c/cas/{i}", NOW - age - i, size) for i in range(count)]
+
+    def plan(self, files, cap, busy=False):
+        return gc.plan_bazel_disk_cache(files, "/c", NOW, cap, RECENT, busy)
+
+    def test_under_cap_nothing(self):
+        self.assertEqual(self.plan(self.blobs(5), 100), [])
+
+    def test_trims_oldest_first_down_to_ninety_percent(self):
+        files = self.blobs(10)               # 100 bytes, blob 9 is the oldest
+        (removal,) = self.plan(files, 90)    # goal 81: two blobs go
+        self.assertEqual(removal.action, "trim")
+        self.assertEqual(removal.files, ("/c/cas/9", "/c/cas/8"))
+
+    def test_recently_touched_blobs_stay(self):
+        files = self.blobs(4, age=60)
+        self.assertEqual(self.plan(files, 10), [])
+
+    def test_waits_for_bazels_own_gc(self):
+        self.assertEqual(self.plan(self.blobs(10), 10, busy=True), [])
+
+    def test_trim_deletes_only_blobs_under_ac_and_cas(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "cache"
+            (root / "cas/ab").mkdir(parents=True)
+            (root / "gc").mkdir()
+            blob, other = root / "cas/ab/blob", root / "gc/lock"
+            blob.write_text("12345")
+            other.write_text("x")
+            count, freed = gc.trim_files(root, (str(blob), str(other), str(root / "cas/missing")))
+            self.assertEqual((count, freed), (1, 5))
+            self.assertFalse(blob.exists())
+            self.assertTrue(other.exists())
+
+    def test_scan_lists_blobs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "ac/00").mkdir(parents=True)
+            (root / "ac/00/x").write_text("abc")
+            files = gc.scan_bazel_disk_cache(root, time.time() + 60)
+            self.assertEqual([(Path(p).name, s) for p, _, s in files], [("x", 3)])
+            self.assertIsNone(gc.scan_bazel_disk_cache(root, time.time() - 1))
+
+    def test_trim_target_must_be_the_disk_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp).resolve()
+            pol = policy(home)
+            ok = gc.Removal("bazel-disk-cache", str(pol.path("bazel_disk_cache")), "r", 0, "trim")
+            bad = gc.Removal("bazel-disk-cache", str(home / "elsewhere"), "r", 0, "trim")
+            self.assertIsNone(gc.safe_to_remove(ok, pol, []))
+            self.assertEqual(gc.safe_to_remove(bad, pol, []), "not the Bazel disk cache")
+
+
+class StopServer(unittest.TestCase):
+    def test_refuses_a_process_that_is_not_the_bazel_server_of_that_base(self):
+        import subprocess
+        child = subprocess.Popen(["sleep", "30"])
+        try:
+            self.assertFalse(gc.stop_bazel_server(child.pid, "/some/base"))
+            self.assertIsNone(child.poll())
+        finally:
+            child.kill()
+            child.wait()
+
+    def test_a_missing_process_counts_as_stopped(self):
+        self.assertTrue(gc.stop_bazel_server(2 ** 22 - 3, "/some/base"))
+
+    def test_stops_a_matching_server(self):
+        import subprocess
+        base = "/tmp/fake-bazel-base-for-test"
+        child = subprocess.Popen(["bash", "-c", f"exec -a 'bazel(test) --output_base={base}' sleep 30"])
+        try:
+            time.sleep(0.5)
+            if "bazel(" not in gc.bazel_server_command(child.pid):
+                self.skipTest("cannot set argv[0] here")
+            self.assertTrue(gc.stop_bazel_server(child.pid, base))
+        finally:
+            child.kill()
+            child.wait()
+
+
+class CacheRoot(unittest.TestCase):
+    def entry(self, path, kind="spm-scratch", age=DAY, size=1, orphan=False):
+        return {"path": path, "kind": kind, "last_used": NOW - age, "size": size, "orphan": orphan}
+
+    def plan(self, entries, fixed=0, cap=100, busy=(), current=()):
+        return gc.plan_cache_root(entries, fixed, NOW, 14, cap, RECENT, set(busy), set(current))
+
+    def test_orphan_derived_data_goes_at_once(self):
+        plan = self.plan([self.entry("/r/DerivedData-gone", "derived-data", age=3 * 3600, orphan=True)])
+        self.assertEqual([r.path for r in plan], ["/r/DerivedData-gone"])
+
+    def test_busy_and_current_are_never_chosen(self):
+        entries = [self.entry("/r/DerivedData-a", "derived-data", age=30 * DAY, orphan=True),
+                   self.entry("/r/DerivedData-b", "derived-data", age=30 * DAY)]
+        self.assertEqual(self.plan(entries, busy={"/r/DerivedData-a"}, current={"/r/DerivedData-b"}), [])
+
+    def test_unused_for_days_goes_even_when_under_the_cap(self):
+        plan = self.plan([self.entry("/r/DerivedData-old", "derived-data", age=20 * DAY)])
+        self.assertEqual(len(plan), 1)
+
+    def test_total_cap_takes_scratch_before_derived_data_least_recently_used_first(self):
+        entries = [self.entry("/r/DerivedData-x", "derived-data", age=5 * DAY, size=30),
+                   self.entry("/r/spm-a-P", age=2 * DAY, size=30),
+                   self.entry("/r/spm-b-P", age=4 * DAY, size=30)]
+        plan = self.plan(entries, fixed=30, cap=100)   # 120 -> remove 20+
+        self.assertEqual([r.path for r in plan], ["/r/spm-b-P"])
+        plan = self.plan(entries, fixed=30, cap=70)
+        self.assertEqual([r.path for r in plan], ["/r/spm-b-P", "/r/spm-a-P"])
+
+    def test_recent_entries_survive_the_cap(self):
+        entries = [self.entry("/r/spm-a-P", age=60, size=500)]
+        self.assertEqual(self.plan(entries, cap=100), [])
+
+    def test_names(self):
+        self.assertEqual(gc.derived_data_name("nanogram-macos"), "DerivedData")
+        self.assertEqual(gc.derived_data_name("nanogram-macos-stage2"), "DerivedData-stage2")
+        self.assertEqual(gc.derived_data_name("mac-integ"), "DerivedData-mac-integ")
+        self.assertEqual(gc.scratch_owner("spm-mac-integ-ChatUI", "spm-", {"mac", "mac-integ"}), "mac-integ")
+        self.assertEqual(gc.scratch_owner("spm-mac-integ-ChatUI", "spm-", {"other"}), None)
+
+
+class InUse(unittest.TestCase):
+    def test_path_cwd_and_lock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lock = Path(tmp) / "x.lock"
+            lock.write_text("")
+            self.assertTrue(gc.in_use("/a/b", ["swift build --scratch-path /a/b"], set()))
+            self.assertTrue(gc.in_use("/a/b", [], {"/a/b/sub"}))
+            self.assertFalse(gc.in_use("/a/b", ["swift build --scratch-path /a/c"], {"/a/c"}, (lock,)))
+            fd = os.open(lock, os.O_RDONLY)
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_SH)      # tg build holds its checkout lock shared
+            try:
+                self.assertTrue(gc.in_use("/a/b", [], set(), (lock,)))
+            finally:
+                os.close(fd)
+
+
+class Sizes(unittest.TestCase):
+    def test_remembered_between_runs_and_expires(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "d"
+            target.mkdir()
+            (target / "f").write_bytes(b"x" * 5000)
+            store = Path(tmp) / "sizes.json"
+            first = gc.Sizes(store)
+            size = first.get(target, 1.0, NOW)
+            self.assertGreater(size, 0)
+            first.save()
+            second = gc.Sizes(store)
+            self.assertEqual(second.cached(target, 1.0, NOW + 60), size)
+            self.assertIsNone(second.cached(target, 2.0, NOW + 60))
+            self.assertIsNone(second.cached(target, 1.0, NOW + gc.Sizes.MAX_AGE + 1))
+            self.assertEqual(second.get(target, 5.0, NOW, measure=False), 0)
+
+    def test_unremovable_is_remembered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "sizes.json"
+            first = gc.Sizes(store)
+            first.mark_unremovable("/t/instruments-1.ktrace")
+            first.save()
+            self.assertIn("/t/instruments-1.ktrace", gc.Sizes(store).unremovable)
+
+
+class Guard(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self.tmp.name).resolve()
+        self.addCleanup(self.tmp.cleanup)
+        self.pol = policy(self.home)
+        (self.home / ".cache/nanogram-macos").mkdir(parents=True)
+
+    def run_guard(self, free):
+        from unittest import mock
+        with mock.patch.object(gc, "free_gb", return_value=free), mock.patch.object(gc, "run") as run, \
+                mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("TG_ALLOW_LOW_DISK", None)
+            run.return_value = {"removed": 0, "freed": 0, "refused": 0, "lines": []}
+            code = gc.guard(self.pol, self.home)
+            return code, run
+
+    def test_plenty_of_space_runs_the_hard_caps_only(self):
+        code, run = self.run_guard(200)
+        self.assertEqual(code, 0)
+        self.assertEqual(run.call_args.args[1], set(gc.GUARD_CATEGORIES))
+        self.assertEqual(run.call_args.kwargs["budget"], 60)
+
+    def test_below_soft_runs_every_rule_with_the_longer_budget(self):
+        code, run = self.run_guard(40)
+        self.assertEqual(code, 0)
+        self.assertIn("worktree", run.call_args.args[1])
+        self.assertNotIn("simulator", run.call_args.args[1])
+        self.assertEqual(run.call_args.kwargs["budget"], 180)
+
+    def test_below_hard_refuses_unless_overridden(self):
+        from unittest import mock
+        code, _ = self.run_guard(10)
+        self.assertEqual(code, 1)
+        with mock.patch.object(gc, "free_gb", return_value=10), mock.patch.object(gc, "run") as run, \
+                mock.patch.dict(os.environ, {"TG_ALLOW_LOW_DISK": "1"}):
+            run.return_value = {"removed": 0, "freed": 0, "refused": 0, "lines": []}
+            self.assertEqual(gc.guard(self.pol, self.home), 0)
+
+
+class RunIntegration(unittest.TestCase):
+    """A real run() over a fake home: orphan scratch and DerivedData of a deleted checkout go, the live one stays."""
+
+    def test_orphans_removed_live_checkout_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp).resolve()
+            repo = home / "Projects/nanogram-macos"
+            (repo / ".git").mkdir(parents=True)
+            cache = home / ".cache/nanogram-macos"
+            for name in ("spm-nanogram-macos-Pkg", "spm-deleted-wt-Pkg", "DerivedData", "DerivedData-deleted-wt", "frameworks"):
+                (cache / name).mkdir(parents=True)
+                (cache / name / "f").write_text("x")
+            old = time.time() - 5 * 3600
+            for name in ("spm-deleted-wt-Pkg", "DerivedData-deleted-wt"):
+                os.utime(cache / name / "f", (old, old))
+                os.utime(cache / name, (old, old))
+            data = json.loads(gc.POLICY_FILE.read_text())
+            data["repos"] = [str(repo)]
+            pol = gc.Policy(data, home, "u")
+            from unittest import mock
+            with mock.patch.object(gc, "known_checkouts", return_value={"nanogram-macos"}), \
+                    mock.patch.object(gc, "process_commands", return_value=[]), \
+                    mock.patch.object(gc, "process_cwds", return_value=set()):
+                result = gc.run(pol, {"spm-scratch", "cache-root"}, dry_run=False, repo=repo, tmpdir=home / "t", quiet=True)
+            self.assertFalse((cache / "spm-deleted-wt-Pkg").exists())
+            self.assertFalse((cache / "DerivedData-deleted-wt").exists())
+            self.assertTrue((cache / "spm-nanogram-macos-Pkg").exists())
+            self.assertTrue((cache / "DerivedData").exists())
+            self.assertTrue((cache / "frameworks").exists())
+            self.assertEqual(result["removed"], 2)
+
+    def test_unknown_checkout_list_deletes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp).resolve()
+            cache = home / ".cache/nanogram-macos"
+            (cache / "spm-x-Pkg").mkdir(parents=True)
+            old = time.time() - 9 * 3600
+            os.utime(cache / "spm-x-Pkg", (old, old))
+            pol = gc.Policy(json.loads(gc.POLICY_FILE.read_text()), home, "u")
+            from unittest import mock
+            with mock.patch.object(gc, "known_checkouts", return_value=None), \
+                    mock.patch.object(gc, "process_commands", return_value=[]), \
+                    mock.patch.object(gc, "process_cwds", return_value=set()):
+                gc.run(pol, {"spm-scratch", "cache-root"}, dry_run=False, repo=None, tmpdir=home / "t", quiet=True)
+            self.assertTrue((cache / "spm-x-Pkg").exists())
+
+
+class PolicyKeys(unittest.TestCase):
+    def test_new_keys(self):
+        data = json.loads(gc.POLICY_FILE.read_text())
+        self.assertLess(data["free_space_gb"]["hard"], data["free_space_gb"]["soft"])
+        self.assertEqual(data["bazel_max_idle_secs"], 1800)
+        self.assertGreaterEqual(data["bazel_output_base_unused_days"], 1)
+        self.assertEqual(data["caps_gb"]["compilation_cache"] % 2, 0)
+        self.assertTrue(set(gc.GUARD_CATEGORIES) <= set(gc.CATEGORIES))
+
+
+if __name__ == "__main__":
+    unittest.main()

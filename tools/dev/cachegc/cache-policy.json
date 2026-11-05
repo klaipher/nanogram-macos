@@ -15,7 +15,7 @@
  "base_branches": ["main", "nanogram/integration", "nanogram"],
  "caps_gb": {
   "bazel_disk_cache": 20,
-  "compilation_cache": 10,
+  "compilation_cache": 12,
   "xcode_module_cache": 3,
   "spm_scratch_total": 20,
   "cache_root_total": 40
@@ -29,7 +29,6 @@
   "spm_build_unused": 7,
   "spm_scratch_unused": 7,
   "worktree_merged": 14,
-  "worktree_merged_low_space": 1,
   "build_output_logs": 14,
   "tool_tmp": 2
  },
@@ -39,12 +38,19 @@
  "released_unknown_before_build": "202611050000",
  "released_unknown_note": "Builds numbered before this were made before tg testflight wrote the .released marker; whether they were uploaded is unknown, so they count as released and are kept with their dSYMs.",
  "recently_used_minutes": 120,
- "low_free_space_gb": 60,
- "low_free_space_note": "Below this much free space on the volume of the Bazel output bases the cleanup ignores auto.min_interval_minutes, runs the merged-worktree categories first (the output base of a merged worktree goes at once, the merged worktree itself after worktree_merged_low_space days) and may run for auto.low_space_time_budget_seconds.",
+ "bazel_max_idle_secs": 1800,
+ "bazel_output_base_unused_days": 3,
+ "free_space_gb": {
+  "soft": 50,
+  "hard": 25
+ },
+ "guard": {
+  "time_budget_seconds": 60,
+  "low_disk_budget_seconds": 180
+ },
  "auto": {
   "min_interval_minutes": 30,
-  "time_budget_seconds": 25,
-  "low_space_time_budget_seconds": 120
+  "time_budget_seconds": 25
  },
  "tool_tmp_globs": ["nanogram-*", "tg-*", "frameworks-*", "casprobe*"],
  "protected_names": ["launch-home", "sparkle-ed25519", "sparkle_ed25519", "dsyms"],
