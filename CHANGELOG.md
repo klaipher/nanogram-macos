@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Privacy trimming fully reverted** (owner, 2026-11-05): the Mac behaves like official Telegram (exact model, channel read metrics); the core's time zone, analytics, telemetry and call debug changes are reverted in the iOS repo and arrive with the core bump. `tools/dev/tests/test_privacy.py` is removed. The Mac never uploaded call logs or music reports upstream either.
+
 - **rlottie on the iOS line** (083f19a, branch `telegram-ios-dev`): the Mac now pins the same rlottie commit as iOS; the only difference left (`LOTTIE_THREAD_SAFE`) moved into the shared line. `nanogram-mac` is retired.
 
 - **Exact device and channel statistics back** (owner, 2026-11-05): the app and the share extension send the real Mac model again (`deviceModelPretty()`), and `MessageReadMetricsManager` measures channel reading again so channel owners see our readers. Reverts 446a1a07 (device part and the manager), 5013bdc8 and 53ee7af9. Music listening reports, call-log uploads and analytics stay off.
