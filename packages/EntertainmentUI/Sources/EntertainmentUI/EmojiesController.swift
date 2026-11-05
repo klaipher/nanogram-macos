@@ -1504,7 +1504,7 @@ public final class AnimatedEmojiesView : Control {
         addSubview(searchStatusView)
         
         self.packsView.addScroll(listener: .init(dispatchWhenVisibleRangeUpdated: false, { [weak self] position in
-            self?.updateSelectionState(animated: false)
+            self?.updateSelectionState(animated: false, retheme: false)
         }))
         
         self.tableView.addScroll(listener: .init(dispatchWhenVisibleRangeUpdated: false, { [weak self] position in
@@ -1769,7 +1769,7 @@ public final class AnimatedEmojiesView : Control {
         return NSMakeRect(searchContainer.frame.width - (width + searchView.frame.minX), searchView.frame.minY, width, 30)
     }
     
-    public func updateSelectionState(animated: Bool) {
+    public func updateSelectionState(animated: Bool, retheme: Bool = true) {
         
         let transition: ContainedViewLayoutTransition
         if animated {
@@ -1882,7 +1882,9 @@ public final class AnimatedEmojiesView : Control {
             selectionView.layer?.animateCornerRadius()
         }
         transition.updateFrame(view: selectionView, frame: rect)
-        updateLocalizationAndTheme(theme: presentation ?? theme)
+        if retheme {
+            updateLocalizationAndTheme(theme: presentation ?? theme)
+        }
     }
     
     

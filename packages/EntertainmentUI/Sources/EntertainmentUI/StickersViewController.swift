@@ -792,7 +792,7 @@ public class NStickersView : View {
         }
         
         self.packsView.addScroll(listener: .init(dispatchWhenVisibleRangeUpdated: false, { [weak self] position in
-            self?.updateSelectionState(animated: false)
+            self?.updateSelectionState(animated: false, retheme: false)
         }))
         
         tableView.scrollerInsets = .init(left: 0, right: 0, top: 46, bottom: 50)
@@ -855,7 +855,7 @@ public class NStickersView : View {
         
     }
     
-    public func updateSelectionState(animated: Bool) {
+    public func updateSelectionState(animated: Bool, retheme: Bool = true) {
         
       
         
@@ -963,7 +963,9 @@ public class NStickersView : View {
             selectionView.layer?.animateCornerRadius()
         }
         transition.updateFrame(view: selectionView, frame: rect)
-        updateLocalizationAndTheme(theme: presentation ?? theme)
+        if retheme {
+            updateLocalizationAndTheme(theme: presentation ?? theme)
+        }
     }
     private var state: State?
     private var context: (any AccountContextProtocol)?
