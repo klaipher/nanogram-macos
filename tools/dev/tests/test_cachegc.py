@@ -261,3 +261,322 @@ class CompilationCache(unittest.TestCase):
         self.assertEqual(gc.plan_module_cache("/c", 11, 10, False, "compilation-cache")[0].category, "compilation-cache")
         self.assertEqual(gc.plan_module_cache("/c", 11, 10, True, "compilation-cache"), [])
         self.assertEqual(gc.plan_module_cache("/c", 9, 10, False, "compilation-cache"), [])
+
+
+GB = 1024 ** 3
+
+
+class OrphanBazelServers(unittest.TestCase):
+    def base(self, **kw):
+        base = {"path": "/b/1", "workspace": "/gone", "server_alive": True, "server_pids": [4242], "mtime": NOW - DAY, "size": 5}
+        base.update(kw)
+        return base
+
+    def plan(self, bases, existing=()):
+        return gc.plan_output_bases(bases, lambda p: p in existing, lambda p: True, NOW, RECENT)
+
+    def test_deleted_workspace_with_running_server_is_planned_with_its_pid(self):
+        plan = self.plan([self.base()])
+        self.assertEqual(len(plan), 1)
+        self.assertEqual(plan[0].action, "bazel-orphan")
+        self.assertEqual(plan[0].pids, (4242,))
+        self.assertEqual(plan[0].path, "/b/1")
+        self.assertIn("stopped first", plan[0].reason)
+
+    def test_existing_workspace_is_never_touched_even_with_a_server(self):
+        self.assertEqual(self.plan([self.base()], existing={"/gone"}), [])
+
+    def test_live_server_that_could_not_be_verified_keeps_the_base(self):
+        self.assertEqual(self.plan([self.base(server_pids=[])]), [])
+        self.assertEqual(self.plan([self.base(server_pids=None)]), [])
+
+    def test_recent_activity_and_unmounted_volumes_keep_the_base(self):
+        self.assertEqual(self.plan([self.base(mtime=NOW - 60)]), [])
+        self.assertEqual(gc.plan_output_bases([self.base()], lambda p: False, lambda p: False, NOW, RECENT), [])
+
+    def test_idle_base_without_server_is_still_a_plain_removal(self):
+        plan = self.plan([self.base(server_alive=False, server_pids=[])])
+        self.assertEqual([(r.action, r.pids) for r in plan], [("rmtree", ())])
+
+
+class ServerProcessVerification(unittest.TestCase):
+    BASE = "/Users/u/Library/Caches/bazel/_bazel_u/" + "a" * 32
+
+    def table(self):
+        return [
+            (100, f"/usr/bin/java -jar /x/install/A-server.jar --output_base={self.BASE} --install_base=/x/install"),
+            (101, f"/opt/homebrew/bin/bazel build //app --output_base={self.BASE}"),
+            (102, f"/usr/bin/java -jar /x/A-server.jar --output_base={self.BASE}2"),
+            (103, f"vim --output_base={self.BASE}"),
+            (104, "/usr/bin/java -jar /x/A-server.jar --output_base=/other/" + "b" * 32),
+            (105, f"grep --output_base={self.BASE}"),
+        ]
+
+    def test_only_processes_with_this_exact_output_base_that_look_like_bazel(self):
+        self.assertEqual(gc.bazel_server_pids(self.BASE, self.table(), None, own_pid=1), [100, 101])
+
+    def test_pid_from_the_pid_file_counts_when_the_command_line_matches(self):
+        self.assertEqual(gc.bazel_server_pids(self.BASE, self.table(), 103, own_pid=1), [100, 101, 103])
+
+    def test_pid_file_pid_with_a_different_command_is_ignored(self):
+        self.assertEqual(gc.bazel_server_pids(self.BASE, self.table(), 104, own_pid=1), [100, 101])
+
+    def test_own_process_is_never_a_target(self):
+        self.assertEqual(gc.bazel_server_pids(self.BASE, self.table(), None, own_pid=100), [101])
+
+    def test_prefix_of_another_base_does_not_match(self):
+        self.assertFalse(gc.has_output_base(f"x --output_base={self.BASE}2", self.BASE))
+        self.assertTrue(gc.has_output_base(f"x --output_base={self.BASE} y", self.BASE))
+        self.assertTrue(gc.has_output_base(f"x --output_base={self.BASE}", self.BASE))
+
+    def test_gather_uses_the_pid_file_and_the_process_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp).resolve()
+            pol = gc.Policy(json.loads(gc.POLICY_FILE.read_text()), home, "u")
+            base = home / "Library/Caches/bazel/_bazel_u" / ("c" * 32)
+            (base / "server").mkdir(parents=True)
+            (base / "DO_NOT_BUILD_HERE").write_text("/gone/workspace")
+            (base / "server/server.pid.txt").write_text(str(os.getpid()))
+            table = [(os.getpid() + 7, f"java A-server.jar --output_base={base}")]
+            bases = gc.gather_output_bases(pol, [], NOW, table)
+            self.assertTrue(bases[0]["server_alive"])
+            self.assertEqual(bases[0]["server_pids"], [os.getpid() + 7])
+
+
+class StopServers(unittest.TestCase):
+    BASE = "/b/" + "d" * 32
+
+    def run_stop(self, commands, stays=(), **kw):
+        alive = set(commands)
+        signals = []
+
+        def send(pid, sig):
+            signals.append((pid, sig))
+            if sig == gc.signal.SIGKILL or pid not in stays:
+                alive.discard(pid)
+
+        ok = gc.stop_bazel_servers(self.BASE, tuple(commands), send=send, command_of=lambda pid: commands[pid],
+                                   alive=lambda pid: pid in alive, sleep=lambda s: None, term_wait=0.0, kill_wait=0.0, **kw)
+        return ok, signals
+
+    def test_sigterm_is_enough_for_a_cooperative_server(self):
+        ok, signals = self.run_stop({10: f"java --output_base={self.BASE}"})
+        self.assertTrue(ok)
+        self.assertEqual(signals, [(10, gc.signal.SIGTERM)])
+
+    def test_stubborn_server_gets_sigkill(self):
+        ok, signals = self.run_stop({10: f"java --output_base={self.BASE}"}, stays={10})
+        self.assertTrue(ok)
+        self.assertEqual(signals, [(10, gc.signal.SIGTERM), (10, gc.signal.SIGKILL)])
+
+    def test_reused_pid_with_another_command_is_not_signalled(self):
+        ok, signals = self.run_stop({10: "/Applications/Xcode.app/Contents/MacOS/Xcode"})
+        self.assertTrue(ok)
+        self.assertEqual(signals, [])
+
+    def test_failure_to_signal_keeps_the_base(self):
+        def send(pid, sig):
+            raise PermissionError()
+
+        ok = gc.stop_bazel_servers(self.BASE, (10,), send=send, command_of=lambda pid: f"java --output_base={self.BASE}",
+                                   alive=lambda pid: True, sleep=lambda s: None, term_wait=0.0, kill_wait=0.0)
+        self.assertFalse(ok)
+
+    def test_execute_does_not_delete_the_base_when_the_server_survives(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / ("e" * 32)
+            base.mkdir()
+            removal = gc.Removal("bazel-output-base", str(base), "r", 0, "bazel-orphan", "", (os.getpid(),))
+            real = gc.stop_bazel_servers
+            gc.stop_bazel_servers = lambda *a, **k: False
+            try:
+                self.assertFalse(gc.execute(removal))
+            finally:
+                gc.stop_bazel_servers = real
+            self.assertTrue(base.exists())
+            gc.stop_bazel_servers = lambda *a, **k: True
+            try:
+                self.assertTrue(gc.execute(removal))
+            finally:
+                gc.stop_bazel_servers = real
+            self.assertFalse(base.exists())
+
+
+class BazelBuildDetection(unittest.TestCase):
+    def test_build_like_commands_count(self):
+        self.assertTrue(gc.bazel_build_running(["/opt/homebrew/bin/bazel build //x"]))
+        self.assertTrue(gc.bazel_build_running(["bazelisk test //y --foo"]))
+        self.assertFalse(gc.bazel_build_running(["/opt/homebrew/bin/bazel shutdown"]))
+        self.assertFalse(gc.bazel_build_running(["/usr/bin/java -jar A-server.jar --output_base=/b build"]))
+        self.assertFalse(gc.bazel_build_running(["vim build"]))
+
+
+class DiskCachePlan(unittest.TestCase):
+    def files(self, count=10, size=GB):
+        return [(NOW - (count - i) * DAY, size, f"/c/cas/{i:02d}/f{i}") for i in range(count)]
+
+    def plan(self, files, cap, free=100 * GB, floor=25 * GB, building=False, min_age=900):
+        return gc.plan_disk_cache(files, cap, free, floor, building, NOW, min_age, root="/c")
+
+    def planned(self, plan):
+        return [path for r in plan for path, _, _ in r.files]
+
+    def test_over_cap_removes_the_least_recently_used_down_to_the_cap(self):
+        plan = self.plan(self.files(), cap=7 * GB)
+        self.assertEqual(self.planned(plan), ["/c/cas/00/f0", "/c/cas/01/f1", "/c/cas/02/f2"])
+        self.assertEqual({r.action for r in plan}, {"disk-cache-trim"})
+        self.assertEqual({r.path for r in plan}, {"/c"})
+        self.assertIn("cap", plan[0].reason)
+
+    def test_under_cap_and_enough_free_space_removes_nothing(self):
+        self.assertEqual(self.plan(self.files(), cap=10 * GB), [])
+
+    def test_free_space_below_the_floor_trims_further_than_the_cap(self):
+        plan = self.plan(self.files(), cap=20 * GB, free=24 * GB + GB // 2)
+        self.assertEqual(len(self.planned(plan)), 1)
+        self.assertIn("floor", plan[0].reason)
+        plan = self.plan(self.files(), cap=20 * GB, free=22 * GB)
+        self.assertEqual(len(self.planned(plan)), 3)
+
+    def test_the_larger_of_cap_excess_and_shortfall_wins(self):
+        plan = self.plan(self.files(), cap=5 * GB, free=24 * GB)
+        self.assertEqual(len(self.planned(plan)), 5)
+        self.assertIn("cap", plan[0].reason)
+
+    def test_nothing_is_deleted_while_bazel_builds(self):
+        self.assertEqual(self.plan(self.files(), cap=1 * GB, building=True), [])
+
+    def test_fresh_entries_stay_even_when_the_target_is_not_reached(self):
+        files = self.files(3) + [(NOW - 60, GB, "/c/cas/ff/new")]
+        planned = self.planned(self.plan(files, cap=0))
+        self.assertNotIn("/c/cas/ff/new", planned)
+        self.assertEqual(len(planned), 3)
+
+    def test_plan_is_cut_into_chunks_and_never_exceeds_the_cache(self):
+        files = self.files(5, size=GB // 2)
+        plan = gc.plan_disk_cache(files, 0, 100 * GB, 0, False, NOW, 900, chunk_bytes=GB, root="/c")
+        self.assertEqual([len(r.files) for r in plan], [2, 2, 1])
+        self.assertEqual(sum(r.size for r in plan), int(2.5 * GB))
+
+    def test_floor_zero_disables_the_floor_rule(self):
+        self.assertEqual(self.plan(self.files(), cap=20 * GB, free=1 * GB, floor=0), [])
+
+
+class DiskCacheOnDisk(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self.tmp.name).resolve()
+        self.addCleanup(self.tmp.cleanup)
+        self.policy = gc.Policy(json.loads(gc.POLICY_FILE.read_text()), self.home, "u")
+        self.cache = self.home / ".cache/telegram-ios/bazel-disk-cache"
+        for index in range(6):
+            entry = self.cache / ("cas" if index % 2 else "ac") / f"{index:02x}" / f"{index:064x}"
+            entry.parent.mkdir(parents=True, exist_ok=True)
+            entry.write_bytes(b"x" * 1000)
+            stamp = time.time() - (10 - index) * DAY
+            os.utime(entry, (stamp, stamp))
+        (self.cache / "gc").mkdir()
+        (self.cache / "gc/lock").write_text("keep")
+        (self.cache / "cas/00").mkdir(parents=True, exist_ok=True)
+        (self.cache / "cas/00/partial.tmp.1").write_bytes(b"y" * 1000)
+
+    def test_scan_sees_entries_but_not_gc_files_or_temporary_files(self):
+        files = gc.scan_disk_cache(self.cache, time.time() + 60)
+        self.assertEqual(len(files), 6)
+        self.assertTrue(all("/gc/" not in path and ".tmp" not in path for _, _, path in files))
+
+    def test_scan_gives_up_when_the_deadline_passed(self):
+        self.assertIsNone(gc.scan_disk_cache(self.cache, time.time() - 1, check_every=1))
+
+    def run_trim(self, cap, dry_run=False):
+        pol = gc.Policy({**self.policy.data, "caps_gb": {**self.policy.data["caps_gb"], "bazel_disk_cache": cap / GB},
+                         "free_space_floor_gb": 0}, self.home, "u")
+        return gc.run(pol, {"bazel-disk-cache"}, dry_run=dry_run, tmpdir=self.home / "t", quiet=True)
+
+    def count(self):
+        return len(gc.scan_disk_cache(self.cache, time.time() + 60))
+
+    def test_run_trims_the_oldest_entries_down_to_the_cap(self):
+        result = self.run_trim(3000)
+        self.assertEqual(self.count(), 3)
+        self.assertEqual(result["freed"], 3000)
+        self.assertTrue((self.cache / "gc/lock").exists())
+        self.assertTrue((self.cache / "cas/00/partial.tmp.1").exists())
+        newest = self.cache / "cas" / "05" / f"{5:064x}"
+        self.assertTrue(newest.exists())
+
+    def test_dry_run_keeps_everything(self):
+        result = self.run_trim(3000, dry_run=True)
+        self.assertEqual(result["removed"], 1)
+        self.assertEqual(self.count(), 6)
+
+    def test_entry_used_after_the_scan_is_kept(self):
+        files = gc.scan_disk_cache(self.cache, time.time() + 60)
+        plan = gc.plan_disk_cache(files, 0, 100 * GB, 0, False, time.time(), 900, root=str(self.cache))
+        for _, _, path in files:
+            os.utime(path, None)
+        for removal in plan:
+            gc.execute(removal)
+        self.assertEqual(self.count(), 6)
+
+    def test_safety_accepts_only_the_disk_cache_itself(self):
+        roots = gc.allowed_roots(self.policy, [], self.home / "t")
+        entry = (str(self.cache / "cas/01/x"), 1, 0.0)
+        ok = gc.Removal("bazel-disk-cache", str(self.cache), "r", 1, "disk-cache-trim", "", (), (entry,))
+        self.assertIsNone(gc.safe_to_remove(ok, self.policy, roots))
+        elsewhere = gc.Removal("bazel-disk-cache", str(self.home / "Documents"), "r", 1, "disk-cache-trim", "", (), (entry,))
+        self.assertEqual(gc.safe_to_remove(elsewhere, self.policy, roots), "not the Bazel disk cache")
+        escape = gc.Removal("bazel-disk-cache", str(self.cache), "r", 1, "disk-cache-trim", "", (),
+                            ((str(self.home / "Documents/secret"), 1, 0.0),))
+        self.assertEqual(gc.safe_to_remove(escape, self.policy, roots), "entry outside the Bazel disk cache")
+        dotdot = gc.Removal("bazel-disk-cache", str(self.cache), "r", 1, "disk-cache-trim", "", (),
+                            ((str(self.cache / "cas/../../x"), 1, 0.0),))
+        self.assertEqual(gc.safe_to_remove(dotdot, self.policy, roots), "entry outside the Bazel disk cache")
+
+
+class FreeSpaceFloor(unittest.TestCase):
+    def pol(self, home, floor):
+        data = json.loads(gc.POLICY_FILE.read_text())
+        data["free_space_floor_gb"] = floor
+        return gc.Policy(data, home, "u")
+
+    def test_policy_has_a_floor_and_a_minimum_age(self):
+        data = json.loads(gc.POLICY_FILE.read_text())
+        self.assertGreaterEqual(data["free_space_floor_gb"], 10)
+        self.assertGreater(data["bazel_disk_cache_min_age_minutes"], 0)
+
+    def test_low_space_is_judged_against_the_floor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            real = gc.free_bytes
+            try:
+                gc.free_bytes = lambda path: 10 * GB
+                self.assertTrue(gc.low_on_space(self.pol(home, 25)))
+                self.assertFalse(gc.low_on_space(self.pol(home, 5)))
+                self.assertFalse(gc.low_on_space(self.pol(home, 0)))
+            finally:
+                gc.free_bytes = real
+
+    def test_auto_skips_its_throttle_only_when_space_is_low(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp).resolve()
+            pol = self.pol(home, 25)
+            state = pol.path("state_file")
+            state.parent.mkdir(parents=True)
+            state.write_text(json.dumps({"last_run": time.time()}))
+            calls = []
+            real_run, real_free = gc.run, gc.free_bytes
+            gc.run = lambda *a, **k: calls.append(1) or {"removed": 0, "freed": 0, "refused": 0, "lines": []}
+            try:
+                gc.free_bytes = lambda path: 100 * GB
+                gc.auto(pol, None)
+                self.assertEqual(calls, [])
+                gc.free_bytes = lambda path: 10 * GB
+                gc.auto(pol, None)
+                self.assertEqual(calls, [1])
+            finally:
+                gc.run, gc.free_bytes = real_run, real_free
+
+    def test_free_bytes_of_a_missing_path_uses_its_parent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertGreater(gc.free_bytes(Path(tmp) / "a" / "b"), 0)

@@ -9,6 +9,10 @@ processes; execution deletes after a second safety check. Configuration: cache-p
   cachegc.py report        sizes of every cache root
   cachegc.py verify        policy vs .bazelrc / xcconfig, and the sibling repo's copy of this directory
 
+Output bases whose workspace is gone are removed even while their Bazel server still runs (the server is stopped
+first, only when its command line carries --output_base=<that base>). The Bazel disk cache is trimmed to its cap by
+least recent use, further when free disk space is below the floor in the policy, and `auto` then skips its throttle.
+
 No schedule, no launchd agent, no cron: nothing runs unless a tg command or the person starts it.
 """
 from __future__ import annotations
@@ -20,6 +24,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -30,7 +35,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 POLICY_FILE = HERE / "cache-policy.json"
 DAY = 86400
-CATEGORIES = ("bazel-output-base", "derived-data", "module-cache", "compilation-cache", "spm-build", "spm-scratch", "instruments",
+CATEGORIES = ("bazel-output-base", "bazel-disk-cache", "derived-data", "module-cache", "compilation-cache", "spm-build", "spm-scratch", "instruments",
               "build-output", "simulator", "worktree", "tool-tmp")
 HEX32 = re.compile(r"^[0-9a-f]{32}$")
 XCODE_DERIVED = re.compile(r"^.+-[a-z]{28}$")
@@ -45,6 +50,8 @@ class Removal:
     size: int = 0
     action: str = "rmtree"
     repo: str = ""
+    pids: tuple[int, ...] = ()
+    files: tuple[tuple[str, int, float], ...] = ()
 
 
 @dataclass
@@ -81,6 +88,16 @@ class Policy:
     @property
     def repos(self) -> list[Path]:
         return [self.expand(p) for p in self.data["repos"]]
+
+    @property
+    def free_space_floor(self) -> int:
+        """Bytes of free disk space below which the cleanup runs at once and trims the Bazel disk cache; 0 = off."""
+        return int(float(self.data.get("free_space_floor_gb", 0)) * 1024 ** 3)
+
+    @property
+    def disk_cache_min_age(self) -> float:
+        """Seconds a disk-cache entry must have been idle before the trim may delete it (a build may be writing it)."""
+        return float(self.data.get("bazel_disk_cache_min_age_minutes", 15)) * 60
 
 
 def load_policy(path: Path | None = None, home: Path | None = None) -> Policy:
@@ -144,6 +161,41 @@ def process_commands() -> list[str]:
     return result.stdout.splitlines()
 
 
+def process_table() -> list[tuple[int, str]]:
+    result = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=False)
+    table = []
+    for line in result.stdout.splitlines():
+        head, _, command = line.strip().partition(" ")
+        try:
+            table.append((int(head), command.strip()))
+        except ValueError:
+            continue
+    return table
+
+
+def pid_command(pid: int) -> str:
+    result = subprocess.run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, check=False)
+    return result.stdout.strip()
+
+
+def has_output_base(command: str, base: str) -> bool:
+    return re.search(re.escape(f"--output_base={base}") + r"(?=\s|$)", command) is not None
+
+
+def bazel_server_pids(base: str, table: list[tuple[int, str]], pid_from_file: int | None, own_pid: int) -> list[int]:
+    """Processes that are the Bazel server (or a client) of this output base. The pid in server.pid.txt counts only
+    when that process really runs with --output_base=<base> (the pid may have been reused); without the file a
+    process counts when it mentions the output base and looks like Bazel."""
+    pids = []
+    for pid, command in table:
+        if pid == own_pid or not has_output_base(command, base):
+            continue
+        looks_like_bazel = "A-server" in command or "bazel" in command.replace(base, "").lower()
+        if pid == pid_from_file or looks_like_bazel:
+            pids.append(pid)
+    return sorted(pids)
+
+
 def process_cwds() -> set[str]:
     result = subprocess.run(["lsof", "-a", "-d", "cwd", "-Fn"], capture_output=True, text=True, check=False)
     return {line[1:] for line in result.stdout.splitlines() if line.startswith("n")}
@@ -168,19 +220,166 @@ def path_mentioned(path: str, commands: list[str]) -> bool:
 
 
 def plan_output_bases(bases: list[dict], exists, mounted, now: float, recent_s: float) -> list[Removal]:
-    """bases: {path, workspace (str|None), server_alive, mtime, size}. A base is stale when its workspace is gone."""
+    """bases: {path, workspace (str|None), server_alive, server_pids, mtime, size}. A base is stale when its
+    workspace is gone. A base whose workspace still exists is never touched. When its Bazel server is still running,
+    the server is stopped first, but only when the process was verified to run with this output base
+    (`server_pids`); a live server that cannot be verified keeps the base."""
     plan = []
     for base in bases:
         workspace = base.get("workspace")
-        if not workspace or base["server_alive"]:
+        if not workspace:
             continue
         if exists(workspace) or not mounted(workspace):
             continue
         if now - base["mtime"] < recent_s:
             continue
+        if base["server_alive"]:
+            pids = tuple(base.get("server_pids") or ())
+            if not pids:
+                continue
+            plan.append(Removal("bazel-output-base", base["path"],
+                                f"workspace {workspace} no longer exists; its Bazel server (pid "
+                                f"{', '.join(str(p) for p in pids)}) is stopped first", base.get("size", 0),
+                                "bazel-orphan", "", pids))
+            continue
         plan.append(Removal("bazel-output-base", base["path"], f"workspace {workspace} no longer exists",
                             base.get("size", 0)))
     return plan
+
+
+def bazel_build_running(commands: list[str]) -> bool:
+    """A Bazel client running a command that reads or writes the disk cache (build, test, run, ...)."""
+    for command in commands:
+        words = command.split()
+        if words and re.search(r"(^|/)(bazel|bazel-real|bazelisk)$", words[0]) and any(
+                w in ("build", "test", "run", "coverage", "mobile-install", "fetch", "sync") for w in words[1:]):
+            return True
+    return False
+
+
+def plan_disk_cache(files: list[tuple[float, int, str]], cap: int, free: int, floor: int, building: bool,
+                    now: float, min_age_s: float, chunk_bytes: int = 1024 ** 3, root: str = "") -> list[Removal]:
+    """files: (last_used, size, path) of every cache entry. Bazel's own garbage collection only runs while Bazel is
+    idle, so the disk cache outgrows its cap. Delete the least recently used entries until the cache is back under
+    `cap`, or, when free space is below `floor`, until the shortfall is freed too. Entries used in the last
+    `min_age_s` stay (a build may be writing them), and nothing is deleted while a Bazel build runs. The plan is cut
+    into chunks of about `chunk_bytes` so the time budget is checked between them."""
+    if building or not files:
+        return []
+    total = sum(size for _, size, _ in files)
+    over = max(0, total - cap)
+    shortfall = max(0, floor - free) if floor else 0
+    target = min(total, max(over, shortfall))
+    if target <= 0:
+        return []
+    if over >= shortfall:
+        reason = f"disk cache over its {cap / 1024 ** 3:.0f} GB cap (least recently used first)"
+    else:
+        reason = (f"free disk space {free / 1024 ** 3:.1f} GB is below the {floor / 1024 ** 3:.0f} GB floor "
+                  "(least recently used cache entries first)")
+    chosen, freed = [], 0
+    for last_used, size, path in sorted(files):
+        if freed >= target:
+            break
+        if now - last_used < min_age_s:
+            continue
+        chosen.append((path, size, last_used))
+        freed += size
+    plan, chunk, chunk_size = [], [], 0
+    for entry in chosen:
+        chunk.append(entry)
+        chunk_size += entry[1]
+        if chunk_size >= chunk_bytes:
+            plan.append(Removal("bazel-disk-cache", root, reason, chunk_size, "disk-cache-trim", "", (), tuple(chunk)))
+            chunk, chunk_size = [], 0
+    if chunk:
+        plan.append(Removal("bazel-disk-cache", root, reason, chunk_size, "disk-cache-trim", "", (), tuple(chunk)))
+    return plan
+
+
+def scan_disk_cache(root: Path, deadline: float, check_every: int = 256) -> list[tuple[float, int, str]] | None:
+    """(last_used, size, path) of the regular files under root/ac and root/cas, or None when the deadline passed
+    before the scan finished (a partial scan would misjudge the total size)."""
+    files: list[tuple[float, int, str]] = []
+    stack = [root / "ac", root / "cas"]
+    visited = 0
+    while stack:
+        directory = stack.pop()
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(Path(entry.path))
+                        elif entry.is_file(follow_symlinks=False) and ".tmp" not in entry.name:
+                            info = entry.stat(follow_symlinks=False)
+                            files.append((max(info.st_atime, info.st_mtime), info.st_size, entry.path))
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+        visited += 1
+        if visited % check_every == 0 and time.time() > deadline:
+            return None
+    return files
+
+
+def free_bytes(path: Path) -> int:
+    probe = path
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    try:
+        return shutil.disk_usage(probe).free
+    except OSError:
+        return 1 << 62
+
+
+def stop_bazel_servers(path: str, pids: tuple[int, ...], term_wait: float = 10.0, kill_wait: float = 5.0,
+                       send=os.kill, command_of=pid_command, alive=pid_alive, sleep=time.sleep) -> bool:
+    """Stops the Bazel processes of a deleted workspace: SIGTERM, then SIGKILL for the ones that stay. Each pid is
+    verified again right before the signal (--output_base=<path> in its command line); a pid that no longer runs
+    with it is left alone. True when none of them is left."""
+    targets = [pid for pid in pids if has_output_base(command_of(pid), path)]
+    for sig, wait in ((signal.SIGTERM, term_wait), (signal.SIGKILL, kill_wait)):
+        for pid in targets:
+            if alive(pid):
+                try:
+                    send(pid, sig)
+                except ProcessLookupError:
+                    pass
+                except OSError:
+                    return False
+        deadline = time.monotonic() + wait
+        while any(alive(pid) for pid in targets) and time.monotonic() < deadline:
+            sleep(0.2)
+        if not any(alive(pid) for pid in targets):
+            return True
+    return False
+
+
+def inside_cache(path: str, root: Path) -> bool:
+    """A file path below the cache root (spelled with or without symlinks resolved), without ".." parts."""
+    if ".." in path.split("/"):
+        return False
+    return any(path.startswith(str(prefix).rstrip("/") + "/") for prefix in (root, root.resolve()))
+
+
+def trim_disk_cache_files(removal: Removal, root: Path) -> bool:
+    """Deletes the planned entries that are still where and as old as the scan saw them."""
+    removed = 0
+    for path, _, last_used in removal.files:
+        target = Path(path)
+        if not inside_cache(path, root) or target.parent.name == "gc":
+            continue
+        try:
+            info = os.lstat(target)
+            if not stat.S_ISREG(info.st_mode) or max(info.st_atime, info.st_mtime) > last_used + 1.0:
+                continue
+            os.unlink(target)
+            removed += 1
+        except OSError:
+            continue
+    return removed > 0 or not removal.files
 
 
 def plan_derived_data(entries: list[dict], exists, mounted, now: float, unused_days: float, recent_s: float,
@@ -330,6 +529,13 @@ def safe_to_remove(removal: Removal, policy: Policy, allowed_roots: list[Path]) 
     resolved = path.parent.resolve() / path.name
     if removal.action in ("simctl", "worktree-prune"):
         return None
+    if removal.action == "disk-cache-trim":
+        disk_cache = policy.path("bazel_disk_cache")
+        if path.name in policy.protected_names or resolved != disk_cache.parent.resolve() / disk_cache.name:
+            return "not the Bazel disk cache"
+        if any(not inside_cache(f[0], disk_cache) for f in removal.files):
+            return "entry outside the Bazel disk cache"
+        return None
     if path.name in policy.protected_names:
         return "protected name"
     for protected in policy.protected_paths:
@@ -383,6 +589,10 @@ def execute(removal: Removal) -> bool:
             return True
         except OSError:
             return False
+    if removal.action == "disk-cache-trim":
+        return trim_disk_cache_files(removal, path)
+    if removal.action == "bazel-orphan" and not stop_bazel_servers(removal.path, removal.pids):
+        return False
     make_writable(path)
     shutil.rmtree(path, ignore_errors=True)
     return not path.exists()
@@ -397,7 +607,8 @@ def git(repo: Path | str, *args: str) -> str:
     return result.stdout
 
 
-def gather_output_bases(policy: Policy, commands: list[str], now: float) -> list[dict]:
+def gather_output_bases(policy: Policy, commands: list[str], now: float,
+                        table: list[tuple[int, str]] | None = None) -> list[dict]:
     root = policy.path("bazel_user_root")
     bases = []
     if not root.is_dir():
@@ -412,11 +623,18 @@ def gather_output_bases(policy: Policy, commands: list[str], now: float) -> list
             workspace = None
         alive = path_mentioned(f"--output_base={child}", commands)
         pid_file = child / "server" / "server.pid.txt"
+        pid_from_file = None
         try:
-            alive = alive or pid_alive(int(pid_file.read_text().strip()))
+            pid_from_file = int(pid_file.read_text().strip())
+            alive = alive or pid_alive(pid_from_file)
         except (OSError, ValueError):
             pass
-        bases.append({"path": str(child), "workspace": workspace, "server_alive": alive,
+        pids: list[int] = []
+        if alive:
+            if table is None:
+                table = process_table()
+            pids = bazel_server_pids(str(child), table, pid_from_file, os.getpid())
+        bases.append({"path": str(child), "workspace": workspace, "server_alive": alive, "server_pids": pids,
                       "mtime": newest_mtime(child), "size": 0})
     return bases
 
@@ -514,6 +732,17 @@ def gather_and_plan(policy: Policy, only: set[str], repo: Path | None, now: floa
         bases = gather_output_bases(policy, commands, now)
         stale = plan_output_bases(bases, lambda p: Path(p).exists(), mounted, now, recent_s)
         plan += [Removal(r.category, r.path, r.reason, disk_usage(Path(r.path)), r.action) for r in stale]
+
+    if want("bazel-disk-cache"):
+        disk_cache = policy.path("bazel_disk_cache")
+        if disk_cache.is_dir():
+            entries = scan_disk_cache(disk_cache, deadline)
+            if entries is None:
+                notes.append("bazel disk cache scan did not finish inside the time budget; nothing trimmed")
+            else:
+                plan += plan_disk_cache(entries, policy.cap_bytes("bazel_disk_cache"), free_bytes(disk_cache),
+                                        policy.free_space_floor, bazel_build_running(commands), now,
+                                        policy.disk_cache_min_age, root=str(disk_cache))
 
     if want("derived-data"):
         derived_root = policy.path("xcode_derived_data")
@@ -665,11 +894,11 @@ def run(policy: Policy, only: set[str], dry_run: bool, repo: Path | None = None,
     now = time.time() if now is None else now
     deadline = time.time() + (budget if budget is not None else 3600)
     tmpdir = Path(tmpdir or os.environ.get("TMPDIR", "/tmp"))
-    plan, _ = gather_and_plan(policy, only, repo, now, deadline, tmpdir)
+    plan, notes = gather_and_plan(policy, only, repo, now, deadline, tmpdir)
     repo_paths = [p for p in policy.repos if p.is_dir()] + ([repo] if repo else [])
     roots = allowed_roots(policy, extra_repo_dirs(policy, repo_paths), tmpdir)
     stamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    freed, removed, refused, lines = 0, 0, 0, []
+    freed, removed, refused, lines = 0, 0, 0, [f"{stamp} note: {n}" for n in notes]
     for item in plan:
         if time.time() > deadline:
             lines.append(f"{stamp} budget exhausted; the rest runs next time")
@@ -697,6 +926,12 @@ def run(policy: Policy, only: set[str], dry_run: bool, repo: Path | None = None,
     return {"removed": removed, "freed": freed, "refused": refused, "lines": lines}
 
 
+def low_on_space(policy: Policy) -> bool:
+    """Free disk space is below the policy floor: the throttle is skipped so the cleanup runs after every command."""
+    floor = policy.free_space_floor
+    return floor > 0 and free_bytes(policy.path("cache_root")) < floor
+
+
 def auto(policy: Policy, repo: Path | None) -> int:
     state_path = policy.path("state_file")
     auto_cfg = policy.data["auto"]
@@ -705,7 +940,7 @@ def auto(policy: Policy, repo: Path | None) -> int:
     except (OSError, ValueError):
         state = {}
     now = time.time()
-    if now - state.get("last_run", 0) < auto_cfg["min_interval_minutes"] * 60:
+    if now - state.get("last_run", 0) < auto_cfg["min_interval_minutes"] * 60 and not low_on_space(policy):
         return 0
     lock_path = state_path.with_suffix(".lock")
     try:
@@ -739,6 +974,9 @@ def report(policy: Policy) -> int:
             ("Compilation cache", policy.path("compilation_cache"))]
     for label, path in rows:
         print(f"{label:<22} {human(disk_usage(path)) if path.exists() else '-':>10}  {path}")
+    floor = policy.free_space_floor
+    free = free_bytes(policy.path("cache_root"))
+    print(f"{'Free disk space':<22} {human(free):>10}  floor {human(floor)}{' (BELOW THE FLOOR)' if floor and free < floor else ''}")
     return 0
 
 
