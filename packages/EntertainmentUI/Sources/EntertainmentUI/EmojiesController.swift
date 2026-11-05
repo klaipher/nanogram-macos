@@ -1521,10 +1521,10 @@ public final class AnimatedEmojiesView : Control {
     }
     
     private func updateScrollerSearch() {
-        self.updateLayout(self.frame.size, transition: .immediate)
+        self.updateLayout(self.frame.size, transition: .immediate, retheme: false)
     }
     
-    public func updateLayout(_ size: NSSize, transition: ContainedViewLayoutTransition) {
+    public func updateLayout(_ size: NSSize, transition: ContainedViewLayoutTransition, retheme: Bool = true) {
         
         if let glassSurface {
             glassSurface.frame = size.bounds
@@ -1573,7 +1573,7 @@ public final class AnimatedEmojiesView : Control {
 
        
         
-        self.updateSelectionState(animated: transition.isAnimated)
+        self.updateSelectionState(animated: transition.isAnimated, retheme: retheme)
         
     }
     

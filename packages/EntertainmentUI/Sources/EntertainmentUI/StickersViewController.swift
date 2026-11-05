@@ -805,7 +805,7 @@ public class NStickersView : View {
     }
     
     private func updateScrollerSearch() {
-        self.updateLayout(size: self.frame.size, transition: .immediate)
+        self.updateLayout(size: self.frame.size, transition: .immediate, retheme: false)
     }
     
     
@@ -1081,7 +1081,7 @@ public class NStickersView : View {
         self.searchView.updateLocalizationAndTheme(theme: theme)
     }
     
-    public func updateLayout(size: NSSize, transition: ContainedViewLayoutTransition) {
+    public func updateLayout(size: NSSize, transition: ContainedViewLayoutTransition, retheme: Bool = true) {
         
         let inSearch = searchState?.state == .Focus || state?.selectedEmojiCategory != nil
         
@@ -1129,7 +1129,7 @@ public class NStickersView : View {
         transition.updateFrame(view: searchStatusView, frame: NSMakeRect(0, searchContainer.frame.maxY, size.width, max(0, size.height - searchContainer.frame.maxY - 56)))
         
         
-        self.updateSelectionState(animated: transition.isAnimated)
+        self.updateSelectionState(animated: transition.isAnimated, retheme: retheme)
 
     }
     
