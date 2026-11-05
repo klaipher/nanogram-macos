@@ -388,7 +388,7 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
         self.audioRenderer?.volume = volume
     }
 
-    static func updateInterval(isPlaying: Bool, pendingSeek: Bool, pendingVideoFrame: Bool, didSeekOnce: Bool, isBuffering: Bool, isStarved: Bool, isNearEnd: Bool) -> Double {
+    static func updateInterval(isPlaying: Bool, pendingSeek: Bool, pendingVideoFrame: Bool, didSeekOnce: Bool, isBuffering: Bool, isStarved: Bool, isNearEnd: Bool) -> Double? {
         if pendingSeek || pendingVideoFrame || !didSeekOnce {
             return 1.0 / 60.0
         }
@@ -398,12 +398,22 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
             }
             return 1.0 / 10.0
         }
-        return 1.0 / 5.0
+        return nil
+    }
+
+    static func updateTimerTolerance(interval: Double) -> Double {
+        return max(interval * 0.1, 0.002)
     }
 
     private func updateTimerState() {
         let isStarved = !self.videoIsRequestingMediaData || (self.audioRenderer != nil && !self.audioIsRequestingMediaData)
         let interval = ChunkMediaPlayerV2.updateInterval(isPlaying: self.isPlaying, pendingSeek: self.pendingSeekTimestamp != nil, pendingVideoFrame: self.pendingVideoFrameTimestamp != nil, didSeekOnce: self.didSeekOnce, isBuffering: self.lastIsBuffering, isStarved: isStarved, isNearEnd: self.lastIsNearEnd)
+        guard let interval else {
+            self.updateTimer?.invalidate()
+            self.updateTimer = nil
+            self.updateTimerInterval = 0.0
+            return
+        }
         if interval == self.updateTimerInterval, self.updateTimer != nil {
             return
         }
@@ -415,7 +425,7 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
             }
             self.updateInternalState()
         })
-        timer.tolerance = interval >= 0.1 ? interval * 0.1 : 0.0
+        timer.tolerance = ChunkMediaPlayerV2.updateTimerTolerance(interval: interval)
         self.updateTimer = timer
     }
 
