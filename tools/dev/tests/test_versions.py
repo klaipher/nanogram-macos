@@ -153,8 +153,11 @@ class PinnedVersionsTests(unittest.TestCase):
     def test_rlottie_has_the_klaipher_fork_fixes(self):
         rlottie = ROOT / "submodules" / "rlottie"
         pin = gitlink(ROOT, "submodules/rlottie")
-        for commit in ("0742a4898e8fea1a88379033f26f6765a6c901f7", "e0221d3ee344f467c0aa8f34c23a95f836b3c223"):
-            self.assertTrue(is_ancestor(rlottie, commit, pin), f"rlottie {pin} does not contain {commit}")
+        # One rlottie line for both apps (083f19a): the keep-alive fix (the Mac's former e0221d3) arrived with 0742a48.
+        commit = "0742a4898e8fea1a88379033f26f6765a6c901f7"
+        self.assertTrue(is_ancestor(rlottie, commit, pin), f"rlottie {pin} does not contain {commit}")
+        self.assertIn("new RleTaskScheduler()", read(rlottie / "src" / "vector" / "vraster.cpp"))
+        self.assertIn("new LottieModelCache()", read(rlottie / "src" / "lottie" / "lottieloader.cpp"))
         self.assertIn("url = https://github.com/klaipher/rlottie", read(ROOT / ".gitmodules"))
 
     def test_tgcalls_is_the_klaipher_fork(self):
