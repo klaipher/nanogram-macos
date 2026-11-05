@@ -23,7 +23,7 @@ enum ReactionEffectFileWait {
 
 /// Process-wide downloads of reaction effect files. A download outlives the 1.5 s wait, so on a slow link
 /// the file keeps arriving and the effect plays on a later tap. One download per file, capped at `cap` seconds.
-final class ReactionEffectFetches {
+final class ReactionEffectFetches: @unchecked Sendable { // every mutable field is guarded by `lock`
     static let cap: Double = 30.0
     static let shared = ReactionEffectFetches()
 

@@ -150,10 +150,17 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
 
     private func activateMediaControls() {
         guard mediaControlsActive else { return }
-        mediaControls.activate()
-        mediaControls.updateControlsAvaiability(nextEnabled: false, prevEnabled: false, seekEnabled: false)
-        if let status = genericView.status {
-            mediaControls.setupNowPlaying(videoTitle: strings().chatListVideo, status: status)
+        // Runs inline on the main queue and hops to it otherwise, so the view access below is on main.
+        Queue.mainQueue().async { [weak self] in
+            guard let self, self.mediaControlsActive else { return }
+            nonisolated(unsafe) let controller = self
+            MainActor.assumeIsolated {
+                controller.mediaControls.activate()
+                controller.mediaControls.updateControlsAvaiability(nextEnabled: false, prevEnabled: false, seekEnabled: false)
+                if let status = controller.genericView.status {
+                    controller.mediaControls.setupNowPlaying(videoTitle: strings().chatListVideo, status: status)
+                }
+            }
         }
     }
 

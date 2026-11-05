@@ -6,12 +6,12 @@ import InlineStickerLayer
 
 extension ChatLayerMessageTextPresentation {
     private enum AttributeKeys {
-        static let quote = TextInputAttributes.quote.rawValue as NSString
-        static let spoiler = TextInputAttributes.spoiler.rawValue as NSString
-        static let customEmoji = TextInputAttributes.customEmoji.rawValue as NSString
-        static let embedded = TextInputAttributes.embedded.rawValue as NSString
-        static let formattedDate = TextInputAttributes.formattedDate.rawValue as NSString
-        static let link = NSAttributedString.Key.link.rawValue as NSString
+        nonisolated(unsafe) static let quote = TextInputAttributes.quote.rawValue as NSString
+        nonisolated(unsafe) static let spoiler = TextInputAttributes.spoiler.rawValue as NSString
+        nonisolated(unsafe) static let customEmoji = TextInputAttributes.customEmoji.rawValue as NSString
+        nonisolated(unsafe) static let embedded = TextInputAttributes.embedded.rawValue as NSString
+        nonisolated(unsafe) static let formattedDate = TextInputAttributes.formattedDate.rawValue as NSString
+        nonisolated(unsafe) static let link = NSAttributedString.Key.link.rawValue as NSString
     }
 
     @inline(__always)

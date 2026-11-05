@@ -543,9 +543,11 @@ public protocol APDelegate : AnyObject {
 }
 
 public final class MediaPlaybackControlCenter {
-    private static weak var activeOwner: MediaPlaybackControlCenter?
-    private static var activeOwnerId: UUID?
-    private static weak var persistentOwner: MediaPlaybackControlCenter?
+    // The owner statics are read and written on the main thread only: `clearOwner` runs from `deinit`
+    // through a main-thread hop, and remote commands hop to main in `performCommand`.
+    nonisolated(unsafe) private static weak var activeOwner: MediaPlaybackControlCenter?
+    nonisolated(unsafe) private static var activeOwnerId: UUID?
+    nonisolated(unsafe) private static weak var persistentOwner: MediaPlaybackControlCenter?
     private let ownerId = UUID()
     private(set) var commandGeneration: UInt64 = 0
     private let artworkDisposable = MetaDisposable()

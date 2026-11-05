@@ -263,6 +263,11 @@ public class GalleryModernControlsView: View {
         }
     }
     
+    public func setZoomControlsEnabled(zoomOut: Bool, zoomIn: Bool) {
+        zoomOutControl.isEnabled = zoomOut
+        zoomInControl.isEnabled = zoomIn
+    }
+
     public func updateControlsVisible(_ entry: GalleryEntry) {
         switch entry {
        
@@ -466,8 +471,7 @@ public class GalleryModernControls: GenericViewController<GalleryModernControlsV
                 }))
                 zoomControlsDisposable.set((item.magnify.get() |> deliverOnMainQueue).start(next: { [weak self, weak item] value in
                     if let item = item {
-                        self?.genericView.zoomOutControl.isEnabled = item.minMagnify < value
-                        self?.genericView.zoomInControl.isEnabled = item.maxMagnify > value
+                        self?.genericView.setZoomControlsEnabled(zoomOut: item.minMagnify < value, zoomIn: item.maxMagnify > value)
                     }
                 }))
             }

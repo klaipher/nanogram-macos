@@ -1515,7 +1515,10 @@ public class PreviewSenderController: ModalViewController, Notifable {
     
     public override func returnKeyAction() -> KeyHandlerResult {
         if let currentEvent = NSApp.currentEvent {
-            let hasMarkedText = genericView.textView.inputView.hasMarkedText()
+            // returnKeyAction is a key or button action from AppKit event dispatch (it already reads
+            // NSApp.currentEvent), so it always runs on the main thread.
+            nonisolated(unsafe) let controller = self
+            let hasMarkedText = MainActor.assumeIsolated { controller.genericView.textView.inputView.hasMarkedText() }
             if FastSettings.checkSendingAbility(for: currentEvent), didSetReady, !hasMarkedText {
                 send(false)
                 return .invoked

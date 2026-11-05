@@ -11190,10 +11190,14 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             return .invoked
         }, with: self, for: .K, priority: .medium, modifierFlags: [.command, .shift])
 
-        self.context.window.set(mouseHandler: { [weak self] _ in
-            self?.readMetricsManager?.recordUserActivity()
-            return .rejected
-        }, with: self, for: .mouseMoved, priority: .low)
+        // viewDidAppear is an AppKit lifecycle callback, always called on the main thread.
+        nonisolated(unsafe) let controller = self
+        MainActor.assumeIsolated {
+            controller.context.window.set(mouseHandler: { [weak controller] _ in
+                controller?.readMetricsManager?.recordUserActivity()
+                return .rejected
+            }, with: controller, for: .mouseMoved, priority: .low)
+        }
 
         self.context.window.add(swipe: { [weak self] direction, _ -> SwipeHandlerResult in
             guard let `self` = self, let window = self.window, self.chatInteraction.presentation.canReplyInRestrictedMode else {return .failed}

@@ -284,8 +284,8 @@ public extension UnicodeScalar {
     }
 
     
-    static var ZeroWidthJoiner = UnicodeScalar(0x200D)!
-    static var VariationSelector = UnicodeScalar(0xFE0F)!
+    static let ZeroWidthJoiner: UnicodeScalar = "\u{200D}"
+    static let VariationSelector: UnicodeScalar = "\u{FE0F}"
 }
 
 

@@ -1394,13 +1394,15 @@ public final class AnimatedEmojiesCategories : Control {
 }
 
 public final class AnimatedEmojiesView : Control {
-    public let tableView = TableView(frame: NSMakeRect(0, 0, 350, 350))
-    public let packsView = HorizontalTableView(frame: NSMakeRect(0, 0, 350, 46))
+    // The subviews are `let`: only the reference is read from the (nonisolated) controller, the views
+    // themselves are still used on the main thread.
+    public nonisolated(unsafe) let tableView = TableView(frame: NSMakeRect(0, 0, 350, 350))
+    public nonisolated(unsafe) let packsView = HorizontalTableView(frame: NSMakeRect(0, 0, 350, 46))
     private let borderView = View()
     private let tabs = View()
     private let selectionView: View = View(frame: NSMakeRect(0, 0, 36, 36))
     
-    public let searchView = SearchView(frame: .zero)
+    public nonisolated(unsafe) let searchView = SearchView(frame: .zero)
     fileprivate let searchContainer = View()
     private let visualEffect = NSVisualEffectView()
     private let searchInside = View()
