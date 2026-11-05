@@ -2,6 +2,7 @@ import Foundation
 public import CoreVideo
 import CoreMedia
 import VideoToolbox
+import os
 
 // What the device reports about hardware VP9 decoding. Nothing in it is user data.
 public struct VP9HardwareProbeResult: Sendable, Equatable, CustomStringConvertible {
@@ -26,6 +27,118 @@ public struct VP9HardwareProbeResult: Sendable, Equatable, CustomStringConvertib
     public var description: String {
         let status = self.sessionStatus.map { "\($0)" } ?? "not tried"
         return "VP9 hardware decode: requested=\(self.didRequestSupplementalDecoder) supported=\(self.isHardwareDecodeSupported) session=\(status) usingHardware=\(self.usesHardwareDecoder) -> \(self.hasHardwareDecoder ? "hardware" : "libvpx")"
+    }
+}
+
+// How the stickers that asked for a hardware decoder fared. The session cap (`maxConcurrentSessions`) leaves libvpx
+// for every sticker after the first four with alpha; these counters show whether that is what happens.
+public struct VP9HardwareStats: Sendable, Equatable {
+    // A sticker got a hardware decoder.
+    public var hardwareStarts = 0
+    // No decoder: every session slot was taken.
+    public var capMisses = 0
+    // No decoder: a hardware session could not be created, or did not run on hardware.
+    public var sessionFailures = 0
+    // No decoder: not a plain 8-bit video-range 4:2:0 VP9 file.
+    public var ineligible = 0
+    // The most session slots in use at once.
+    public var peakSessions = 0
+
+    public init(hardwareStarts: Int = 0, capMisses: Int = 0, sessionFailures: Int = 0, ineligible: Int = 0, peakSessions: Int = 0) {
+        self.hardwareStarts = hardwareStarts
+        self.capMisses = capMisses
+        self.sessionFailures = sessionFailures
+        self.ineligible = ineligible
+        self.peakSessions = peakSessions
+    }
+
+    public var description: String {
+        return "VP9 hardware stickers: hardwareStarts=\(self.hardwareStarts) capMisses=\(self.capMisses) sessionFailures=\(self.sessionFailures) ineligible=\(self.ineligible) peakSessions=\(self.peakSessions)"
+    }
+}
+
+enum VP9HardwareOutcome {
+    case hardware
+    case capReached
+    case sessionFailure
+    case ineligible
+}
+
+final class VP9HardwareStatsStore: @unchecked Sendable {
+    static let reportInterval: Double = 60.0
+
+    private let lock = NSLock()
+    private var stats = VP9HardwareStats()
+    private var reportedStats = VP9HardwareStats()
+    private var lastReportTime: Double?
+    private var reporter: (@Sendable (String) -> Void)?
+
+    var snapshot: VP9HardwareStats {
+        self.lock.lock()
+        defer {
+            self.lock.unlock()
+        }
+        return self.stats
+    }
+
+    func record(_ outcome: VP9HardwareOutcome) {
+        self.lock.lock()
+        switch outcome {
+        case .hardware:
+            self.stats.hardwareStarts += 1
+        case .capReached:
+            self.stats.capMisses += 1
+        case .sessionFailure:
+            self.stats.sessionFailures += 1
+        case .ineligible:
+            self.stats.ineligible += 1
+        }
+        self.lock.unlock()
+    }
+
+    func noteActiveSessions(_ count: Int) {
+        self.lock.lock()
+        if count > self.stats.peakSessions {
+            self.stats.peakSessions = count
+        }
+        self.lock.unlock()
+    }
+
+    func setReporter(_ reporter: (@Sendable (String) -> Void)?) {
+        self.lock.lock()
+        self.reporter = reporter
+        self.lock.unlock()
+    }
+
+    // The text to log when a minute passed since the last report and the counters changed since then.
+    func takeReport(now: Double) -> String? {
+        self.lock.lock()
+        defer {
+            self.lock.unlock()
+        }
+        if self.stats == self.reportedStats {
+            return nil
+        }
+        if let lastReportTime = self.lastReportTime {
+            let elapsed = now - lastReportTime
+            // A clock set backwards must not silence the report for good.
+            if elapsed >= 0.0 && elapsed < VP9HardwareStatsStore.reportInterval {
+                return nil
+            }
+        }
+        self.lastReportTime = now
+        self.reportedStats = self.stats
+        return self.stats.description
+    }
+
+    func reportIfDue(now: Double) {
+        self.lock.lock()
+        let reporter = self.reporter
+        self.lock.unlock()
+        guard let reporter, let text = self.takeReport(now: now) else {
+            return
+        }
+        reporter(text)
     }
 }
 
@@ -58,10 +171,36 @@ public enum VP9HardwareDecoding {
     // Hardware sessions are a limited resource; more stickers than this decode with libvpx.
     public static let maxConcurrentSessions = 8
     private static let sessionCount = SessionCounter()
+    static let statsStore = VP9HardwareStatsStore()
+    private static let signposter = OSSignposter(subsystem: Bundle.main.bundleIdentifier ?? "VP9Hardware", category: "Performance")
+
+    public static var stats: VP9HardwareStats {
+        return self.statsStore.snapshot
+    }
+
+    // Called with the counters at most once a minute, and only when they changed. The app logs it.
+    public static func setStatsReporter(_ reporter: (@Sendable (String) -> Void)?) {
+        self.statsStore.setReporter(reporter)
+    }
+
+    // A sticker that wanted hardware decoding and did not get it leaves a signpost event, so a trace shows where.
+    static func record(_ outcome: VP9HardwareOutcome) {
+        self.statsStore.record(outcome)
+        switch outcome {
+        case .capReached:
+            self.signposter.emitEvent("vp9HardwareCapReached")
+        case .sessionFailure:
+            self.signposter.emitEvent("vp9HardwareSessionFailure")
+        case .hardware, .ineligible:
+            break
+        }
+        self.statsStore.reportIfDue(now: Date().timeIntervalSince1970)
+    }
 
     final class SessionCounter: @unchecked Sendable {
         private let lock = NSLock()
         private var value = 0
+        private var peakValue = 0
 
         func acquire(_ count: Int, limit: Int) -> Bool {
             self.lock.lock()
@@ -72,6 +211,7 @@ public enum VP9HardwareDecoding {
                 return false
             }
             self.value += count
+            self.peakValue = max(self.peakValue, self.value)
             return true
         }
 
@@ -88,10 +228,22 @@ public enum VP9HardwareDecoding {
             }
             return self.value
         }
+
+        var peak: Int {
+            self.lock.lock()
+            defer {
+                self.lock.unlock()
+            }
+            return self.peakValue
+        }
     }
 
     static func acquireSessions(_ count: Int) -> Bool {
-        return self.sessionCount.acquire(count, limit: self.maxConcurrentSessions)
+        let didAcquire = self.sessionCount.acquire(count, limit: self.maxConcurrentSessions)
+        if didAcquire {
+            self.statsStore.noteActiveSessions(self.sessionCount.peak)
+        }
+        return didAcquire
     }
 
     static func releaseSessions(_ count: Int) {
@@ -185,22 +337,27 @@ public final class VP9HardwareFrameDecoder {
             return nil
         }
         guard let first = sticker.frames.first, let colorRange = VP9HardwareFrameDecoder.keyFrameColorRange(first.color) else {
+            VP9HardwareDecoding.record(.ineligible)
             return nil
         }
         // Output is requested as video range, and only video-range files were checked against libvpx.
         // A full-range file could come back range-converted (alpha 255 -> 235), so it stays on libvpx.
         if colorRange {
+            VP9HardwareDecoding.record(.ineligible)
             return nil
         }
         if let alpha = first.alpha, VP9HardwareFrameDecoder.keyFrameColorRange(alpha) != false {
+            VP9HardwareDecoding.record(.ineligible)
             return nil
         }
         guard let formatDescription = VP9HardwareDecoding.vp9FormatDescription(width: sticker.width, height: sticker.height, fullRange: colorRange) else {
+            VP9HardwareDecoding.record(.ineligible)
             return nil
         }
         let hasAlpha = sticker.hasAlpha
         let sessionCount = hasAlpha ? 2 : 1
         guard VP9HardwareDecoding.acquireSessions(sessionCount) else {
+            VP9HardwareDecoding.record(.capReached)
             return nil
         }
         let (_, colorSession) = VP9HardwareDecoding.makeSession(formatDescription: formatDescription)
@@ -209,6 +366,7 @@ public final class VP9HardwareFrameDecoder {
                 VTDecompressionSessionInvalidate(colorSession)
             }
             VP9HardwareDecoding.releaseSessions(sessionCount)
+            VP9HardwareDecoding.record(.sessionFailure)
             return nil
         }
         var alphaSession: VTDecompressionSession?
@@ -220,6 +378,7 @@ public final class VP9HardwareFrameDecoder {
                 }
                 VTDecompressionSessionInvalidate(colorSession)
                 VP9HardwareDecoding.releaseSessions(sessionCount)
+                VP9HardwareDecoding.record(.sessionFailure)
                 return nil
             }
             alphaSession = session
@@ -228,6 +387,7 @@ public final class VP9HardwareFrameDecoder {
         self.colorSession = colorSession
         self.alphaSession = alphaSession
         self.sessionCount = sessionCount
+        VP9HardwareDecoding.record(.hardware)
     }
 
     deinit {
