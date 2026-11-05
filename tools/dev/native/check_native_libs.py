@@ -74,7 +74,20 @@ def run_probe(root: Path, probe: dict) -> object:
         stop = re.search(end, text[begin.end():], re.M)
         text = text[begin.start(): begin.end() + (stop.end() if stop else len(text))]
     if kind == "flags":
-        return sorted({_normalise(t) for t in FLAG_TOKEN.findall(text)})
+        tokens = {_normalise(t) for t in FLAG_TOKEN.findall(text)}
+        # A script that sources a shared flag list names that file (and its region) under "also".
+        for extra in probe.get("also", []):
+            extra_path, extra_text = _read(Path(root), extra)
+            if extra_path is None:
+                return None
+            if "region" in extra:
+                begin = re.search(extra["region"][0], extra_text, re.M)
+                if not begin:
+                    return None
+                stop = re.search(extra["region"][1], extra_text[begin.end():], re.M)
+                extra_text = extra_text[begin.start(): begin.end() + (stop.end() if stop else len(extra_text))]
+            tokens |= {_normalise(t) for t in FLAG_TOKEN.findall(extra_text)}
+        return sorted(tokens)
     match = re.search(probe["regex"], text, re.M)
     if not match:
         return None
