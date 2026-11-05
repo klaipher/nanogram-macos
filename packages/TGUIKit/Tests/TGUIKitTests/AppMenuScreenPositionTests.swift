@@ -56,6 +56,13 @@ final class AppMenuScreenPositionTests: XCTestCase {
         try verify(panel.frame, reference, owner.convertToScreen(NSRect(origin: local, size: .zero)).origin)
     }
 
+    /// A 440x300 owner centered in `visible`, snapped to whole points. Menu panels are placed on whole points, so a
+    /// fractional visibleFrame (a notched display's menu bar height, for one) would otherwise make the expected
+    /// cursor-relative position differ from the panel's by half a point depending on the host screen.
+    private func centeredOwnerFrame(in visible: NSRect) -> NSRect {
+        NSMakeRect((visible.midX - 220).rounded(), (visible.midY - 150).rounded(), 440, 300)
+    }
+
     func testDesktopSizedWindowTopClickKeepsMenuBelowVisibleTop() throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let visible = screen.visibleFrame
@@ -95,7 +102,7 @@ final class AppMenuScreenPositionTests: XCTestCase {
     func testSmallWindowCanPlaceMenuOutsideOwnerButInsideScreen() throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let visible = screen.visibleFrame
-        let frame = NSMakeRect(visible.midX - 220, visible.midY - 150, 440, 300)
+        let frame = centeredOwnerFrame(in: visible)
         try checkMenu(screen: screen, ownerFrame: frame, point: NSMakePoint(frame.midX, frame.maxY - 5)) { menu, bounds, point in
             XCTAssertEqual(menu.maxY, point.y + 20, accuracy: 0.01)
             XCTAssertGreaterThan(menu.maxY, frame.maxY)
@@ -106,7 +113,7 @@ final class AppMenuScreenPositionTests: XCTestCase {
     func testBetterInsideMenuClampsToOwnerTop() throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let visible = screen.visibleFrame
-        let frame = NSMakeRect(visible.midX - 220, visible.midY - 150, 440, 300)
+        let frame = centeredOwnerFrame(in: visible)
         try checkMenu(screen: screen, ownerFrame: frame, point: NSMakePoint(frame.midX, frame.maxY - 5), betterInside: true) { menu, bounds, _ in
             XCTAssertEqual(menu.maxY, bounds.maxY, accuracy: 0.01)
             XCTAssertGreaterThanOrEqual(menu.minY, bounds.minY)
