@@ -23,7 +23,6 @@ let package = Package(
         .package(name: "InputDataUI", path: "../InputDataUI"),
         .package(name: "AvatarUI", path: "../AvatarUI"),
         .package(name: "TelegramMediaUtils", path: "../TelegramMediaUtils"),
-        .package(name: "HardenedMedia", path: "../../submodules/telegram-ios/submodules/HardenedMedia"),
     ],
     targets: [
         .target(
@@ -43,7 +42,6 @@ let package = Package(
                 .product(name: "InputDataUI", package: "InputDataUI", condition: nil),
                 .product(name: "AvatarUI", package: "AvatarUI", condition: nil),
                 .product(name: "TelegramMediaUtils", package: "TelegramMediaUtils", condition: nil),
-                .product(name: "HardenedMedia", package: "HardenedMedia", condition: nil),
             ],
             path: "Sources/LocationUI"),
     ]

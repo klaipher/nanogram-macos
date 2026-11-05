@@ -13,7 +13,6 @@ import GeneralRows
 import InputDataUI
 import AvatarUI
 import ObjcUtils
-import HardenedMedia
 
 private enum PickLocationState : Equatable {
     case user(CLLocation?)
@@ -682,29 +681,36 @@ public class LocationModalController: ModalViewController {
         
         
         
-        let requestSignal = combineLatest(delegate.location.get() |> take(1) |> deliverOnPrepareQueue, search.get() |> distinctUntilChanged |> deliverOnPrepareQueue)
-            |> mapToSignal { location, query -> Signal<(ChatContextResultCollection?, CLLocation?, Bool, Bool), NoError> in
-                guard let location = location, let userLocation = location.location else {
-                    return .single((nil, nil, true, false))
-                }
-                let backend = VenueSearchPolicy.backend(isSecretChat: peerId.namespace == Namespaces.Peer.SecretChat, isStory: false, userRequested: !query.isEmpty, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
-                guard backend == .mapKit else {
-                    return .single((nil, location.location, false, false))
-                }
-                let first = Signal<(ChatContextResultCollection?, CLLocation?, Bool, Bool), NoError>.single((cachedData[query] ?? previousResult.modify {$0}, location.location, cachedData[query] == nil, !query.isEmpty))
-                if cachedData[query] == nil {
-                    return first |> then(mapKitVenueResults(peerId: peerId, location: userLocation, query: query)
-                        |> deliverOnPrepareQueue |> map { result in
-                            var value = result
-                            if let result = result {
-                                cachedData[query] = result
-                            }
-                            value = previousResult.modify { _ in result }
-                            
-                            return (value, location.location, false, !query.isEmpty)
-                        })
+        let peerSignal: Signal<PeerId?, NoError> = .single(nil) |> then(context.engine.peers.resolvePeerByName(name: "foursquare", referrer: nil) |> mapToSignal { result in
+            switch result {
+            case .progress:
+                return .never()
+            case let .result(peer):
+                return .single(peer?._asPeer().id)
+            }
+        })
+        let requestSignal = combineLatest(peerSignal |> deliverOnPrepareQueue, delegate.location.get() |> take(1) |> deliverOnPrepareQueue, search.get() |> distinctUntilChanged |> deliverOnPrepareQueue)
+            |> mapToSignal { botId, location, query -> Signal<(ChatContextResultCollection?, CLLocation?, Bool, Bool), NoError> in
+                if let botId = botId, let location = location {
+                    let first = Signal<(ChatContextResultCollection?, CLLocation?, Bool, Bool), NoError>.single((cachedData[query] ?? previousResult.modify {$0}, location.location, cachedData[query] == nil, !query.isEmpty))
+                    if cachedData[query] == nil {
+                        return first |> then(context.engine.messages.requestChatContextResults(botId: botId, peerId: peerId, query: query, location: .single((location.coordinate.latitude, location.coordinate.longitude)), offset: "")
+                            |> `catch` { _ in return .complete() }
+                            |> deliverOnPrepareQueue |> map { result in
+                                var value = result?.results
+                                if let result = result {
+                                    cachedData[query] = result.results
+                                }
+                                value = previousResult.modify { _ in result?.results }
+                                
+                                return (value, location.location, false, !query.isEmpty)
+                            })
+                    } else {
+                        return first
+                    }
+                    
                 } else {
-                    return first
+                    return .single((nil, location?.location, botId == nil, false))
                 }
         }
         

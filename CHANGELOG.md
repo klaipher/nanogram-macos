@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Attach > Location as upstream** (owner, 2026-11-05): nearby places come from Telegram's venue bot again; reverts 89ce930e and the `MapKitVenueSearch` warning fix from 1669203f (file removed).
+
 - Night review fixes (2026-11-05, branch `night/review-fixes`; nothing built or run yet, tests added for the combined build).
   - **Chat list**: a remembered folder view is no longer replaced by a live loading placeholder; the live value is held back until it has rows or is definitively empty (`ChatListCachedReplayGate.acceptLive`, tests in `ChatListFirstDisplayTests`). The chat list, forum topics and saved-messages lists run on their own `chatListPrepareQueue` (user-initiated); the shared `prepareQueue` is back to `.utility`, and `ChatLiveTranslateContext` uses a private utility queue (`PrepareQueueQosTests` checks both).
   - **Reactions**: the effect file download is owned by `ReactionEffectFetches` (one per file, 30 s cap) and no longer dies with the 1.5 s wait; the first four reactions also prefetch `effectAnimation` and `activateAnimation`.
