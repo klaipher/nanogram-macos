@@ -59,4 +59,18 @@ final class VP9HardwareStickerReaderTests: XCTestCase {
         reader = nil
         XCTAssertEqual(VP9HardwareDecoding.activeSessionCount, before)
     }
+
+    func testAFullCapGivesNoReaderWithoutReadingTheFile() throws {
+        try XCTSkipUnless(VP9HardwareStickerReader.probeResult.hasHardwareDecoder)
+        let limit = VP9HardwareDecoding.maxConcurrentSessions
+        let free = limit - VP9HardwareDecoding.activeSessionCount
+        XCTAssertTrue(VP9HardwareDecoding.acquireSessions(free))
+        defer {
+            VP9HardwareDecoding.releaseSessions(free)
+        }
+        let before = VP9HardwareDecoding.stats
+        // The path does not exist; with a free slot the read would fail and nothing would be counted.
+        XCTAssertNil(VP9HardwareStickerReader(path: "/nonexistent/sticker.webm", unpremultiplyAlpha: false))
+        XCTAssertEqual(VP9HardwareDecoding.stats.capMisses - before.capMisses, 1)
+    }
 }

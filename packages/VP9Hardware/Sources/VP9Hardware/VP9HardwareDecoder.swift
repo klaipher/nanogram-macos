@@ -43,22 +43,27 @@ public struct VP9HardwareStats: Sendable, Equatable {
     public var ineligible = 0
     // The most session slots in use at once.
     public var peakSessions = 0
+    // Decoders set up again for a sticker that gave its sessions back (hidden, or its frame cache was complete).
+    // They are not counted in `hardwareStarts`.
+    public var resumes = 0
 
-    public init(hardwareStarts: Int = 0, capMisses: Int = 0, sessionFailures: Int = 0, ineligible: Int = 0, peakSessions: Int = 0) {
+    public init(hardwareStarts: Int = 0, capMisses: Int = 0, sessionFailures: Int = 0, ineligible: Int = 0, peakSessions: Int = 0, resumes: Int = 0) {
         self.hardwareStarts = hardwareStarts
         self.capMisses = capMisses
         self.sessionFailures = sessionFailures
         self.ineligible = ineligible
         self.peakSessions = peakSessions
+        self.resumes = resumes
     }
 
     public var description: String {
-        return "VP9 hardware stickers: hardwareStarts=\(self.hardwareStarts) capMisses=\(self.capMisses) sessionFailures=\(self.sessionFailures) ineligible=\(self.ineligible) peakSessions=\(self.peakSessions)"
+        return "VP9 hardware stickers: hardwareStarts=\(self.hardwareStarts) capMisses=\(self.capMisses) sessionFailures=\(self.sessionFailures) ineligible=\(self.ineligible) peakSessions=\(self.peakSessions) resumes=\(self.resumes)"
     }
 }
 
 enum VP9HardwareOutcome {
     case hardware
+    case resumed
     case capReached
     case sessionFailure
     case ineligible
@@ -86,6 +91,8 @@ final class VP9HardwareStatsStore: @unchecked Sendable {
         switch outcome {
         case .hardware:
             self.stats.hardwareStarts += 1
+        case .resumed:
+            self.stats.resumes += 1
         case .capReached:
             self.stats.capMisses += 1
         case .sessionFailure:
@@ -193,11 +200,33 @@ public enum VP9HardwareDecoding {
                 self.signposter.emitEvent("vp9HardwareCapReached")
             case .sessionFailure:
                 self.signposter.emitEvent("vp9HardwareSessionFailure")
-            case .hardware, .ineligible:
+            case .ineligible:
+                self.signposter.emitEvent("vp9HardwareIneligible")
+            case .hardware, .resumed:
                 break
             }
         }
         self.statsStore.reportIfDue(now: Date().timeIntervalSince1970)
+    }
+
+    // Whether at least one session slot is free right now. It reserves nothing: a sticker that needs two slots can
+    // still miss the cap in `VP9HardwareFrameDecoder.init`. It lets a caller skip reading and parsing the file of a
+    // sticker that could not get a decoder anyway.
+    public static var hasFreeSessionSlot: Bool {
+        return self.sessionCount.current < self.maxConcurrentSessions
+    }
+
+    // Reads (`load`) and parses a sticker file for a hardware decoder, but only when a session slot is free. When the
+    // cap is full nothing is read or parsed and the miss is counted like one from the decoder.
+    public static func loadSticker(_ load: () -> Data?) -> WebMSticker? {
+        guard self.hasFreeSessionSlot else {
+            self.record(.capReached)
+            return nil
+        }
+        guard let data = load() else {
+            return nil
+        }
+        return WebMStickerDemuxer.parse(data)
     }
 
     final class SessionCounter: @unchecked Sendable {
@@ -334,8 +363,9 @@ public final class VP9HardwareFrameDecoder {
     private let sessionCount: Int
     private var isInvalidated = false
 
-    // Nil when the sticker is not plain 8-bit 4:2:0 VP9, or no hardware session can be made.
-    public init?(sticker: WebMSticker) {
+    // Nil when the sticker is not plain 8-bit 4:2:0 VP9, or no hardware session can be made. `isResume` marks a
+    // decoder set up again for a sticker that gave its sessions back: it is counted as a resume, not as a start.
+    public init?(sticker: WebMSticker, isResume: Bool = false) {
         guard #available(iOS 26.2, macOS 11.0, tvOS 26.2, visionOS 26.2, *) else {
             return nil
         }
@@ -390,7 +420,7 @@ public final class VP9HardwareFrameDecoder {
         self.colorSession = colorSession
         self.alphaSession = alphaSession
         self.sessionCount = sessionCount
-        VP9HardwareDecoding.record(.hardware)
+        VP9HardwareDecoding.record(isResume ? .resumed : .hardware)
     }
 
     deinit {

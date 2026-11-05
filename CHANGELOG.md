@@ -114,6 +114,11 @@ Nanogram for macOS releases, newest first.
 ### Media and UI
 - Pinned message bar: the side indicator is one aligned column the height of the title and text lines (it was a fixed 30 pt strip, with 12 pt segments that left a dim sliver on top when there are several pins); several pins show three equal segments that scroll with the selection (`ChatPinnedIndicatorLayout`, `VerticalParticleListControl.segmentHeight`). The highlighted segment is placed at its own slot in the scrolled list (`VerticalParticleListControl.positions`), so the second-to-last pin no longer lights up the last segment; the dim list is redrawn when the segment height changes.
 - Reactions: the reaction effect animations (the effect on the chip and the one around the message) now request their file and wait up to 1.5 s for it, instead of playing only when the file happened to be on disk and otherwise waiting forever and playing late or never; the effects of the first eight reactions are prefetched when the reaction list loads (`ReactionEffectFileWait`, `ReactionEffectPrefetch`, `EmojiScreenEffect`).
+- **Profiling wave 2, shared core, Mac files** (2026-11-05, branch `perf/wave2-core`; not built; `swift test` of `packages/VP9Hardware` ran, 21 tests; the rest of the lane lands in the iOS core and reaches the Mac with a core bump):
+  - `VP9HardwareDecoder.swift` (identical to the iOS copy): `vp9HardwareIneligible` signpost event, a separate `resumes` counter (`VP9HardwareFrameDecoder(sticker:isResume:)`), and `VP9HardwareDecoding.loadSticker`, which checks for a free session slot before the file is read and parsed.
+  - `VP9HardwareStickerReader(path:unpremultiplyAlpha:isResume:)` reads through `loadSticker` (a full cap no longer reads and parses the file) and takes `isResume` for the session-release work of the Mac media lane. `init(data:)` keeps its signature.
+  - `docs/profiling.md` is identical to the iOS copy (recording rules, new signposts). The Mac core pin has to be bumped for the new signpost names and `coalesceOnMain`.
+  - Tests: `VP9HardwareStatsTests` (new here, same file as iOS), a resume test in `VP9HardwareTests`, a full-cap test in `VP9HardwareStickerReaderTests`.
 
 ## 13.1.0 (202611041127) — 2026-11-04
 

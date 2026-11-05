@@ -13,8 +13,9 @@ documentation (links at the end). Commands were read from `xctrace help`, not re
 2. **The app must be debuggable** (`get-task-allow = true`) for Allocations, Leaks, VM Tracker, Swift
    Concurrency, Processor Trace on device, and for attaching on an iPhone. Builds we ship are not:
    TestFlight/App Store and the Developer ID direct edition carry no `get-task-allow`, and the direct edition
-   has the hardened runtime. Sampling a shipped Mac app still works with `--all-processes` (Time Profiler,
-   System Trace, Hangs), nothing that needs the task port.
+   has the hardened runtime. Sampling a shipped Mac app still works with `--all-processes` for Time Profiler,
+   System Trace and Hangs only; nothing that needs the task port, and never Metal System Trace or Processor
+   Trace (those are attach-only, see "Recording rules").
 3. **Do not profile under Xcode's debugger or with `CA_DEBUG_TRANSACTIONS`.** lldb, queue debugging and the
    transaction backtraces distort every number. The Mac `Telegram` scheme sets `CA_DEBUG_TRANSACTIONS=1` for
    Run, and its Profile action reuses Run's environment and the Debug configuration (see "Known gaps").
@@ -24,6 +25,39 @@ documentation (links at the end). Commands were read from `xctrace help`, not re
 5. **Disk.** A trace is 0.1–3 GB, and Instruments leaves `instruments*.ktrace` files in
    `$(getconf DARWIN_USER_TEMP_DIR)`. Record to `~/traces/` and delete what you do not keep; `tg cache-cleanup`
    removes stale `.ktrace` files on the Mac repo. Check `df -h /` first: no recording below 15 GB free.
+
+## Recording rules
+
+Learned from the 2026-11-05 iPhone and Mac sessions; each one cost a recording.
+
+1. **`toc` after every recording, before anything else.** `xcrun xctrace toc ~/traces/<name>.trace` must
+   print the run and its tracks. If it fails, the recording is lost: stop and record again instead of
+   analysing a half-written file.
+2. **Metal System Trace and Processor Trace are attach-only.** Use `--attach Telegram` (iPhone) or
+   `--attach Nanogram` (Mac), never `--all-processes`, with `--time-limit 20s` for Metal System Trace and
+   `--time-limit 5s` for Processor Trace. A Metal System Trace of 62 s without a limit was 10.3 GB and never
+   finalized; a Processor Trace save failed (exit 17) and the file was gone.
+3. **Allocations and Leaks need `xcrun xctrace remodel`** on the trace before `export` (the memory recording
+   of 2026-11-05 did): `xcrun xctrace remodel --input ~/traces/x.trace --output ~/traces/x-modelled.trace`
+   (check `xctrace help remodel` for the exact options). Delete the unmodelled copy and any large export when
+   done.
+4. **Power: off the charger, thermal state Nominal.** The iPhone power recording of 2026-11-05 was made
+   while charging at thermal state Fair: `DeviceChargingState` covered the whole recording and
+   `SystemPowerLevel` was 0 in every row, so it is not a baseline. Check the thermal state first (iPhone: Settings ▸ Developer, or the
+   `device-thermal-state-intervals` table of the finished trace; Mac: `pmset -g therm`, `powermetrics
+   --samplers thermal -n 1`). A trace taken at thermal state Fair or worse is not a baseline. On the iPhone
+   record wirelessly or use an on-device Performance Trace. Mac: `sudo powermetrics --samplers tasks
+   --show-process-energy -i 1000 -n 60` for the same minute you record.
+5. **Mac file recordings: pause ESET.** ESET takes about two cores during builds and may hook file metadata
+   writes (`open`, `link`, `utimes`); how much of the Mac's file-syscall cost it is has not been measured.
+   Pause it for File Activity recordings, or note that it ran, and write down the load average (`uptime`).
+6. **Launch numbers come from the second launch after an install.** The first launch after an install runs
+   once-a-day work (the cache walkers `stat` every cached file) that a same-day relaunch skips. Install,
+   launch once, quit, then record the launch you compare; record two launches on the same day to see that
+   work disappear.
+7. **File Activity**: `xcrun xctrace record --template 'File Activity' --instrument os_signpost --time-limit 30s
+   --output ~/traces/x.trace --attach <app>`; do the first and then the second open of the same sticker pack
+   in the 30 s. On the Mac `sudo fs_usage -w -f filesys -f diskio <app>` counts the syscalls without a trace.
 
 ## Profiling builds
 
@@ -59,7 +93,7 @@ dwarfdump --uuid "$APP/Contents/MacOS/Nanogram" "$APP.dSYM"         # UUIDs must
 
 A Release build costs ~11 GB of DerivedData and 20+ minutes; build it once and profile many things with it.
 The installed `/Applications/Nanogram.app` (Developer ID, hardened, no `get-task-allow`) can only be sampled
-with `--all-processes`.
+with `--all-processes`, and only with Time Profiler, System Trace or Hangs.
 
 PerfLab (`docs/perflab/README.md`, Mac only) runs in the Debug app today; its numbers are for A/B within one
 configuration, not absolute.
@@ -202,7 +236,12 @@ in every Instruments template and give Run Comparisons a range):
 
 **Hot paths** (category `Performance` only; can run per frame or keystroke): `chatHistoryEntriesForView`,
 `chatListPrepareEntries`, `composerKeystroke` (iOS) / `composerTextDidChange` (Mac), `tableMerge`,
-`lottieRenderFrame`. Plus `WAL checkpoint` (its own log in Postbox, shared core).
+`lottieRenderFrame`. Plus `WAL checkpoint` (its own log in Postbox, shared core). Added for the proofs of the
+second performance wave: `chatControllerCreated` / `chatControllerDeinit` (events, Mac; unmatched creations show a
+leak), `panelScrollTick`, `mouseMovedDispatch`, `modalOpenToVisible` (Mac), `launchToChatListUsable`,
+`resumeToFirstFrame`, `vp9ResumeCatchUp` (the replay after a hardware VP9 decoder is set up again) and
+`mediaBoxReopen` (event: a media file had to be opened again after its handle was evicted; Postbox also logs
+the open and re-open counts once a minute). Events use `NanogramSignposts.event(name)`.
 
 Category `Performance` is **not** shown by the Points of Interest instrument that the Time Profiler, System
 Trace, CPU Profiler, Processor Trace and Allocations templates carry (Animation Hitches has none); add

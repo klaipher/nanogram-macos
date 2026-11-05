@@ -239,4 +239,16 @@ final class VP9HardwareTests: XCTestCase {
         XCTAssertEqual(VP9HardwareDecoding.activeSessionCount, 0)
         XCTAssertNotNil(VP9HardwareFrameDecoder(sticker: sticker))
     }
+
+    func testAResumedDecoderIsCountedAsAResumeNotAStart() throws {
+        let probe = VP9HardwareDecoding.probe()
+        try XCTSkipUnless(probe.hasHardwareDecoder, "no hardware VP9 decoder: \(probe)")
+        let sticker = try XCTUnwrap(WebMStickerDemuxer.parse(try fixture("sticker_vp9.webm")))
+        let before = VP9HardwareDecoding.stats
+        let decoder = try XCTUnwrap(VP9HardwareFrameDecoder(sticker: sticker, isResume: true))
+        let after = VP9HardwareDecoding.stats
+        XCTAssertEqual(after.resumes - before.resumes, 1)
+        XCTAssertEqual(after.hardwareStarts - before.hardwareStarts, 0)
+        decoder.invalidate()
+    }
 }

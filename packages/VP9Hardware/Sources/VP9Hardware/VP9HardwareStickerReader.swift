@@ -21,18 +21,30 @@ public final class VP9HardwareStickerReader {
     private let alpha: UnsafeMutablePointer<UInt8>
     private let lumaStride: Int
 
-    public convenience init?(path: String, unpremultiplyAlpha: Bool) {
-        guard VP9HardwareStickerReader.probeResult.hasHardwareDecoder, let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: [.mappedIfSafe]) else {
+    // `isResume` marks a reader set up again for a sticker that gave its sessions back (counted as a resume, not as
+    // a start). The file is not read or parsed when every hardware session slot is taken.
+    public convenience init?(path: String, unpremultiplyAlpha: Bool, isResume: Bool = false) {
+        guard VP9HardwareStickerReader.probeResult.hasHardwareDecoder else {
             return nil
         }
-        self.init(data: data, unpremultiplyAlpha: unpremultiplyAlpha)
+        guard let sticker = VP9HardwareDecoding.loadSticker({ try? Data(contentsOf: URL(fileURLWithPath: path), options: [.mappedIfSafe]) }) else {
+            return nil
+        }
+        self.init(sticker: sticker, unpremultiplyAlpha: unpremultiplyAlpha, isResume: isResume)
     }
 
-    public init?(data: Data, unpremultiplyAlpha: Bool) {
-        guard let sticker = WebMStickerDemuxer.parse(data), sticker.width > 1, sticker.height > 1, sticker.width % 2 == 0, sticker.height % 2 == 0, !sticker.frames.isEmpty else {
+    public convenience init?(data: Data, unpremultiplyAlpha: Bool, isResume: Bool = false) {
+        guard let sticker = WebMStickerDemuxer.parse(data) else {
             return nil
         }
-        guard let decoder = VP9HardwareFrameDecoder(sticker: sticker) else {
+        self.init(sticker: sticker, unpremultiplyAlpha: unpremultiplyAlpha, isResume: isResume)
+    }
+
+    private init?(sticker: WebMSticker, unpremultiplyAlpha: Bool, isResume: Bool) {
+        guard sticker.width > 1, sticker.height > 1, sticker.width % 2 == 0, sticker.height % 2 == 0, !sticker.frames.isEmpty else {
+            return nil
+        }
+        guard let decoder = VP9HardwareFrameDecoder(sticker: sticker, isResume: isResume) else {
             return nil
         }
         self.sticker = sticker
