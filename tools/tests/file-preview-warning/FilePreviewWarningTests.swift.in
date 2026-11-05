@@ -187,7 +187,9 @@ func confirm() {
     pendingAlert?(.basic)
 }
 
-let risky = ["sh", "bash", "zsh", "csh", "tcsh", "command", "svg", "html", "htm", "shtml", "xhtml", "app", "exe", "bin", "run", "pkg", "mpkg", "dmg", "iso", "docm", "xlsm", "pptm", "alias", "lnk", "plist", "conf", "ini", "md"].map { "file.\($0)" }
+let risky = ["sh", "bash", "zsh", "csh", "tcsh", "command", "svg", "html", "htm", "shtml", "xhtml", "app", "exe", "bin", "run", "pkg", "mpkg", "dmg", "iso", "docm", "xlsm", "pptm", "alias", "lnk", "plist", "conf", "ini", "md",
+            // Nanogram: other WebKit-rendered formats and files that open outside Quick Look and can run something.
+            "webarchive", "xht", "svgz", "terminal", "tool", "workflow", "action", "scpt", "scptd", "applescript", "jar", "fileloc", "inetloc", "mobileconfig", "prefpane"].map { "file.\($0)" }
 let safe = ["note.txt", "paper.pdf", "archive.zip", "song.mp3", "table.xlsx"]
 let octet = "application/x-unknown-test"
 

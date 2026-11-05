@@ -21,11 +21,21 @@ texts = section(alerts, 'public func protectedCopyText(_ peer: Peer)', 'public f
 row_file = (root / 'packages/TranslateUI/Sources/TranslateUI/TranslateTableRowItem.swift').read_text()
 page = (root / 'packages/ChatUI/Sources/ChatUI/InstantPageV2View.swift').read_text()
 text_view = (root / 'packages/TGUIKit/Sources/TextView.swift').read_text()
+layer_text = (root / 'packages/ChatUI/Sources/ChatUI/ChatLayerTextNode.swift').read_text()
 assert 'initialState.canCopy = messageId == nil' in modal
 assert 'current.canCopy = item.canCopy\n                current.update(layout: richLayout' in row_file
 assert 'if self.canCopy, let layout = self.currentLayout {\n            if event.clickCount == 2, self.selectWord' in page
 assert 'if self.canCopy, event.clickCount == 1, let layout = self.currentLayout {' in page
-assert 'blockHeaderRects.first(where: { $0.0.contains(point) }), layout.mayItems {' in text_view
+# Code-block header copy goes through the one mayItems gate in TextView and in the chat layer engine.
+copyable = section(text_view, 'public func copyableBlockQuoteText(startingWith range: NSRange)', '\n    }')
+assert 'guard mayItems else { return nil }' in copyable
+assert 'layout.copyableBlockQuoteText(startingWith: blockHeader.1)' in text_view
+assert 'layout.blockQuoteText(startingWith: blockHeader.1)' not in text_view
+assert 'where quote.header != nil && textLayout.mayItems' in layer_text
+assert 'layout.copyableBlockQuoteText(startingWith: layout.blockQuotes[index].range)' in layer_text
+# Expanded <details> bodies are nested InstantPageV2Views and follow canCopy.
+assert 'body.canCopy = self.canCopy' in page
+assert 'for body in detailsBodies.values {\n                body.canCopy = canCopy' in page
 restriction = section(modal, '        let copyRestriction = context.account.postbox.transaction', '        actionsDisposable.add((copyRestriction |> deliverOnMainQueue)')
 row = section(modal, '        if let copyRestriction = state.copyRestriction {', '        if showOriginal {')
 update = section(modal, '            updateState { current in\n                var current = current\n                current.canCopy = copyRestriction == nil', '        }))')

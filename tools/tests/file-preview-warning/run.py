@@ -42,7 +42,7 @@ for line in (root / 'Resources/data/mime-types.txt').read_text(errors='replace')
 show_start = '    public func show(context: any AccountContextProtocol'
 if 'private func present(' in preview:
     show = section(preview, show_start, '    private func present(')
-    warning = section(preview, 'private let previewWarningExtensions', 'private class QuickLookPreviewItem')
+    warning = section(preview, 'let previewWarningExtensions', 'private class QuickLookPreviewItem')
     present = section(preview, '    private func present(', '    @objc func openPanelInRunLoop')
     keeps_preview = present.split('{', 1)[1].strip().startswith('self.context = context') and all(line in present for line in ('self.context = context', 'self.media = media', 'self.delegate = delegate', 'self.stableId = stableId', 'panel = QLPreviewPanel.shared()', 'copyToDownloads(', 'NSWorkspace.shared.openFile('))
 else:
