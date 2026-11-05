@@ -313,7 +313,7 @@
  "counts": {
   "ios_swift_modules": 822,
   "ios_swift6": 41,
-  "mac_swift_targets": 257,
+  "mac_swift_targets": 258,
   "mac_swift6": 8,
   "built_by_both": 43,
   "modes_differ": 6
