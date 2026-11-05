@@ -6,6 +6,8 @@ processes; execution deletes after a second safety check. Configuration: cache-p
 
   cachegc.py run [--dry-run] [--only A,B] [--repo PATH] [--force]
   cachegc.py auto          what tg runs after build/test commands: throttled, time-boxed, quiet, never fails
+  cachegc.py guard         what tg runs BEFORE build/test commands: not throttled, enforces the hard caps, and
+                           refuses to start a build when the disk is below the hard free-space floor
   cachegc.py report        sizes of every cache root
   cachegc.py verify        policy vs .bazelrc / xcconfig, and the sibling repo's copy of this directory
 
@@ -20,6 +22,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -30,8 +33,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 POLICY_FILE = HERE / "cache-policy.json"
 DAY = 86400
-CATEGORIES = ("bazel-output-base", "derived-data", "module-cache", "compilation-cache", "spm-build", "spm-scratch", "instruments",
-              "build-output", "simulator", "worktree", "tool-tmp")
+CATEGORIES = ("bazel-output-base", "bazel-disk-cache", "derived-data", "module-cache", "compilation-cache", "spm-build",
+              "spm-scratch", "cache-root", "instruments", "build-output", "simulator", "worktree", "tool-tmp")
+# What `guard` always enforces: the hard caps and the leftovers of deleted checkouts. Below the soft free-space floor
+# it runs every category.
+GUARD_CATEGORIES = ("bazel-output-base", "bazel-disk-cache", "spm-scratch", "cache-root")
 HEX32 = re.compile(r"^[0-9a-f]{32}$")
 XCODE_DERIVED = re.compile(r"^.+-[a-z]{28}$")
 BUILD_ID = re.compile(r"^\d{8,}$")
@@ -45,6 +51,8 @@ class Removal:
     size: int = 0
     action: str = "rmtree"
     repo: str = ""
+    pid: int = 0                      # a Bazel server to stop first ("stop-and-rmtree")
+    files: tuple[str, ...] = ()       # the files of a "trim" removal (path is then the cache root)
 
 
 @dataclass
@@ -67,6 +75,9 @@ class Policy:
 
     def cap_bytes(self, key: str) -> int:
         return int(float(self.data["caps_gb"][key]) * 1024 ** 3)
+
+    def setting(self, key: str, default):
+        return self.data.get(key, default)
 
     @property
     def protected_names(self) -> set[str]:
@@ -139,6 +150,39 @@ def lock_held(path: Path) -> bool:
         os.close(fd)
 
 
+def lock_in_use(path: Path) -> bool:
+    """True when anyone holds the flock on `path`, shared or exclusive (tg build holds its checkout lock shared,
+    SwiftPM holds its scratch lock exclusive). Takes and drops the lock at once; an absent file is not in use."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return False
+    except OSError:
+        return True
+    finally:
+        os.close(fd)
+
+
+def posix_lock_held(path: Path) -> bool:
+    """Java's FileLock (Bazel) is a POSIX record lock, which flock cannot see."""
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except OSError:
+        return False
+    try:
+        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.lockf(fd, fcntl.LOCK_UN)
+        return False
+    except OSError:
+        return True
+    finally:
+        os.close(fd)
+
+
 def process_commands() -> list[str]:
     result = subprocess.run(["ps", "-axo", "command="], capture_output=True, text=True, check=False)
     return result.stdout.splitlines()
@@ -167,20 +211,121 @@ def path_mentioned(path: str, commands: list[str]) -> bool:
     return any(path in c for c in commands)
 
 
-def plan_output_bases(bases: list[dict], exists, mounted, now: float, recent_s: float) -> list[Removal]:
-    """bases: {path, workspace (str|None), server_alive, mtime, size}. A base is stale when its workspace is gone."""
+def in_use(path: str, commands: list[str], cwds: set[str], locks: tuple[Path, ...] = ()) -> bool:
+    """A directory is in use when its path appears in a running command line, a process has its cwd inside it, or one
+    of its locks is held. This is decided per directory: an xcodebuild working somewhere else says nothing about it."""
+    return path_mentioned(path, commands) or cwd_inside(path, cwds) or any(lock_in_use(lock) for lock in locks)
+
+
+class Sizes:
+    """Directory sizes remembered between runs (cachegc-sizes.json next to the state file), so a plan does not run `du`
+    over tens of gigabytes every time. An entry is reused while the directory's newest top-level mtime is unchanged and
+    the measurement is younger than MAX_AGE; deeper changes show up at the latest after MAX_AGE. Also remembers paths
+    that could not be removed, so a failure is reported once and not on every run."""
+    MAX_AGE = 6 * 3600
+
+    def __init__(self, path: Path | None = None):
+        self.path = path
+        self.sizes: dict[str, list[float]] = {}
+        self.unremovable: set[str] = set()
+        self.dirty = False
+        if path is not None:
+            try:
+                data = json.loads(path.read_text())
+                self.sizes = {k: v for k, v in data.get("sizes", {}).items() if isinstance(v, list) and len(v) == 3}
+                self.unremovable = set(data.get("unremovable", []))
+            except (OSError, ValueError, AttributeError):
+                pass
+
+    def cached(self, path: Path, mtime: float, now: float) -> int | None:
+        entry = self.sizes.get(str(path))
+        if entry and entry[0] == mtime and now - entry[2] < self.MAX_AGE:
+            return int(entry[1])
+        return None
+
+    def get(self, path: Path, mtime: float, now: float, measure: bool = True) -> int:
+        known = self.cached(path, mtime, now)
+        if known is not None or not measure:
+            return known or 0
+        size = disk_usage(path)
+        self.sizes[str(path)] = [mtime, size, now]
+        self.dirty = True
+        return size
+
+    def forget(self, path: str) -> None:
+        if self.sizes.pop(path, None) is not None:
+            self.dirty = True
+
+    def mark_unremovable(self, path: str) -> None:
+        self.unremovable.add(path)
+        self.dirty = True
+
+    def save(self) -> None:
+        if self.path is None or not self.dirty:
+            return
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps({"sizes": self.sizes, "unremovable": sorted(self.unremovable)}))
+        except OSError:
+            pass
+
+
+def plan_output_bases(bases: list[dict], exists, mounted, now: float, recent_s: float,
+                      unused_days: float | None = None, keep_workspaces: frozenset[str] = frozenset()) -> list[Removal]:
+    """bases: {path, workspace (str|None), server_alive, pid, mtime, size}.
+
+    A base whose workspace is gone is removed at once (the "recent" window does not apply: nothing can build in a
+    deleted checkout); if its server is still alive the server is stopped first ("stop-and-rmtree"). A base whose
+    workspace exists is removed when no server runs and nothing touched it for `unused_days` (it is rebuilt on the next
+    build; the disk cache still holds the work). `keep_workspaces` (the checkout the command runs in) is never removed."""
     plan = []
     for base in bases:
         workspace = base.get("workspace")
-        if not workspace or base["server_alive"]:
+        if not workspace or workspace in keep_workspaces:
             continue
-        if exists(workspace) or not mounted(workspace):
+        if not exists(workspace):
+            if not mounted(workspace):
+                continue
+            reason = f"workspace {workspace} no longer exists"
+            if base["server_alive"]:
+                if base.get("pid"):
+                    plan.append(Removal("bazel-output-base", base["path"], reason + " (its server is stopped first)",
+                                        base.get("size", 0), "stop-and-rmtree", pid=int(base["pid"])))
+                continue
+            plan.append(Removal("bazel-output-base", base["path"], reason, base.get("size", 0)))
             continue
-        if now - base["mtime"] < recent_s:
+        if unused_days is None or base["server_alive"]:
             continue
-        plan.append(Removal("bazel-output-base", base["path"], f"workspace {workspace} no longer exists",
-                            base.get("size", 0)))
+        age = now - base["mtime"]
+        if age > unused_days * DAY and age >= recent_s:
+            plan.append(Removal("bazel-output-base", base["path"],
+                                f"no Bazel command for {int(age // DAY)} days, no server running (rebuilt on demand)",
+                                base.get("size", 0)))
     return plan
+
+
+def plan_bazel_disk_cache(files: list[tuple[str, float, int]], root: str, now: float, cap: int, recent_s: float,
+                          gc_busy: bool, target: float = 0.9) -> list[Removal]:
+    """files: (path, mtime, size) of every blob under ac/ and cas/. Over the cap, the least recently used go first,
+    down to `target` of the cap; blobs touched in the last `recent_s` stay. A removed blob is only a cache miss to
+    Bazel. Bazel's own garbage collection runs only after 5 idle minutes, so with builds back to back it never
+    keeps the cap; this does."""
+    total = sum(size for _, _, size in files)
+    if gc_busy or total <= cap:
+        return []
+    goal = int(cap * target)
+    chosen, freed = [], 0
+    for path, mtime, size in sorted(files, key=lambda f: f[1]):
+        if total - freed <= goal:
+            break
+        if now - mtime < recent_s:
+            break
+        chosen.append(path)
+        freed += size
+    if not chosen:
+        return []
+    return [Removal("bazel-disk-cache", root, f"{human(total)} is over the {human(cap)} cap; {len(chosen)} least recently "
+                    f"used blobs go (down to {human(goal)})", freed, "trim", files=tuple(chosen))]
 
 
 def plan_derived_data(entries: list[dict], exists, mounted, now: float, unused_days: float, recent_s: float,
@@ -214,12 +359,13 @@ def plan_module_cache(path: str, size: int, cap: int, busy: bool, category: str 
 
 
 def plan_spm_build(entries: list[dict], now: float, unused_days: float, recent_s: float,
-                   cwds: set[str], tools_running: bool) -> list[Removal]:
-    """entries: {path, last_used, size}; .build directories inside a repository."""
+                   cwds: set[str], busy: set[str] = frozenset()) -> list[Removal]:
+    """entries: {path, last_used, size}; .build directories inside a repository. A directory in use (named by a
+    running command, a process working inside it) is skipped; nothing else on the machine matters."""
     plan = []
     for entry in entries:
         age = now - entry["last_used"]
-        if tools_running or age < recent_s or age <= unused_days * DAY or cwd_inside(entry["path"], cwds):
+        if entry["path"] in busy or age < recent_s or age <= unused_days * DAY or cwd_inside(entry["path"], cwds):
             continue
         plan.append(Removal("spm-build", entry["path"], f"SwiftPM .build unused for {int(age // DAY)} days",
                             entry.get("size", 0)))
@@ -227,17 +373,23 @@ def plan_spm_build(entries: list[dict], now: float, unused_days: float, recent_s
 
 
 def plan_spm_scratch(entries: list[dict], now: float, unused_days: float, total_cap: int, recent_s: float,
-                     locked: set[str], tools_running: bool) -> list[Removal]:
-    """entries: {path, last_used, size}; scratch paths under the cache root. Stale first, then LRU down to the cap."""
+                     busy: set[str] = frozenset()) -> list[Removal]:
+    """entries: {path, last_used, size, orphan}; scratch paths under the cache root. In order: scratch of a checkout
+    that no longer exists, scratch unused for `unused_days`, then least recently used down to the cap. A directory in
+    use (`busy`: named by a running command, a process inside it, its SwiftPM lock or its checkout's build lock held)
+    is never chosen, whatever else is running on the machine."""
     plan, removed = [], set()
-    usable = [e for e in entries if e["path"] not in locked and now - e["last_used"] >= recent_s]
-    if tools_running:
-        return []
+    free = [e for e in entries if e["path"] not in busy]
+    for entry in free:
+        if entry.get("orphan"):
+            plan.append(Removal("spm-scratch", entry["path"], "its checkout no longer exists", entry.get("size", 0)))
+            removed.add(entry["path"])
+    usable = [e for e in free if e["path"] not in removed and now - e["last_used"] >= recent_s]
     for entry in sorted(usable, key=lambda e: e["last_used"]):
         age = now - entry["last_used"]
         if age > unused_days * DAY:
             plan.append(Removal("spm-scratch", entry["path"], f"scratch unused for {int(age // DAY)} days",
-                                entry["size"]))
+                                entry.get("size", 0)))
             removed.add(entry["path"])
     total = sum(e["size"] for e in entries if e["path"] not in removed)
     for entry in sorted(usable, key=lambda e: e["last_used"]):
@@ -248,6 +400,55 @@ def plan_spm_scratch(entries: list[dict], now: float, unused_days: float, total_
         plan.append(Removal("spm-scratch", entry["path"], "over the scratch cap (least recently used)", entry["size"]))
         removed.add(entry["path"])
         total -= entry["size"]
+    return plan
+
+
+def derived_data_name(checkout: str) -> str:
+    """The DerivedData directory tg gives a checkout in the cache root (nanogram/config.py: derived_data_dir)."""
+    suffix = checkout.removeprefix("nanogram-macos").lstrip("-")
+    return f"DerivedData-{suffix}" if suffix else "DerivedData"
+
+
+def scratch_owner(name: str, prefix: str, checkouts: set[str]) -> str | None:
+    """`spm-<checkout>-<package>` belongs to the longest known checkout name that fits."""
+    best = None
+    for checkout in checkouts:
+        if name.startswith(f"{prefix}{checkout}-") and (best is None or len(checkout) > len(best)):
+            best = checkout
+    return best
+
+
+def plan_cache_root(entries: list[dict], fixed_bytes: int, now: float, unused_days: float, total_cap: int,
+                    recent_s: float, busy: set[str], current: set[str]) -> list[Removal]:
+    """entries: {path, kind ("derived-data" | "spm-scratch"), last_used, size, orphan}, the removable top-level entries
+    of the cache root; fixed_bytes: everything else in the root (frameworks, CompilationCache, tools), which has its
+    own caps. DerivedData-<suffix> whose checkout is gone or that nothing used for `unused_days` goes first; then, while
+    the root is over `total_cap` (cache_root_total, which no other code enforced), the least recently used scratch, then
+    DerivedData. `current` (this command's own checkout) and anything busy or used in the last `recent_s` stay."""
+    plan, removed = [], set()
+    candidates = [e for e in entries if e["path"] not in busy and e["path"] not in current]
+    for entry in candidates:
+        if entry["kind"] != "derived-data":
+            continue
+        age = now - entry["last_used"]
+        if entry.get("orphan"):
+            plan.append(Removal("cache-root", entry["path"], "its checkout no longer exists", entry.get("size", 0)))
+            removed.add(entry["path"])
+        elif age > unused_days * DAY and age >= recent_s:
+            plan.append(Removal("cache-root", entry["path"], f"DerivedData unused for {int(age // DAY)} days",
+                                entry.get("size", 0)))
+            removed.add(entry["path"])
+    total = fixed_bytes + sum(e["size"] for e in entries if e["path"] not in removed)
+    for kind in ("spm-scratch", "derived-data"):
+        for entry in sorted((e for e in candidates if e["kind"] == kind), key=lambda e: e["last_used"]):
+            if total <= total_cap:
+                return plan
+            if entry["path"] in removed or now - entry["last_used"] < recent_s:
+                continue
+            plan.append(Removal("cache-root", entry["path"],
+                                f"cache root over its {human(total_cap)} cap (least recently used)", entry["size"]))
+            removed.add(entry["path"])
+            total -= entry["size"]
     return plan
 
 
@@ -330,6 +531,9 @@ def safe_to_remove(removal: Removal, policy: Policy, allowed_roots: list[Path]) 
     resolved = path.parent.resolve() / path.name
     if removal.action in ("simctl", "worktree-prune"):
         return None
+    if removal.action == "trim":
+        cache = policy.path("bazel_disk_cache")
+        return None if resolved == cache.parent.resolve() / cache.name else "not the Bazel disk cache"
     if path.name in policy.protected_names:
         return "protected name"
     for protected in policy.protected_paths:
@@ -365,8 +569,71 @@ def make_writable(path: Path) -> None:
         pass
 
 
+def bazel_server_command(pid: int) -> str:
+    result = subprocess.run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, check=False)
+    return result.stdout.strip()
+
+
+def process_gone(pid: int) -> bool:
+    result = subprocess.run(["ps", "-p", str(pid), "-o", "stat="], capture_output=True, text=True, check=False)
+    state = result.stdout.strip()
+    return not state or state.startswith("Z")
+
+
+def stop_bazel_server(pid: int, output_base: str, wait_s: float = 15.0) -> bool:
+    """SIGTERM a Bazel server, after checking that the pid really is a server of this output base (pids are reused).
+    True when the process is gone."""
+    command = bazel_server_command(pid)
+    if not command:
+        return True
+    if "bazel(" not in command or output_base not in command:
+        return False
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    deadline = time.time() + wait_s
+    while time.time() < deadline:
+        if process_gone(pid):
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def trim_files(root: Path, files: tuple[str, ...]) -> tuple[int, int]:
+    """Removes the listed blobs of the Bazel disk cache (only regular files under root/ac and root/cas).
+    Returns (files removed, bytes freed)."""
+    count, freed = 0, 0
+    resolved_root = root.resolve()
+    for name in files:
+        path = Path(name)
+        try:
+            relative = path.relative_to(root)
+            if relative.parts[0] not in ("ac", "cas") or path.is_symlink() or not path.is_file():
+                continue
+            size = path.stat().st_size
+            path.unlink()
+        except (OSError, ValueError, IndexError):
+            continue
+        if path.parent.resolve().is_relative_to(resolved_root):
+            count += 1
+            freed += size
+    return count, freed
+
+
 def execute(removal: Removal) -> bool:
     path = Path(removal.path)
+    if removal.action == "trim":
+        count, _ = trim_files(path, removal.files)
+        return count > 0
+    if removal.action == "stop-and-rmtree":
+        if not stop_bazel_server(removal.pid, removal.path):
+            return False
+        make_writable(path)
+        shutil.rmtree(path, ignore_errors=True)
+        return not path.exists()
     if removal.action == "simctl":
         return subprocess.run(["xcrun", "simctl", "delete", "unavailable"], capture_output=True).returncode == 0
     if removal.action == "worktree-prune":
@@ -412,11 +679,13 @@ def gather_output_bases(policy: Policy, commands: list[str], now: float) -> list
             workspace = None
         alive = path_mentioned(f"--output_base={child}", commands)
         pid_file = child / "server" / "server.pid.txt"
+        pid = 0
         try:
-            alive = alive or pid_alive(int(pid_file.read_text().strip()))
+            pid = int(pid_file.read_text().strip())
+            alive = alive or pid_alive(pid)
         except (OSError, ValueError):
             pass
-        bases.append({"path": str(child), "workspace": workspace, "server_alive": alive,
+        bases.append({"path": str(child), "workspace": workspace, "server_alive": alive, "pid": pid,
                       "mtime": newest_mtime(child), "size": 0})
     return bases
 
@@ -496,8 +765,51 @@ def worktree_entries(repo: Path, bases: list[str]) -> list[dict]:
     return entries
 
 
+def known_checkouts(policy: Policy, repo_paths: list[Path]) -> set[str] | None:
+    """Names of every checkout that exists: the worktrees of both repositories, plus any directory with a .git beside
+    them (~/Projects, ~/Projects/wt). None when the list cannot be trusted (git failed, the current repository is
+    missing), which switches the "its checkout is gone" rules off instead of deleting everything."""
+    names: set[str] = set()
+    for repo in repo_paths:
+        if not (repo / ".git").exists():
+            continue
+        names.update(p.name for p in worktree_entries_paths(repo))
+        names.add(repo.name)
+        for parent in (repo.parent, repo.parent / "wt"):
+            try:
+                names.update(c.name for c in parent.iterdir() if (c / ".git").exists())
+            except OSError:
+                pass
+    return names if names else None
+
+
+def scan_bazel_disk_cache(root: Path, deadline: float) -> list[tuple[str, float, int]] | None:
+    """(path, mtime, size) of every blob in ac/ and cas/; None when the scan ran out of time."""
+    files = []
+    for sub in ("ac", "cas"):
+        stack = [root / sub]
+        while stack:
+            if time.time() > deadline:
+                return None
+            try:
+                with os.scandir(stack.pop()) as it:
+                    for entry in it:
+                        try:
+                            if entry.is_dir(follow_symlinks=False):
+                                stack.append(Path(entry.path))
+                            elif entry.is_file(follow_symlinks=False):
+                                st = entry.stat(follow_symlinks=False)
+                                files.append((entry.path, st.st_mtime, st.st_size))
+                        except OSError:
+                            continue
+            except OSError:
+                continue
+    return files
+
+
 def gather_and_plan(policy: Policy, only: set[str], repo: Path | None, now: float, deadline: float,
-                    tmpdir: Path) -> tuple[list[Removal], list[str]]:
+                    tmpdir: Path, sizes: Sizes | None = None) -> tuple[list[Removal], list[str]]:
+    sizes = sizes if sizes is not None else Sizes()
     plan: list[Removal] = []
     notes: list[str] = []
     commands = process_commands()
@@ -506,14 +818,62 @@ def gather_and_plan(policy: Policy, only: set[str], repo: Path | None, now: floa
     repo_paths = [p for p in policy.repos if p.is_dir()]
     if repo and repo.resolve() not in [p.resolve() for p in repo_paths]:
         repo_paths.append(repo)
+    cache_root = policy.path("cache_root")
+    current = repo.name if repo else ""
+    cwds_cache: list[set[str]] = []
+
+    def cwds() -> set[str]:
+        if not cwds_cache:
+            cwds_cache.append(process_cwds())
+        return cwds_cache[0]
 
     def want(category: str) -> bool:
         return category in only and time.time() < deadline
 
+    def measured(path: Path, mtime: float) -> int:
+        return sizes.get(path, mtime, now, measure=time.time() < deadline)
+
+    known_cache: list[set[str] | None] = []
+
+    def known() -> set[str] | None:
+        if not known_cache:
+            names = known_checkouts(policy, repo_paths)
+            known_cache.append(names if names and (not current or current in names) else None)
+        return known_cache[0]
+
+    def scratch_entries() -> list[dict]:
+        prefix = policy.data["roots"]["spm_scratch_prefix"]
+        checkouts = known()
+        out = []
+        if not cache_root.is_dir():
+            return out
+        for p in sorted(cache_root.iterdir()):
+            if not (p.is_dir() and not p.is_symlink() and p.name.startswith(prefix)):
+                continue
+            owner = scratch_owner(p.name, prefix, checkouts) if checkouts else None
+            mtime = newest_mtime(p)
+            locks = [p / ".lock"] + ([cache_root / f"build-{owner}.lock"] if owner else [])
+            out.append({"path": str(p), "last_used": mtime, "size": measured(p, mtime), "owner": owner,
+                        "orphan": checkouts is not None and owner is None and now - mtime >= recent_s,
+                        "busy": in_use(str(p), commands, cwds(), tuple(locks))})
+        return out
+
     if want("bazel-output-base"):
         bases = gather_output_bases(policy, commands, now)
-        stale = plan_output_bases(bases, lambda p: Path(p).exists(), mounted, now, recent_s)
-        plan += [Removal(r.category, r.path, r.reason, disk_usage(Path(r.path)), r.action) for r in stale]
+        keep = frozenset({str(repo.resolve())} if repo else ())
+        plan += plan_output_bases(bases, lambda p: Path(p).exists(), mounted, now, recent_s,
+                                  policy.setting("bazel_output_base_unused_days", None), keep)
+
+    if want("bazel-disk-cache"):
+        root = policy.path("bazel_disk_cache")
+        if root.is_dir():
+            gc_busy = any(posix_lock_held(lock) for lock in (root / "gc").glob("*lock*") if lock.is_file())
+            files = scan_bazel_disk_cache(root, deadline)
+            if files is None:
+                notes.append("bazel-disk-cache: scan ran out of time")
+            else:
+                plan += plan_bazel_disk_cache(files, str(root), now, policy.cap_bytes("bazel_disk_cache"), recent_s,
+                                              gc_busy)
 
     if want("derived-data"):
         derived_root = policy.path("xcode_derived_data")
@@ -526,42 +886,78 @@ def gather_and_plan(policy: Policy, only: set[str], repo: Path | None, now: floa
                                     "last_used": max(newest_mtime(child), newest_mtime(child / "Build"),
                                                      newest_mtime(child / "Logs")), "size": 0})
         busy = {e["path"] for e in entries if path_mentioned(e["path"], commands)}
-        stale = plan_derived_data(entries, lambda p: Path(p).exists(), mounted, now, policy.days("derived_data_unused"),
-                                  recent_s, busy, tools_running or xcode_ide_running(commands))
-        plan += [Removal(r.category, r.path, r.reason, disk_usage(Path(r.path))) for r in stale]
+        plan += plan_derived_data(entries, lambda p: Path(p).exists(), mounted, now, policy.days("derived_data_unused"),
+                                  recent_s, busy, False)
 
     if want("module-cache"):
         module_cache = policy.path("xcode_derived_data") / "ModuleCache.noindex"
         if module_cache.is_dir():
-            plan += plan_module_cache(str(module_cache), disk_usage(module_cache), policy.cap_bytes("xcode_module_cache"),
-                                      tools_running or xcode_ide_running(commands))
+            plan += plan_module_cache(str(module_cache), measured(module_cache, newest_mtime(module_cache)),
+                                      policy.cap_bytes("xcode_module_cache"), tools_running or xcode_ide_running(commands))
 
     if want("compilation-cache"):
         cas = policy.path("compilation_cache")
         if cas.is_dir():
-            locks = [p for p in policy.path("cache_root").glob("build*.lock") if lock_held(p)]
-            plan += plan_module_cache(str(cas), disk_usage(cas), policy.cap_bytes("compilation_cache"),
+            locks = [p for p in cache_root.glob("build*.lock") if lock_held(p)]
+            plan += plan_module_cache(str(cas), measured(cas, newest_mtime(cas)), policy.cap_bytes("compilation_cache"),
                                       tools_running or xcode_ide_running(commands) or bool(locks), "compilation-cache")
 
     if want("spm-build"):
-        cwds = process_cwds()
         entries = [{"path": str(p), "last_used": newest_mtime(p), "size": 0}
                    for p in find_build_dirs(extra_repo_dirs(policy, repo_paths))]
-        stale = plan_spm_build(entries, now, policy.days("spm_build_unused"), recent_s, cwds, tools_running)
-        plan += [Removal(r.category, r.path, r.reason, disk_usage(Path(r.path))) for r in stale]
+        busy = {e["path"] for e in entries if path_mentioned(e["path"], commands)}
+        plan += plan_spm_build(entries, now, policy.days("spm_build_unused"), recent_s, cwds(), busy)
 
-    cache_root = policy.path("cache_root")
     if want("spm-scratch") and cache_root.is_dir():
-        prefix = policy.data["roots"]["spm_scratch_prefix"]
-        entries = [{"path": str(p), "last_used": newest_mtime(p), "size": disk_usage(p)}
-                   for p in sorted(cache_root.iterdir()) if p.is_dir() and not p.is_symlink() and p.name.startswith(prefix)]
+        entries = scratch_entries()
         plan += plan_spm_scratch(entries, now, policy.days("spm_scratch_unused"), policy.cap_bytes("spm_scratch_total"),
-                                 recent_s, set(), tools_running)
+                                 recent_s, {e["path"] for e in entries if e["busy"] or e["owner"] == current and current})
+
+    if want("cache-root") and cache_root.is_dir():
+        checkouts = known()
+        derived_names = {derived_data_name(n): n for n in checkouts or ()}
+        prefix = policy.data["roots"]["spm_scratch_prefix"]
+        entries, busy, fixed, current_paths = [], set(), 0, set()
+        for p in sorted(cache_root.iterdir()):
+            if p.is_symlink() or p.name in policy.protected_names:
+                continue
+            mtime = newest_mtime(p)
+            if p.is_dir() and p.name.startswith("DerivedData"):
+                workspace = read_workspace(p)
+                owner = derived_names.get(p.name)
+                alive = (owner is not None) or bool(workspace and Path(workspace).parent.is_dir())
+                orphan = checkouts is not None and not alive
+                locks = (cache_root / f"build-{owner}.lock",) if owner else ()
+                if in_use(str(p), commands, cwds(), locks):
+                    busy.add(str(p))
+                if owner == current and current:
+                    current_paths.add(str(p))
+                entries.append({"path": str(p), "kind": "derived-data", "last_used": mtime,
+                                "size": measured(p, mtime), "orphan": orphan})
+            elif p.is_dir() and p.name.startswith(prefix):
+                continue  # counted below from the scratch scan
+            else:
+                fixed += measured(p, mtime) if p.is_dir() else p.stat().st_size
+        for e in scratch_entries():
+            if e["busy"]:
+                busy.add(e["path"])
+            if e["owner"] == current and current:
+                current_paths.add(e["path"])
+            entries.append({"path": e["path"], "kind": "spm-scratch", "last_used": e["last_used"], "size": e["size"],
+                            "orphan": False})
+        plan += plan_cache_root(entries, fixed, now, policy.days("derived_data_unused"),
+                                policy.cap_bytes("cache_root_total"), recent_s, busy, current_paths)
 
     if want("instruments"):
         files = []
         for p in tmpdir.glob("instruments*.ktrace"):
-            files.append({"path": str(p), "mtime": newest_mtime(p), "size": disk_usage(p)})
+            if str(p) in sizes.unremovable:
+                continue
+            try:
+                size = p.stat().st_size
+            except OSError:
+                continue
+            files.append({"path": str(p), "mtime": newest_mtime(p), "size": size})
         open_paths = set()
         for f in files:
             if now - f["mtime"] > policy.data["instruments_min_age_minutes"] * 60:
@@ -592,7 +988,7 @@ def gather_and_plan(policy: Policy, only: set[str], repo: Path | None, now: floa
                 for p in parent.iterdir():
                     if (p.is_dir() and not p.is_symlink()
                             and any(fnmatch.fnmatch(p.name, g) for g in policy.data["tool_tmp_globs"])):
-                        entries.append({"path": str(p), "last_used": newest_mtime(p), "size": disk_usage(p)})
+                        entries.append({"path": str(p), "last_used": newest_mtime(p), "size": 0})
         locked = {e["path"] for e in entries if path_mentioned(e["path"], commands)}
         plan += plan_tool_tmp(entries, now, days, policy.data["tool_tmp_globs"], locked)
     return plan, notes
@@ -640,7 +1036,7 @@ def gather_build_output(policy: Policy, repo: Path, now: float) -> list[Removal]
                 released.add((edition, build))
     root_s = str(root)
     candidates = plan_build_output(editions, released, policy.data["keep_unreleased_builds"], {}, set(), root_s)
-    plan = [Removal(r.category, r.path, r.reason, disk_usage(Path(r.path)), r.action) for r in candidates]
+    plan = [Removal(r.category, r.path, r.reason, 0, r.action) for r in candidates]
     log_files = []
     for p in root.iterdir():
         if p.is_file() and p.suffix in (".log", ".out", ".time", ".tsv", ".txt", ".patch"):
@@ -660,41 +1056,104 @@ def log_lines(path: Path, lines: list[str], limit: int = 1_000_000) -> None:
         pass
 
 
+def sizes_file(policy: Policy) -> Path:
+    return policy.path("state_file").with_name("cachegc-sizes.json")
+
+
 def run(policy: Policy, only: set[str], dry_run: bool, repo: Path | None = None, now: float | None = None,
         budget: float | None = None, quiet: bool = False, tmpdir: Path | None = None) -> dict:
     now = time.time() if now is None else now
-    deadline = time.time() + (budget if budget is not None else 3600)
+    started = time.time()
+    deadline = started + (budget if budget is not None else 3600)
     tmpdir = Path(tmpdir or os.environ.get("TMPDIR", "/tmp"))
-    plan, _ = gather_and_plan(policy, only, repo, now, deadline, tmpdir)
+    sizes = Sizes(sizes_file(policy))
+    free_before = free_gb(policy)
+    plan, _ = gather_and_plan(policy, only, repo, now, deadline, tmpdir, sizes)
     repo_paths = [p for p in policy.repos if p.is_dir()] + ([repo] if repo else [])
     roots = allowed_roots(policy, extra_repo_dirs(policy, repo_paths), tmpdir)
     stamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    freed, removed, refused, lines = 0, 0, 0, []
+    freed, removed, refused, lines, seen = 0, 0, 0, [], set()
     for item in plan:
         if time.time() > deadline:
             lines.append(f"{stamp} budget exhausted; the rest runs next time")
             break
+        if item.path in seen and item.action != "trim":
+            continue  # two categories chose the same directory
+        seen.add(item.path)
         reason = safe_to_remove(item, policy, roots)
         if reason:
             refused += 1
             lines.append(f"{stamp} REFUSED {item.category} {item.path}: {reason}")
             continue
+        size = item.size
+        if not size and not dry_run and item.action in ("rmtree", "stop-and-rmtree") and deadline - time.time() > 5:
+            # Sizes are measured here, once, only for the log of what is about to go (the plan never needs them).
+            size = sizes.cached(Path(item.path), newest_mtime(Path(item.path)), now) or 0
         ok = True if dry_run else execute(item)
         if ok:
             removed += 1
-            freed += item.size
+            if item.action == "trim" and not dry_run:
+                size = item.size
+            freed += size
+            note = human(size) if size else "size not measured"
             lines.append(f"{stamp} {'WOULD REMOVE' if dry_run else 'removed'} {item.category} {item.path} "
-                         f"({human(item.size)}): {item.reason}")
+                         f"({note}): {item.reason}")
+            sizes.forget(item.path)
+        elif item.category == "instruments":
+            # Instruments traces that the system will not let go (the same two .ktrace files on every run): said once.
+            refused += 1
+            sizes.mark_unremovable(item.path)
+            lines.append(f"{stamp} REFUSED instruments {item.path}: cannot be removed; not tried again")
         else:
             lines.append(f"{stamp} FAILED {item.category} {item.path}")
     verb = "would free" if dry_run else "freed"
+    gained = free_gb(policy) - free_before
     lines.append(f"{stamp} summary: {removed} item(s), {verb} {human(freed)}, {refused} refused"
-                 f"{' (dry run)' if dry_run else ''}")
+                 f"{' (dry run)' if dry_run else f', disk free {gained:+.1f} GB'}")
     if not dry_run:
+        sizes.save()
         log_lines(policy.path("log_file"), lines)
     if not quiet:
         print("\n".join(lines))
     return {"removed": removed, "freed": freed, "refused": refused, "lines": lines}
+
+
+def free_gb(policy: Policy) -> float:
+    probe = policy.path("cache_root")
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    return shutil.disk_usage(probe).free / 1024 ** 3
+
+
+def guard(policy: Policy, repo: Path | None) -> int:
+    """Runs before a build command. Not throttled. Enforces the hard caps (stale output bases and stopped servers of
+    deleted checkouts, the Bazel disk cache, SwiftPM scratch, the cache root total). Below the soft free-space floor
+    it runs every rule with a longer budget. Below the hard floor it refuses to start the build."""
+    floors = policy.setting("free_space_gb", {"soft": 50, "hard": 20})
+    guard_cfg = policy.setting("guard", {"time_budget_seconds": 60, "low_disk_budget_seconds": 180})
+    before = free_gb(policy)
+    low = before < floors["soft"]
+    categories = set(CATEGORIES) - {"simulator"} if low else set(GUARD_CATEGORIES)
+    budget = guard_cfg["low_disk_budget_seconds"] if low else guard_cfg["time_budget_seconds"]
+    result = {"freed": 0, "removed": 0}
+    try:
+        result = run(policy, categories, dry_run=False, repo=repo, budget=budget, quiet=True)
+    except Exception as error:  # a broken cleanup must not stop a build that has room
+        print(f"cache guard: cleanup skipped: {error}", file=sys.stderr)
+    after = free_gb(policy)
+    if result["removed"]:
+        print(f"==> cache guard freed {human(result['freed'])}, {after:.0f} GB free (log: {policy.path('log_file')})",
+              file=sys.stderr)
+    if after < floors["hard"] and not os.environ.get("TG_ALLOW_LOW_DISK"):
+        print(f"error: only {after:.1f} GB free (the build needs at least {floors['hard']} GB). What uses the space:",
+              file=sys.stderr)
+        report(policy, file=sys.stderr)
+        print("Free space (tg cache-cleanup, remove old worktrees with tg worktree remove), or set TG_ALLOW_LOW_DISK=1 "
+              "to build anyway.", file=sys.stderr)
+        return 1
+    if low:
+        print(f"warning: {after:.0f} GB free, below the {floors['soft']} GB comfort level", file=sys.stderr)
+    return 0
 
 
 def auto(policy: Policy, repo: Path | None) -> int:
@@ -733,12 +1192,13 @@ def auto(policy: Policy, repo: Path | None) -> int:
     return 0
 
 
-def report(policy: Policy) -> int:
+def report(policy: Policy, file=None) -> int:
+    file = file or sys.stdout
     rows = [("Bazel disk cache", policy.path("bazel_disk_cache")), ("Bazel output bases", policy.path("bazel_user_root")),
             ("Xcode DerivedData", policy.path("xcode_derived_data")), ("Cache root", policy.path("cache_root")),
             ("Compilation cache", policy.path("compilation_cache"))]
     for label, path in rows:
-        print(f"{label:<22} {human(disk_usage(path)) if path.exists() else '-':>10}  {path}")
+        print(f"{label:<22} {human(disk_usage(path)) if path.exists() else '-':>10}  {path}", file=file)
     return 0
 
 
@@ -753,15 +1213,26 @@ def verify(policy: Policy, repo: Path) -> int:
             match = re.search(rf"^\S*\s*--{flag}=(\S+)", text, re.MULTILINE)
             if not match or match.group(1) != value:
                 problems.append(f".bazelrc --{flag} is {match.group(1) if match else 'missing'}, policy says {value}")
+        idle = policy.setting("bazel_max_idle_secs", None)
+        if idle is not None:
+            match = re.search(r"^startup\s+--max_idle_secs=(\d+)", text, re.MULTILINE)
+            if not match or int(match.group(1)) != int(idle):
+                problems.append(f".bazelrc startup --max_idle_secs is {match.group(1) if match else 'missing'}, "
+                                f"policy says {idle}")
     xcconfig = repo / "nanogram" / "Nanogram.xcconfig"
     if xcconfig.is_file():
         text = xcconfig.read_text()
         cas = str(policy.path("compilation_cache")).replace(str(policy.home), "$(HOME)")
         if f"COMPILATION_CACHE_CAS_PATH[config=Debug] = {cas}" not in text:
             problems.append(f"Nanogram.xcconfig COMPILATION_CACHE_CAS_PATH is not {cas}")
-        limit = str(policy.cap_bytes("compilation_cache"))
+        # The LLVM CAS keeps two generations, so it can reach twice its limit: the limit is half the footprint cap.
+        limit = str(policy.cap_bytes("compilation_cache") // 2)
         if f"COMPILATION_CACHE_LIMIT_SIZE[config=Debug] = {limit}" not in text:
-            problems.append(f"Nanogram.xcconfig COMPILATION_CACHE_LIMIT_SIZE is not {limit}")
+            problems.append(f"Nanogram.xcconfig COMPILATION_CACHE_LIMIT_SIZE is not {limit} "
+                            f"(half of the compilation_cache cap)")
+    floors = policy.setting("free_space_gb", None)
+    if not floors or not (0 < floors.get("hard", 0) < floors.get("soft", 0)):
+        problems.append("free_space_gb needs 0 < hard < soft")
     for sibling in policy.repos:
         other = sibling / "tools" / "dev" / "cachegc"
         if sibling.resolve() == repo.resolve() or not other.is_dir():
@@ -784,7 +1255,7 @@ def detect_repo() -> Path:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cachegc")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("run", "auto", "report", "verify"):
+    for name in ("run", "auto", "guard", "report", "verify"):
         sub = commands.add_parser(name)
         sub.add_argument("--repo", type=Path, default=None)
         if name == "run":
@@ -798,6 +1269,12 @@ def main(argv: list[str] | None = None) -> int:
             return auto(policy, repo)
         except Exception as error:
             print(f"cache cleanup skipped: {error}", file=sys.stderr)
+            return 0
+    if args.command == "guard":
+        try:
+            return guard(policy, repo)
+        except Exception as error:
+            print(f"cache guard skipped: {error}", file=sys.stderr)
             return 0
     if args.command == "report":
         return report(policy)

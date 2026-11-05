@@ -14,14 +14,14 @@
  "repos": ["~/Projects/nanogram-ios", "~/Projects/nanogram-macos"],
  "base_branches": ["main", "nanogram/integration", "nanogram"],
  "caps_gb": {
-  "bazel_disk_cache": 30,
-  "compilation_cache": 10,
+  "bazel_disk_cache": 20,
+  "compilation_cache": 12,
   "xcode_module_cache": 3,
   "spm_scratch_total": 20,
   "cache_root_total": 40
  },
  "bazel_disk_cache_gc": {
-  "max_size": "30G",
+  "max_size": "20G",
   "max_age": "14d"
  },
  "max_age_days": {
@@ -38,6 +38,16 @@
  "released_unknown_before_build": "202611050000",
  "released_unknown_note": "Builds numbered before this were made before tg testflight wrote the .released marker; whether they were uploaded is unknown, so they count as released and are kept with their dSYMs.",
  "recently_used_minutes": 120,
+ "bazel_max_idle_secs": 1800,
+ "bazel_output_base_unused_days": 3,
+ "free_space_gb": {
+  "soft": 50,
+  "hard": 20
+ },
+ "guard": {
+  "time_budget_seconds": 60,
+  "low_disk_budget_seconds": 180
+ },
  "auto": {
   "min_interval_minutes": 30,
   "time_budget_seconds": 25
