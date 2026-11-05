@@ -21,7 +21,9 @@ ENABLE_MODULE_VERIFIER[config=Debug] = NO
 LM_SKIP_METADATA_EXTRACTION[config=Debug] = YES
 COMPILATION_CACHE_ENABLE_CACHING[config=Debug] = YES
 COMPILATION_CACHE_CAS_PATH[config=Debug] = $(HOME)/.cache/nanogram-macos/CompilationCache
-COMPILATION_CACHE_LIMIT_SIZE[config=Debug] = 10737418240
+// Half of the 12 GB footprint cap in cache-policy.json: the LLVM store keeps two generations (builtin/v1.1 and
+// v1.validation), so it reached 15 GB against a 10 GB limit. `tg cache-cleanup verify` checks the rule.
+COMPILATION_CACHE_LIMIT_SIZE[config=Debug] = 6442450944
 
 GCC_OPTIMIZATION_LEVEL[config=Release] = 3
 LLVM_LTO[config=Release] = YES_THIN
