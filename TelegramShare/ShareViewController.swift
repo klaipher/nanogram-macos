@@ -23,6 +23,7 @@ class ShareViewController: NSViewController {
     private var contextValue: AuthorizedApplicationContext?
     private let context = Promise<AuthorizedApplicationContext?>()
     private var passlock: SEPasslockController? = nil
+    private var unavailableController: SEUnauthorizedViewController?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -42,7 +43,10 @@ class ShareViewController: NSViewController {
         
         
         let rootPath = containerUrl.path
-        let accountManager = AccountManager<TelegramAccountManagerTypes>(basePath: containerUrl.path + "/accounts-metadata", isTemporary: false, isReadOnly: true, useCaches: true, removeDatabaseOnError: true, accessChallenge: makeAccountManagerAccessChallenge(basePath: containerUrl.path + "/accounts-metadata", isTemporary: false, isReadOnly: true))
+        guard let accountManager = AccountManager<TelegramAccountManagerTypes>.openForExtension(basePath: containerUrl.path + "/accounts-metadata", isTemporary: false, isReadOnly: true, useCaches: true, accessChallenge: makeAccountManagerAccessChallenge(basePath: containerUrl.path + "/accounts-metadata", isTemporary: false, isReadOnly: true)) else {
+            presentAccountsUnavailable()
+            return
+        }
 
         let logger = Logger(rootPath: containerUrl.path, basePath: containerUrl.path + "/logs")
         logger.logToConsole = false
@@ -100,6 +104,19 @@ class ShareViewController: NSViewController {
     }
 
     
+    private func presentAccountsUnavailable() {
+        telegramUpdateTheme(updateTheme(with: ThemePaletteSettings.defaultTheme), window: nil, animated: false)
+        let extensionContext = self.extensionContext
+        let controller = SEUnauthorizedViewController(cancelImpl: {
+            let cancelError = NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError, userInfo: nil)
+            extensionContext?.cancelRequest(withError: cancelError)
+        })
+        controller.view.frame = self.view.bounds
+        controller.view.autoresizingMask = [.width, .height]
+        self.view.addSubview(controller.view)
+        self.unavailableController = controller
+    }
+
     private func launchExtension(accountManager: AccountManager<TelegramAccountManagerTypes>, encryptionParameters: ValueBoxEncryptionParameters, appEncryption: AppEncryptionParameters) {
         
         
