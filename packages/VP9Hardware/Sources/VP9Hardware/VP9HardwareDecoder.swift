@@ -172,6 +172,7 @@ public enum VP9HardwareDecoding {
     public static let maxConcurrentSessions = 8
     private static let sessionCount = SessionCounter()
     static let statsStore = VP9HardwareStatsStore()
+    @available(macOS 12.0, iOS 15.0, *)
     private static let signposter = OSSignposter(subsystem: Bundle.main.bundleIdentifier ?? "VP9Hardware", category: "Performance")
 
     public static var stats: VP9HardwareStats {
@@ -186,13 +187,15 @@ public enum VP9HardwareDecoding {
     // A sticker that wanted hardware decoding and did not get it leaves a signpost event, so a trace shows where.
     static func record(_ outcome: VP9HardwareOutcome) {
         self.statsStore.record(outcome)
-        switch outcome {
-        case .capReached:
-            self.signposter.emitEvent("vp9HardwareCapReached")
-        case .sessionFailure:
-            self.signposter.emitEvent("vp9HardwareSessionFailure")
-        case .hardware, .ineligible:
-            break
+        if #available(macOS 12.0, iOS 15.0, *) {
+            switch outcome {
+            case .capReached:
+                self.signposter.emitEvent("vp9HardwareCapReached")
+            case .sessionFailure:
+                self.signposter.emitEvent("vp9HardwareSessionFailure")
+            case .hardware, .ineligible:
+                break
+            }
         }
         self.statsStore.reportIfDue(now: Date().timeIntervalSince1970)
     }
