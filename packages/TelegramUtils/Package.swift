@@ -67,6 +67,7 @@ let package = Package(
         .testTarget(
             name: "TelegramUtilsTests",
             dependencies: ["TelegramUtils"],
-            path: "Tests/TelegramUtilsTests"),
+            path: "Tests/TelegramUtilsTests",
+            linkerSettings: [.unsafeFlags(["-L", "../../core-xprojects/Mozjpeg/build", "-ljpeg"])]),
     ]
 )
