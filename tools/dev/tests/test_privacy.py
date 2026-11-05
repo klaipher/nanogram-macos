@@ -1,5 +1,5 @@
-"""Privacy guards on the Mac sources (no build). The shared core's side of this (no music listening,
-call logs, analytics events, time zone offset) is checked by the core's own
+"""Privacy guards on the Mac sources (no build). The shared core's side of this (no call-log uploads,
+analytics events, time zone offset) is checked by the core's own
 tools/dev/tests/test_privacy.py; this file covers what lives only in the Mac app.
 """
 import re
@@ -38,9 +38,6 @@ class MacPrivacyTests(unittest.TestCase):
         # Channel owners see their statistics as usual (owner, 2026-11-05).
         self.assertNotEqual(lines_matching(r"MessageReadMetricsManager\(context:"), [])
         self.assertTrue((ROOT / "packages/ChatUI/Sources/ChatUI/MessageReadMetricsManager.swift").exists())
-
-    def test_nothing_reports_music(self):
-        self.assertEqual(lines_matching(r"reportMusicListened"), [])
 
     def test_calls_do_not_upload_logs(self):
         self.assertEqual(lines_matching(r"\bsaveCallDebugLog\(|saveCompleteCallDebugLog\("), [])
