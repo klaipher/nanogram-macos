@@ -124,6 +124,27 @@ func combineLatest<A, B, C, E>(queue: Queue, _ a: Signal<A, E>, _ b: Signal<B, E
     }
 }
 
+precedencegroup PipeRight {
+    associativity: left
+    higherThan: DefaultPrecedence
+}
+
+infix operator |> : PipeRight
+
+func |> <T, U>(value: T, function: (T) -> U) -> U {
+    return function(value)
+}
+
+func then<T, E>(_ next: Signal<T, E>) -> (Signal<T, E>) -> Signal<T, E> {
+    return { first in
+        return Signal { completed in
+            _ = first.start(completed: {
+                _ = next.start(completed: completed)
+            })
+        }
+    }
+}
+
 final class MetaDisposable {
     func set(_ disposable: Disposable?) {
     }
@@ -172,8 +193,10 @@ final class Server {
     }
 
     func answer() {
-        self.pendingAnswers.forEach { $0() }
+        // An answer can start the next request of a sequence (then), which must stay pending.
+        let answers = self.pendingAnswers
         self.pendingAnswers = []
+        answers.forEach { $0() }
     }
 }
 
@@ -665,6 +688,30 @@ do {
     check("a peer-to-peer change leaves global settings alone", !page.writes.contains { if case .global = $0 { return true } else { return false } })
     check("a peer-to-peer change is reported", page.reports.count == 1 && page.reports[0].callSettings == nobody())
     check("a peer-to-peer change reports no global settings", page.reports.first?.globalSettings == nil)
+    check("a peer-to-peer change is sent to the server", page.writes == [.selective(.voiceCallsP2P, nobody())])
+    check("a peer-to-peer save waits for the answer", page.state().saving && page.dismissed == 0)
+    page.server.answer()
+    check("a peer-to-peer save ends after the answer", !page.state().saving && page.dismissed == 1)
+}
+
+do {
+    let page = Page(.voiceCalls, current: everybody(), callSettings: everybody(), globalSettings: global())
+    page.change { $0.setting = .contacts }
+    page.change { $0.callP2PMode = .nobody }
+    page.didRemovedFromStack()
+    check("the call rule is sent first", page.writes == [.selective(.voiceCalls, contacts())])
+    page.server.answer()
+    check("the peer-to-peer rule follows the call rule", page.writes == [.selective(.voiceCalls, contacts()), .selective(.voiceCallsP2P, nobody())])
+    check("the save waits for the peer-to-peer answer", page.state().saving && page.dismissed == 0)
+    page.server.answer()
+    check("the save ends after both answers", !page.state().saving && page.dismissed == 1)
+}
+
+for kind in [SelectivePrivacySettingsKind.voiceMessages, .gifts, .savedMusic, .bio, .birthday] {
+    let page = Page(kind, current: everybody(), callSettings: everybody(), globalSettings: global())
+    page.change { $0.callP2PMode = .nobody }
+    page.didRemovedFromStack()
+    check("the \(kind) page never sends the peer-to-peer rule", !page.writes.contains { if case .selective(.voiceCallsP2P, _) = $0 { return true } else { return false } })
 }
 
 do {
@@ -746,8 +793,9 @@ do {
     let page = Page(.voiceCalls, current: everybody(), callSettings: everybody(), globalSettings: global())
     page.change { $0.callP2PMode = .contacts }
     page.didRemovedFromStack()
-    check("a peer-to-peer change does not stay saving", !page.state().saving)
-    check("a peer-to-peer change does not go back a second time", page.dismissed == 0)
+    page.server.answer()
+    check("a peer-to-peer change does not stay saving once answered", !page.state().saving)
+    check("a peer-to-peer save finishes like any other save", page.dismissed == 1)
 }
 
 check("a save never finishes while the page is being removed", !wentBackWhileLeaving)

@@ -1229,7 +1229,11 @@ open class SelectivePrivacySettingsController<Context: AccountContextProtocol>: 
             let phoneDiscoveryChanged = phoneDiscoveryEnabled != initialState.phoneDiscoveryEnabled
             let globalSettingsChanged = updatedGlobalSettings != globalSettings
 
-            if settingsChanged || phoneDiscoveryChanged || globalSettingsChanged {
+            // The peer-to-peer rule is shown (and editable) only on the Calls page. Upstream never sent it:
+            // a change showed in the list until the next load while the server kept the old rule.
+            let sendsCallSettings = kind == .voiceCalls && callSettingsChanged && callSettings != nil
+
+            if settingsChanged || sendsCallSettings || phoneDiscoveryChanged || globalSettingsChanged {
                 updateState { current in
                     var current = current
                     current.saving = true
@@ -1270,6 +1274,9 @@ open class SelectivePrivacySettingsController<Context: AccountContextProtocol>: 
                 var basic: Signal<Void, NoError> = Signal.complete()
                 if settingsChanged {
                     basic = context.engine.privacy.updateSelectiveAccountPrivacySettings(type: type, settings: settings)
+                }
+                if sendsCallSettings, let callSettings = callSettings {
+                    basic = basic |> then(context.engine.privacy.updateSelectiveAccountPrivacySettings(type: .voiceCallsP2P, settings: callSettings))
                 }
                 
                 var global: Signal<Never, NoError> = Signal.complete()
