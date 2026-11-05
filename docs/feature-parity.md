@@ -99,7 +99,7 @@ upstream gap (official Telegram has the same gap on that platform).
 ## 4. Unfinished work in our fork
 
 - iOS integrations still partial (ios:docs/superpowers/specs/2026-11-03-ios-integrations-specs.md): I-15 notification
-  downloads use 128 KB parts; I-26 extensions can still trap without the account DB; I-27 widget refresh coalescing;
+  downloads use 128 KB parts; I-26 NotificationContent has no account-manager open (Share, Notification Service and Siri use the failable open); I-27 widget refresh coalescing;
   I-31 App Intents (not started, L); I-36 Files/iCloud metadata on the main thread; I-40 live location sensor rate;
   I-42 the proxy paste prompt.
 - iOS runtime specs still `todo`: R11, R13, R17, R19, R20, R21, R23 (R7 is done, 1907a285).
