@@ -164,7 +164,7 @@ public final class ChatInputAttachButton: View, MorphHoldObserving {
         super.updateLocalizationAndTheme(theme: theme)
         let theme = (theme as! TelegramPresentationTheme)
         button.set(image: theme.icons.chat_input_attach, for: .Normal)
-        button.setGlassEffect(size: NSMakeSize(40, 40))
+        button.setGlassEffect(size: NSMakeSize(40, 40), deferInnerGlass: true)
         aiButton?.set(image: theme.icons.chat_input_ai, for: .Normal)
     }
 

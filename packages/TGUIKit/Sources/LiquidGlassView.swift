@@ -230,6 +230,47 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
         return false
     }
 
+    public internal(set) var glassReuseSpec: GlassGhostSpec?
+
+    private let glassReuseHolders = NSHashTable<Control>.weakObjects()
+
+    func registerGlassReuseHolder(_ holder: Control) {
+        glassReuseHolders.add(holder)
+    }
+
+    func detachGlassReuseHolders() {
+        let holders = glassReuseHolders.allObjects
+        glassReuseHolders.removeAllObjects()
+        for holder in holders where holder.additionalGlassEffectView === self {
+            holder.additionalGlassEffectView = nil
+        }
+    }
+
+    func resetForGlassReuse() {
+        onAppearanceChange = nil
+        glassGroup = nil
+        customTint = nil
+        removeFromSuperview()
+        if effectView.superview !== self {
+            effectView.removeFromSuperview()
+            addSubview(effectView, positioned: .below, relativeTo: nil)
+        }
+        isHidden = false
+        alphaValue = 1
+        effectView.isHidden = false
+        effectView.alphaValue = 1
+        layer?.removeAllAnimations()
+        layer?.transform = CATransform3DIdentity
+        effectView.layer?.removeAllAnimations()
+        effectView.layer?.transform = CATransform3DIdentity
+        frame = .zero
+        effectView.frame = .zero
+        validGhostFrame = nil
+        validLayout = nil
+        appliedCornerRadius.invalidate()
+        writeCornerRadius(cornerRadius)
+    }
+
     public init(frame: NSRect, cornerRadius: CGFloat = 16, hasShadow: Bool = true, hasBorder: Bool = true, tintAlpha: CGFloat = 0.3, forceAppearance: LiquidGlassAppearance? = nil, customTint: NSColor? = nil, forceBlur: Bool = false) {
         self.cornerRadius = cornerRadius
         self.hasShadow = hasShadow

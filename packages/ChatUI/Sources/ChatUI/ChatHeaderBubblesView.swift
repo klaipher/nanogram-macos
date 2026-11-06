@@ -237,6 +237,7 @@ private final class TitlePillView: Control {
 final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
 
     static let bubbleHeight: CGFloat = 40
+    static let ghostSpec = GlassGhostSpec(cornerRadius: ChatHeaderBubblesView.bubbleHeight / 2, hasShadow: true, hasBorder: true, tintAlpha: 0.4, group: .chatHeader)
     static let topInset: CGFloat = 12
     static let bottomInset: CGFloat = 10
     static let sideInset: CGFloat = 12
@@ -262,9 +263,7 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
     private let glassWrapper: GlassContainerView
     private lazy var backGhostSlot = LazyGlassGhostSlot<LiquidGlassView>(
         make: {
-            let view = LiquidGlassView(frame: .zero, cornerRadius: ChatHeaderBubblesView.bubbleHeight / 2, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
-            view.glassGroup = .chatHeader
-            return view
+            return GlassGhostPool.shared.acquire(ChatHeaderBubblesView.ghostSpec)
         },
         attach: { [weak self] ghost in
             guard let self else { return }
@@ -472,13 +471,8 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         self.rightCluster = RightActionsCluster()
         self.glassWrapper = GlassContainerView(frame: frameRect, flipped: true, spacing: 5)
 
-        let cornerRadius = ChatHeaderBubblesView.bubbleHeight / 2
-        
-        self.centerGhost = LiquidGlassView(frame: .zero, cornerRadius: cornerRadius, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
-        self.rightGhost = LiquidGlassView(frame: .zero, cornerRadius: cornerRadius, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
-
-        centerGhost.glassGroup = .chatHeader
-        rightGhost.glassGroup = .chatHeader
+        self.centerGhost = GlassGhostPool.shared.acquire(ChatHeaderBubblesView.ghostSpec)
+        self.rightGhost = GlassGhostPool.shared.acquire(ChatHeaderBubblesView.ghostSpec)
 
         super.init(frame: frameRect)
 
@@ -581,6 +575,10 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        GlassGhostPool.shared.release(from: glassWrapper)
+    }
+
     required init(frame frameRect: NSRect) {
         fatalError("init(frame:) has not been implemented")
     }
@@ -592,7 +590,7 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         let buttonSize = NSMakeSize(Self.bubbleHeight, Self.bubbleHeight)
 
         updateBackButtonIcon()
-        backButton.setGlassEffect(size: buttonSize)
+        backButton.setGlassEffect(size: buttonSize, deferInnerGlass: true)
         backButton.sizeToFit(NSZeroSize, buttonSize, thatFit: true)
 
         searchButton.set(image: theme.icons.chat_header_search, for: .Normal)

@@ -48,6 +48,20 @@ open class ImageButton: Button {
 
     private var _glassView: LiquidGlassView?
     private var _glassSize: NSSize?
+    private var _glassDeferred = false
+    private var _glassWantsHidden = false
+    private var _glassTouchProxy: View?
+    private var _deferredInitialAppearance: LiquidGlassAppearance?
+    private var _deferredAppearanceOverride: LiquidGlassAppearance?
+    private var _lastGlassTheme: PresentationTheme?
+
+    private var hasGlassEffect: Bool {
+        return _glassView != nil || _glassDeferred
+    }
+
+    var glassViewIfCreated: LiquidGlassView? {
+        return _glassView
+    }
     internal var _glassContentTint: NSColor?
 
     public var onGlassAppearanceChange: ((NSAppearance) -> Void)? {
@@ -57,8 +71,20 @@ open class ImageButton: Button {
     }
 
     public var glassForceAppearance: LiquidGlassAppearance {
-        get { return _glassView?.forceAppearance ?? .automatic }
+        get {
+            if let glass = _glassView {
+                return glass.forceAppearance
+            }
+            if _glassDeferred {
+                return _deferredAppearanceOverride ?? _deferredInitialAppearance ?? (_lastGlassTheme ?? presentation).appearance.glassAppearance
+            }
+            return .automatic
+        }
         set {
+            if _glassDeferred {
+                _deferredAppearanceOverride = newValue
+                return
+            }
             _glassView?.forceAppearance = newValue
             _glassView?.updateLocalizationAndTheme(theme: presentation)
         }
@@ -115,8 +141,12 @@ open class ImageButton: Button {
         return target
     }
 
-    public func setGlassEffect(size: NSSize? = nil, tintColor: NSColor? = nil, forceAppearance: LiquidGlassAppearance? = nil, interactive: Bool = true) {
-        guard _glassView == nil else { return }
+    public func setGlassEffect(size: NSSize? = nil, tintColor: NSColor? = nil, forceAppearance: LiquidGlassAppearance? = nil, interactive: Bool = true, deferInnerGlass: Bool = false) {
+        guard !hasGlassEffect else { return }
+        if deferInnerGlass && GlassChromeReuse.isEnabled {
+            setDeferredGlassEffect(size: size, tintColor: tintColor, forceAppearance: forceAppearance, interactive: interactive)
+            return
+        }
         let glass = LiquidGlassView(frame: NSZeroRect, cornerRadius: 999, hasShadow: true, hasBorder: true, forceAppearance: forceAppearance, customTint: tintColor)
         _intendedGlassTint = tintColor
         glass.customTint = tintColor
@@ -136,7 +166,54 @@ open class ImageButton: Button {
     }
 
     public func setGlassEffectHidden(_ hidden: Bool) {
-        _glassView?.isHidden = hidden
+        _glassWantsHidden = hidden
+        if let glass = _glassView {
+            glass.isHidden = hidden
+        } else if _glassDeferred, !hidden {
+            materializeDeferredGlass()
+            needsLayout = true
+        }
+    }
+
+    private func setDeferredGlassEffect(size: NSSize?, tintColor: NSColor?, forceAppearance: LiquidGlassAppearance?, interactive: Bool) {
+        _intendedGlassTint = tintColor
+        self.layer?.masksToBounds = false
+        self.autohighlight = false
+        self.shadow = nil
+        let proxy = View()
+        proxy.isEventLess = true
+        self.addSubview(proxy, positioned: .below, relativeTo: imageView)
+        _glassTouchProxy = proxy
+        _glassDeferred = true
+        _glassSize = size
+        _deferredInitialAppearance = forceAppearance
+        if interactive {
+            self.interactiveGlassView = proxy
+        }
+        needsLayout = true
+    }
+
+    private func materializeDeferredGlass() {
+        guard _glassDeferred, _glassView == nil else { return }
+        _glassDeferred = false
+        let glass = LiquidGlassView(frame: NSZeroRect, cornerRadius: 999, hasShadow: true, hasBorder: true, forceAppearance: _deferredInitialAppearance, customTint: _intendedGlassTint)
+        glass.customTint = _intendedGlassTint
+        glass.onAppearanceChange = { [weak self] appearance in
+            self?.onGlassAppearanceChange?(appearance)
+        }
+        if let proxy = _glassTouchProxy, proxy.superview === self {
+            self.addSubview(glass, positioned: .above, relativeTo: proxy)
+        } else {
+            self.addSubview(glass, positioned: .below, relativeTo: imageView)
+        }
+        _glassView = glass
+        if let override = _deferredAppearanceOverride {
+            glass.forceAppearance = override
+        }
+        glass.updateLocalizationAndTheme(theme: _lastGlassTheme ?? presentation)
+        let gs = _glassSize ?? frame.size
+        glass.frame = NSMakeRect((frame.width - gs.width) / 2, (frame.height - gs.height) / 2, gs.width, gs.height)
+        glass.updateLayout(size: gs, transition: .immediate)
     }
 
     public var glassSize: NSSize? {
@@ -260,7 +337,7 @@ open class ImageButton: Button {
         super.apply(state: state)
         self.previousState = state
 
-        if _glassView != nil {
+        if hasGlassEffect {
             self.layer?.backgroundColor = NSColor.clear.cgColor
             additionBackgroundView?.backgroundColor = .clear
         }
@@ -421,12 +498,24 @@ open class ImageButton: Button {
             transition.updateFrame(view: additionBackgroundView, frame: NSRect(origin: NSMakePoint((size.width - abSize.width) / 2, (size.height - abSize.height) / 2), size: abSize))
         }
 
+        if _glassDeferred, !_glassWantsHidden {
+            materializeDeferredGlass()
+        }
+
         if let glassView = _glassView {
             let gs = _glassSize ?? size
             let gx = (size.width - gs.width) / 2
             let gy = (size.height - gs.height) / 2
             transition.updateFrame(view: glassView, frame: NSMakeRect(gx, gy, gs.width, gs.height))
             glassView.updateLayout(size: gs, transition: transition)
+        }
+
+        if let proxy = _glassTouchProxy {
+            let gs = _glassSize ?? size
+            let gx = (size.width - gs.width) / 2
+            let gy = (size.height - gs.height) / 2
+            transition.updateFrame(view: proxy, frame: NSMakeRect(gx, gy, gs.width, gs.height))
+            proxy.layer?.cornerRadius = min(gs.width, gs.height) / 2
         }
     }
     
@@ -440,6 +529,7 @@ open class ImageButton: Button {
 
     open override func updateLocalizationAndTheme(theme: PresentationTheme) {
         super.updateLocalizationAndTheme(theme: theme)
+        _lastGlassTheme = theme
         _glassView?.updateLocalizationAndTheme(theme: theme)
     }
 
