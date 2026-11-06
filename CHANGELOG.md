@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **1:1 screen share goes out as screen content** (branch `feat/mac-screencast-quality`; not built or run). The Mac passes `isScreenCapture` for `desktop_capturer_` sources (tgcalls `macos/Sources/OngoingCallThreadLocalContext.mm`), so the engine treats the screen as screen content instead of a camera: 7/8/9/12/13 send it on the separate screencast channel (no resolution scaling, no thermal downscale), 10/11 on the single video channel with screen-content settings (new in `InstanceV2ReferenceImpl`; before, a screen capture would have been dropped there), 2.7.7/5.0.0 with the 700 kbps floor. Starting a share while the camera is already on now re-registers the capturer (`PCallSession.enableScreenCapture`: switch input, `disableVideo`, `requestVideo`) so the call engine re-reads the flag. Each call logs `Call: negotiated version X, screen share mode Y` in its call log. Core change in the tgcalls fork (`ScreenSharePolicy.h`, test `screen_share_policy_test`); the Mac pin must move to it. No server-visible change beyond media encoding and the existing E2E-encrypted signalling.
+
 ## 13.1.0 (202611060301) — 2026-11-06
 
 Source: `nanogram/integration` @ 716d4fd0 · core `klaipher/nanogram` `main` @ b4703321 (was 3819d287 at the last release) · tgcalls `nanogram-shared` @ 6f45f0cc · tg_owt `nanogram-mac` @ 655db2eb · rlottie `telegram-ios-dev` @ 083f19a.

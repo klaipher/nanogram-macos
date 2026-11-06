@@ -1292,8 +1292,10 @@ public class PCallSession {
         if let videoCapturer = self.videoCapturer, requestVideo {
             self.ongoingContext?.requestVideo(videoCapturer)
         }
-        if !requestVideo {
-            self.videoCapturer?.switchVideoInput(id)
+        if !requestVideo, let videoCapturer = self.videoCapturer {
+            videoCapturer.switchVideoInput(id)
+            self.ongoingContext?.disableVideo()
+            self.ongoingContext?.requestVideo(videoCapturer)
         }
         //        setRequestedVideoAspect(Float(System.aspectRatio))
         
