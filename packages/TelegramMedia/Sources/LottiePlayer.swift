@@ -1566,7 +1566,7 @@ final class WebmRenderer : RenderContainer {
 
         if let position = self.suspendedHardwarePosition {
             self.suspendedHardwarePosition = nil
-            if self.decoder == nil, self.hardwareReader == nil, let reader = self.resumeHardwareReader?(true), reader.skipFrames(position) {
+            if self.decoder == nil, self.hardwareReader == nil, let reader = self.resumeHardwareReader?(true), PerformanceSignposts.interval(PerformanceSignpostName.vp9ResumeCatchUp, { reader.skipFrames(position) }) {
                 self.hardwareReader = reader
             } else {
                 self.continueWithSoftwareDecoding(skipping: position)

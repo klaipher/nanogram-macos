@@ -156,25 +156,25 @@ extension NotificationCenter {
         }
     }
 
-    @objc fileprivate func nanogramCountedAddObserver(_ observer: Any, selector: Selector, name: NSNotification.Name?, object: Any?) {
+    @objc dynamic fileprivate func nanogramCountedAddObserver(_ observer: Any, selector: Selector, name: NSNotification.Name?, object: Any?) {
         observerRegistryForSwizzling?.addObject(observer as AnyObject)
         self.nanogramCountedAddObserver(observer, selector: selector, name: name, object: object)
     }
 
-    @objc fileprivate func nanogramCountedAddObserver(forName name: NSNotification.Name?, object: Any?, queue: OperationQueue?, using block: @escaping @Sendable (Notification) -> Void) -> NSObjectProtocol {
+    @objc dynamic fileprivate func nanogramCountedAddObserver(forName name: NSNotification.Name?, object: Any?, queue: OperationQueue?, using block: @escaping @Sendable (Notification) -> Void) -> NSObjectProtocol {
         let token = self.nanogramCountedAddObserver(forName: name, object: object, queue: queue, using: block)
         observerRegistryForSwizzling?.addBlockToken(token)
         return token
     }
 
-    @objc fileprivate func nanogramCountedRemoveObserver(_ observer: Any) {
+    @objc dynamic fileprivate func nanogramCountedRemoveObserver(_ observer: Any) {
         let object = observer as AnyObject
         observerRegistryForSwizzling?.removeObject(object)
         observerRegistryForSwizzling?.removeBlockToken(object)
         self.nanogramCountedRemoveObserver(observer)
     }
 
-    @objc fileprivate func nanogramCountedRemoveObserver(_ observer: Any, name: NSNotification.Name?, object: Any?) {
+    @objc dynamic fileprivate func nanogramCountedRemoveObserver(_ observer: Any, name: NSNotification.Name?, object: Any?) {
         observerRegistryForSwizzling?.removeOneRegistration(of: observer as AnyObject)
         self.nanogramCountedRemoveObserver(observer, name: name, object: object)
     }
