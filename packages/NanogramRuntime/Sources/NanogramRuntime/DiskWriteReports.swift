@@ -35,7 +35,7 @@ public struct DiskWriteReportThrottle: Sendable {
     }
 }
 
-public final class DiskWriteReports {
+public final class DiskWriteReports: @unchecked Sendable {
     private let reporter: DiskWriteAccountingReporter
     private let log: (String) -> Void
     private let throttleLock = NSLock()

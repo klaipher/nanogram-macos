@@ -192,7 +192,7 @@ public func setLottieRenderingSuspended(_ suspended: Bool) {
     webmHiddenRelease.setSuspended(suspended)
 }
 
-private final class WebmHiddenRelease {
+private final class WebmHiddenRelease: @unchecked Sendable {
     private let lock = NSLock()
     private let renderers = NSHashTable<WebmRenderer>.weakObjects()
     private var gate = VP9HiddenReleaseGate()

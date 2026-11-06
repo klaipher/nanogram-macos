@@ -16,7 +16,7 @@ public extension NanogramSignposts.OneShot {
 }
 
 public enum LaunchUsableSignpost {
-    private static let current = Atomic<NanogramSignposts.OneShot?>(value: nil)
+    nonisolated(unsafe) private static let current = Atomic<NanogramSignposts.OneShot?>(value: nil)
 
     public static func begin() {
         current.swap(NanogramSignposts.OneShot(PerformanceSignpostName.launchToChatListUsable))?.end()

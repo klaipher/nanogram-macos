@@ -79,8 +79,8 @@ public final class LiveObserverRegistry: @unchecked Sendable {
 public enum LiveObjectDiagnostics {
     private static let registry = LiveObserverRegistry()
     private static let lock = NSLock()
-    private static var started = false
-    private static var timer: DispatchSourceTimer?
+    nonisolated(unsafe) private static var started = false
+    nonisolated(unsafe) private static var timer: DispatchSourceTimer?
     private static let log = OSLog(subsystem: Bundle.main.bundleIdentifier ?? "Telegram", category: "LiveObjectDiagnostics")
 
     public static func startIfEnabled() {
@@ -104,12 +104,15 @@ public enum LiveObjectDiagnostics {
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
         timer.schedule(deadline: .now() + LiveObjectDiagnosticsPolicy.interval, repeating: LiveObjectDiagnosticsPolicy.interval, leeway: .seconds(1))
         timer.setEventHandler {
-            LiveObjectDiagnostics.report()
+            MainActor.assumeIsolated {
+                LiveObjectDiagnostics.report()
+            }
         }
         timer.resume()
         LiveObjectDiagnostics.timer = timer
     }
 
+    @MainActor
     static func report() {
         var trackingAreas = 0
         var trackedViews = 0
@@ -124,6 +127,7 @@ public enum LiveObjectDiagnostics {
         os_log("%{public}@", log: LiveObjectDiagnostics.log, type: .info, line)
     }
 
+    @MainActor
     private static func count(_ view: NSView, trackingAreas: inout Int, trackedViews: inout Int, views: inout Int) {
         views += 1
         let areas = view.trackingAreas.count
@@ -137,7 +141,7 @@ public enum LiveObjectDiagnostics {
     }
 }
 
-private var observerRegistryForSwizzling: LiveObserverRegistry?
+nonisolated(unsafe) private var observerRegistryForSwizzling: LiveObserverRegistry?
 
 extension NotificationCenter {
     fileprivate static func swizzleObserverCounting(_ registry: LiveObserverRegistry) {

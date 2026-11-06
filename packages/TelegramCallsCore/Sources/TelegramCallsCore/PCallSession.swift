@@ -769,7 +769,10 @@ public class PCallSession {
         self.reception = reception
         
         if callSessionReleasesCapture(sessionState.state) {
-            self.captureSelectWindow?.close()
+            let captureSelectWindow = self.captureSelectWindow
+            MainActor.assumeIsolated {
+                captureSelectWindow?.close()
+            }
             self.releaseVideoCapturer()
             self.videoIsForceDisabled = true
             self.screenCaptureSource = nil
