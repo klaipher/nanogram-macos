@@ -637,5 +637,151 @@ class EnhancedSecurityExportTests(unittest.TestCase):
                     release.check_exported_app(app, "mas")
 
 
+class BuildRecordTests(unittest.TestCase):
+    def make_archive(self, tmp: Path, with_dsym=True) -> Path:
+        archive = tmp / "Nanogram.xcarchive"
+        app = archive / "Products" / "Applications" / "Nanogram.app" / "Contents"
+        (app / "MacOS").mkdir(parents=True)
+        (app / "MacOS" / "Nanogram").write_bytes(b"binary")
+        (app / "Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "Nanogram"}))
+        if with_dsym:
+            dsym = archive / "dSYMs" / "Nanogram.app.dSYM" / "Contents" / "Resources" / "DWARF"
+            dsym.mkdir(parents=True)
+            (dsym / "Nanogram").write_bytes(b"dwarf")
+            other = archive / "dSYMs" / "Sparkle.framework.dSYM" / "Contents"
+            other.mkdir(parents=True)
+            (other / "Info.plist").write_bytes(b"x")
+        return archive
+
+    def test_build_info_text_has_the_ios_fields(self):
+        text = release.build_info_text("202611061200", "a" * 40, "main", dirty=False, pushed=True)
+        self.assertEqual(text, "build 202611061200\ncommit " + "a" * 40 + "\nbranch main\ndirty no\npushed yes\n")
+        text = release.build_info_text("1", "b" * 40, "x", dirty=True, pushed=False)
+        self.assertIn("dirty yes\n", text)
+        self.assertIn("pushed no\n", text)
+
+    def test_git_state_clean_and_pushed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            origin = make_repo(tmp / "origin", {"a.txt": "a\n"})
+            clone = tmp / "clone"
+            import subprocess
+            subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True, capture_output=True)
+            commit, branch, dirty, pushed = release.git_state(clone)
+            self.assertEqual(commit, git(clone, "rev-parse", "HEAD").strip())
+            self.assertEqual(branch, "main")
+            self.assertFalse(dirty)
+            self.assertTrue(pushed)
+
+    def test_git_state_dirty_and_unpushed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            origin = make_repo(tmp / "origin", {"a.txt": "a\n"})
+            clone = tmp / "clone"
+            import subprocess
+            subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True, capture_output=True)
+            (clone / "a.txt").write_text("b\n")
+            git(clone, "commit", "-q", "-am", "local")
+            (clone / "a.txt").write_text("c\n")
+            _, _, dirty, pushed = release.git_state(clone)
+            self.assertTrue(dirty)
+            self.assertFalse(pushed)
+
+    def test_warnings_name_each_problem(self):
+        self.assertEqual(release.build_warnings("1", "c" * 40, dirty=False, pushed=True, unreleased=False), [])
+        warnings = release.build_warnings("1", "c" * 40, dirty=True, pushed=False, unreleased=True)
+        self.assertEqual(len(warnings), 3)
+        self.assertTrue(any("uncommitted" in w for w in warnings))
+        self.assertTrue(any("remote" in w for w in warnings))
+        self.assertTrue(any("Unreleased" in w for w in warnings))
+
+    def test_unreleased_entries_are_found_in_the_changelog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            changelog = Path(tmp) / "CHANGELOG.md"
+            changelog.write_text("# Changelog\n\n## Unreleased\n\n## 1.0 (5)\n- done\n")
+            self.assertFalse(release.has_unreleased_entries(changelog))
+            changelog.write_text("# Changelog\n\n## Unreleased\n- something\n\n## 1.0 (5)\n- done\n")
+            self.assertTrue(release.has_unreleased_entries(changelog))
+            self.assertFalse(release.has_unreleased_entries(Path(tmp) / "missing.md"))
+
+    def test_dsyms_are_zipped_outside_the_archive_with_uuids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            archive = self.make_archive(tmp)
+            dest = tmp / "dsyms"
+            uuids = {"Nanogram": ["AAAA-1"], "Nanogram.app.dSYM": ["AAAA-1"], "Sparkle.framework.dSYM": ["BBBB-2"]}
+            found = release.archive_dsyms(archive, dest, "direct", "202611061200",
+                                          uuids_of=lambda path: uuids[path.name])
+            self.assertEqual(found, dest / "direct" / "202611061200")
+            self.assertTrue((found / "Nanogram.app.dSYM.zip").is_file())
+            self.assertTrue((found / "Sparkle.framework.dSYM.zip").is_file())
+            listing = (found / "uuids.txt").read_text()
+            self.assertIn("Nanogram.app.dSYM AAAA-1", listing)
+            self.assertTrue(archive.is_dir())
+            self.assertTrue((archive / "dSYMs" / "Nanogram.app.dSYM").is_dir())
+
+    def test_a_rebuilt_number_holds_only_the_new_dsyms(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            archive = self.make_archive(tmp)
+            dest = tmp / "dsyms"
+            old = dest / "direct" / "7"
+            old.mkdir(parents=True)
+            (old / "stale.dSYM.zip").write_text("old")
+            release.archive_dsyms(archive, dest, "direct", "7", uuids_of=lambda path: ["U"])
+            self.assertFalse((old / "stale.dSYM.zip").exists())
+            self.assertTrue((old / "Nanogram.app.dSYM.zip").exists())
+
+    def test_a_dsym_that_does_not_match_the_app_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            archive = self.make_archive(tmp)
+            uuids = {"Nanogram": ["AAAA-1"], "Nanogram.app.dSYM": ["CCCC-3"], "Sparkle.framework.dSYM": ["B"]}
+            with self.assertRaises(config.ConfigError) as caught:
+                release.archive_dsyms(archive, tmp / "dsyms", "direct", "9", uuids_of=lambda path: uuids[path.name])
+            self.assertIn("does not match", str(caught.exception))
+            self.assertFalse((tmp / "dsyms" / "direct" / "9").exists())
+
+    def test_an_archive_without_dsyms_gives_none(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            archive = self.make_archive(tmp, with_dsym=False)
+            self.assertIsNone(release.archive_dsyms(archive, tmp / "dsyms", "direct", "9", uuids_of=lambda path: ["U"]))
+
+    def test_record_writes_build_info_next_to_the_artifacts_and_the_dsyms(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            origin = make_repo(tmp / "origin", {"a.txt": "a\n", "CHANGELOG.md": "## Unreleased\n"})
+            import subprocess
+            clone = tmp / "clone"
+            subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True, capture_output=True)
+            archive = self.make_archive(tmp)
+            out_dir = tmp / "out"
+            out_dir.mkdir()
+            printed = []
+            release.record_build(archive, out_dir, "direct", "55", dsym_root=tmp / "dsyms", root=clone,
+                                 uuids_of=lambda path: ["U"], say=printed.append)
+            info = (out_dir / "BUILD-INFO.txt").read_text()
+            self.assertIn("build 55\n", info)
+            self.assertIn("commit " + git(clone, "rev-parse", "HEAD").strip() + "\n", info)
+            self.assertIn("dirty no\n", info)
+            self.assertIn("pushed yes\n", info)
+            self.assertEqual((tmp / "dsyms" / "direct" / "55" / "BUILD-INFO.txt").read_text(), info)
+            self.assertEqual(sorted(path.name for path in out_dir.iterdir()), ["BUILD-INFO.txt"])
+
+    def test_record_survives_an_archive_without_dsyms(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            origin = make_repo(tmp / "origin", {"a.txt": "a\n"})
+            archive = self.make_archive(tmp, with_dsym=False)
+            out_dir = tmp / "out"
+            out_dir.mkdir()
+            printed = []
+            release.record_build(archive, out_dir, "mas", "56", dsym_root=tmp / "dsyms", root=origin,
+                                 uuids_of=lambda path: ["U"], say=printed.append)
+            self.assertTrue((out_dir / "BUILD-INFO.txt").is_file())
+            self.assertTrue(any("dSYM" in line for line in printed))
+
+
 if __name__ == "__main__":
     unittest.main()

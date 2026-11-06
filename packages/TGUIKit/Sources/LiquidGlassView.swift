@@ -151,8 +151,8 @@ open class LiquidGlassView: View {
                 // Rebuilding with the new forced appearance is the only way
                 // to re-render correctly when crossing dark↔light boundaries.
                 rebuildEffectView()
+                applyForceAppearance()
             }
-            applyForceAppearance()
         }
     }
 
@@ -263,6 +263,7 @@ open class LiquidGlassView: View {
     }
 
     private var rebuildState: RebuildState?
+    private var appliedCornerRadius = AppliedValueCache<CGFloat>()
 
     private func currentRebuildState() -> RebuildState {
         return RebuildState(
@@ -301,6 +302,7 @@ open class LiquidGlassView: View {
 
         effectView?.removeFromSuperview()
         effectView = nil
+        appliedCornerRadius.invalidate()
 
         if newState.usesGlass {
             if #available(macOS 26.0, *) {
@@ -459,18 +461,26 @@ open class LiquidGlassView: View {
             overlay.layer?.masksToBounds = true
             host.addSubview(overlay)
             tintOverlay = overlay
+            appliedCornerRadius.invalidate()
         }
         overlay.layer?.backgroundColor = tint.cgColor
     }
 
     private func applyCornerRadius() {
-        if #available(macOS 26.0, *), let glass = effectView as? NSGlassEffectView {
-            glass.cornerRadius = cornerRadius
-        } else {
-            effectView.layer?.cornerRadius = cornerRadius
-        }
-        tintOverlay?.layer?.cornerRadius = cornerRadius
+        writeCornerRadius(cornerRadius)
         applyBorder()
+    }
+
+    private func writeCornerRadius(_ radius: CGFloat) {
+        guard appliedCornerRadius.needsWrite(radius) else {
+            return
+        }
+        if #available(macOS 26.0, *), let glass = effectView as? NSGlassEffectView {
+            glass.cornerRadius = radius
+        } else {
+            effectView.layer?.cornerRadius = radius
+        }
+        tintOverlay?.layer?.cornerRadius = radius
     }
 
     func applyShadow() {
@@ -524,13 +534,7 @@ open class LiquidGlassView: View {
     }
     
     func updateCornerRadius(size: NSSize) {
-        let clampedRadius = min(cornerRadius, min(size.width, size.height) / 2)
-        if #available(macOS 26.0, *), let glass = effectView as? NSGlassEffectView {
-            glass.cornerRadius = clampedRadius
-        } else {
-            effectView.layer?.cornerRadius = clampedRadius
-        }
-        tintOverlay?.layer?.cornerRadius = clampedRadius
+        writeCornerRadius(min(cornerRadius, min(size.width, size.height) / 2))
     }
 
     open func updateLayout(size: NSSize, transition: ContainedViewLayoutTransition) {

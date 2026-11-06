@@ -322,8 +322,8 @@ Status values: `todo`, `in progress`, `done (<commit>)`, `dropped (<reason>)`.
 ### M12. The chat list table does not skip AppKit's needs-display walk while scrolling — `done (28b6e26, test 065c497)`, verified (A/B with the account not measured)
 
 - **Evidence**: `packages/TGUIKit/Sources/TGClipView.swift:24-47,264-268` (`skipsDisplayOnScroll`); only
-  `ChatController.swift:483` and `PeerMediaPhotosController.swift:424` set it; the chat list's table
-  (`packages/ChatListUI/Sources/ChatListUI/PeersListController.swift:1085`) does not. `docs/perflab/README.md:158`
+  `ChatController.swift:483` and `PeerMediaPhotosController.swift:424` set it; the chat list's table did not
+  (before 28b6e26) and now sets it at `packages/ChatListUI/Sources/ChatListUI/PeersListController.swift:1138`. `docs/perflab/README.md:158`
   calls the walk pure cost; `chat-optimization-log.md:52-65` measured −15% main thread in the chat with
   pixel-identical rows.
 - **Mechanism**: NSClipView marks itself dirty on every scroll step, and the next display pass walks every view

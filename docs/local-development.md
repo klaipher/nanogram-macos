@@ -309,6 +309,11 @@ Xcode's automatic signing through the App Store Connect API key (`~/.config/tele
   Info.plists carry a literal `CFBundleVersion` that upstream bumps by hand, so the build number is stamped into the
   archived app and share extension (re-signed with the same identity; export signs them again) instead of editing
   those files.
+  Builds from `tg build` (Debug and `--release` without an archive) therefore show upstream's literal
+  (`283357` at 13.1.0) in the About window, the crash marker and the log export. That is on purpose: the literal is the
+  marker `tg sync-upstream` uses to find upstream's last shipped build, so the plist stays untouched; a per-build
+  `CURRENT_PROJECT_VERSION` setting would also make Xcode recreate its build description (20-30 s) on every
+  build, and patching the built bundle would break its signature. Only archives carry the real build number.
 - Release-only command-line settings (`python3 -m nanogram.release settings`, also used by `tg build --release`):
   `SWIFT_ENFORCE_EXCLUSIVE_ACCESS=off`, so the packages, not only the app target, drop runtime exclusivity checks in
   Release (runtime spec M17); Debug builds and `swift test` keep them. `buildcheck --release` fails any Swift compile

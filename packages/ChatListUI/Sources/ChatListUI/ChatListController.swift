@@ -1407,6 +1407,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 Queue.mainQueue().async {
                     LaunchTrace.end(.firstFrame)
                 }
+                LaunchUsableSignpost.endAfterNextCommit()
             }
             folderSwitchSignpost.swap(nil)?.end()
             _ = chatListAppliedOnce.swap(true)

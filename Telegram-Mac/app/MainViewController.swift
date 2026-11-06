@@ -490,7 +490,7 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
 
         connectingStatusView.isHidden = true
         addSubview(connectingStatusView)
-        connectingStatusDisposable.set((context.networkStatusManager.statusSignal |> deliverOnMainQueue).start(next: { [weak self] status in
+        connectingStatusDisposable.set((context.networkStatusManager.statusSignal |> coalesceOnMain).start(next: { [weak self] status in
             guard let self = self else { return }
             self.connectingStatusView.isHidden = status == nil
             self.connectingStatusView.update(status: status, animated: true)

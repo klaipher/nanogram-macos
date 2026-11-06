@@ -1686,8 +1686,10 @@ public class Modal: NSObject {
 
     public func show() -> Void {
         if let controller = controller {
+            let openSignpost = PerformanceSignposts.OneShot(PerformanceSignpostName.modalOpenToVisible)
             disposable.set((controller.ready.get() |> take(1)).start(next: { [weak self, weak controller] ready in
                 NSCursor.arrow.set()
+                openSignpost.endAfterNextCommit()
                 
                 
                 if let strongSelf = self, let controller = controller {

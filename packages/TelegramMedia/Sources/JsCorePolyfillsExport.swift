@@ -236,7 +236,7 @@ private var ObjCKey_ContextReference: Int?
             if !repeats {
                 self.timers.removeValue(forKey: id)
             }
-        }, queue: self.queue, leeway: .precise)
+        }, queue: self.queue, leeway: .automatic)
         self.timers[id] = timer
         timer.start()
         

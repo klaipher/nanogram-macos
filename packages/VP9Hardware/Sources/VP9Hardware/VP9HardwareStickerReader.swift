@@ -79,6 +79,24 @@ public final class VP9HardwareStickerReader {
         self.nextFrame = 0
     }
 
+    public func skipFrames(_ count: Int) -> Bool {
+        guard count >= 0, count <= self.frameCount - self.nextFrame else {
+            return false
+        }
+        for _ in 0 ..< count {
+            let frame = self.sticker.frames[self.nextFrame]
+            self.nextFrame += 1
+            guard self.decoder.decode(frame) != nil else {
+                return false
+            }
+        }
+        return true
+    }
+
+    public var framesRead: Int {
+        return self.nextFrame
+    }
+
     public func readFrame(_ body: (UnsafePointer<UInt8>, Int, Int, Int) -> Void) -> Bool {
         guard self.nextFrame < self.frameCount else {
             return false

@@ -838,6 +838,12 @@ open class Window: NSWindow {
     }
 
     open override func sendEvent(_ event: NSEvent) {
+        let mouseMovedState = event.type == .mouseMoved ? PerformanceSignposts.begin(PerformanceSignpostName.mouseMovedDispatch) : nil
+        defer {
+            if let mouseMovedState {
+                PerformanceSignposts.end(PerformanceSignpostName.mouseMovedDispatch, mouseMovedState)
+            }
+        }
         
         //        let testEvent = NSEvent.EventType.init(rawValue: 36)!
         //

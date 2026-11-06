@@ -59,6 +59,16 @@ Learned from the 2026-11-05 iPhone and Mac sessions; each one cost a recording.
    --output ~/traces/x.trace --attach <app>`; do the first and then the second open of the same sticker pack
    in the 30 s. On the Mac `sudo fs_usage -w -f filesys -f diskio <app>` counts the syscalls without a trace.
 
+8. **One recorder at a time, and check for holes.** Two `xctrace` instances recording together (`pgrep -l xctrace`)
+   share the kernel trace buffers. The Mac GPU recording of 2026-11-05 (`mac-gpu-152949`) has a 13.37 s "Severe
+   Hang" at 25.34 s that is not the app: `SystemCPUUsage` is exactly 0 % for every process from 25.35 s to 38.7 s,
+   `displayed-surfaces-per-second` is 0, no thread of any process has a sample, and `pmset -g log` shows no sleep.
+   After every recording export `SystemCPUUsage` (`xcrun xctrace export --input x.trace --xpath
+   '/trace-toc/run[1]/data/table[@schema="SystemCPUUsage"]'`) and look for stretches of 0.0 % longer than 1 s; a
+   hang that coincides with one is a hole in the data, not a freeze. Thread states are not in a Time Profiler
+   recording: for an off-CPU stall (a microhang whose main-thread CPU is well under 100 %) record System Trace
+   together with Hangs, so the blocking reason is on the main thread's timeline.
+
 ## Profiling builds
 
 ### iPhone (over USB)

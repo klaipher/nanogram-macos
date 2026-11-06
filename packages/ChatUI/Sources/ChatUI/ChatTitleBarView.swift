@@ -210,6 +210,14 @@ class ChatTitleBarView: TitledBarView, InteractionContentViewProtocol {
     
     
     var presenceManager:PeerPresenceStatusManager?
+
+    func suspendPresence() {
+        self.presenceManager?.suspend()
+    }
+
+    func resumePresence() {
+        self.presenceManager?.resume()
+    }
     
     init(controller: ViewController, _ chatInteraction:ChatInteraction) {
         activities = ChatActivitiesModel()

@@ -300,6 +300,14 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
 
     private var presenceManager: PeerPresenceStatusManager?
 
+    func suspendPresence() {
+        self.presenceManager?.suspend()
+    }
+
+    func resumePresence() {
+        self.presenceManager?.resume()
+    }
+
     private var searchHidden: Bool = false
     var displaysInlineHeader: Bool = false
     private var previousInlineHeaderFrame: NSRect?

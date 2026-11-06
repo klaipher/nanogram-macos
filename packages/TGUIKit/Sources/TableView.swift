@@ -1612,7 +1612,9 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
                 self.scrollUpdateScheduled = true
                 DispatchQueue.main.async {
                     self.scrollUpdateScheduled = false
-                    self.updateScroll()
+                    PerformanceSignposts.interval(PerformanceSignpostName.panelScrollTick) {
+                        self.updateScroll()
+                    }
                 }
             }))
             
