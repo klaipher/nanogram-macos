@@ -33,6 +33,7 @@ private final class Arguments {
     public let toggleAccessibilityTree: () -> Void
     public let accessibilityAudit: () -> Void
     public let toggleForceRLottieBackend: () -> Void
+    public let toggleGlassGrouping: () -> Void
     public let resetApp: (DeveloperAppReset) -> Void
     public init(context: any AccountContextProtocol,
          toggleLogs: @escaping (Bool) -> Void,
@@ -47,6 +48,7 @@ private final class Arguments {
          toggleAccessibilityTree: @escaping () -> Void,
          accessibilityAudit: @escaping () -> Void,
          toggleForceRLottieBackend: @escaping () -> Void,
+         toggleGlassGrouping: @escaping () -> Void,
          resetApp: @escaping (DeveloperAppReset) -> Void) {
         self.context = context
         self.toggleLogs = toggleLogs
@@ -61,6 +63,7 @@ private final class Arguments {
         self.toggleAccessibilityTree = toggleAccessibilityTree
         self.accessibilityAudit = accessibilityAudit
         self.toggleForceRLottieBackend = toggleForceRLottieBackend
+        self.toggleGlassGrouping = toggleGlassGrouping
         self.resetApp = resetApp
     }
 }
@@ -75,6 +78,7 @@ private struct State: Equatable {
     public var useExperimentalDownload: Bool = true
     public var accessibilityTree: Bool = true
     public var forceRLottieBackend: Bool = false
+    public var glassGroupingSecondary: Bool = false
 }
 
 private let _id_add_account = InputDataIdentifier("_id_add_account")
@@ -89,6 +93,7 @@ private let _id_memory_report = InputDataIdentifier("_id_memory_report")
 private let _id_accessibility_tree = InputDataIdentifier("_id_accessibility_tree")
 private let _id_accessibility_audit = InputDataIdentifier("_id_accessibility_audit")
 private let _id_force_rlottie = InputDataIdentifier("_id_force_rlottie")
+private let _id_glass_grouping = InputDataIdentifier("_id_glass_grouping")
 private let _id_clear_database = InputDataIdentifier("_id_clear_database")
 private let _id_clear_database_and_cache = InputDataIdentifier("_id_clear_database_and_cache")
 private let _id_nanogram_switches = InputDataIdentifier("_id_nanogram_switches")
@@ -153,7 +158,10 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     })))
     index += 1
 
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_force_rlottie, data: InputDataGeneralData(name: "Lottie: rlottie instead of tlottie", color: theme.colors.text, type: .switchable(state.forceRLottieBackend), viewType: .lastItem, action: arguments.toggleForceRLottieBackend)))
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_force_rlottie, data: InputDataGeneralData(name: "Lottie: rlottie instead of tlottie", color: theme.colors.text, type: .switchable(state.forceRLottieBackend), viewType: .innerItem, action: arguments.toggleForceRLottieBackend)))
+    index += 1
+
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_glass_grouping, data: InputDataGeneralData(name: "Glass: group secondary screens (reopen the screen)", color: theme.colors.text, type: .switchable(state.glassGroupingSecondary), viewType: .lastItem, action: arguments.toggleGlassGrouping)))
     index += 1
 
     entries.append(.sectionId(sectionId, type: .normal))
@@ -247,7 +255,8 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
         activeNetworkEngine: context.account.network.engineKind,
         useExperimentalDownload: DeveloperNetworkSwitches(settings: nil).downloadsV2,
         accessibilityTree: FastSettings.accessibilityTreeEnabled,
-        forceRLottieBackend: DeveloperHooks.shared.forceRLottieBackend()
+        forceRLottieBackend: DeveloperHooks.shared.forceRLottieBackend(),
+        glassGroupingSecondary: SecondaryGlassGrouping.isEnabled
     )
 
     let statePromise = ValuePromise(initialState, ignoreRepeated: true)
@@ -348,6 +357,13 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
         updateState { current in
             var current = current
             current.forceRLottieBackend = DeveloperHooks.shared.forceRLottieBackend()
+            return current
+        }
+    }, toggleGlassGrouping: {
+        SecondaryGlassGrouping.setEnabled(!SecondaryGlassGrouping.isEnabled)
+        updateState { current in
+            var current = current
+            current.glassGroupingSecondary = SecondaryGlassGrouping.isEnabled
             return current
         }
     }, resetApp: { action in

@@ -2412,6 +2412,7 @@ public final class EditorToolbarView: NSView {
     private let leftPill = LiquidGlassView(frame: .zero, cornerRadius: 19, hasShadow: true, hasBorder: true)
     private let aiPill = LiquidGlassView(frame: .zero, cornerRadius: 19, hasShadow: true, hasBorder: true)
     private let centerPill = LiquidGlassView(frame: .zero, cornerRadius: 19, hasShadow: true, hasBorder: true)
+    private var pillGroup: SecondaryGlassGroup?
 
     private let toolbarHeight: CGFloat = 52
     private let pillHeight: CGFloat = 38
@@ -2430,9 +2431,13 @@ public final class EditorToolbarView: NSView {
         super.init(frame: .zero)
         self.wantsLayer = true
         self.layer?.masksToBounds = false
-        addSubview(leftPill)             // pills below the buttons
-        if ai != nil { addSubview(aiPill) }
-        addSubview(centerPill)
+        var pills = [leftPill]
+        if ai != nil { pills.append(aiPill) }
+        pills.append(centerPill)
+        pillGroup = SecondaryGlassGroup.make(host: self, glasses: pills, minimumGap: aiGap, flipped: true)
+        if pillGroup == nil {
+            for pill in pills { addSubview(pill) }
+        }
         for b in left { addSubview(b) }
         if let ai { addSubview(ai) }
         for b in center { addSubview(b) }
@@ -2452,6 +2457,14 @@ public final class EditorToolbarView: NSView {
     private func pillWidth(_ count: Int) -> CGFloat {
         guard count > 0 else { return 0 }
         return pad * 2 + CGFloat(count) * buttonSize + CGFloat(count - 1) * gap
+    }
+
+    private func setPillFrame(_ pill: LiquidGlassView, _ frame: NSRect) {
+        if let pillGroup {
+            pillGroup.place(pill, frame: frame)
+        } else {
+            pill.frame = frame
+        }
     }
 
     private func layoutButtons(_ buttons: [NSView], in pill: NSRect) {
@@ -2480,13 +2493,14 @@ public final class EditorToolbarView: NSView {
         // instead of stretching to fill it.
         let gap = aiGap
 
-        leftPill.frame = NSRect(x: inset, y: pillY, width: leftW, height: pillHeight)
+        pillGroup?.updateLayout(size: bounds.size)
+        setPillFrame(leftPill, NSRect(x: inset, y: pillY, width: leftW, height: pillHeight))
         layoutButtons(leftButtons, in: leftPill.frame)
 
         // Standalone AI circle: its own round glass pill right after the left pill.
         var leadingEdge = leftPill.frame.maxX
         if let ai = aiButton {
-            aiPill.frame = NSRect(x: leadingEdge + gap, y: pillY, width: pillHeight, height: pillHeight)
+            setPillFrame(aiPill, NSRect(x: leadingEdge + gap, y: pillY, width: pillHeight, height: pillHeight))
             ai.frame = NSRect(x: aiPill.frame.minX + (pillHeight - buttonSize) / 2,
                               y: aiPill.frame.minY + (pillHeight - buttonSize) / 2,
                               width: buttonSize, height: buttonSize)
@@ -2495,7 +2509,7 @@ public final class EditorToolbarView: NSView {
 
         sendButton.frame = NSRect(x: bounds.width - inset - sendSize, y: (toolbarHeight - sendSize) / 2, width: sendSize, height: sendSize)
 
-        centerPill.frame = NSRect(x: leadingEdge + gap, y: pillY, width: centerW, height: pillHeight)
+        setPillFrame(centerPill, NSRect(x: leadingEdge + gap, y: pillY, width: centerW, height: pillHeight))
         layoutButtons(centerButtons, in: centerPill.frame)
     }
 }
