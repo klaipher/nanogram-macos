@@ -113,17 +113,6 @@ open class LiquidGlassView: View {
             default: changed = true
             }
             if !changed { return }
-            // In fallback mode (no liquid glass), the effectView TYPE depends
-            // on whether customTint is set. Crossing nil↔non-nil requires
-            // rebuilding the effectView; otherwise just refresh appearance.
-            if usesGlass, oldValue != nil {
-                rebuildEffectView()
-            } else if rebuildState != nil {
-                // Tint changed but we didn't rebuild — keep the cached
-                // snapshot in sync so the next `rebuildEffectView()` doesn't
-                // see a spurious diff and tear the effectView down for nothing.
-                rebuildState = currentRebuildState()
-            }
             applyAppearance(presentation)
         }
     }
@@ -234,43 +223,17 @@ open class LiquidGlassView: View {
         applyBorder()
     }
 
-    /// Snapshot of the inputs that determine which `effectView` subclass
-    /// gets built (`AdaptiveGlassEffectView` / `NSVisualEffectView` /
-    /// plain `View`). `rebuildEffectView()` compares the previous
-    /// snapshot against the current one and short-circuits when they're
-    /// equal — recreating the effectView is expensive (SDF
-    /// resubscription, allocator churn, lost `customTint` overlay), and
-    /// the call sites (init, theme change, forceAppearance didSet) fire
-    /// far more often than the underlying inputs actually change.
-    private struct RebuildState: Equatable {
-        let usesGlass: Bool
-        let blurEnabled: Bool
-        let forceAppearance: LiquidGlassAppearance
-        let customTint: NSColor?
-
-        static func == (lhs: RebuildState, rhs: RebuildState) -> Bool {
-            guard lhs.usesGlass == rhs.usesGlass,
-                  lhs.blurEnabled == rhs.blurEnabled,
-                  lhs.forceAppearance == rhs.forceAppearance else {
-                return false
-            }
-            switch (lhs.customTint, rhs.customTint) {
-            case (nil, nil): return true
-            case let (l?, r?): return l.isEqual(r)
-            default: return false
-            }
-        }
-    }
-
-    private var rebuildState: RebuildState?
+    private var rebuildState: LiquidGlassRebuildKey?
+    private var appliedTint = AppliedValueCache<NSColor>()
+    private var appliedEffectAppearance = AppliedValueCache<NSAppearance>()
+    private var appliedBorder = AppliedValueCache<LiquidGlassBorderKey>()
     private var appliedCornerRadius = AppliedValueCache<CGFloat>()
 
-    private func currentRebuildState() -> RebuildState {
-        return RebuildState(
+    private func currentRebuildState() -> LiquidGlassRebuildKey {
+        return LiquidGlassRebuildKey(
             usesGlass: usesGlass,
             blurEnabled: System.blurEnabled,
-            forceAppearance: forceAppearance,
-            customTint: customTint
+            forceAppearance: forceAppearance
         )
     }
 
@@ -303,6 +266,9 @@ open class LiquidGlassView: View {
         effectView?.removeFromSuperview()
         effectView = nil
         appliedCornerRadius.invalidate()
+        appliedTint.invalidate()
+        appliedEffectAppearance.invalidate()
+        appliedBorder.invalidate()
 
         if newState.usesGlass {
             if #available(macOS 26.0, *) {
@@ -385,37 +351,44 @@ open class LiquidGlassView: View {
         applyBorder()
     }
 
+    private func applyEffectAppearance(_ appearance: NSAppearance) {
+        guard appliedEffectAppearance.needsWrite(appearance) else {
+            return
+        }
+        effectView.appearance = appearance
+    }
+
     private func applyAppearance(_ theme: PresentationTheme) {
         let palette: ColorPalette
         if followsTheme {
             palette = theme.colors
-            effectView.appearance = theme.appearance
+            applyEffectAppearance(theme.appearance)
             forceAppearance = theme.appearance.glassAppearance
         } else {
             switch forceAppearance {
             case .forceDark:
                 if #available(macOS 10.14, *) {
-                    effectView.appearance = NSAppearance(named: .darkAqua) ?? theme.appearance
+                    applyEffectAppearance(NSAppearance(named: .darkAqua) ?? theme.appearance)
                 } else {
-                    effectView.appearance = NSAppearance(named: .vibrantDark) ?? theme.appearance
+                    applyEffectAppearance(NSAppearance(named: .vibrantDark) ?? theme.appearance)
                 }
                 palette = darkPalette
             case .forceLight:
                 palette = whitePalette
-                effectView.appearance = NSAppearance(named: .aqua) ?? theme.appearance
+                applyEffectAppearance(NSAppearance(named: .aqua) ?? theme.appearance)
             case .automatic:
                 palette = theme.colors
-                effectView.appearance = theme.appearance
+                applyEffectAppearance(theme.appearance)
             }
         }
         if #available(macOS 26.0, *), let glass = effectView as? NSGlassEffectView {
-            // Set tintColor without an implicit Core Animation transaction. When
-            // this glass shares an NSGlassEffectContainerView with neighbouring
-            // ghosts, an in-flight tint animation can be picked up by the merged
-            // SDF surface and bleed onto adjacent ghosts for a frame or two.
-            
-            glass.tintColor = customTint ?? palette.background.withAlphaComponent(tintAlpha)
-
+            let tint = customTint ?? palette.background.withAlphaComponent(tintAlpha)
+            if appliedTint.needsWrite(tint) {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                glass.tintColor = tint
+                CATransaction.commit()
+            }
         } else if let visual = effectView as? NSVisualEffectView {
             if #available(macOS 10.14, *) {
                 let isDark = (visual.appearance ?? visual.effectiveAppearance).glassAppearance == .forceDark
@@ -425,9 +398,6 @@ open class LiquidGlassView: View {
             }
             applyTintOverlay(host: visual)
         } else if let solid = effectView {
-            // Solid-background fallback (glass and blur both disabled). Keep
-            // the base colour aligned with the current palette and compose
-            // any customTint on top via the overlay.
             solid.layer?.backgroundColor = palette.background.cgColor
             applyTintOverlay(host: solid)
         }
@@ -505,12 +475,16 @@ open class LiquidGlassView: View {
     }
 
     private func applyBorder() {
-        guard !usesGlass else {
+        let key = LiquidGlassBorderKey(usesGlass: usesGlass, hasBorder: hasBorder, isDark: presentation.colors.isDark)
+        guard appliedBorder.needsWrite(key) else {
+            return
+        }
+        guard !key.usesGlass else {
             effectView.layer?.borderWidth = 0
             return
         }
-        if hasBorder {
-            let borderColor = presentation.colors.isDark
+        if key.hasBorder {
+            let borderColor = key.isDark
                 ? NSColor.white.withAlphaComponent(0.10)
                 : NSColor.black.withAlphaComponent(0.04)
             effectView.layer?.borderColor = borderColor.cgColor
@@ -554,4 +528,16 @@ open class LiquidGlassView: View {
     }
 
 
+}
+
+struct LiquidGlassRebuildKey: Equatable {
+    let usesGlass: Bool
+    let blurEnabled: Bool
+    let forceAppearance: LiquidGlassAppearance
+}
+
+struct LiquidGlassBorderKey: Equatable {
+    let usesGlass: Bool
+    let hasBorder: Bool
+    let isDark: Bool
 }
