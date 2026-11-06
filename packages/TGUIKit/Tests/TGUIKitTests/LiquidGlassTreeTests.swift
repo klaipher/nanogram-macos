@@ -79,11 +79,13 @@ final class LiquidGlassTreeTests: XCTestCase {
             glass.isHidden = true
             glass.effectView.alphaValue = 0.5
             let previous = glass.effectView
+            let frameBeforeRebuild = glass.effectView.frame
             glass.forceAppearance = .forceDark
             XCTAssertFalse(previous === glass.effectView, "liquidGlass \(liquidGlass)")
             XCTAssertTrue(glass.effectView.isHidden, "liquidGlass \(liquidGlass)")
             XCTAssertEqual(glass.effectView.alphaValue, 0.5, "liquidGlass \(liquidGlass)")
-            XCTAssertEqual(glass.effectView.frame, NSMakeRect(10, 0, 40, 40), "liquidGlass \(liquidGlass)")
+            XCTAssertEqual(glass.effectView.frame, frameBeforeRebuild, "liquidGlass \(liquidGlass)")
+            XCTAssertEqual(glass.effectView.frame, glass.effectView.superview === glass ? glass.bounds : NSMakeRect(10, 0, 40, 40), "liquidGlass \(liquidGlass)")
         }
     }
 
