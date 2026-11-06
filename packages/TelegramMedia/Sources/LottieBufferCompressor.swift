@@ -21,8 +21,8 @@ private enum ReadResult {
 
 private var sharedData:Atomic<[LottieAnimationEntryKey:WeakReference<TRLotData>]> = Atomic(value: [:])
 
-private let recentDataCapacity = 24
-private let recentData: Atomic<LottieRecentList<LottieAnimationEntryKey, TRLotData>> = Atomic(value: LottieRecentList(capacity: recentDataCapacity))
+let lottieRecentDataCapacity = 24
+private let recentData: Atomic<LottieRecentList<LottieAnimationEntryKey, TRLotData>> = Atomic(value: LottieRecentList(capacity: lottieRecentDataCapacity))
 
 private func flushAndTrim(_ evicted: [TRLotData]) {
     for data in evicted {

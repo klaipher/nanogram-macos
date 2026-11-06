@@ -46,7 +46,7 @@ final class LottieFrameCacheMemoryTests: XCTestCase {
     }
 
     func testFinishedAnimationsReleaseTheirEncoderBuffers() {
-        let count = 40
+        let count = lottieRecentDataCapacity - 4
         var supplyments: [(TRLotFileSupplyment, Int)] = []
         for i in 0 ..< count {
             let (supplyment, bufferSize) = makeSupplyment("\(i)", side: 64)
