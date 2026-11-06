@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Log flush on quit, hide and resign-active (not built or run).** The core's `Logger` buffers "Log to File" lines for up to 1 s (core `perf/log-buffer`, `flushPendingLogs()` / `flushPendingLogsAndWait()`). `applicationWillTerminate` now calls `Logger.shared.flushPendingLogsAndWait()` first (before the crash marker, the updater and `holdPostboxQueueUntilExit`, and before the `_exit(0)` paths), and `applicationDidResignActive` and `applicationDidHide` call `Logger.shared.flushPendingLogs()` (no wait). **Merge only together with the core pin bump to the iOS commit that contains perf/log-buffer (e40fcc15, merged as 66fe9fa2 on nanogram/int5): the current pin 30d1f328 has no `flushPendingLogs`, so this commit does not compile before the bump.** The core pin is unchanged here.
+
 ## 13.1.0 (202611061725) — 2026-11-06
 
 Source: `nanogram/integration` @ e3a71457 · core `klaipher/nanogram` `main` @ 30d1f328 (was b4703321 at the last release) · tgcalls `nanogram-shared` @ 57b914d (was 6f45f0cc) · tg_owt `nanogram-mac` @ 655db2eb · rlottie `telegram-ios-dev` @ 083f19a.
