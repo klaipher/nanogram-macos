@@ -7,6 +7,7 @@ import VideoToolbox
 import IOSurface
 import TelegramMediaPlayer
 import TelegramMediaResources
+import TGUIKit
 
 public let internal_isHardwareAv1Supported: Bool = {
     let value = VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1)
@@ -277,6 +278,7 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
     private var partsStateDisposable: Disposable?
     private var updateTimer: Foundation.Timer?
     private var updateTimerInterval: Double = 0.0
+    private var updateDisplayLink: SharedDisplayLinkDriverLink?
     private var lastIsBuffering: Bool = false
     private var lastIsNearEnd: Bool = false
     
@@ -357,6 +359,7 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
         let _ = self.renderGeneration.swap(-1)
         self.partsStateDisposable?.dispose()
         self.updateTimer?.invalidate()
+        self.updateDisplayLink?.invalidate()
         
         if #available(macOS 14.0, *) {
             self.videoRenderer.sampleBufferRenderer.stopRequestingMediaData()
@@ -401,6 +404,12 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
         return nil
     }
 
+    static let displayLinkSafetyInterval: Double = 1.0 / 10.0
+
+    static func usesDisplayLink(interval: Double) -> Bool {
+        return interval < ChunkMediaPlayerV2.displayLinkSafetyInterval
+    }
+
     static func updateTimerTolerance(interval: Double) -> Double {
         return max(interval * 0.1, 0.002)
     }
@@ -411,6 +420,8 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
         guard let interval else {
             self.updateTimer?.invalidate()
             self.updateTimer = nil
+            self.updateDisplayLink?.invalidate()
+            self.updateDisplayLink = nil
             self.updateTimerInterval = 0.0
             return
         }
@@ -419,13 +430,22 @@ public final class ChunkMediaPlayerV2: ChunkMediaPlayer {
         }
         self.updateTimerInterval = interval
         self.updateTimer?.invalidate()
-        let timer = Foundation.Timer.scheduledTimer(withTimeInterval: interval, repeats: true, block: { [weak self] _ in
+        self.updateDisplayLink?.invalidate()
+        self.updateDisplayLink = nil
+        let useDisplayLink = ChunkMediaPlayerV2.usesDisplayLink(interval: interval) && Thread.isMainThread
+        if useDisplayLink {
+            self.updateDisplayLink = SharedDisplayLinkDriver.shared.add(framesPerSecond: .fps(60), { [weak self] _ in
+                self?.updateInternalState()
+            })
+        }
+        let timerInterval = useDisplayLink ? ChunkMediaPlayerV2.displayLinkSafetyInterval : interval
+        let timer = Foundation.Timer.scheduledTimer(withTimeInterval: timerInterval, repeats: true, block: { [weak self] _ in
             guard let self else {
                 return
             }
             self.updateInternalState()
         })
-        timer.tolerance = ChunkMediaPlayerV2.updateTimerTolerance(interval: interval)
+        timer.tolerance = ChunkMediaPlayerV2.updateTimerTolerance(interval: timerInterval)
         self.updateTimer = timer
     }
 

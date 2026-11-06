@@ -10913,6 +10913,10 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     public override func didRemovedFromStack() {
         super.didRemovedFromStack()
         chatInteraction.remove(observer: self)
+        (self.centerBarView as? ChatTitleBarView)?.suspendPresence()
+        if self.isLoaded() {
+            self.genericView.bubblesView.suspendPresence()
+        }
     }
     
     
@@ -11429,6 +11433,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
         readMetricsManager?.resume()
         setVisibleRefreshActive(true)
+        (self.centerBarView as? ChatTitleBarView)?.resumePresence()
+        self.genericView.bubblesView.resumePresence()
 
         updateBubblesBackButton()
 

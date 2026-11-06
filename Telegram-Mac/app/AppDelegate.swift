@@ -345,6 +345,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         
         initializeSelectManager()
         startLottieCacheCleaner()
+        LiveObjectDiagnostics.startIfEnabled()
         updateDisplayColorSpace()
         NotificationCenter.default.addObserver(forName: NSScreen.colorSpaceDidChangeNotification, object: nil, queue: .main, using: { [weak self] _ in
             self?.updateDisplayColorSpace()

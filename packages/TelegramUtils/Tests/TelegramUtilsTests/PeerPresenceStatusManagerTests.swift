@@ -375,4 +375,64 @@ final class PeerPresenceStatusManagerTests: XCTestCase {
         environment.isApplicationInBackground = false
         XCTAssertEqual(updates, 0)
     }
+
+    func testSuspendedManagerSchedulesNothingAndResumeCatchesUp() {
+        let start = 1_000_000.0
+        let environment = FakeEnvironment(timestamp: start)
+        var updates = 0
+        let manager = PeerPresenceStatusManager(mode: .onlineState, environment: environment, update: {
+            updates += 1
+        })
+        manager.reset(presence: present(1_000_005), timeDifference: 0)
+        XCTAssertEqual(environment.pendingTimerCount, 1)
+
+        manager.suspend()
+        XCTAssertEqual(environment.pendingTimerCount, 0)
+        environment.advance(to: start + 60.0)
+        XCTAssertEqual(updates, 0)
+
+        manager.reset(presence: present(1_000_100), timeDifference: 0)
+        XCTAssertEqual(environment.pendingTimerCount, 0)
+
+        manager.resume()
+        XCTAssertEqual(environment.pendingTimerCount, 1)
+        environment.advance(to: start + 3600.0)
+        XCTAssertEqual(updates, 1)
+    }
+
+    func testResumeAfterTheDeadlinePassedUpdatesOnce() {
+        let start = 1_000_000.0
+        let environment = FakeEnvironment(timestamp: start)
+        var updates = 0
+        let manager = PeerPresenceStatusManager(mode: .onlineState, environment: environment, update: {
+            updates += 1
+        })
+        manager.reset(presence: present(1_000_005), timeDifference: 0)
+        manager.suspend()
+        environment.advance(to: start + 60.0)
+        manager.resume()
+        XCTAssertEqual(updates, 1)
+        XCTAssertEqual(environment.pendingTimerCount, 0)
+    }
+
+    func testApplicationStateChangesDoNotRearmASuspendedManager() {
+        let environment = FakeEnvironment(timestamp: 1_000_000.0)
+        let manager = PeerPresenceStatusManager(mode: .onlineState, environment: environment, update: {})
+        manager.reset(presence: present(1_000_005), timeDifference: 0)
+        manager.suspend()
+        environment.isApplicationInBackground = true
+        environment.isApplicationInBackground = false
+        XCTAssertEqual(environment.pendingTimerCount, 0)
+        manager.resume()
+        XCTAssertEqual(environment.pendingTimerCount, 1)
+    }
+
+    func testResumeWithoutSuspendDoesNothing() {
+        let environment = FakeEnvironment(timestamp: 1_000_000.0)
+        let manager = PeerPresenceStatusManager(mode: .onlineState, environment: environment, update: {})
+        manager.reset(presence: present(1_000_005), timeDifference: 0)
+        manager.resume()
+        XCTAssertEqual(environment.pendingTimerCount, 1)
+        XCTAssertEqual(environment.scheduledTimerCount, 1)
+    }
 }

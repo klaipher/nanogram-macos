@@ -34,4 +34,16 @@ final class ChunkMediaPlayerUpdateTimerTests: XCTestCase {
         }
         XCTAssertEqual(ChunkMediaPlayerV2.updateTimerTolerance(interval: 0.001), 0.002)
     }
+
+    func testOnlyTheFastCasesUseTheDisplayLink() {
+        XCTAssertTrue(ChunkMediaPlayerV2.usesDisplayLink(interval: 1.0 / 60.0))
+        XCTAssertTrue(ChunkMediaPlayerV2.usesDisplayLink(interval: 1.0 / 30.0))
+        XCTAssertFalse(ChunkMediaPlayerV2.usesDisplayLink(interval: 1.0 / 10.0))
+        XCTAssertFalse(ChunkMediaPlayerV2.usesDisplayLink(interval: 1.0))
+    }
+
+    func testEveryFastCaseKeepsASlowSafetyTimer() {
+        XCTAssertEqual(ChunkMediaPlayerV2.displayLinkSafetyInterval, 1.0 / 10.0)
+        XCTAssertGreaterThanOrEqual(ChunkMediaPlayerV2.updateTimerTolerance(interval: ChunkMediaPlayerV2.displayLinkSafetyInterval), 0.01 - 1e-12)
+    }
 }

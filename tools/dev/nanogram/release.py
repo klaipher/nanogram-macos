@@ -56,7 +56,8 @@ EXPORT_TIMEOUT = 600
 __all__ = ["AscKey", "asc_key", "build_number", "marketing_version", "conditions", "release_settings", "distribution_entitlements", "enhanced_security_requested",
            "archive_command", "archive", "export_options", "export", "set_build_number", "ensure_mac_platform",
            "upload_mas", "unsign_resource_bundles", "check_distribution_signing", "check_exported_app", "testflight", "notarize", "make_dmg", "appcast_entry", "appcast", "source_archive",
-           "release_direct"]
+           "release_direct", "build_info_text", "git_state", "build_warnings", "has_unreleased_entries", "dwarf_uuids",
+           "archive_dsyms", "record_build"]
 
 
 class ReleaseError(config.ConfigError):
@@ -368,6 +369,99 @@ def set_build_number(archive_path: Path, build: str, app_entitlements: Path | No
     _set_plist_value(Path(archive_path) / "Info.plist", ("ApplicationProperties", "CFBundleVersion"), build)
 
 
+def build_info_text(build: str, commit: str, branch: str, dirty: bool, pushed: bool) -> str:
+    return (f"build {build}\ncommit {commit}\nbranch {branch}\n"
+            f"dirty {'yes' if dirty else 'no'}\npushed {'yes' if pushed else 'no'}\n")
+
+
+def git_state(root: Path = config.ROOT) -> tuple[str, str, bool, bool]:
+    def git_output(*args: str) -> str | None:
+        result = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+        return result.stdout.strip() if result.returncode == 0 else None
+    commit = git_output("rev-parse", "HEAD") or "unknown"
+    branch = git_output("rev-parse", "--abbrev-ref", "HEAD") or "unknown"
+    dirty = bool(git_output("status", "--porcelain", "--untracked-files=no"))
+    pushed = bool(git_output("branch", "-r", "--contains", commit)) if commit != "unknown" else False
+    return commit, branch, dirty, pushed
+
+
+def has_unreleased_entries(changelog: Path) -> bool:
+    try:
+        lines = Path(changelog).read_text().splitlines()
+    except OSError:
+        return False
+    inside = False
+    for line in lines:
+        if line.startswith("## Unreleased"):
+            inside = True
+        elif line.startswith("## "):
+            inside = False
+        elif inside and line.strip():
+            return True
+    return False
+
+
+def build_warnings(build: str, commit: str, dirty: bool, pushed: bool, unreleased: bool) -> list[str]:
+    warnings = []
+    if dirty:
+        warnings.append(f"the working tree has uncommitted changes: build {build} is not exactly commit {commit[:8]}")
+    if not pushed:
+        warnings.append(f"commit {commit[:8]} is not on any remote branch: the changelog for the next build "
+                        "cannot start from it")
+    if unreleased:
+        warnings.append(f"CHANGELOG.md still has Unreleased entries: add this build's entry (build {build}, "
+                        f"commit {commit[:8]})")
+    return warnings
+
+
+def dwarf_uuids(path: Path) -> list[str]:
+    result = subprocess.run(["dwarfdump", "--uuid", str(path)], capture_output=True, text=True)
+    return re.findall(r"UUID: ([0-9A-Fa-f-]{36}) \(", result.stdout) if result.returncode == 0 else []
+
+
+def archive_dsyms(archive_path: Path, dest_root: Path, edition: str, build: str, uuids_of=dwarf_uuids) -> Path | None:
+    """Zips the archive's dSYMs into <dest_root>/<edition>/<build>/, outside the xcarchive and every cache, with
+    uuids.txt. The folder is emptied first, so a rebuilt number holds this build's alone. None when the archive has
+    no dSYM for the app; an app dSYM whose UUIDs are not the app's refuses the release."""
+    dsyms = sorted((Path(archive_path) / "dSYMs").glob("*.dSYM"))
+    app = archived_app(archive_path)
+    app_dsym = next((item for item in dsyms if item.name == f"{app.name}.dSYM"), None)
+    if app_dsym is None:
+        return None
+    info = plistlib.loads((app / "Contents" / "Info.plist").read_bytes())
+    app_uuids = set(uuids_of(app / "Contents" / "MacOS" / info.get("CFBundleExecutable", app.stem)))
+    if not app_uuids or app_uuids != set(uuids_of(app_dsym)):
+        raise ReleaseError(f"{app_dsym.name} in the archive does not match the {app.name} binary (UUIDs "
+                           f"{sorted(app_uuids)} vs {sorted(uuids_of(app_dsym))}): its traces would not symbolicate")
+    dest = Path(dest_root) / edition / build
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.mkdir(parents=True)
+    lines = []
+    for dsym in dsyms:
+        subprocess.run(["ditto", "-c", "-k", "--keepParent", str(dsym), str(dest / f"{dsym.name}.zip")], check=True)
+        lines += [f"{dsym.name} {uuid}" for uuid in uuids_of(dsym)]
+    (dest / "uuids.txt").write_text("\n".join(lines) + "\n")
+    return dest
+
+
+def record_build(archive_path: Path, out_dir: Path, edition: str, build: str, dsym_root: Path | None = None,
+                 root: Path = config.ROOT, uuids_of=dwarf_uuids, say=print) -> None:
+    """What the next changelog needs (git log <previous build's commit>..<this one>) and what a crash report needs
+    (the dSYMs): BUILD-INFO.txt next to the artifacts and next to the dSYMs. Warns, never blocks."""
+    commit, branch, dirty, pushed = git_state(root)
+    text = build_info_text(build, commit, branch, dirty, pushed)
+    (Path(out_dir) / "BUILD-INFO.txt").write_text(text)
+    for warning in build_warnings(build, commit, dirty, pushed, has_unreleased_entries(Path(root) / "CHANGELOG.md")):
+        say(f"warning: {warning}")
+    dest = archive_dsyms(archive_path, dsym_root or config.dsym_dir(), edition, build, uuids_of)
+    if dest is None:
+        say(f"warning: the archive holds no dSYM for the app: traces of build {build} will not symbolicate")
+        return
+    (dest / "BUILD-INFO.txt").write_text(text)
+    say(f"==> dSYMs and BUILD-INFO of build {build} kept in {dest}")
+
+
 def export_options(method: str, upload: bool) -> dict:
     if method not in METHODS.values():
         raise ValueError(f"unknown export method {method!r}")
@@ -466,6 +560,7 @@ def testflight(export_only: bool = False) -> Path:
     out_dir = config.BUILD_OUTPUT / "testflight" / build
     out_dir.mkdir(parents=True, exist_ok=True)
     archive_path = archive("mas", build, out_dir, key)
+    record_build(archive_path, out_dir, "mas", build)
     pkg = _single(export(archive_path, "mas", out_dir, key), "*.pkg")
     print(verify_pkg(pkg), flush=True)
     check_exported_pkg(pkg, "mas")
@@ -652,6 +747,7 @@ def release_direct(allow_dirty: bool = False) -> Path:
     out_dir = config.BUILD_OUTPUT / "direct" / build
     out_dir.mkdir(parents=True, exist_ok=True)
     archive_path = archive("direct", build, out_dir, key)
+    record_build(archive_path, out_dir, "direct", build)
     app = _single(export(archive_path, "direct", out_dir, key), "*.app")
     authority = _signing_authority(app)
     check_exported_app(app, "direct")

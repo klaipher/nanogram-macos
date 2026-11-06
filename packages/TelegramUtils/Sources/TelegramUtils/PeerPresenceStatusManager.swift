@@ -94,6 +94,7 @@ public final class PeerPresenceStatusManager {
     private let environment: PeerPresenceStatusManagerEnvironment
 
     private var deadline: Double?
+    private var isSuspended = false
     private var timer: Disposable?
     private var applicationStateDisposable: Disposable?
 
@@ -133,8 +134,22 @@ public final class PeerPresenceStatusManager {
         }
     }
 
+    public func suspend() {
+        self.isSuspended = true
+        self.timer?.dispose()
+        self.timer = nil
+    }
+
+    public func resume() {
+        guard self.isSuspended else {
+            return
+        }
+        self.isSuspended = false
+        self.applicationStateUpdated()
+    }
+
     private func scheduleTimerIfNeeded() {
-        guard self.timer == nil, let deadline = self.deadline, !self.environment.isApplicationInBackground else {
+        guard self.timer == nil, !self.isSuspended, let deadline = self.deadline, !self.environment.isApplicationInBackground else {
             return
         }
         let timeout = max(0.0, deadline - self.environment.currentTimestamp)
@@ -154,6 +169,9 @@ public final class PeerPresenceStatusManager {
     }
 
     private func applicationStateUpdated() {
+        if self.isSuspended {
+            return
+        }
         if self.environment.isApplicationInBackground {
             self.timer?.dispose()
             self.timer = nil

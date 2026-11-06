@@ -46,6 +46,10 @@ def api_credentials_path() -> Path:
     return tg_ios_config() / "api-credentials.json"
 
 
+def dsym_dir() -> Path:
+    return Path(os.environ.get("NANOGRAM_DSYM_DIR", HOME / "Library" / "Application Support" / "Nanogram" / "dsyms" / "mac"))
+
+
 def asc_dir() -> Path:
     return tg_ios_config() / "asc"
 

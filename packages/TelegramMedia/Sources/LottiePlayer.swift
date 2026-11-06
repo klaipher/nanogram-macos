@@ -189,7 +189,46 @@ private struct RenderFpsToken : Hashable {
 
 public func setLottieRenderingSuspended(_ suspended: Bool) {
     loops.setSuspended(suspended)
+    webmHiddenRelease.setSuspended(suspended)
 }
+
+private final class WebmHiddenRelease {
+    private let lock = NSLock()
+    private let renderers = NSHashTable<WebmRenderer>.weakObjects()
+    private var gate = VP9HiddenReleaseGate()
+
+    func register(_ renderer: WebmRenderer) {
+        self.lock.lock()
+        self.renderers.add(renderer)
+        self.lock.unlock()
+    }
+
+    func setSuspended(_ suspended: Bool) {
+        self.lock.lock()
+        if suspended {
+            let generation = self.gate.hide()
+            self.lock.unlock()
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + VP9SessionHoldPolicy.hiddenReleaseDelay) { [weak self] in
+                self?.releaseIfStillHidden(generation: generation)
+            }
+        } else {
+            self.gate.show()
+            self.lock.unlock()
+        }
+    }
+
+    private func releaseIfStillHidden(generation: Int) {
+        self.lock.lock()
+        let shouldRelease = self.gate.shouldRelease(scheduledGeneration: generation)
+        let current = shouldRelease ? self.renderers.allObjects : []
+        self.lock.unlock()
+        for renderer in current {
+            renderer.releaseHardwareForHidden()
+        }
+    }
+}
+
+private let webmHiddenRelease = WebmHiddenRelease()
 
 private final class LottieMainBatch {
     var actions: [() -> Void] = []
@@ -1419,7 +1458,10 @@ final class WebmRenderer : RenderContainer {
     private var decoder: SoftwareVideoSource?
     private var makeDecoder: (() -> SoftwareVideoSource)?
     private var hardwareReader: VP9HardwareStickerReader?
-    private var makeHardwareReader: (() -> VP9HardwareStickerReader?)?
+    private var makeHardwareReader: ((Bool) -> VP9HardwareStickerReader?)?
+    private var resumeHardwareReader: ((Bool) -> VP9HardwareStickerReader?)?
+    private var suspendedHardwarePosition: Int?
+    private let hardwareLock = NSLock()
     private var hardwareFramesRead: Int = 0
     private var hardwareStreamEnded = false
     private let framerate: Int
@@ -1430,17 +1472,18 @@ final class WebmRenderer : RenderContainer {
     private let fileSupplyment: TRLotFileSupplyment?
     private let detectedEndFrame: Atomic<Int32?>
 
-    init(animation: LottieAnimation, makeDecoder: @escaping () -> SoftwareVideoSource, makeHardwareReader: (() -> VP9HardwareStickerReader?)? = nil, fileSupplyment: TRLotFileSupplyment?) {
+    init(animation: LottieAnimation, makeDecoder: @escaping () -> SoftwareVideoSource, makeHardwareReader: ((Bool) -> VP9HardwareStickerReader?)? = nil, fileSupplyment: TRLotFileSupplyment?) {
         _ = vp9StatsReporterRegistration
         self.animation = animation
         if let fileSupplyment = fileSupplyment, fileSupplyment.isFinished, fileSupplyment.fps > 0 {
             self.framerate = Int(fileSupplyment.fps)
             self.makeDecoder = makeDecoder
             self.makeHardwareReader = makeHardwareReader
-        } else if let hardwareReader = makeHardwareReader?() {
+        } else if let hardwareReader = makeHardwareReader?(false) {
             self.hardwareReader = hardwareReader
             self.framerate = hardwareReader.frameRate
             self.makeDecoder = makeDecoder
+            self.resumeHardwareReader = makeHardwareReader
         } else {
             let decoder = makeDecoder()
             self.decoder = decoder
@@ -1452,6 +1495,36 @@ final class WebmRenderer : RenderContainer {
         } else {
             self.detectedEndFrame = Atomic(value: nil)
         }
+        if self.resumeHardwareReader != nil {
+            webmHiddenRelease.register(self)
+        }
+    }
+
+    func releaseHardwareForHidden() {
+        self.hardwareLock.lock()
+        defer {
+            self.hardwareLock.unlock()
+        }
+        guard self.hardwareReader != nil, !self.hardwareStreamEnded else {
+            return
+        }
+        guard VP9SessionHoldPolicy.shouldRelease(streamEnded: false, frameCacheComplete: self.fileSupplyment?.isFinished == true, hiddenFor: VP9SessionHoldPolicy.hiddenReleaseDelay) else {
+            return
+        }
+        self.suspendedHardwarePosition = self.hardwareFramesRead
+        self.hardwareReader = nil
+    }
+
+    private func continueWithSoftwareDecoding(skipping count: Int) {
+        guard let makeDecoder = self.makeDecoder else {
+            return
+        }
+        self.makeDecoder = nil
+        let decoder = makeDecoder()
+        for _ in 0 ..< count {
+            _ = decoder.readFrame(maxPts: nil)
+        }
+        self.decoder = decoder
     }
     
     private func reachedEnd(at frameIndex: Int32) {
@@ -1467,6 +1540,10 @@ final class WebmRenderer : RenderContainer {
     }
 
     func render(at frameIndex: Int32, frames: [RenderedFrame], previousFrame: RenderedFrame?) -> RenderedFrame? {
+        self.hardwareLock.lock()
+        defer {
+            self.hardwareLock.unlock()
+        }
         
         let s:(w: Int, h: Int) = (w: Int(animation.size.width) * animation.backingScale, h: Int(animation.size.height) * animation.backingScale)
         
@@ -1487,9 +1564,17 @@ final class WebmRenderer : RenderContainer {
             return nil
         }
 
+        if let position = self.suspendedHardwarePosition {
+            self.suspendedHardwarePosition = nil
+            if self.decoder == nil, self.hardwareReader == nil, let reader = self.resumeHardwareReader?(true), reader.skipFrames(position) {
+                self.hardwareReader = reader
+            } else {
+                self.continueWithSoftwareDecoding(skipping: position)
+            }
+        }
         if self.decoder == nil, self.hardwareReader == nil, let makeHardwareReader = self.makeHardwareReader {
             self.makeHardwareReader = nil
-            self.hardwareReader = makeHardwareReader()
+            self.hardwareReader = makeHardwareReader(false)
         }
         if let hardwareReader = self.hardwareReader {
             if !hardwareReader.hasMoreFrames {
@@ -1507,14 +1592,7 @@ final class WebmRenderer : RenderContainer {
                 return RenderedWebmFrame(key: animation.key, frame: frameIndex, fps: self.fps, size: animation.size, data: data, backingScale: animation.backingScale)
             }
             self.hardwareReader = nil
-            if let makeDecoder = self.makeDecoder {
-                self.makeDecoder = nil
-                let decoder = makeDecoder()
-                for _ in 0 ..< self.hardwareFramesRead {
-                    _ = decoder.readFrame(maxPts: nil)
-                }
-                self.decoder = decoder
-            }
+            self.continueWithSoftwareDecoding(skipping: self.hardwareFramesRead)
         }
         if self.decoder == nil, let makeDecoder = self.makeDecoder {
             self.makeDecoder = nil
@@ -1592,10 +1670,14 @@ final class WebmRenderer : RenderContainer {
     func markFinished() {
         if let fileSupplyment = fileSupplyment {
             fileSupplyment.markFinished()
+            self.hardwareLock.lock()
             self.decoder = nil
             self.makeDecoder = nil
             self.hardwareReader = nil
             self.makeHardwareReader = nil
+            self.resumeHardwareReader = nil
+            self.suspendedHardwarePosition = nil
+            self.hardwareLock.unlock()
         }
     }
     func setColor(_ color: NSColor, keyPath: String) {
@@ -1953,8 +2035,8 @@ public final class LottieAnimation : Equatable {
                 }
                 return WebmRenderer(animation: self, makeDecoder: {
                     return SoftwareVideoSource(path: path, hintVP9: true, unpremultiplyAlpha: premultiply, reusePixelBuffers: true)
-                }, makeHardwareReader: {
-                    return VP9HardwareStickerReader(path: path, unpremultiplyAlpha: premultiply)
+                }, makeHardwareReader: { isResume in
+                    return VP9HardwareStickerReader(path: path, unpremultiplyAlpha: premultiply, isResume: isResume)
                 }, fileSupplyment: fileSupplyment)
             }
         }

@@ -46,6 +46,30 @@ final class VP9HardwareStickerReaderTests: XCTestCase {
         }
     }
 
+    func testSkippingFramesLandsOnTheSameFrameAsReading() throws {
+        try XCTSkipUnless(VP9HardwareStickerReader.probeResult.hasHardwareDecoder)
+        let source = try self.data("sticker_vp9")
+        let reference = try XCTUnwrap(VP9HardwareStickerReader(data: source, unpremultiplyAlpha: false))
+        var expected: Data?
+        for index in 0 ..< 6 {
+            XCTAssertTrue(reference.readFrame { pointer, _, height, bytesPerRow in
+                if index == 5 {
+                    expected = Data(bytes: pointer, count: bytesPerRow * height)
+                }
+            })
+        }
+        let resumed = try XCTUnwrap(VP9HardwareStickerReader(data: source, unpremultiplyAlpha: false, isResume: true))
+        XCTAssertTrue(resumed.skipFrames(5))
+        XCTAssertEqual(resumed.framesRead, 5)
+        var actual: Data?
+        XCTAssertTrue(resumed.readFrame { pointer, _, height, bytesPerRow in
+            actual = Data(bytes: pointer, count: bytesPerRow * height)
+        })
+        XCTAssertEqual(actual, expected)
+        XCTAssertFalse(resumed.skipFrames(resumed.frameCount))
+        XCTAssertFalse(resumed.skipFrames(-1))
+    }
+
     func testBrokenFilesGiveNoReader() {
         XCTAssertNil(VP9HardwareStickerReader(data: Data([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0]), unpremultiplyAlpha: false))
     }

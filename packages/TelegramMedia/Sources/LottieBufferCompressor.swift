@@ -21,6 +21,27 @@ private enum ReadResult {
 
 private var sharedData:Atomic<[LottieAnimationEntryKey:WeakReference<TRLotData>]> = Atomic(value: [:])
 
+private let recentDataCapacity = 24
+private let recentData: Atomic<LottieRecentList<LottieAnimationEntryKey, TRLotData>> = Atomic(value: LottieRecentList(capacity: recentDataCapacity))
+
+private func flushAndTrim(_ evicted: [TRLotData]) {
+    for data in evicted {
+        data.queue.async {
+            data.flushAndTrim()
+        }
+    }
+}
+
+func releaseRecentLottieData() {
+    var evicted: [TRLotData] = []
+    _ = recentData.modify { list in
+        var list = list
+        evicted = list.removeAll()
+        return list
+    }
+    flushAndTrim(evicted)
+}
+
 private struct FrameDst : Codable {
     let offset: Int
     let length: Int
@@ -186,6 +207,26 @@ final class TRLotData {
         }
     }
     
+    fileprivate func flushAndTrim() {
+        assert(queue.isCurrent())
+        if self.isDirty {
+            self.save()
+        }
+        self.readHandle?.closeFile()
+        self.readHandle = nil
+        self.writeHandle?.closeFile()
+        self.writeHandle = nil
+        free(self.readBuffer)
+        self.readBuffer = nil
+        self.readBufferCapacity = 0
+        free(self.decodeScratch)
+        self.decodeScratch = nil
+        free(self.encodeScratch)
+        self.encodeScratch = nil
+        free(self.encodeDestination)
+        self.encodeDestination = nil
+    }
+    
     deinit {
         if isDirty {
             save()
@@ -338,6 +379,10 @@ final class TRLotFileSupplyment {
     
     deinit {
         free(self.lastCompressed)
+        let data = self.data
+        data.queue.async {
+            data.flushAndTrim()
+        }
     }
     
     init(_ animation:LottieAnimation, bufferSize: Int, queue: Queue) {
@@ -362,6 +407,13 @@ final class TRLotFileSupplyment {
         self.data = data
         self.queue = data.queue
         self.bufferSize = bufferSize
+        var evicted: [TRLotData] = []
+        _ = recentData.modify { list in
+            var list = list
+            evicted = list.use(key, data)
+            return list
+        }
+        flushAndTrim(evicted)
     }
     
     func initialize(fps: Int32, startFrame: Int32, endFrame: Int32) {
@@ -535,6 +587,7 @@ private final class CacheRemovable {
     }
     
     private func clean() {
+        releaseRecentLottieData()
         cleanLottieCache(directory: TRLotData.directory, now: Date(), byteBudget: lottieCacheByteBudget)
     }
     
