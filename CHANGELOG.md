@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Media preload cancel race (core fix, arrives with the next core bump; branch fix/media-preload-cancel; not built or run)**. The blocked-read race lives in the shared core (`submodules/telegram-ios/submodules/MediaPlayer`: `FFMpegMediaFrameSource` / `FFMpegMediaFrameSourceContext`, used by `preloadVideoResource`), fixed in nanogram-ios commit c70da5b6 (`MediaReadCancellation`, per-request and per-source cancel flags checked before every semaphore wait). The Mac packages hold no copy of that code: `packages/TelegramMedia/Sources/MediaPlayer.swift` only constructs the core's `FFMpegMediaFrameSource`, and the other semaphore wait, `ChunkMediaPlayerDirectFetchSourceImpl.swift` (`FFMpegLookaheadReader_readPacketCallback`), is not affected because its cancel is a replaying `Promise` that is already set when the read subscribes. So no Mac source changed and the `submodules/telegram-ios` pin is untouched; the Mac gets the fix with `tools/dev/tg core-bump`. Effect then: cancelled preloads stop requesting data sooner (fewer requests, same as upstream's intent of dispose = cancel).
+
 ## 13.1.0 (202611061725) — 2026-11-06
 
 Source: `nanogram/integration` @ e3a71457 · core `klaipher/nanogram` `main` @ 30d1f328 (was b4703321 at the last release) · tgcalls `nanogram-shared` @ 57b914d (was 6f45f0cc) · tg_owt `nanogram-mac` @ 655db2eb · rlottie `telegram-ios-dev` @ 083f19a.
