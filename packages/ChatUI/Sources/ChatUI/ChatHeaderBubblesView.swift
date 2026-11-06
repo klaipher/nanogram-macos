@@ -260,7 +260,22 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
     private let rightCluster: RightActionsCluster
 
     private let glassWrapper: GlassContainerView
-    private let backGhost: LiquidGlassView
+    private lazy var backGhostSlot = LazyGlassGhostSlot<LiquidGlassView>(
+        make: {
+            let view = LiquidGlassView(frame: .zero, cornerRadius: ChatHeaderBubblesView.bubbleHeight / 2, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
+            view.glassGroup = .chatHeader
+            return view
+        },
+        attach: { [weak self] ghost in
+            guard let self else { return }
+            self.glassWrapper.addGhost(ghost)
+            self.backButton.additionalGlassEffectView = ghost
+            if let theme = self.currentChatTheme {
+                ghost.updateLocalizationAndTheme(theme: theme)
+                ghost.customTint = theme.colors.background.withAlphaComponent(0.4)
+            }
+        }
+    )
     private let centerGhost: LiquidGlassView
     private let rightGhost: LiquidGlassView
 
@@ -418,7 +433,7 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
 
     private func updateBackButtonIcon() {
         self.backButton.isHidden = !hasBackButton
-        self.backGhost.isHidden = !hasBackButton
+        backGhostSlot.ghost?.isHidden = !hasBackButton
         let icon = isCloseButton ? theme.icons.chat_header_close : theme.icons.chat_header_back
         backButton.set(image: icon, for: .Normal)
         backButton.setAccessibilityLabel(isCloseButton ? strings().voiceOverCommonClose : strings().voiceOverCommonBack)
@@ -459,9 +474,11 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
 
         let cornerRadius = ChatHeaderBubblesView.bubbleHeight / 2
         
-        self.backGhost = LiquidGlassView(frame: .zero, cornerRadius: cornerRadius, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
         self.centerGhost = LiquidGlassView(frame: .zero, cornerRadius: cornerRadius, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
         self.rightGhost = LiquidGlassView(frame: .zero, cornerRadius: cornerRadius, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
+
+        centerGhost.glassGroup = .chatHeader
+        rightGhost.glassGroup = .chatHeader
 
         super.init(frame: frameRect)
 
@@ -474,7 +491,6 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
 
         glassWrapper.addGhost(rightGhost)
         glassWrapper.addGhost(centerGhost)
-        glassWrapper.addGhost(backGhost)
 
         rightCluster.additionalGlassEffectView = rightGhost
 
@@ -557,7 +573,6 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         updateLocalizationAndTheme(theme: theme)
 
         backButton.setGlassEffectHidden(true)
-        backButton.additionalGlassEffectView = backGhost
         centerBubble.interactiveGlassView = centerBubble
         centerBubble.additionalGlassEffectView = centerGhost
     }
@@ -588,12 +603,12 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         applyCallButtonImage()
         callButton.sizeToFit(NSZeroSize, buttonSize, thatFit: true)
 
-        backGhost.updateLocalizationAndTheme(theme: theme)
+        backGhostSlot.ghost?.updateLocalizationAndTheme(theme: theme)
         centerGhost.updateLocalizationAndTheme(theme: theme)
         rightGhost.updateLocalizationAndTheme(theme: theme)
 
         let chatGlassTint = theme.colors.background.withAlphaComponent(0.4)
-        backGhost.customTint = chatGlassTint
+        backGhostSlot.ghost?.customTint = chatGlassTint
         centerGhost.customTint = chatGlassTint
         rightGhost.customTint = chatGlassTint
         applyMenuMode()
@@ -1060,11 +1075,11 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         if hasBackButton {
             let backFrame = NSRect(x: leftX, y: bubbleY, width: bubbleHeight, height: bubbleHeight)
             transition.updateFrame(view: backButton, frame: backFrame)
-            syncGhost(backGhost, frame: backFrame, hidden: false, transition: transition)
+            syncGhost(backGhostSlot.resolve(isNeeded: true), frame: backFrame, hidden: false, transition: transition)
             leftX += bubbleHeight + spacing
             leftEdgeHandle.isHidden = true
         } else {
-            backGhost.isHidden = true
+            backGhostSlot.ghost?.isHidden = true
             let handleFrame = NSRect(x: 0, y: bubbleY, width: leftSideInset, height: bubbleHeight)
             transition.updateFrame(view: leftEdgeHandle, frame: handleFrame)
             leftEdgeHandle.isHidden = false

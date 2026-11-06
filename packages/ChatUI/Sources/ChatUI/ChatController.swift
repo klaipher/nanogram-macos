@@ -1814,6 +1814,7 @@ final class ChatToasterView: Control {
 
     required init(frame frameRect: NSRect) {
         self.glass = LiquidGlassView(frame: frameRect.size.bounds, cornerRadius: max(36, frameRect.height) / 2, hasShadow: true, hasBorder: true, tintAlpha: 0.0)
+        glass.glassGroup = .toasts
         super.init(frame: frameRect)
         addSubview(glass)
         addSubview(textView)

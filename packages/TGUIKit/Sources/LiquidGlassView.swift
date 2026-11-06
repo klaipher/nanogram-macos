@@ -70,7 +70,7 @@ public final class AdaptiveGlassEffectView: NSGlassEffectView {
     }
 }
 
-open class LiquidGlassView: View {
+open class LiquidGlassView: View, GlassEnvironmentListener {
 
     public var cornerRadius: CGFloat {
         didSet {
@@ -113,25 +113,40 @@ open class LiquidGlassView: View {
             default: changed = true
             }
             if !changed { return }
-            // In fallback mode (no liquid glass), the effectView TYPE depends
-            // on whether customTint is set. Crossing nil↔non-nil requires
-            // rebuilding the effectView; otherwise just refresh appearance.
-            if usesGlass, oldValue != nil {
-                rebuildEffectView()
-            } else if rebuildState != nil {
-                // Tint changed but we didn't rebuild — keep the cached
-                // snapshot in sync so the next `rebuildEffectView()` doesn't
-                // see a spurious diff and tear the effectView down for nothing.
-                rebuildState = currentRebuildState()
-            }
             applyAppearance(presentation)
         }
     }
 
     public let forceBlur: Bool
 
+    public var glassGroup: GlassGroup? {
+        didSet {
+            if GlassDebug.isDisabled(oldValue) != GlassDebug.isDisabled(glassGroup) {
+                glassEnvironmentDidChange()
+            }
+        }
+    }
+
+    private var groupDisabled: Bool {
+        return GlassDebug.isDisabled(glassGroup)
+    }
+
+    private var accessibilityState: GlassAccessibilityState {
+        return GlassAccessibilityMonitor.shared.state
+    }
+
     private var usesGlass: Bool {
-        return System.liquidGlass && !forceBlur
+        return System.liquidGlass && !forceBlur && !accessibilityState.prefersOpaque && !groupDisabled
+    }
+
+    public func glassEnvironmentDidChange() {
+        guard effectView != nil else {
+            return
+        }
+        rebuildEffectView()
+        applyAppearance(presentation)
+        applyBorder()
+        applyShadow()
     }
 
     public func setCustomTint(_ color: NSColor?, animated: Bool, duration: TimeInterval = 0.25) {
@@ -206,6 +221,14 @@ open class LiquidGlassView: View {
     /// from / added to a container so the first call after re-parenting
     /// always re-applies.
     public internal(set) var validGhostFrame: NSRect?
+    weak var mergeHost: NSView?
+
+    var hasGlassSurface: Bool {
+        if #available(macOS 26.0, *) {
+            return effectView is NSGlassEffectView
+        }
+        return false
+    }
 
     public init(frame: NSRect, cornerRadius: CGFloat = 16, hasShadow: Bool = true, hasBorder: Bool = true, tintAlpha: CGFloat = 0.3, forceAppearance: LiquidGlassAppearance? = nil, customTint: NSColor? = nil, forceBlur: Bool = false) {
         self.cornerRadius = cornerRadius
@@ -226,6 +249,7 @@ open class LiquidGlassView: View {
         layer?.masksToBounds = false
         backgroundColor = .clear
 
+        GlassAccessibilityMonitor.shared.register(self)
         rebuildEffectView()
 
         applyForceAppearance()
@@ -234,49 +258,24 @@ open class LiquidGlassView: View {
         applyBorder()
     }
 
-    /// Snapshot of the inputs that determine which `effectView` subclass
-    /// gets built (`AdaptiveGlassEffectView` / `NSVisualEffectView` /
-    /// plain `View`). `rebuildEffectView()` compares the previous
-    /// snapshot against the current one and short-circuits when they're
-    /// equal — recreating the effectView is expensive (SDF
-    /// resubscription, allocator churn, lost `customTint` overlay), and
-    /// the call sites (init, theme change, forceAppearance didSet) fire
-    /// far more often than the underlying inputs actually change.
-    private struct RebuildState: Equatable {
-        let usesGlass: Bool
-        let blurEnabled: Bool
-        let forceAppearance: LiquidGlassAppearance
-        let customTint: NSColor?
-
-        static func == (lhs: RebuildState, rhs: RebuildState) -> Bool {
-            guard lhs.usesGlass == rhs.usesGlass,
-                  lhs.blurEnabled == rhs.blurEnabled,
-                  lhs.forceAppearance == rhs.forceAppearance else {
-                return false
-            }
-            switch (lhs.customTint, rhs.customTint) {
-            case (nil, nil): return true
-            case let (l?, r?): return l.isEqual(r)
-            default: return false
-            }
-        }
-    }
-
-    private var rebuildState: RebuildState?
+    private var rebuildState: LiquidGlassRebuildKey?
+    private var appliedThemeKey: LiquidGlassThemeKey?
+    private var appliedTint = AppliedValueCache<NSColor>()
+    private var appliedEffectAppearance = AppliedValueCache<NSAppearance>()
+    private var appliedBorder = AppliedValueCache<LiquidGlassBorderKey>()
     private var appliedCornerRadius = AppliedValueCache<CGFloat>()
 
-    private func currentRebuildState() -> RebuildState {
-        return RebuildState(
+    private func currentRebuildState() -> LiquidGlassRebuildKey {
+        return LiquidGlassRebuildKey(
             usesGlass: usesGlass,
-            blurEnabled: System.blurEnabled,
-            forceAppearance: forceAppearance,
-            customTint: customTint
+            blurEnabled: System.blurEnabled && !groupDisabled,
+            forceAppearance: forceAppearance
         )
     }
 
-    private func rebuildEffectView() {
+    private func rebuildEffectView(force: Bool = false) {
         let newState = currentRebuildState()
-        if let cached = rebuildState, cached == newState, effectView != nil {
+        if !force, let cached = rebuildState, cached == newState, effectView != nil {
             // Same effect type and same appearance baking — nothing to do.
             // Downstream (`applyAppearance` etc.) refreshes tint/colors
             // without needing to recreate the view.
@@ -300,9 +299,15 @@ open class LiquidGlassView: View {
             return parent.subviews[idx - 1]
         }()
 
+        let previousHidden = effectView?.isHidden ?? isHidden
+        let previousAlpha = effectView?.alphaValue ?? 1
+
         effectView?.removeFromSuperview()
         effectView = nil
         appliedCornerRadius.invalidate()
+        appliedTint.invalidate()
+        appliedEffectAppearance.invalidate()
+        appliedBorder.invalidate()
 
         if newState.usesGlass {
             if #available(macOS 26.0, *) {
@@ -338,17 +343,34 @@ open class LiquidGlassView: View {
             }
         }
 
-        let target = previousSuperview ?? self
-        if let above = previousAboveSibling {
-            target.addSubview(effectView, positioned: .above, relativeTo: above)
-        } else if target === self {
-            target.addSubview(effectView, positioned: .below, relativeTo: nil)
+        let mergeTarget: NSView? = hasGlassSurface ? mergeHost : nil
+        let target: NSView
+        if mergeHost != nil {
+            target = mergeTarget ?? self
         } else {
-            target.addSubview(effectView)
+            target = previousSuperview ?? self
         }
-        if let previousFrame {
-            effectView.frame = previousFrame
+        if mergeHost != nil, previousSuperview !== target {
+            if target === self {
+                target.addSubview(effectView, positioned: .below, relativeTo: nil)
+            } else {
+                target.addSubview(effectView, positioned: .above, relativeTo: self)
+            }
+            effectView.frame = target === self ? NSRect(origin: .zero, size: bounds.size) : (validGhostFrame ?? frame)
+        } else {
+            if let above = previousAboveSibling {
+                target.addSubview(effectView, positioned: .above, relativeTo: above)
+            } else if target === self {
+                target.addSubview(effectView, positioned: .below, relativeTo: nil)
+            } else {
+                target.addSubview(effectView)
+            }
+            if let previousFrame {
+                effectView.frame = previousFrame
+            }
         }
+        effectView.isHidden = previousHidden
+        effectView.alphaValue = previousAlpha
 
 
         // Reset cached layout so updateLayout actually applies frame/cornerRadius
@@ -380,42 +402,52 @@ open class LiquidGlassView: View {
 
     open override func updateLocalizationAndTheme(theme: PresentationTheme) {
         super.updateLocalizationAndTheme(theme: theme)
-        rebuildEffectView()
+        let themeKey = LiquidGlassThemeKey(background: theme.colors.background, isDark: theme.colors.isDark)
+        let themeSwitched = LiquidGlassThemeSwitch.needsRebuild(previous: appliedThemeKey, current: themeKey, usesGlass: usesGlass)
+        appliedThemeKey = themeKey
+        rebuildEffectView(force: themeSwitched)
         applyAppearance(theme)
         applyBorder()
+    }
+
+    private func applyEffectAppearance(_ appearance: NSAppearance) {
+        guard appliedEffectAppearance.needsWrite(appearance) else {
+            return
+        }
+        effectView.appearance = appearance
     }
 
     private func applyAppearance(_ theme: PresentationTheme) {
         let palette: ColorPalette
         if followsTheme {
             palette = theme.colors
-            effectView.appearance = theme.appearance
+            applyEffectAppearance(theme.appearance)
             forceAppearance = theme.appearance.glassAppearance
         } else {
             switch forceAppearance {
             case .forceDark:
                 if #available(macOS 10.14, *) {
-                    effectView.appearance = NSAppearance(named: .darkAqua) ?? theme.appearance
+                    applyEffectAppearance(NSAppearance(named: .darkAqua) ?? theme.appearance)
                 } else {
-                    effectView.appearance = NSAppearance(named: .vibrantDark) ?? theme.appearance
+                    applyEffectAppearance(NSAppearance(named: .vibrantDark) ?? theme.appearance)
                 }
                 palette = darkPalette
             case .forceLight:
                 palette = whitePalette
-                effectView.appearance = NSAppearance(named: .aqua) ?? theme.appearance
+                applyEffectAppearance(NSAppearance(named: .aqua) ?? theme.appearance)
             case .automatic:
                 palette = theme.colors
-                effectView.appearance = theme.appearance
+                applyEffectAppearance(theme.appearance)
             }
         }
         if #available(macOS 26.0, *), let glass = effectView as? NSGlassEffectView {
-            // Set tintColor without an implicit Core Animation transaction. When
-            // this glass shares an NSGlassEffectContainerView with neighbouring
-            // ghosts, an in-flight tint animation can be picked up by the merged
-            // SDF surface and bleed onto adjacent ghosts for a frame or two.
-            
-            glass.tintColor = customTint ?? palette.background.withAlphaComponent(tintAlpha)
-
+            let tint = customTint ?? palette.background.withAlphaComponent(tintAlpha)
+            if appliedTint.needsWrite(tint) {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                glass.tintColor = tint
+                CATransaction.commit()
+            }
         } else if let visual = effectView as? NSVisualEffectView {
             if #available(macOS 10.14, *) {
                 let isDark = (visual.appearance ?? visual.effectiveAppearance).glassAppearance == .forceDark
@@ -425,9 +457,6 @@ open class LiquidGlassView: View {
             }
             applyTintOverlay(host: visual)
         } else if let solid = effectView {
-            // Solid-background fallback (glass and blur both disabled). Keep
-            // the base colour aligned with the current palette and compose
-            // any customTint on top via the overlay.
             solid.layer?.backgroundColor = palette.background.cgColor
             applyTintOverlay(host: solid)
         }
@@ -505,12 +534,22 @@ open class LiquidGlassView: View {
     }
 
     private func applyBorder() {
-        guard !usesGlass else {
+        let key = LiquidGlassBorderKey(usesGlass: usesGlass, hasBorder: hasBorder, isDark: presentation.colors.isDark, highContrast: accessibilityState.increaseContrast)
+        guard appliedBorder.needsWrite(key) else {
+            return
+        }
+        guard !key.usesGlass else {
             effectView.layer?.borderWidth = 0
             return
         }
-        if hasBorder {
-            let borderColor = presentation.colors.isDark
+        if key.hasBorder && key.highContrast {
+            let borderColor = key.isDark
+                ? NSColor.white.withAlphaComponent(0.55)
+                : NSColor.black.withAlphaComponent(0.55)
+            effectView.layer?.borderColor = borderColor.cgColor
+            effectView.layer?.borderWidth = 1
+        } else if key.hasBorder {
+            let borderColor = key.isDark
                 ? NSColor.white.withAlphaComponent(0.10)
                 : NSColor.black.withAlphaComponent(0.04)
             effectView.layer?.borderColor = borderColor.cgColor
@@ -554,4 +593,33 @@ open class LiquidGlassView: View {
     }
 
 
+}
+
+struct LiquidGlassRebuildKey: Equatable {
+    let usesGlass: Bool
+    let blurEnabled: Bool
+    let forceAppearance: LiquidGlassAppearance
+}
+
+struct LiquidGlassThemeKey: Equatable {
+    let background: NSColor
+    let isDark: Bool
+}
+
+enum LiquidGlassThemeSwitch {
+    static let rebuildsGlassOnThemeSwitch = true
+
+    static func needsRebuild(previous: LiquidGlassThemeKey?, current: LiquidGlassThemeKey, usesGlass: Bool) -> Bool {
+        guard rebuildsGlassOnThemeSwitch, usesGlass, let previous else {
+            return false
+        }
+        return previous != current
+    }
+}
+
+struct LiquidGlassBorderKey: Equatable {
+    let usesGlass: Bool
+    let hasBorder: Bool
+    let isDark: Bool
+    let highContrast: Bool
 }
