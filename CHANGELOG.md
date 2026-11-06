@@ -4,7 +4,7 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
-- **In-app update screen shows what changed** (tooling): `tg release-direct` now requires `--notes <file>` (the public release notes) and writes their `- ` bullets as an HTML list into the appcast item's `<description>` (`release.release_notes_html`, CDATA); the update screen already renders `itemDescription` (`UpdateNotes.plainText`), it was empty because the feed had no description. The notes file is read before the archive starts, so a file without bullets fails at once. Tests: `DirectReleaseTests` (`test_release_notes_html_*`, `test_appcast_entry_carries_release_notes`, `test_release_direct_cli_requires_notes`).
+- **In-app update screen shows what changed** (tooling): `tg release-direct` now requires `--notes <file>` (the public release notes) and writes the bullets of their first list (it ends at the first line that is not blank, a bullet or an indented continuation; commit e50bac52, follow-up 09308d06) as an HTML list into the appcast item's `<description>` (`release.release_notes_html`, CDATA); the update screen already renders `itemDescription` (`UpdateNotes.plainText`), it was empty because the feed had no description. The notes file is read before the archive starts, so a file without bullets fails at once. The notes path is relative to the directory `tg` was started in (`tg` exports `TG_CALLER_CWD`), a missing or non-UTF-8 file is a `ReleaseError`, the notes and the appcast are read and written as UTF-8. Tests: `DirectReleaseTests` (`test_release_notes_html_*`, `test_appcast_entry_carries_release_notes`, `test_release_direct_cli_requires_notes`).
 
 ## 13.1.0 (202611060301) — 2026-11-06
 
