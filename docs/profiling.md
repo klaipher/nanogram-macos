@@ -251,7 +251,10 @@ second performance wave: `chatControllerCreated` / `chatControllerDeinit` (event
 leak), `panelScrollTick`, `mouseMovedDispatch`, `modalOpenToVisible` (Mac), `launchToChatListUsable`,
 `resumeToFirstFrame`, `vp9ResumeCatchUp` (the replay after a hardware VP9 decoder is set up again) and
 `mediaBoxReopen` (event: a media file had to be opened again after its handle was evicted; Postbox also logs
-the open and re-open counts once a minute). Events use `NanogramSignposts.event(name)`.
+the open and re-open counts once a minute). Chat open on iOS, three events in order: `chatListRowTap` (the chat list
+row is tapped, `ChatListController` `peerSelected`), `navigationPush` (`NavigationController.pushViewController`)
+and `historyFirstContent` (the first history transition with entries is applied, `ChatHistoryListNodeImpl`, once per
+chat node). Events use `NanogramSignposts.event(name)`.
 
 Category `Performance` is **not** shown by the Points of Interest instrument that the Time Profiler, System
 Trace, CPU Profiler, Processor Trace and Allocations templates carry (Animation Hitches has none); add
