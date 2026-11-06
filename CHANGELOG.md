@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Early upstream picks (5, not yet in a released telegram-macos build)**, `cherry-pick -x` from telegram-macos master after a review of the 32 new commits (`upstream-mac-32-review.md`: these five rated low risk, no overlap with fork changes): #234 a9327d05 → 314a45a9 (privacy row click while the page loads is kept), #232 91926036 → d743d356 (capsule Premium button in the invite failure window), #144 46c5a65e → a02d1449 (AI editor keeps draft formatting), #218 fdcfb748 → 8479fad7 (spoiler media revealable in Recent Actions rows), #167 eaff4925 → b0a5619a (accessibility labels; English-only `//TODOLANG` strings). Not taken: #247 glass message bubbles (on by default, per-bubble backdrop, wallpaper rendered on main) and #166 profile header (scroll handler never removed); the rest waits for the next upstream build bump.
+
 ## 13.1.0 (202611061725) — 2026-11-06
 
 Source: `nanogram/integration` @ e3a71457 · core `klaipher/nanogram` `main` @ 30d1f328 (was b4703321 at the last release) · tgcalls `nanogram-shared` @ 57b914d (was 6f45f0cc) · tg_owt `nanogram-mac` @ 655db2eb · rlottie `telegram-ios-dev` @ 083f19a.
