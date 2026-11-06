@@ -119,8 +119,30 @@ open class LiquidGlassView: View {
 
     public let forceBlur: Bool
 
+    public var glassGroup: GlassGroup? {
+        didSet {
+            if GlassDebug.isDisabled(oldValue) != GlassDebug.isDisabled(glassGroup) {
+                glassEnvironmentDidChange()
+            }
+        }
+    }
+
+    private var groupDisabled: Bool {
+        return GlassDebug.isDisabled(glassGroup)
+    }
+
     private var usesGlass: Bool {
-        return System.liquidGlass && !forceBlur
+        return System.liquidGlass && !forceBlur && !groupDisabled
+    }
+
+    func glassEnvironmentDidChange() {
+        guard effectView != nil else {
+            return
+        }
+        rebuildEffectView()
+        applyAppearance(presentation)
+        applyBorder()
+        applyShadow()
     }
 
     public func setCustomTint(_ color: NSColor?, animated: Bool, duration: TimeInterval = 0.25) {
@@ -232,7 +254,7 @@ open class LiquidGlassView: View {
     private func currentRebuildState() -> LiquidGlassRebuildKey {
         return LiquidGlassRebuildKey(
             usesGlass: usesGlass,
-            blurEnabled: System.blurEnabled,
+            blurEnabled: System.blurEnabled && !groupDisabled,
             forceAppearance: forceAppearance
         )
     }

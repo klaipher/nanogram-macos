@@ -30,7 +30,11 @@ final class QrStudioToastView: View {
     private static let iconFrame = CGRect(x: 14.0, y: 0.0, width: 30.0, height: 30.0)
     private static let maxTextWidth: CGFloat = 270.0
 
-    private let glass = LiquidGlassView(frame: .zero, cornerRadius: 24.0, hasShadow: false, hasBorder: true, tintAlpha: 0.0, forceAppearance: .forceDark)
+    private let glass: LiquidGlassView = {
+        let view = LiquidGlassView(frame: .zero, cornerRadius: 24.0, hasShadow: false, hasBorder: true, tintAlpha: 0.0, forceAppearance: .forceDark)
+        view.glassGroup = .toasts
+        return view
+    }()
     private let contentView = View()
     private let contentMask = SimpleShapeLayer()
     private let iconView = ImageView(frame: .zero)

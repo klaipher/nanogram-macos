@@ -450,6 +450,7 @@ public func RichTextEditorController(context: any AccountContextProtocol, initia
             let toastSize = NSMakeSize(layout.layoutSize.width + 32, layout.layoutSize.height + 16)
             // Same frosted glass as the toolbar pills; fully rounded (pill).
             let glass = LiquidGlassView(frame: toastSize.bounds, cornerRadius: toastSize.height / 2, hasShadow: true, hasBorder: true)
+            glass.glassGroup = .toasts
             toast.addSubview(glass)
             toast.addSubview(textView)
             toast.setFrameSize(toastSize)

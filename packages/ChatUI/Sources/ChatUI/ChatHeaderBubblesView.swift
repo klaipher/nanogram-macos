@@ -261,7 +261,11 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
 
     private let glassWrapper: GlassContainerView
     private lazy var backGhostSlot = LazyGlassGhostSlot<LiquidGlassView>(
-        make: { LiquidGlassView(frame: .zero, cornerRadius: ChatHeaderBubblesView.bubbleHeight / 2, hasShadow: true, hasBorder: true, tintAlpha: 0.4) },
+        make: {
+            let view = LiquidGlassView(frame: .zero, cornerRadius: ChatHeaderBubblesView.bubbleHeight / 2, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
+            view.glassGroup = .chatHeader
+            return view
+        },
         attach: { [weak self] ghost in
             guard let self else { return }
             self.glassWrapper.addGhost(ghost)
@@ -472,6 +476,9 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         
         self.centerGhost = LiquidGlassView(frame: .zero, cornerRadius: cornerRadius, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
         self.rightGhost = LiquidGlassView(frame: .zero, cornerRadius: cornerRadius, hasShadow: true, hasBorder: true, tintAlpha: 0.4)
+
+        centerGhost.glassGroup = .chatHeader
+        rightGhost.glassGroup = .chatHeader
 
         super.init(frame: frameRect)
 

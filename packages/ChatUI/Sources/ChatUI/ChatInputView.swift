@@ -78,6 +78,14 @@ public final class InputMessageEffectView : Control {
     }
 }
 
+private extension LiquidGlassView {
+    static func inputRowGhost() -> LiquidGlassView {
+        let view = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
+        view.glassGroup = .inputRow
+        return view
+    }
+}
+
 public final class ChatInputContainerView: FlippableView {
     public let chatInteraction: ChatInteraction
 
@@ -120,7 +128,7 @@ public final class ChatInputContainerView: FlippableView {
     fileprivate var chatGhostTheme: TelegramPresentationTheme?
 
     private lazy var botMenuSlot = LazyGlassGhostSlot<LiquidGlassView>(
-        make: { LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true) },
+        make: { LiquidGlassView.inputRowGhost() },
         attach: { [weak self] ghost in
             guard let self else { return }
             self.glassWrapper.addGhost(ghost)
@@ -130,7 +138,7 @@ public final class ChatInputContainerView: FlippableView {
     )
 
     private lazy var keyboardGhostSlot = LazyGlassGhostSlot<LiquidGlassView>(
-        make: { LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true) },
+        make: { LiquidGlassView.inputRowGhost() },
         attach: { [weak self] ghost in
             guard let self else { return }
             self.glassWrapper.addGhost(ghost)
@@ -140,7 +148,7 @@ public final class ChatInputContainerView: FlippableView {
     )
 
     private lazy var keyboardGlassSlot = LazyGlassGhostSlot<LiquidGlassView>(
-        make: { LiquidGlassView(frame: NSZeroRect, cornerRadius: 20, hasShadow: true, hasBorder: true) },
+        make: { LiquidGlassView.inputRowGhost() },
         attach: { [weak self] glass in
             guard let self else { return }
             glass.isHidden = true
@@ -205,6 +213,9 @@ public final class ChatInputContainerView: FlippableView {
         let attachGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
         let textGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
         let voiceGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
+        attachGhost.glassGroup = .inputRow
+        textGhost.glassGroup = .inputRow
+        voiceGhost.glassGroup = .inputRow
         self.attachGhost = attachGhost
         self.textGhost = textGhost
         self.voiceGhost = voiceGhost

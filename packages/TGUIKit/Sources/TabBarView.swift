@@ -143,6 +143,8 @@ public class TabBarView: View {
         autoresizingMask = []
         backgroundColor = .clear
         layer?.masksToBounds = false
+        glass.glassGroup = .tabBar
+        liftedGlass.glassGroup = .tabBar
         glass.isEventLess = true
         selectionView.isEventLess = true
         selectionView.layer?.masksToBounds = false
