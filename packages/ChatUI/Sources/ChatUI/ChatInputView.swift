@@ -114,11 +114,55 @@ public final class ChatInputContainerView: FlippableView {
     public var attachGhost: LiquidGlassView?
     public var textGhost: LiquidGlassView?
     public var voiceGhost: LiquidGlassView?
-    public var botMenuGhost: LiquidGlassView?
-    public var keyboardGhost: LiquidGlassView?
+    public var botMenuGhost: LiquidGlassView? { botMenuSlot.ghost }
+    public var keyboardGhost: LiquidGlassView? { keyboardGhostSlot.ghost }
+
+    fileprivate var chatGhostTheme: TelegramPresentationTheme?
+
+    private lazy var botMenuSlot = LazyGlassGhostSlot<LiquidGlassView>(
+        make: { LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true) },
+        attach: { [weak self] ghost in
+            guard let self else { return }
+            self.glassWrapper.addGhost(ghost)
+            ghost.isHidden = true
+            self.styleLazyGhost(ghost)
+        }
+    )
+
+    private lazy var keyboardGhostSlot = LazyGlassGhostSlot<LiquidGlassView>(
+        make: { LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true) },
+        attach: { [weak self] ghost in
+            guard let self else { return }
+            self.glassWrapper.addGhost(ghost)
+            ghost.isHidden = true
+            self.styleLazyGhost(ghost)
+        }
+    )
+
+    private lazy var keyboardGlassSlot = LazyGlassGhostSlot<LiquidGlassView>(
+        make: { LiquidGlassView(frame: NSZeroRect, cornerRadius: 20, hasShadow: true, hasBorder: true) },
+        attach: { [weak self] glass in
+            guard let self else { return }
+            glass.isHidden = true
+            self.addSubview(glass, positioned: .below, relativeTo: self.bottomView)
+        }
+    )
+
+    public var keyboardGlass: LiquidGlassView? { keyboardGlassSlot.ghost }
+
+    private func styleLazyGhost(_ ghost: LiquidGlassView) {
+        guard let theme = chatGhostTheme else {
+            return
+        }
+        ghost.updateLocalizationAndTheme(theme: theme)
+        ghost.customTint = theme.colors.background.withAlphaComponent(0.4)
+    }
+
+    public func ensureBotMenuGhost() -> LiquidGlassView? {
+        return botMenuSlot.resolve(isNeeded: true)
+    }
 
     public let bottomView: ScrollView = ScrollView()
-    public let keyboardGlass = LiquidGlassView(frame: NSZeroRect, cornerRadius: 20, hasShadow: true, hasBorder: true)
 
     public var botMenuView: ChatInputMenuView?
     public var sendAsView: ChatInputSendAsView?
@@ -161,19 +205,13 @@ public final class ChatInputContainerView: FlippableView {
         let attachGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
         let textGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
         let voiceGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
-        let botMenuGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
-        let keyboardGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
         self.attachGhost = attachGhost
         self.textGhost = textGhost
         self.voiceGhost = voiceGhost
-        self.botMenuGhost = botMenuGhost
-        self.keyboardGhost = keyboardGhost
 
         glassWrapper.addGhost(attachGhost)
         glassWrapper.addGhost(textGhost)
         glassWrapper.addGhost(voiceGhost)
-        glassWrapper.addGhost(botMenuGhost)
-        glassWrapper.addGhost(keyboardGhost)
 
         sendButton.setMediaActionInnerGlassHidden(true)
         sendButton.setSharedGlassGhost(voiceGhost)
@@ -191,7 +229,6 @@ public final class ChatInputContainerView: FlippableView {
         // bottomView (keyboard markup scroll area) + keyboardGlass live in the
         // container so they're hidden together when the input state changes
         // (recording / action panel / etc. via container.isHidden).
-        keyboardGlass.isHidden = true
         bottomView.documentView = ReplyMarkupContainerView()
         bottomView.layer?.cornerRadius = 16
         bottomView.documentView?.background = .clear
@@ -199,7 +236,6 @@ public final class ChatInputContainerView: FlippableView {
         bottomView.contentView.backgroundColor = .clear
         bottomView.background = .clear
         bottomView.backgroundColor = .clear
-        self.addSubview(keyboardGlass)
         self.addSubview(bottomView)
     }
 
@@ -334,7 +370,7 @@ public final class ChatInputContainerView: FlippableView {
         // hidden — `keyboardGlassHeight <= 0` hides it in that state.
         let keyboardInset: CGFloat = 3
         let glassFrame = NSMakeRect(13, keyboardGlassY, keyboardWidth, keyboardGlassHeight)
-        if inputRowGlassContainer == nil {
+        if inputRowGlassContainer == nil, let keyboardGlass = keyboardGlassSlot.resolve(isNeeded: keyboardGlassHeight > 0) {
             transition.updateFrame(view: keyboardGlass, frame: glassFrame)
             keyboardGlass.updateLayout(size: glassFrame.size, transition: transition)
             keyboardGlass.isHidden = keyboardGlassHeight <= 0
@@ -438,6 +474,13 @@ public final class ChatInputContainerView: FlippableView {
             }
         }
 
+        let keyboardGhostExisted = keyboardGhostSlot.isCreated
+        let botMenuGhost = botMenuSlot.resolve(isNeeded: botTarget != nil)
+        let keyboardGhost = keyboardGhostSlot.resolve(isNeeded: keyboardGlassHeight > 0 && morphSlots == nil)
+        if !keyboardGhostExisted, let keyboardGhost {
+            let collapsedY = chatInteraction.presentation.isKeyboardShown ? glassBottomMargin : 0
+            glassWrapper.setGhostFrame(keyboardGhost, frame: NSMakeRect(glassFrame.minX, collapsedY, glassFrame.width, 0), transition: .immediate)
+        }
         let botMenuAppearing = transition.isAnimated && morphSlots == nil && botMenuGhost.map { $0.frame == .zero || $0.isHidden } == true
         keyboardGhost?.isHidden = keyboardGlassHeight <= 0 || morphSlots != nil
         botMenuGhost?.isHidden = botTarget == nil
@@ -652,14 +695,8 @@ public class ChatInputView: View, Notifable {
         get { container.voiceGhost }
         set { container.voiceGhost = newValue }
     }
-    public var botMenuGhost: LiquidGlassView? {
-        get { container.botMenuGhost }
-        set { container.botMenuGhost = newValue }
-    }
-    public var keyboardGhost: LiquidGlassView? {
-        get { container.keyboardGhost }
-        set { container.keyboardGhost = newValue }
-    }
+    public var botMenuGhost: LiquidGlassView? { container.botMenuGhost }
+    public var keyboardGhost: LiquidGlassView? { container.keyboardGhost }
 
     public var botMenuView: ChatInputMenuView? {
         get { container.botMenuView }
@@ -671,7 +708,6 @@ public class ChatInputView: View, Notifable {
     }
 
     private var bottomView: ScrollView { container.bottomView }
-    private var keyboardGlass: LiquidGlassView { container.keyboardGlass }
 
 
     private var messageActionsPanelView: MessageActionsPanelView?
@@ -1214,6 +1250,7 @@ public class ChatInputView: View, Notifable {
         // leaves it visually stale). Without this, the merged SDF surface
         // keeps the previous theme's tint until something else triggers a
         // ghost rebuild (resize, reparent, etc.).
+        container.chatGhostTheme = theme
         attachGhost?.updateLocalizationAndTheme(theme: theme)
         textGhost?.updateLocalizationAndTheme(theme: theme)
         voiceGhost?.updateLocalizationAndTheme(theme: theme)
@@ -1912,7 +1949,7 @@ public class ChatInputView: View, Notifable {
                 self.botMenuView = current
                 contentView.addSubview(current)
                 current.setInnerGlassHidden(true)
-                current.setSharedGlassGhost(botMenuGhost)
+                current.setSharedGlassGhost(container.ensureBotMenuGhost())
 
                 if animated {
                     current.layer?.animateAlpha(from: 0, to: 1, duration: 0.2)
