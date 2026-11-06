@@ -13,7 +13,7 @@ Everything goes through `tools/dev/tg`. Run `tools/dev/tg help` for the command 
 | `tg sync-upstream` | merge upstream telegram-macos (see Keeping up with upstream) |
 | `tg sparkle-key [sign <archive>]` | the direct edition's EdDSA update key |
 | `tg testflight [--export-only]` | archive, export and upload the App Store edition |
-| `tg release-direct [--allow-dirty]` | notarized dmg, appcast and source archive for the direct edition |
+| `tg release-direct --notes <file> [--allow-dirty]` | notarized dmg, appcast (with the public notes) and source archive for the direct edition |
 
 The settings live in our own files (`nanogram/`, `tools/dev/`, `packages/Nanogram*`); upstream's project files
 and manifests change only by small, marked hook lines.
@@ -325,10 +325,13 @@ Xcode's automatic signing through the App Store Connect API key (`~/.config/tele
   one line if not. `--export-only` signs and stops. The export asks App Store Connect for the next build number
   and has once hung there for 14 minutes; it now stops after 600 s with a "run it again" line, and the retry of the
   same archive usually finishes in about a minute.
-- `tg release-direct [--allow-dirty]`: direct edition, exported with Developer ID, notarized (`notarytool`) and
+- `tg release-direct --notes <file> [--allow-dirty]`: direct edition, exported with Developer ID, notarized (`notarytool`) and
   stapled, put in an APFS ULFO `.dmg` that is signed with the same Developer ID (Gatekeeper checks the disk
   image's own signature), notarized and stapled too, signed for Sparkle (`appcast.xml`, one item,
-  enclosure `…/releases/download/v<version>-<build>/Nanogram-<version>-<build>.dmg`), plus
+  enclosure `…/releases/download/v<version>-<build>/Nanogram-<version>-<build>.dmg`; the bullets of the
+  first list in the public notes file (UTF-8; a relative path is taken from the directory you run `tg` in; the list
+  ends at the first line that is not blank, a bullet or an indented continuation) become the item's `<description>`,
+  which the in-app update screen shows), plus
   `Nanogram-<version>-<build>-source.tar.gz` (`git archive` of the superproject and every submodule). It refuses
   uncommitted tracked changes, so the source archive matches the binary. Nothing is uploaded: the owner creates
   the GitHub release in `klaipher/nanogram-releases` with the dmg, `appcast.xml` and the source archive. When

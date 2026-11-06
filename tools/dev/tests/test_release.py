@@ -464,6 +464,67 @@ class DirectReleaseTests(unittest.TestCase):
         self.assertEqual(root.find("channel/link").text,
                          "https://github.com/klaipher/nanogram-releases/releases/latest/download/appcast.xml")
 
+    def test_release_notes_html_keeps_only_bullets(self):
+        notes = ("Nanogram is an unofficial Telegram client.\n\n**What's better in this update**\n"
+                 "- Calls: **screen sharing** stops <reliably> & fast.\n"
+                 "• Chats open faster.\n\n**Requirements:** macOS 15.\n")
+        self.assertEqual(release.release_notes_html(notes),
+                         "<ul><li>Calls: screen sharing stops &lt;reliably&gt; &amp; fast.</li>"
+                         "<li>Chats open faster.</li></ul>")
+
+    def test_release_notes_html_takes_only_the_first_list(self):
+        notes = ("**What's better**\n- First.\n\n- Second,\n  wrapped.\n\n"
+                 "## Requirements\n- macOS 15\n- Apple Silicon\n")
+        self.assertEqual(release.release_notes_html(notes), "<ul><li>First.</li><li>Second, wrapped.</li></ul>")
+        self.assertEqual(release.release_notes_html("- A\nText ends the list.\n- B\n"), "<ul><li>A</li></ul>")
+
+    def test_release_notes_html_keeps_non_ascii_text(self):
+        self.assertEqual(release.release_notes_html("- Дзвінки: краща картинка\n"),
+                         "<ul><li>Дзвінки: краща картинка</li></ul>")
+
+    def test_a_relative_notes_path_is_resolved_against_the_callers_directory(self):
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as elsewhere:
+            (Path(tmp) / "notes.md").write_text("- Дзвінки\n", encoding="utf-8")
+            with mock.patch.dict(release.os.environ, {release.CALLER_CWD_ENV: tmp}):
+                self.assertEqual(release.read_release_notes(Path("notes.md")), "- Дзвінки\n")
+            self.assertEqual(release.read_release_notes(Path("notes.md"), base=Path(tmp)), "- Дзвінки\n")
+            self.assertEqual(release.read_release_notes(Path(tmp) / "notes.md", base=Path(elsewhere)), "- Дзвінки\n")
+
+    def test_a_missing_or_undecodable_notes_file_is_a_release_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(release.ReleaseError):
+                release.read_release_notes(Path("missing.md"), base=Path(tmp))
+            (Path(tmp) / "bad.md").write_bytes(b"\xff\xfe- x")
+            with self.assertRaises(release.ReleaseError):
+                release.read_release_notes(Path("bad.md"), base=Path(tmp))
+
+    def test_main_reports_a_missing_notes_file_without_a_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch("sys.stderr"), \
+                mock.patch.dict(release.os.environ, {release.CALLER_CWD_ENV: tmp}):
+            self.assertEqual(release.main(["release-direct", "--notes", "missing.md"]), 1)
+
+    def test_release_notes_html_rejects_notes_without_bullets(self):
+        with self.assertRaises(release.ReleaseError):
+            release.release_notes_html("Just a paragraph.\n")
+
+    def test_appcast_entry_carries_release_notes(self):
+        import xml.etree.ElementTree as ET
+        with tempfile.TemporaryDirectory() as tmp:
+            dmg = Path(tmp) / "Nanogram-13.1.0-4242.dmg"
+            dmg.write_bytes(b"x")
+            entry = release.appcast_entry("13.1.0", "4242", dmg, "c2ln", "https://example.org/a.dmg",
+                                          notes_html="<ul><li>A ]]> B</li></ul>")
+            plain = release.appcast_entry("13.1.0", "4242", dmg, "c2ln", "https://example.org/a.dmg")
+        item = ET.fromstring(release.appcast([entry])).find("channel/item")
+        self.assertEqual(item.find("description").text, "<ul><li>A ]]> B</li></ul>")
+        self.assertIsNone(ET.fromstring(release.appcast([plain])).find("channel/item/description"))
+
+    def test_release_direct_cli_requires_notes(self):
+        with mock.patch.object(release, "release_direct") as direct, \
+                mock.patch("sys.stderr"), self.assertRaises(SystemExit):
+            release.main(["release-direct"])
+        direct.assert_not_called()
+
     def test_source_archive_includes_submodules(self):
         import tarfile
         with tempfile.TemporaryDirectory() as tmp:
