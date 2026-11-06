@@ -221,6 +221,14 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
     /// from / added to a container so the first call after re-parenting
     /// always re-applies.
     public internal(set) var validGhostFrame: NSRect?
+    weak var mergeHost: NSView?
+
+    var hasGlassSurface: Bool {
+        if #available(macOS 26.0, *) {
+            return effectView is NSGlassEffectView
+        }
+        return false
+    }
 
     public init(frame: NSRect, cornerRadius: CGFloat = 16, hasShadow: Bool = true, hasBorder: Bool = true, tintAlpha: CGFloat = 0.3, forceAppearance: LiquidGlassAppearance? = nil, customTint: NSColor? = nil, forceBlur: Bool = false) {
         self.cornerRadius = cornerRadius
@@ -335,16 +343,31 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
             }
         }
 
-        let target = previousSuperview ?? self
-        if let above = previousAboveSibling {
-            target.addSubview(effectView, positioned: .above, relativeTo: above)
-        } else if target === self {
-            target.addSubview(effectView, positioned: .below, relativeTo: nil)
+        let mergeTarget: NSView? = hasGlassSurface ? mergeHost : nil
+        let target: NSView
+        if mergeHost != nil {
+            target = mergeTarget ?? self
         } else {
-            target.addSubview(effectView)
+            target = previousSuperview ?? self
         }
-        if let previousFrame {
-            effectView.frame = previousFrame
+        if mergeHost != nil, previousSuperview !== target {
+            if target === self {
+                target.addSubview(effectView, positioned: .below, relativeTo: nil)
+            } else {
+                target.addSubview(effectView, positioned: .above, relativeTo: self)
+            }
+            effectView.frame = target === self ? NSRect(origin: .zero, size: bounds.size) : (validGhostFrame ?? frame)
+        } else {
+            if let above = previousAboveSibling {
+                target.addSubview(effectView, positioned: .above, relativeTo: above)
+            } else if target === self {
+                target.addSubview(effectView, positioned: .below, relativeTo: nil)
+            } else {
+                target.addSubview(effectView)
+            }
+            if let previousFrame {
+                effectView.frame = previousFrame
+            }
         }
         effectView.isHidden = previousHidden
         effectView.alphaValue = previousAlpha
