@@ -233,7 +233,7 @@ public final class ChatInputSendButton: View {
         send.layer?.cornerRadius = ChatInputSendButton.fieldSize.height / 2
         send.layer?.masksToBounds = false
 
-        voice.setGlassEffect(size: NSMakeSize(40, 40))
+        voice.setGlassEffect(size: NSMakeSize(40, 40), deferInnerGlass: true)
         voice.setFrameSize(NSMakeSize(40, 40))
         voice.updateLayout()
         updateVoiceIcon(animated: false)
@@ -245,7 +245,7 @@ public final class ChatInputSendButton: View {
             context.fillPath()
         })!
         stop.set(image: stopIcon, for: .Normal)
-        stop.setGlassEffect(size: NSMakeSize(40, 40))
+        stop.setGlassEffect(size: NSMakeSize(40, 40), deferInnerGlass: true)
         stop.sizeToFit(.zero, NSMakeSize(40, 40), thatFit: true)
 
         inlineCancel.set(image: theme.icons.chatInlineDismiss, for: .Normal)
@@ -371,7 +371,7 @@ public final class ChatInputSendButton: View {
             slowModeTimeout.layer?.cornerRadius = 20
             slowModeTimeout.set(background: .clear, for: .Normal)
             if isBoost {
-                slowModeTimeout.setGlassEffect(size: NSMakeSize(slowModeTimeout.frame.width, 40), tintColor: premiumGradient[1])
+                slowModeTimeout.setGlassEffect(size: NSMakeSize(slowModeTimeout.frame.width, 40), tintColor: premiumGradient[1], deferInnerGlass: true)
                 slowModeTimeout.glassTintColor = premiumGradient[1]
                 slowModeTimeout.set(color: .white, for: .Normal)
             } else {

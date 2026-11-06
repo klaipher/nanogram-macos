@@ -53,6 +53,7 @@ open class ImageButton: Button {
     private var _glassTouchProxy: View?
     private var _deferredInitialAppearance: LiquidGlassAppearance?
     private var _deferredAppearanceOverride: LiquidGlassAppearance?
+    private var _lastGlassTheme: PresentationTheme?
 
     private var hasGlassEffect: Bool {
         return _glassView != nil || _glassDeferred
@@ -75,7 +76,7 @@ open class ImageButton: Button {
                 return glass.forceAppearance
             }
             if _glassDeferred {
-                return _deferredAppearanceOverride ?? _deferredInitialAppearance ?? presentation.appearance.glassAppearance
+                return _deferredAppearanceOverride ?? _deferredInitialAppearance ?? (_lastGlassTheme ?? presentation).appearance.glassAppearance
             }
             return .automatic
         }
@@ -140,9 +141,9 @@ open class ImageButton: Button {
         return target
     }
 
-    public func setGlassEffect(size: NSSize? = nil, tintColor: NSColor? = nil, forceAppearance: LiquidGlassAppearance? = nil, interactive: Bool = true) {
+    public func setGlassEffect(size: NSSize? = nil, tintColor: NSColor? = nil, forceAppearance: LiquidGlassAppearance? = nil, interactive: Bool = true, deferInnerGlass: Bool = false) {
         guard !hasGlassEffect else { return }
-        if GlassChromeReuse.isEnabled {
+        if deferInnerGlass && GlassChromeReuse.isEnabled {
             setDeferredGlassEffect(size: size, tintColor: tintColor, forceAppearance: forceAppearance, interactive: interactive)
             return
         }
@@ -170,6 +171,7 @@ open class ImageButton: Button {
             glass.isHidden = hidden
         } else if _glassDeferred, !hidden {
             materializeDeferredGlass()
+            needsLayout = true
         }
     }
 
@@ -208,11 +210,10 @@ open class ImageButton: Button {
         if let override = _deferredAppearanceOverride {
             glass.forceAppearance = override
         }
-        glass.updateLocalizationAndTheme(theme: presentation)
+        glass.updateLocalizationAndTheme(theme: _lastGlassTheme ?? presentation)
         let gs = _glassSize ?? frame.size
         glass.frame = NSMakeRect((frame.width - gs.width) / 2, (frame.height - gs.height) / 2, gs.width, gs.height)
         glass.updateLayout(size: gs, transition: .immediate)
-        needsLayout = true
     }
 
     public var glassSize: NSSize? {
@@ -514,6 +515,7 @@ open class ImageButton: Button {
             let gx = (size.width - gs.width) / 2
             let gy = (size.height - gs.height) / 2
             transition.updateFrame(view: proxy, frame: NSMakeRect(gx, gy, gs.width, gs.height))
+            proxy.layer?.cornerRadius = min(gs.width, gs.height) / 2
         }
     }
     
@@ -527,6 +529,7 @@ open class ImageButton: Button {
 
     open override func updateLocalizationAndTheme(theme: PresentationTheme) {
         super.updateLocalizationAndTheme(theme: theme)
+        _lastGlassTheme = theme
         _glassView?.updateLocalizationAndTheme(theme: theme)
     }
 

@@ -590,7 +590,7 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         let buttonSize = NSMakeSize(Self.bubbleHeight, Self.bubbleHeight)
 
         updateBackButtonIcon()
-        backButton.setGlassEffect(size: buttonSize)
+        backButton.setGlassEffect(size: buttonSize, deferInnerGlass: true)
         backButton.sizeToFit(NSZeroSize, buttonSize, thatFit: true)
 
         searchButton.set(image: theme.icons.chat_header_search, for: .Normal)

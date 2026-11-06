@@ -44,7 +44,7 @@ public final class GlassGhostPool {
         if var list = storage[spec], let view = list.popLast() {
             storage[spec] = list
             reusedCount += 1
-            view.prepareForReuse()
+            view.resetForGlassReuse()
             view.glassGroup = spec.group
             view.glassReuseSpec = spec
             return view
@@ -64,7 +64,7 @@ public final class GlassGhostPool {
             droppedCount += 1
             return
         }
-        view.prepareForReuse()
+        view.resetForGlassReuse()
         storage[spec, default: []].append(view)
     }
 

@@ -89,7 +89,7 @@ final class GlassGhostPoolTests: XCTestCase {
         XCTAssertTrue(reused.effectView.superview === reused)
         XCTAssertTrue(CATransform3DIsIdentity(reused.layer?.transform ?? CATransform3DIdentity))
         let before = appearanceCalls
-        reused.updateLocalizationAndTheme(theme: reused.presentation)
+        reused.updateLocalizationAndTheme(theme: presentation)
         XCTAssertEqual(appearanceCalls, before)
     }
 

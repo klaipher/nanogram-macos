@@ -224,7 +224,7 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
 
     public internal(set) var glassReuseSpec: GlassGhostSpec?
 
-    func prepareForReuse() {
+    func resetForGlassReuse() {
         onAppearanceChange = nil
         glassGroup = nil
         customTint = nil
@@ -245,7 +245,6 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
         effectView.frame = .zero
         validGhostFrame = nil
         validLayout = nil
-        appliedThemeKey = nil
         appliedCornerRadius.invalidate()
         writeCornerRadius(cornerRadius)
     }
