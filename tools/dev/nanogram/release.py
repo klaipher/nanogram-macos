@@ -56,7 +56,7 @@ EXPORT_TIMEOUT = 600
 
 __all__ = ["AscKey", "asc_key", "build_number", "marketing_version", "conditions", "release_settings", "distribution_entitlements", "enhanced_security_requested",
            "archive_command", "archive", "export_options", "export", "set_build_number", "ensure_mac_platform",
-           "upload_mas", "unsign_resource_bundles", "check_distribution_signing", "check_exported_app", "enhanced_security_problems", "testflight", "notarize", "make_dmg", "appcast_entry", "appcast", "source_archive",
+           "upload_mas", "unsign_resource_bundles", "check_distribution_signing", "check_exported_app", "enhanced_security_problems", "enhanced_security_unbacked_problems", "testflight", "notarize", "make_dmg", "appcast_entry", "appcast", "source_archive",
            "release_direct", "build_info_text", "git_state", "build_warnings", "has_unreleased_entries", "dwarf_uuids",
            "archive_dsyms", "record_build"]
 
@@ -327,7 +327,7 @@ def signed_entitlements(bundle: Path) -> dict:
         return {}
 
 
-def embedded_profile_entitlements(app: Path) -> dict | None:
+def embedded_profile(app: Path) -> dict | None:
     path = Path(app) / "Contents" / "embedded.provisionprofile"
     if not path.is_file():
         return None
@@ -335,13 +335,24 @@ def embedded_profile_entitlements(app: Path) -> dict | None:
     if result.returncode != 0:
         return {}
     try:
-        return plistlib.loads(result.stdout).get("Entitlements", {})
+        return plistlib.loads(result.stdout)
     except (plistlib.InvalidFileException, ValueError):
         return {}
 
 
+def embedded_profile_entitlements(app: Path) -> dict | None:
+    profile = embedded_profile(app)
+    return None if profile is None else profile.get("Entitlements", {})
+
+
+def embedded_profile_expiry(app: Path) -> datetime.datetime | None:
+    expiry = (embedded_profile(app) or {}).get("ExpirationDate")
+    return expiry if isinstance(expiry, datetime.datetime) else None
+
+
 def enhanced_security_problems(app: Path, entitlements_of=signed_entitlements,
-                               profile_of=embedded_profile_entitlements) -> list[str]:
+                               profile_of=embedded_profile_entitlements, expiry_of=embedded_profile_expiry,
+                               now: datetime.datetime | None = None) -> list[str]:
     name = Path(app).name
     grant = enhanced_security_module.PREFIX
     signed = entitlements_of(Path(app))
@@ -349,10 +360,43 @@ def enhanced_security_problems(app: Path, entitlements_of=signed_entitlements,
                 for key, value in enhanced_security_module.SOFT_MODE_KEYS.items() if signed.get(key) != value]
     profile = profile_of(Path(app))
     if profile is None:
-        problems.append(f"{name} embeds no provisioning profile that could grant {grant}")
+        problems.append(f"{name} embeds no provisioning profile (Contents/embedded.provisionprofile) that could "
+                        f"grant {grant}")
     elif profile.get(grant) is not True:
         problems.append(f"the provisioning profile of {name} does not grant {grant}")
+    else:
+        expiry = expiry_of(Path(app))
+        now = now or datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        if expiry is not None and expiry.replace(tzinfo=None) <= now:
+            problems.append(f"the provisioning profile of {name} expired on {expiry:%Y-%m-%d}")
     return problems
+
+
+def enhanced_security_unbacked_problems(app: Path, entitlements_of=signed_entitlements,
+                                        profile_of=embedded_profile_entitlements) -> list[str]:
+    problems = []
+    grant = enhanced_security_module.PREFIX
+    for item in nested_code(app)[1:]:
+        if not item.is_dir():
+            continue
+        carried = sorted(key for key in entitlements_of(item) if key.startswith(grant))
+        if not carried:
+            continue
+        where = item.relative_to(Path(app).parent)
+        profile = profile_of(item)
+        if profile is None:
+            problems.append(f"{where} is signed with {', '.join(carried)} but embeds no provisioning profile; "
+                            "a restricted entitlement without a profile keeps the bundle from launching")
+        elif profile.get(grant) is not True:
+            problems.append(f"{where} is signed with {', '.join(carried)} but its provisioning profile does not "
+                            f"grant {grant}; a restricted entitlement the profile does not grant keeps the bundle "
+                            "from launching")
+    return problems
+
+
+ENHANCED_SECURITY_HINT = ("Enhanced Security needs the capability on the macOS App ID in the developer portal and a "
+                          "Developer ID profile that grants it; fix that, or release without it by unsetting "
+                          f"{ENHANCED_SECURITY_ENV}")
 
 
 def check_exported_app(app: Path, edition: str, enhanced_security: bool | None = None) -> None:
@@ -360,11 +404,16 @@ def check_exported_app(app: Path, edition: str, enhanced_security: bool | None =
         enhanced_security = enhanced_security_requested()
     problems = check_distribution_signing(app, edition)
     problems += [f"Apple system font in the bundle (ITMS-91182): {font}" for font in apple_fonts(app)]
+    enhanced_security_failed = False
     if enhanced_security:
-        problems += enhanced_security_problems(app)
+        found = enhanced_security_problems(app) + enhanced_security_unbacked_problems(app)
+        enhanced_security_failed = bool(found)
+        problems += found
     if problems:
         for problem in problems:
             print(f"release: {problem}", file=sys.stderr)
+        if enhanced_security_failed:
+            print(f"release: {ENHANCED_SECURITY_HINT}", file=sys.stderr)
         raise ReleaseError(f"the exported {edition} app failed its signing checks ({len(problems)} problems, "
                            "see above)")
     print(f"==> every nested code item of {Path(app).name} is signed for {edition} distribution", flush=True)

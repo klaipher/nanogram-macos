@@ -120,6 +120,8 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
     
     private var adContext: AdMessagesHistoryContext?
     private let adStateDisposable = MetaDisposable()
+    private var didStartLoading = false
+    private let playerStatus = Promise<MediaPlayerStatus>()
     private let nextAdDisposable = MetaDisposable()
 
     public init(context: any AccountContextProtocol, reference: FileMediaReference, message: Message?, fetchAutomatically: Bool = false, isProtected: Bool = false, isControlsLimited: Bool = false) {
@@ -169,16 +171,25 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         mediaControls.clearNowPlaying()
     }
 
+    private var player: (UniversalVideoContentView & NSView) {
+        loadViewIfNeeded()
+        return mediaPlayer
+    }
+
+    public var isPlayerCreated: Bool {
+        return isLoaded()
+    }
+
     public var status: Signal<MediaPlayerStatus, NoError> {
-        return mediaPlayer.status
+        return player.status
     }
     
     public func play(_ startTime: TimeInterval? = nil) {
         activateMediaControls()
         if let startTime = startTime, startTime > 0 {
-            mediaPlayer.seek(startTime, play: true)
+            player.seek(startTime, play: true)
         } else {
-            mediaPlayer.play()
+            player.play()
         }
         self.isPaused = false
         self.frameStepTimestamp = nil
@@ -186,7 +197,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
     }
     
     public func setBaseRate(_ baseRate: Double) {        
-        mediaPlayer.setBaseRate(baseRate)
+        player.setBaseRate(baseRate)
         FastSettings.setPlayingVideoRate(baseRate)
     }
     
@@ -197,13 +208,15 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         if !self.isPaused {
             self.genericView.hideFrameStepOverlay()
         }
-        mediaPlayer.togglePlayPause()
+        player.togglePlayPause()
     }
 
     public func pause() {
         self.isPaused = true
         self.frameStepTimestamp = nil
-        mediaPlayer.pause()
+        if isLoaded() {
+            mediaPlayer.pause()
+        }
     }
 
     public func play() {
@@ -488,8 +501,11 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         }
     }
     
-    public override func viewDidLoad() {
-        super.viewDidLoad()
+    public func startLoading() {
+        if didStartLoading {
+            return
+        }
+        didStartLoading = true
         
         let account = self.account
         
@@ -518,7 +534,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
             
             var invoked: Bool = false
             
-            adStateDisposable.set(combineLatest(queue:.mainQueue(), adContext.state, status).startStrict(next: { [weak self] values in
+            adStateDisposable.set(combineLatest(queue:.mainQueue(), adContext.state, playerStatus.get()).startStrict(next: { [weak self] values in
                
                 let ( _, messages, startDelay, betweenDelay) = values.0
                 let status = values.1
@@ -531,8 +547,13 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
                 }
             }))
         }
-
-
+    }
+    
+    public override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        startLoading()
+        playerStatus.set(mediaPlayer.status)
         
         genericView.layerContentsRedrawPolicy = .duringViewResize
 
@@ -781,7 +802,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
                 state.view.addSubview(view)
                 
                 genericView.set(isInFullScreen: false)
-                mediaPlayer.setVideoLayerGravity(.resizeAspectFill)
+                player.setVideoLayerGravity(.resizeAspectFill)
 
                 
                 window.removeAllHandlers(for: self)
@@ -793,7 +814,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
                 self.fullScreenRestoreState = nil
             } else {
                 
-                mediaPlayer.setVideoLayerGravity(.resizeAspect)
+                player.setVideoLayerGravity(.resizeAspect)
 
                 
                 fullScreenRestoreState = (rect: view.frame, view: view.superview!)
@@ -832,7 +853,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         partDisposable.dispose()
         frameStepDisposable?.dispose()
         scrubbingFrameDisposable?.dispose()
-        if let endPlaybackId {
+        if let endPlaybackId, let mediaPlayer {
             mediaPlayer.removePlaybackCompleted(endPlaybackId)
         }
         updateControls?.invalidate()

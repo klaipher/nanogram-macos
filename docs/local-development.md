@@ -338,6 +338,17 @@ Xcode's automatic signing through the App Store Connect API key (`~/.config/tele
   `notarytool`'s polling times out after Apple has the upload, it waits on that submission id instead of failing.
   Check a dmg with `xcrun stapler validate <dmg>` and
   `spctl -a -t open --context context:primary-signature -vv <dmg>` ("accepted", "Notarized Developer ID").
+- Enhanced Security (soft mode) on a release, off by default: `NANOGRAM_ENHANCED_SECURITY=1 tools/dev/tg release-direct`
+  (or `tg testflight`). It signs the main app with the `*-EnhancedSecurity.entitlements` variant and, after the export,
+  `check_exported_app` stops the release unless the exported app's signature carries the four soft-mode keys
+  (`hardened-process`, `enhanced-security-version-string` "1", `checked-allocations`, `checked-allocations.soft-mode`),
+  `Contents/embedded.provisionprofile` exists, is not expired and grants `com.apple.security.hardened-process`
+  (`security cms -D -i`), and no extension or XPC service signs the keys without a profile of its own. The Share
+  extension and the decoder XPC service stay without the keys on the Mac: their App IDs have no confirmed capability
+  and a restricted entitlement without a matching profile keeps the bundle from launching (iOS signs Share because its
+  App IDs have the capability). The check cannot prove the app launches on macOS 15 (the entitlements are documented
+  for macOS 26); the testers of the direct channel accepted that risk. The macOS App ID needs the Enhanced Security
+  capability first; until then the release stops at the check with a message saying so.
 
 ## Native libraries
 

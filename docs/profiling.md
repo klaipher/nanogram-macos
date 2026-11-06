@@ -254,7 +254,7 @@ leak), `panelScrollTick`, `mouseMovedDispatch`, `modalOpenToVisible` (Mac), `lau
 the open and re-open counts once a minute). Chat open on iOS, three events in order: `chatListRowTap` (the chat list
 row is tapped, `ChatListController` `peerSelected`), `navigationPush` (`NavigationController.pushViewController`)
 and `historyFirstContent` (the first history transition with entries is applied, `ChatHistoryListNodeImpl`, once per
-chat node). Events use `NanogramSignposts.event(name)`.
+chat node). Chat open on the Mac emits one event per readiness condition the first time it holds (`chatOpenHistoryReady`, `chatOpenAppearanceReady`, `chatOpenPeerViewReady`, `chatOpenInitialDataReady`, `chatOpenInputReady`, `chatOpenMonoforumReady`) and `chatOpenCommitted` just before `chatOpenToReady` ends, so a trace shows which condition arrived last. Events use `NanogramSignposts.event(name)`.
 
 Category `Performance` is **not** shown by the Points of Interest instrument that the Time Profiler, System
 Trace, CPU Profiler, Processor Trace and Allocations templates carry (Animation Hitches has none); add
