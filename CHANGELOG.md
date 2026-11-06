@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **In-app update screen shows what changed** (tooling): `tg release-direct` now requires `--notes <file>` (the public release notes) and writes their `- ` bullets as an HTML list into the appcast item's `<description>` (`release.release_notes_html`, CDATA); the update screen already renders `itemDescription` (`UpdateNotes.plainText`), it was empty because the feed had no description. The notes file is read before the archive starts, so a file without bullets fails at once. Tests: `DirectReleaseTests` (`test_release_notes_html_*`, `test_appcast_entry_carries_release_notes`, `test_release_direct_cli_requires_notes`).
+
 ## 13.1.0 (202611060301) — 2026-11-06
 
 Source: `nanogram/integration` @ 716d4fd0 · core `klaipher/nanogram` `main` @ b4703321 (was 3819d287 at the last release) · tgcalls `nanogram-shared` @ 6f45f0cc · tg_owt `nanogram-mac` @ 655db2eb · rlottie `telegram-ios-dev` @ 083f19a.

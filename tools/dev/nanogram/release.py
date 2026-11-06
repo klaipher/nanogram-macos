@@ -721,11 +721,36 @@ def download_url(version: str, build: str) -> str:
     return f"{RELEASES_REPO}/releases/download/v{version}-{build}/Nanogram-{version}-{build}.dmg"
 
 
-def appcast_entry(version: str, build: str, dmg: Path, ed_signature: str, url: str) -> str:
+def release_notes_html(notes: str) -> str:
+    """The bullet lines of the public release notes as an HTML list for the appcast item, which the in-app
+    update screen shows. Markdown emphasis is dropped; everything that is not a bullet stays on GitHub only."""
+    from xml.sax.saxutils import escape
+    bullets = []
+    for line in notes.splitlines():
+        stripped = line.strip()
+        for marker in ("- ", "* ", "• "):
+            if stripped.startswith(marker):
+                text = stripped[len(marker):].replace("**", "").strip()
+                if text:
+                    bullets.append(f"<li>{escape(text)}</li>")
+                break
+    if not bullets:
+        raise ReleaseError("the release notes have no bullet lines (\"- ...\") for the in-app update screen")
+    return "<ul>" + "".join(bullets) + "</ul>"
+
+
+def _cdata(text: str) -> str:
+    return "<![CDATA[" + text.replace("]]>", "]]]]><![CDATA[>") + "]]>"
+
+
+def appcast_entry(version: str, build: str, dmg: Path, ed_signature: str, url: str,
+                  notes_html: str | None = None) -> str:
     from email.utils import formatdate
     from xml.sax.saxutils import escape, quoteattr
+    description = f"      <description>{_cdata(notes_html)}</description>\n" if notes_html else ""
     return (f"    <item>\n"
             f"      <title>{escape(f'Nanogram {version} ({build})')}</title>\n"
+            f"{description}"
             f"      <pubDate>{formatdate(usegmt=True)}</pubDate>\n"
             f"      <sparkle:version>{escape(build)}</sparkle:version>\n"
             f"      <sparkle:shortVersionString>{escape(version)}</sparkle:shortVersionString>\n"
@@ -777,8 +802,9 @@ def _check(command: list[str], what: str) -> str:
     return output
 
 
-def release_direct(allow_dirty: bool = False) -> Path:
+def release_direct(allow_dirty: bool = False, notes: Path | None = None) -> Path:
     from nanogram import sparkle
+    notes_html = release_notes_html(Path(notes).read_text()) if notes else None
     key = asc_key()
     sparkle.public_key()
     build, version = build_number(), marketing_version()
@@ -803,7 +829,8 @@ def release_direct(allow_dirty: bool = False) -> Path:
     signature = sparkle.sign(dmg)
     if not sparkle.verify(dmg, signature, sparkle.public_key()):
         raise ReleaseError("the Sparkle signature of the dmg does not verify with our public key")
-    write_signed_appcast(out_dir, [appcast_entry(version, build, dmg, signature, download_url(version, build))])
+    write_signed_appcast(out_dir, [appcast_entry(version, build, dmg, signature, download_url(version, build),
+                                                   notes_html=notes_html)])
     print("==> Writing the source archive", flush=True)
     source_archive(out_dir / f"{name}-source.tar.gz", f"{name}-source")
     print(f"==> Direct release {version} ({build}) in {out_dir} (not uploaded): {dmg.name}, appcast.xml, "
@@ -819,6 +846,8 @@ def main(argv: list[str] | None = None) -> int:
     flight.add_argument("--export-only", action="store_true", help="sign the .pkg, do not upload")
     direct = commands.add_parser("release-direct", help="notarized dmg, appcast and source archive (local)")
     direct.add_argument("--allow-dirty", action="store_true", help="build with uncommitted tracked changes")
+    direct.add_argument("--notes", type=Path, required=True,
+                        help="public release notes (markdown); their \"- \" bullets go into the appcast for the in-app update screen")
     args = parser.parse_args(argv)
     try:
         if args.command == "settings":
@@ -826,7 +855,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "testflight":
             testflight(export_only=args.export_only)
         else:
-            release_direct(allow_dirty=args.allow_dirty)
+            release_direct(allow_dirty=args.allow_dirty, notes=args.notes)
     except config.ConfigError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

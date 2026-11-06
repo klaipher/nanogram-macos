@@ -464,6 +464,36 @@ class DirectReleaseTests(unittest.TestCase):
         self.assertEqual(root.find("channel/link").text,
                          "https://github.com/klaipher/nanogram-releases/releases/latest/download/appcast.xml")
 
+    def test_release_notes_html_keeps_only_bullets(self):
+        notes = ("Nanogram is an unofficial Telegram client.\n\n**What's better in this update**\n"
+                 "- Calls: **screen sharing** stops <reliably> & fast.\n"
+                 "• Chats open faster.\n\n**Requirements:** macOS 15.\n")
+        self.assertEqual(release.release_notes_html(notes),
+                         "<ul><li>Calls: screen sharing stops &lt;reliably&gt; &amp; fast.</li>"
+                         "<li>Chats open faster.</li></ul>")
+
+    def test_release_notes_html_rejects_notes_without_bullets(self):
+        with self.assertRaises(release.ReleaseError):
+            release.release_notes_html("Just a paragraph.\n")
+
+    def test_appcast_entry_carries_release_notes(self):
+        import xml.etree.ElementTree as ET
+        with tempfile.TemporaryDirectory() as tmp:
+            dmg = Path(tmp) / "Nanogram-13.1.0-4242.dmg"
+            dmg.write_bytes(b"x")
+            entry = release.appcast_entry("13.1.0", "4242", dmg, "c2ln", "https://example.org/a.dmg",
+                                          notes_html="<ul><li>A ]]> B</li></ul>")
+            plain = release.appcast_entry("13.1.0", "4242", dmg, "c2ln", "https://example.org/a.dmg")
+        item = ET.fromstring(release.appcast([entry])).find("channel/item")
+        self.assertEqual(item.find("description").text, "<ul><li>A ]]> B</li></ul>")
+        self.assertIsNone(ET.fromstring(release.appcast([plain])).find("channel/item/description"))
+
+    def test_release_direct_cli_requires_notes(self):
+        with mock.patch.object(release, "release_direct") as direct, \
+                mock.patch("sys.stderr"), self.assertRaises(SystemExit):
+            release.main(["release-direct"])
+        direct.assert_not_called()
+
     def test_source_archive_includes_submodules(self):
         import tarfile
         with tempfile.TemporaryDirectory() as tmp:
