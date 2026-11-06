@@ -147,17 +147,6 @@ public final class ChatInputContainerView: FlippableView {
         }
     )
 
-    private lazy var keyboardGlassSlot = LazyGlassGhostSlot<LiquidGlassView>(
-        make: { LiquidGlassView.inputRowGhost() },
-        attach: { [weak self] glass in
-            guard let self else { return }
-            glass.isHidden = true
-            self.addSubview(glass, positioned: .below, relativeTo: self.bottomView)
-        }
-    )
-
-    public var keyboardGlass: LiquidGlassView? { keyboardGlassSlot.ghost }
-
     private func styleLazyGhost(_ ghost: LiquidGlassView) {
         guard let theme = chatGhostTheme else {
             return
@@ -237,7 +226,7 @@ public final class ChatInputContainerView: FlippableView {
         self.addSubview(textFieldContainer)
         self.addSubview(sendButton)
 
-        // bottomView (keyboard markup scroll area) + keyboardGlass live in the
+        // bottomView (keyboard markup scroll area) lives in the
         // container so they're hidden together when the input state changes
         // (recording / action panel / etc. via container.isHidden).
         bottomView.documentView = ReplyMarkupContainerView()
@@ -377,15 +366,8 @@ public final class ChatInputContainerView: FlippableView {
         let keyboardGlassHeight = max(0, bottomHeight - glassBottomMargin)
         let keyboardGlassY = chatInteraction.presentation.isKeyboardShown ? glassBottomMargin : -keyboardGlassHeight
 
-        // keyboardGlass parks at a negative y while the markup keyboard is
-        // hidden — `keyboardGlassHeight <= 0` hides it in that state.
         let keyboardInset: CGFloat = 3
         let glassFrame = NSMakeRect(13, keyboardGlassY, keyboardWidth, keyboardGlassHeight)
-        if inputRowGlassContainer == nil, let keyboardGlass = keyboardGlassSlot.resolve(isNeeded: keyboardGlassHeight > 0) {
-            transition.updateFrame(view: keyboardGlass, frame: glassFrame)
-            keyboardGlass.updateLayout(size: glassFrame.size, transition: transition)
-            keyboardGlass.isHidden = keyboardGlassHeight <= 0
-        }
         let bottomViewFrame: NSRect
         if keyboardGlassHeight > keyboardInset * 2 {
             bottomViewFrame = glassFrame.insetBy(dx: keyboardInset, dy: keyboardInset)

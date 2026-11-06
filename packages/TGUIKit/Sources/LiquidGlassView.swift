@@ -251,6 +251,7 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
     }
 
     private var rebuildState: LiquidGlassRebuildKey?
+    private var appliedThemeKey: LiquidGlassThemeKey?
     private var appliedTint = AppliedValueCache<NSColor>()
     private var appliedEffectAppearance = AppliedValueCache<NSAppearance>()
     private var appliedBorder = AppliedValueCache<LiquidGlassBorderKey>()
@@ -264,9 +265,9 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
         )
     }
 
-    private func rebuildEffectView() {
+    private func rebuildEffectView(force: Bool = false) {
         let newState = currentRebuildState()
-        if let cached = rebuildState, cached == newState, effectView != nil {
+        if !force, let cached = rebuildState, cached == newState, effectView != nil {
             // Same effect type and same appearance baking — nothing to do.
             // Downstream (`applyAppearance` etc.) refreshes tint/colors
             // without needing to recreate the view.
@@ -289,6 +290,9 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
             guard let idx = parent.subviews.firstIndex(of: current), idx > 0 else { return nil }
             return parent.subviews[idx - 1]
         }()
+
+        let previousHidden = effectView?.isHidden ?? isHidden
+        let previousAlpha = effectView?.alphaValue ?? 1
 
         effectView?.removeFromSuperview()
         effectView = nil
@@ -342,6 +346,8 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
         if let previousFrame {
             effectView.frame = previousFrame
         }
+        effectView.isHidden = previousHidden
+        effectView.alphaValue = previousAlpha
 
 
         // Reset cached layout so updateLayout actually applies frame/cornerRadius
@@ -373,7 +379,10 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
 
     open override func updateLocalizationAndTheme(theme: PresentationTheme) {
         super.updateLocalizationAndTheme(theme: theme)
-        rebuildEffectView()
+        let themeKey = LiquidGlassThemeKey(background: theme.colors.background, isDark: theme.colors.isDark)
+        let themeSwitched = LiquidGlassThemeSwitch.needsRebuild(previous: appliedThemeKey, current: themeKey, usesGlass: usesGlass)
+        appliedThemeKey = themeKey
+        rebuildEffectView(force: themeSwitched)
         applyAppearance(theme)
         applyBorder()
     }
@@ -510,7 +519,7 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
             effectView.layer?.borderWidth = 0
             return
         }
-        if key.highContrast {
+        if key.hasBorder && key.highContrast {
             let borderColor = key.isDark
                 ? NSColor.white.withAlphaComponent(0.55)
                 : NSColor.black.withAlphaComponent(0.55)
@@ -567,6 +576,22 @@ struct LiquidGlassRebuildKey: Equatable {
     let usesGlass: Bool
     let blurEnabled: Bool
     let forceAppearance: LiquidGlassAppearance
+}
+
+struct LiquidGlassThemeKey: Equatable {
+    let background: NSColor
+    let isDark: Bool
+}
+
+enum LiquidGlassThemeSwitch {
+    static let rebuildsGlassOnThemeSwitch = true
+
+    static func needsRebuild(previous: LiquidGlassThemeKey?, current: LiquidGlassThemeKey, usesGlass: Bool) -> Bool {
+        guard rebuildsGlassOnThemeSwitch, usesGlass, let previous else {
+            return false
+        }
+        return previous != current
+    }
 }
 
 struct LiquidGlassBorderKey: Equatable {

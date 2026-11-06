@@ -3,10 +3,14 @@ import AppKit
 @testable import TGUIKit
 
 final class LiquidGlassRebuildKeyTests: XCTestCase {
-    func testKeyIgnoresTintSoTintChangesNeverRebuildTheEffectView() {
-        let a = LiquidGlassRebuildKey(usesGlass: true, blurEnabled: true, forceAppearance: .forceDark)
-        let b = LiquidGlassRebuildKey(usesGlass: true, blurEnabled: true, forceAppearance: .forceDark)
-        XCTAssertEqual(a, b)
+    func testThemeSwitchRebuildsOnlyGlassAfterTheFirstTheme() {
+        let light = LiquidGlassThemeKey(background: NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1), isDark: false)
+        let tinted = LiquidGlassThemeKey(background: NSColor(srgbRed: 0.9, green: 0.8, blue: 0.7, alpha: 1), isDark: false)
+        XCTAssertFalse(LiquidGlassThemeSwitch.needsRebuild(previous: nil, current: light, usesGlass: true))
+        XCTAssertFalse(LiquidGlassThemeSwitch.needsRebuild(previous: light, current: light, usesGlass: true))
+        XCTAssertTrue(LiquidGlassThemeSwitch.needsRebuild(previous: light, current: tinted, usesGlass: true))
+        XCTAssertTrue(LiquidGlassThemeSwitch.needsRebuild(previous: light, current: LiquidGlassThemeKey(background: light.background, isDark: true), usesGlass: true))
+        XCTAssertFalse(LiquidGlassThemeSwitch.needsRebuild(previous: light, current: tinted, usesGlass: false))
     }
 
     func testKeyDiffersWhenEffectTypeOrBakedAppearanceDiffers() {

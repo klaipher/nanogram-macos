@@ -433,7 +433,7 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
 
     private func updateBackButtonIcon() {
         self.backButton.isHidden = !hasBackButton
-        backGhostSlot.resolve(isNeeded: hasBackButton)?.isHidden = !hasBackButton
+        backGhostSlot.ghost?.isHidden = !hasBackButton
         let icon = isCloseButton ? theme.icons.chat_header_close : theme.icons.chat_header_back
         backButton.set(image: icon, for: .Normal)
         backButton.setAccessibilityLabel(isCloseButton ? strings().voiceOverCommonClose : strings().voiceOverCommonBack)

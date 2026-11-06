@@ -61,6 +61,16 @@ final class TabBarViewTreeTests: XCTestCase {
     override func setUp() {
         super.setUp()
         TGUIKitTestBootstrap.install()
+        MainActor.assumeIsolated {
+            GlassAccessibilityMonitor.shared.force(GlassAccessibilityState(reduceTransparency: false, increaseContrast: false))
+        }
+    }
+
+    override func tearDown() {
+        MainActor.assumeIsolated {
+            GlassAccessibilityMonitor.shared.force(nil)
+        }
+        super.tearDown()
     }
 
     private func makeTab(badge: Bool = false, controller: ViewController = ViewController()) -> TabItem {

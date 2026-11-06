@@ -1,17 +1,30 @@
 import XCTest
 @testable import TGUIKit
 
+@MainActor
 final class GlassRuntimePolicyTests: XCTestCase {
     private final class Listener: GlassEnvironmentListener {
         var calls = 0
         func glassEnvironmentDidChange() { calls += 1 }
     }
 
-    func testPrefersOpaqueForReduceTransparencyOrIncreaseContrast() {
+    func testOnlyReduceTransparencyPrefersOpaque() {
         XCTAssertFalse(GlassAccessibilityState(reduceTransparency: false, increaseContrast: false).prefersOpaque)
         XCTAssertTrue(GlassAccessibilityState(reduceTransparency: true, increaseContrast: false).prefersOpaque)
-        XCTAssertTrue(GlassAccessibilityState(reduceTransparency: false, increaseContrast: true).prefersOpaque)
+        XCTAssertFalse(GlassAccessibilityState(reduceTransparency: false, increaseContrast: true).prefersOpaque)
         XCTAssertTrue(GlassAccessibilityState(reduceTransparency: true, increaseContrast: true).prefersOpaque)
+    }
+
+    func testForcedStateOverridesTheReaderAndNotifies() {
+        let monitor = GlassAccessibilityMonitor(read: { GlassAccessibilityState(reduceTransparency: false, increaseContrast: false) })
+        let listener = Listener()
+        monitor.register(listener)
+        XCTAssertTrue(monitor.force(GlassAccessibilityState(reduceTransparency: true, increaseContrast: false)))
+        XCTAssertEqual(listener.calls, 1)
+        XCTAssertTrue(monitor.state.prefersOpaque)
+        XCTAssertTrue(monitor.force(nil))
+        XCTAssertEqual(listener.calls, 2)
+        XCTAssertFalse(monitor.state.prefersOpaque)
     }
 
     func testMonitorNotifiesListenersOnlyWhenTheStateChanges() {

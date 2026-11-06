@@ -1,6 +1,6 @@
 import Cocoa
 
-public struct GlassAccessibilityState: Equatable {
+public struct GlassAccessibilityState: Equatable, Sendable {
     public var reduceTransparency: Bool
     public var increaseContrast: Bool
 
@@ -10,9 +10,10 @@ public struct GlassAccessibilityState: Equatable {
     }
 
     public var prefersOpaque: Bool {
-        return reduceTransparency || increaseContrast
+        return reduceTransparency
     }
 
+    @MainActor
     public static func current() -> GlassAccessibilityState {
         let workspace = NSWorkspace.shared
         return GlassAccessibilityState(
@@ -22,19 +23,22 @@ public struct GlassAccessibilityState: Equatable {
     }
 }
 
+@MainActor
 public protocol GlassEnvironmentListener: AnyObject {
     func glassEnvironmentDidChange()
 }
 
+@MainActor
 public final class GlassAccessibilityMonitor {
-    public static let shared = GlassAccessibilityMonitor(read: GlassAccessibilityState.current, observesWorkspace: true)
+    public static let shared = GlassAccessibilityMonitor(read: { GlassAccessibilityState.current() }, observesWorkspace: true)
 
     public private(set) var state: GlassAccessibilityState
-    private let read: () -> GlassAccessibilityState
+    private let read: @MainActor () -> GlassAccessibilityState
+    private var forcedState: GlassAccessibilityState?
     private let listeners = NSHashTable<AnyObject>.weakObjects()
     private var observer: NSObjectProtocol?
 
-    public init(read: @escaping () -> GlassAccessibilityState, observesWorkspace: Bool = false) {
+    public init(read: @escaping @MainActor () -> GlassAccessibilityState, observesWorkspace: Bool = false) {
         self.read = read
         self.state = read()
         if observesWorkspace {
@@ -43,7 +47,9 @@ public final class GlassAccessibilityMonitor {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                self?.refresh()
+                MainActor.assumeIsolated {
+                    self?.refresh()
+                }
             }
         }
     }
@@ -59,8 +65,14 @@ public final class GlassAccessibilityMonitor {
     }
 
     @discardableResult
+    public func force(_ state: GlassAccessibilityState?) -> Bool {
+        forcedState = state
+        return refresh()
+    }
+
+    @discardableResult
     public func refresh() -> Bool {
-        let updated = read()
+        let updated = forcedState ?? read()
         guard updated != state else {
             return false
         }
@@ -72,7 +84,7 @@ public final class GlassAccessibilityMonitor {
     }
 }
 
-public enum GlassGroup: String, CaseIterable {
+public enum GlassGroup: String, CaseIterable, Sendable {
     case chatHeader
     case inputRow
     case tabBar

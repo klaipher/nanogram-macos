@@ -32,11 +32,4 @@ final class LazyGlassGhostSlotTests: XCTestCase {
         XCTAssertTrue(slot.resolve(isNeeded: false) === first)
         XCTAssertEqual(slot.creationCount, 1)
     }
-
-    func testShouldCreateTruthTable() {
-        XCTAssertTrue(LazyGlassGhostSlot<Dummy>.shouldCreate(isCreated: false, isNeeded: true))
-        XCTAssertFalse(LazyGlassGhostSlot<Dummy>.shouldCreate(isCreated: false, isNeeded: false))
-        XCTAssertFalse(LazyGlassGhostSlot<Dummy>.shouldCreate(isCreated: true, isNeeded: true))
-        XCTAssertFalse(LazyGlassGhostSlot<Dummy>.shouldCreate(isCreated: true, isNeeded: false))
-    }
 }
