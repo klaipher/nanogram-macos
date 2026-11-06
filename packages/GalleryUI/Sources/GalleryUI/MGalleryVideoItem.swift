@@ -64,6 +64,7 @@ public class MGalleryVideoItem: MGalleryItem {
             guard let self else {
                 return
             }
+            self.controller.startLoading()
             guard GalleryVideoMaterialization.shouldMaterialize(orientation: orientation, isPlayerCreated: self.controller.isPlayerCreated) else {
                 return
             }

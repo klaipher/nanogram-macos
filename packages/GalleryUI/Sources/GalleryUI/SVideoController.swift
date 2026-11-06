@@ -120,6 +120,8 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
     
     private var adContext: AdMessagesHistoryContext?
     private let adStateDisposable = MetaDisposable()
+    private var didStartLoading = false
+    private let playerStatus = Promise<MediaPlayerStatus>()
     private let nextAdDisposable = MetaDisposable()
 
     public init(context: any AccountContextProtocol, reference: FileMediaReference, message: Message?, fetchAutomatically: Bool = false, isProtected: Bool = false, isControlsLimited: Bool = false) {
@@ -499,8 +501,11 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         }
     }
     
-    public override func viewDidLoad() {
-        super.viewDidLoad()
+    public func startLoading() {
+        if didStartLoading {
+            return
+        }
+        didStartLoading = true
         
         let account = self.account
         
@@ -529,7 +534,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
             
             var invoked: Bool = false
             
-            adStateDisposable.set(combineLatest(queue:.mainQueue(), adContext.state, status).startStrict(next: { [weak self] values in
+            adStateDisposable.set(combineLatest(queue:.mainQueue(), adContext.state, playerStatus.get()).startStrict(next: { [weak self] values in
                
                 let ( _, messages, startDelay, betweenDelay) = values.0
                 let status = values.1
@@ -542,8 +547,13 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
                 }
             }))
         }
-
-
+    }
+    
+    public override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        startLoading()
+        playerStatus.set(mediaPlayer.status)
         
         genericView.layerContentsRedrawPolicy = .duringViewResize
 
