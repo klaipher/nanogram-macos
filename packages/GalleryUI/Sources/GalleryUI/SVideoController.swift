@@ -688,6 +688,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         
         
         if let message {
+            let account = self.account
             let throttledSignal = self.mediaPlayer.status
             |> mapToThrottled { next -> Signal<MediaPlayerStatus, NoError> in
                 return .single(next) |> then(.complete() |> delay(2.0, queue: Queue.concurrentDefaultQueue()))
