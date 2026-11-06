@@ -263,6 +263,15 @@ private func chatPresentation(_ base: TelegramPresentationTheme, withWallpaper w
 }
 
 
+private func chatOpenReadinessEvent<T>(_ name: StaticString, _ signal: Signal<T, NoError>, isReady: @escaping (T) -> Bool) -> Signal<T, NoError> {
+    let fired = Atomic<Bool>(value: false)
+    return signal |> beforeNext { value in
+        if isReady(value), !fired.swap(true) {
+            PerformanceSignposts.event(name)
+        }
+    }
+}
+
 public class ChatControllerView : View, ChatInputDelegate {
 
     
@@ -8894,7 +8903,12 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             self?.genericView.bubblesView.connectionStatus = status
         }
         
-        let combine = combineLatest(queue: .mainQueue(), _historyReady.get() |> take(1), appearanceReady.get(), peerView.get() |> take(1) |> map { _ in } |> then(initialData), genericView.inputView.ready.get() |> take(1), _monoforumReady.get() |> take(1))
+        let combine = combineLatest(queue: .mainQueue(),
+            chatOpenReadinessEvent("chatOpenHistoryReady", _historyReady.get() |> take(1)) { $0 },
+            chatOpenReadinessEvent("chatOpenAppearanceReady", appearanceReady.get()) { $0 },
+            chatOpenReadinessEvent("chatOpenPeerViewReady", peerView.get() |> take(1) |> map { _ in }) { _ in true } |> then(chatOpenReadinessEvent("chatOpenInitialDataReady", initialData) { _ in true }),
+            chatOpenReadinessEvent("chatOpenInputReady", genericView.inputView.ready.get() |> take(1)) { $0 },
+            chatOpenReadinessEvent("chatOpenMonoforumReady", _monoforumReady.get() |> take(1)) { $0 })
         
         
         //self.ready.set(.single(true))
@@ -8905,6 +8919,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             if isReady {
                 DispatchQueue.main.async {
                     CATransaction.setCompletionBlock {
+                        PerformanceSignposts.event("chatOpenCommitted")
                         openSignpost.end()
                     }
                 }
