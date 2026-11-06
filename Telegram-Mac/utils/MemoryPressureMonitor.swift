@@ -2,6 +2,7 @@ import Cocoa
 import SwiftSignalKit
 import TelegramCore
 import Postbox
+import TGUIKit
 #if SHARE
 import TelegramThemeShare
 #else
@@ -47,6 +48,7 @@ public final class MemoryPressureMonitor {
 
     private func handlePressure() {
         let event = self.source.data
+        let imageCaches = ScopedImageCache.diagnosticsSummary()
         purgeImageCachesForMemoryPressure()
         TelegramThemeHooks.shared.purgeLottieCache()
         #if !SHARE
@@ -57,6 +59,7 @@ public final class MemoryPressureMonitor {
         let accounts = self.releaseAccountCaches?() ?? 0
         let released = self.trimAllocator()
         Logger.shared.log("Memory", "pressure \(event.contains(.critical) ? "critical" : "warning"): image caches purged, postbox caches cleared for \(accounts) accounts, allocator released \(released / 1024) KB")
+        Logger.shared.log("Memory", "image caches before purge: \(imageCaches)")
     }
 
     private func scheduleInactiveTrim() {
@@ -67,6 +70,7 @@ public final class MemoryPressureMonitor {
             }
             let released = self.trimAllocator()
             Logger.shared.log("Memory", "inactive trim released \(released / 1024) KB")
+            Logger.shared.log("Memory", "image caches: \(ScopedImageCache.diagnosticsSummary())")
         }, queue: .mainQueue())
         self.trimTimer = timer
         timer.start()

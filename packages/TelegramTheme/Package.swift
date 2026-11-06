@@ -50,5 +50,9 @@ let package = Package(
             dependencies: dependencies,
             path: "Sources/TelegramThemeShare",
             swiftSettings: [.define("SHARE")]),
+        .testTarget(
+            name: "TelegramThemeTests",
+            dependencies: ["TelegramTheme"],
+            path: "Tests/TelegramThemeTests"),
     ]
 )
