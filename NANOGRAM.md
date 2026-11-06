@@ -19,7 +19,7 @@ It is the Mac sibling of Nanogram for iOS: the same app, tuned to build faster a
   mode); FFmpeg's script adds the stack protector. Apple Enhanced Security entitlements in soft mode (hardware
   memory tagging logs simulated crashes instead of ending the process) are off by default: the App ID needs the
   Enhanced Security capability and a new profile first. Build with `NANOGRAM_ENHANCED_SECURITY_REQUEST=YES` (release
-  builds: `NANOGRAM_ENHANCED_SECURITY=1 tools/dev/tg testflight`) to sign with the generated
+  builds: `NANOGRAM_ENHANCED_SECURITY=1 tools/dev/tg release-direct` for the testers' Sparkle channel, or `... tg testflight`) to sign with the generated
   `nanogram/entitlements/*-EnhancedSecurity.entitlements`; regenerate them with
   `python3 -m nanogram.enhanced_security` from `tools/dev` after changing a base file.
 - Strictness: our `packages/Nanogram*` build in Swift 6 with warnings as errors; upstream code may only lower its

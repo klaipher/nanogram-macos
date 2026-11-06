@@ -637,6 +637,107 @@ class EnhancedSecurityExportTests(unittest.TestCase):
                     release.check_exported_app(app, "mas")
 
 
+class EnhancedSecurityToolTests(unittest.TestCase):
+    PREFIX = release.enhanced_security_module.PREFIX
+    KEYS = dict(release.enhanced_security_module.SOFT_MODE_KEYS)
+
+    def completed(self, stdout=b"", returncode=0):
+        return mock.Mock(stdout=stdout, returncode=returncode)
+
+    def test_signed_entitlements_reads_the_codesign_xml(self):
+        with mock.patch.object(release.subprocess, "run", return_value=self.completed(plistlib.dumps(self.KEYS))) as run:
+            self.assertEqual(release.signed_entitlements(Path("/x/Nanogram.app")), self.KEYS)
+        self.assertEqual(run.call_args.args[0][:4], ["codesign", "-d", "--entitlements", "-"])
+
+    def test_signed_entitlements_is_empty_when_codesign_fails_or_prints_nothing(self):
+        for result in (self.completed(b"", 1), self.completed(b""), self.completed(b"not a plist")):
+            with mock.patch.object(release.subprocess, "run", return_value=result):
+                self.assertEqual(release.signed_entitlements(Path("/x/Nanogram.app")), {})
+
+    def write_profile(self, root: Path):
+        path = root / "Nanogram.app" / "Contents"
+        path.mkdir(parents=True)
+        (path / "embedded.provisionprofile").write_bytes(b"cms")
+        return root / "Nanogram.app"
+
+    def test_profile_entitlements_come_from_security_cms(self):
+        profile = {"Entitlements": {self.PREFIX: True}, "ExpirationDate": datetime.datetime(2030, 1, 1)}
+        with tempfile.TemporaryDirectory() as tmp:
+            app = self.write_profile(Path(tmp))
+            with mock.patch.object(release.subprocess, "run", return_value=self.completed(plistlib.dumps(profile))) as run:
+                self.assertEqual(release.embedded_profile_entitlements(app), {self.PREFIX: True})
+                self.assertEqual(release.embedded_profile_expiry(app), datetime.datetime(2030, 1, 1))
+            self.assertEqual(run.call_args.args[0][:4], ["security", "cms", "-D", "-i"])
+
+    def test_a_missing_profile_is_none_and_an_unreadable_one_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(release.embedded_profile_entitlements(Path(tmp) / "Nanogram.app"))
+            app = self.write_profile(Path(tmp))
+            with mock.patch.object(release.subprocess, "run", return_value=self.completed(b"", 1)):
+                self.assertEqual(release.embedded_profile_entitlements(app), {})
+            with mock.patch.object(release.subprocess, "run", return_value=self.completed(b"junk")):
+                self.assertEqual(release.embedded_profile_entitlements(app), {})
+                self.assertIsNone(release.embedded_profile_expiry(app))
+
+    def problems(self, expiry, now=datetime.datetime(2026, 11, 6)):
+        return release.enhanced_security_problems(Path("/x/Nanogram.app"), entitlements_of=lambda path: self.KEYS,
+                                                  profile_of=lambda path: {self.PREFIX: True},
+                                                  expiry_of=lambda path: expiry, now=now)
+
+    def test_an_expired_profile_fails_and_a_valid_or_unknown_expiry_passes(self):
+        self.assertIn("expired on 2026-11-01", self.problems(datetime.datetime(2026, 11, 1))[0])
+        self.assertEqual(self.problems(datetime.datetime(2027, 11, 1)), [])
+        self.assertEqual(self.problems(None), [])
+
+    def test_a_missing_profile_message_names_the_file(self):
+        problems = release.enhanced_security_problems(Path("/x/Nanogram.app"), entitlements_of=lambda path: self.KEYS,
+                                                      profile_of=lambda path: None)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("embedded.provisionprofile", problems[0])
+
+    def test_every_missing_key_is_reported(self):
+        problems = release.enhanced_security_problems(Path("/x/Nanogram.app"), entitlements_of=lambda path: {},
+                                                      profile_of=lambda path: {self.PREFIX: True},
+                                                      expiry_of=lambda path: None)
+        self.assertEqual(len(problems), len(self.KEYS))
+
+    def test_a_wrong_version_string_or_soft_mode_off_is_reported(self):
+        wrong = dict(self.KEYS)
+        wrong[f"{self.PREFIX}.enhanced-security-version-string"] = "2"
+        wrong[f"{self.PREFIX}.checked-allocations.soft-mode"] = False
+        problems = release.enhanced_security_problems(Path("/x/Nanogram.app"), entitlements_of=lambda path: wrong,
+                                                      profile_of=lambda path: {self.PREFIX: True},
+                                                      expiry_of=lambda path: None)
+        self.assertEqual(len(problems), 2)
+
+    def test_extensions_with_the_keys_but_no_profile_are_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            appex = app / "Contents" / "PlugIns" / "Share.appex"
+            appex.mkdir(exist_ok=True)
+            hardened = lambda item: dict(self.KEYS) if item == appex else {}
+            problems = release.enhanced_security_unbacked_problems(app, entitlements_of=hardened)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("Share.appex", problems[0])
+            (appex / "Contents").mkdir(exist_ok=True)
+            (appex / "Contents" / "embedded.provisionprofile").write_bytes(b"cms")
+            self.assertEqual(release.enhanced_security_unbacked_problems(app, entitlements_of=hardened), [])
+            self.assertEqual(release.enhanced_security_unbacked_problems(app, entitlements_of=lambda item: {}), [])
+
+    def test_the_release_stops_with_the_hint_when_the_check_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            release.unsign_resource_bundles(app)
+            with mock.patch.object(release, "_authority", return_value=DISTRIBUTION), \
+                    mock.patch.object(release, "signed_entitlements", return_value={}), \
+                    mock.patch.object(release, "embedded_profile_entitlements", return_value=None):
+                with self.assertRaises(release.ReleaseError), mock.patch("sys.stderr") as err:
+                    release.check_exported_app(app, "direct", enhanced_security=True)
+            written = "".join(call.args[0] for call in err.write.call_args_list)
+            self.assertIn("developer portal", written)
+            self.assertIn("embedded.provisionprofile", written)
+
+
 class BuildRecordTests(unittest.TestCase):
     def make_archive(self, tmp: Path, with_dsym=True) -> Path:
         archive = tmp / "Nanogram.xcarchive"
