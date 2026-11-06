@@ -266,7 +266,7 @@ private func chatPresentation(_ base: TelegramPresentationTheme, withWallpaper w
 public class ChatControllerView : View, ChatInputDelegate {
 
     
-    public let tableView:TableView
+    public nonisolated(unsafe) let tableView:TableView
     
     
     private var textInputSuggestionsView: InputSwapSuggestionsPanel?

@@ -50,6 +50,9 @@ public class MGalleryVideoItem: MGalleryItem {
     }
     
     public func videoQualityState() -> (current: Int, preferred: UniversalVideoContentVideoQuality, available: [Int])? {
+        guard controller.isPlayerCreated else {
+            return nil
+        }
         return controller.mediaPlayer.videoQualityState()
     }
     
@@ -59,6 +62,9 @@ public class MGalleryVideoItem: MGalleryItem {
         
         rotateDisposable.set((rotate.get() |> deliverOnMainQueue).start(next: { [weak self] orientation in
             guard let self else {
+                return
+            }
+            guard GalleryVideoMaterialization.shouldMaterialize(orientation: orientation, isPlayerCreated: self.controller.isPlayerCreated) else {
                 return
             }
             let view = self.controller.genericView
