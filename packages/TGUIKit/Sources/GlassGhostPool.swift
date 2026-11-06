@@ -60,6 +60,7 @@ public final class GlassGhostPool {
             return
         }
         view.glassReuseSpec = nil
+        view.detachGlassReuseHolders()
         guard GlassChromeReuse.isEnabled, Thread.isMainThread, pooledCount < capacity else {
             droppedCount += 1
             return
@@ -69,6 +70,9 @@ public final class GlassGhostPool {
     }
 
     public func release(from container: GlassContainerView) {
+        guard Thread.isMainThread else {
+            return
+        }
         for ghost in container.ghosts where ghost.glassReuseSpec != nil {
             container.removeGhost(ghost)
             release(ghost)

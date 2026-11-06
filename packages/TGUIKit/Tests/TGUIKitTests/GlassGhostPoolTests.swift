@@ -147,4 +147,48 @@ final class GlassGhostPoolTests: XCTestCase {
         pool.drain()
         XCTAssertEqual(pool.pooledCount, 0)
     }
+
+    func testReleaseFromContainerOffTheMainThreadChangesNothing() {
+        GlassChromeReuse.isEnabled = true
+        let pool = GlassGhostPool()
+        let container = GlassContainerView(frame: NSMakeRect(0, 0, 300, 100), flipped: false, spacing: 5)
+        let pooled = pool.acquire(spec)
+        container.addGhost(pooled)
+        let done = expectation(description: "released")
+        DispatchQueue.global().async {
+            pool.release(from: container)
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 5)
+        XCTAssertEqual(container.ghosts.count, 1)
+        XCTAssertTrue(pooled.superview != nil)
+        XCTAssertEqual(pool.pooledCount, 0)
+        XCTAssertEqual(pooled.glassReuseSpec, spec)
+    }
+
+    func testReleaseClearsTheAdditionalGlassReferenceOfButtonsHoldingTheGhost() {
+        GlassChromeReuse.isEnabled = true
+        let pool = GlassGhostPool()
+        let ghost = pool.acquire(spec)
+        let button = Control(frame: NSMakeRect(0, 0, 40, 40))
+        let other = Control(frame: NSMakeRect(0, 0, 40, 40))
+        let unrelated = LiquidGlassView(frame: .zero, cornerRadius: 20)
+        button.additionalGlassEffectView = ghost
+        other.additionalGlassEffectView = unrelated
+        pool.release(ghost)
+        XCTAssertNil(button.additionalGlassEffectView)
+        XCTAssertTrue(other.additionalGlassEffectView === unrelated)
+    }
+
+    func testReleaseDoesNotClearAButtonThatMovedToAnotherGhost() {
+        GlassChromeReuse.isEnabled = true
+        let pool = GlassGhostPool()
+        let first = pool.acquire(spec)
+        let second = pool.acquire(spec)
+        let button = Control(frame: NSMakeRect(0, 0, 40, 40))
+        button.additionalGlassEffectView = first
+        button.additionalGlassEffectView = second
+        pool.release(first)
+        XCTAssertTrue(button.additionalGlassEffectView === second)
+    }
 }

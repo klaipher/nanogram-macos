@@ -224,6 +224,20 @@ open class LiquidGlassView: View, GlassEnvironmentListener {
 
     public internal(set) var glassReuseSpec: GlassGhostSpec?
 
+    private let glassReuseHolders = NSHashTable<Control>.weakObjects()
+
+    func registerGlassReuseHolder(_ holder: Control) {
+        glassReuseHolders.add(holder)
+    }
+
+    func detachGlassReuseHolders() {
+        let holders = glassReuseHolders.allObjects
+        glassReuseHolders.removeAllObjects()
+        for holder in holders where holder.additionalGlassEffectView === self {
+            holder.additionalGlassEffectView = nil
+        }
+    }
+
     func resetForGlassReuse() {
         onAppearanceChange = nil
         glassGroup = nil

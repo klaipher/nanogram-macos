@@ -173,6 +173,9 @@ open class Control: View {
     public weak var additionalGlassEffectView: NSView? {
         didSet {
             pendingAdditionalGlassEffectView = additionalGlassEffectView
+            if let ghost = additionalGlassEffectView as? LiquidGlassView, ghost.glassReuseSpec != nil {
+                ghost.registerGlassReuseHolder(self)
+            }
             glassTouchEffect?.additionalGlassEffectView = additionalGlassEffectView
         }
     }
