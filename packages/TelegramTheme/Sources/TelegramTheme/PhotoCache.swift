@@ -245,7 +245,7 @@ public enum PhotoCacheKeyEntry : Hashable {
                 if lhsIsMonoforum != rhsIsMonoforum {
                     return false
                 }
-                if lhsRepresentation.resource.id == rhsRepresentation.resource.id  {
+                if lhsRepresentation.resource.id != rhsRepresentation.resource.id  {
                     return false
                 }
                 if lhsIsForum != rhsIsForum {
@@ -380,11 +380,11 @@ private class WallpaperCache {
 
 private extension ScopedImageCache {
     func cacheImage(_ image: CGImage, sampleBuffer: CMSampleBuffer?, for key: PhotoCacheKeyEntry) {
-        setImage(image, sampleBuffer: sampleBuffer, forKey: key.hashValue)
+        setImage(image, sampleBuffer: sampleBuffer, forKey: key.hashValue, identity: AnyHashable(key))
     }
 
     func cachedImage(for key: PhotoCacheKeyEntry) -> (CGImage, CMSampleBuffer?)? {
-        return image(forKey: key.hashValue)
+        return image(forKey: key.hashValue, identity: AnyHashable(key))
     }
 
     func clearAll() {
@@ -399,14 +399,14 @@ private let minute: TimeInterval = 60
 
 private let closedScreenGrace: TimeInterval = 15
 
-private let peerPhotoCache = ScopedImageCache(countLimit: 200, byteLimit: 8 * megabyte, idleTimeout: 10 * minute, closedScopeGrace: closedScreenGrace)
-private let photosCache = ScopedImageCache(countLimit: 200, byteLimit: 24 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
-private let photoThumbsCache = ScopedImageCache(countLimit: 200, byteLimit: 6 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
-private let themeThums = ScopedImageCache(countLimit: 200, byteLimit: 3 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
+private let peerPhotoCache = ScopedImageCache(name: "peerPhotos", countLimit: 200, byteLimit: 8 * megabyte, idleTimeout: 10 * minute, closedScopeGrace: closedScreenGrace)
+private let photosCache = ScopedImageCache(name: "photos", countLimit: 200, byteLimit: 24 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
+private let photoThumbsCache = ScopedImageCache(name: "photoThumbs", countLimit: 200, byteLimit: 6 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
+private let themeThums = ScopedImageCache(name: "themeThumbs", countLimit: 200, byteLimit: 3 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
 private let wallpaperCache = WallpaperCache(20)
 
-private let stickersCache = ScopedImageCache(countLimit: 200, byteLimit: 8 * megabyte, idleTimeout: 10 * minute, closedScopeGrace: closedScreenGrace)
-private let emojiCache = ScopedImageCache(countLimit: 10000, byteLimit: 8 * megabyte, idleTimeout: 10 * minute, closedScopeGrace: closedScreenGrace)
+private let stickersCache = ScopedImageCache(name: "stickers", countLimit: 200, byteLimit: 8 * megabyte, idleTimeout: 10 * minute, closedScopeGrace: closedScreenGrace)
+private let emojiCache = ScopedImageCache(name: "emoji", countLimit: 10000, byteLimit: 8 * megabyte, idleTimeout: 10 * minute, closedScopeGrace: closedScreenGrace)
 
 
 public func purgeImageCachesForMemoryPressure() {

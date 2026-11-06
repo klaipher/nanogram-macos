@@ -1,5 +1,6 @@
 import Cocoa
 import CoreMedia
+import os
 
 public final class ImageDisplayScope {
     public let id: Int
@@ -13,9 +14,28 @@ public final class ImageDisplayScope {
     }
 }
 
+public struct ScopedImageCacheStatistics: Equatable {
+    public var hits: Int = 0
+    public var misses: Int = 0
+    public var collisions: Int = 0
+    public var stores: Int = 0
+    public var evictions: Int = 0
+    public var purged: Int = 0
+
+    public init() {
+    }
+
+    public func summary(name: String, entries: Int, bytes: Int) -> String {
+        return "\(name): hits=\(hits) misses=\(misses) collisions=\(collisions) stores=\(stores) evictions=\(evictions) purged=\(purged) entries=\(entries) bytes=\(bytes)"
+    }
+}
+
+private let imageCacheLog = OSLog(subsystem: "org.telegram.TGUIKit", category: .pointsOfInterest)
+
 public final class ScopedImageCache {
     private struct Entry {
         let image: CGImage
+        let identity: AnyHashable?
         let sampleBuffer: CMSampleBuffer?
         let cost: Int
         var lastUsed: CFAbsoluteTime
@@ -30,6 +50,7 @@ public final class ScopedImageCache {
         }
     }
 
+    public let name: String
     public let countLimit: Int
     public let byteLimit: Int
     public let idleTimeout: TimeInterval
@@ -42,10 +63,13 @@ public final class ScopedImageCache {
     private var keysByImage: [ObjectIdentifier: [Int]] = [:]
     private var keysByScope: [Int: Set<Int>] = [:]
     private var totalCost: Int = 0
+    private var counters = ScopedImageCacheStatistics()
+    private var lastReported = ScopedImageCacheStatistics()
     private var sweepTimer: DispatchSourceTimer?
     private let sweepQueue = DispatchQueue(label: "org.telegram.scopedImageCache.sweep", qos: .utility)
 
-    public init(countLimit: Int, byteLimit: Int, idleTimeout: TimeInterval, closedScopeGrace: TimeInterval, sweepInterval: TimeInterval = 60, clock: @escaping () -> CFAbsoluteTime = CFAbsoluteTimeGetCurrent) {
+    public init(name: String = "image", countLimit: Int, byteLimit: Int, idleTimeout: TimeInterval, closedScopeGrace: TimeInterval, sweepInterval: TimeInterval = 60, clock: @escaping () -> CFAbsoluteTime = CFAbsoluteTimeGetCurrent) {
+        self.name = name
         self.countLimit = countLimit
         self.byteLimit = byteLimit
         self.idleTimeout = idleTimeout
@@ -59,7 +83,7 @@ public final class ScopedImageCache {
         sweepTimer?.cancel()
     }
 
-    public func setImage(_ image: CGImage, sampleBuffer: CMSampleBuffer?, forKey key: Int) {
+    public func setImage(_ image: CGImage, sampleBuffer: CMSampleBuffer?, forKey key: Int, identity: AnyHashable? = nil) {
         let cost = image.bytesPerRow * image.height
         var released: [Entry] = []
 
@@ -67,24 +91,58 @@ public final class ScopedImageCache {
         if let previous = removeEntry(key) {
             released.append(previous)
         }
-        entries[key] = Entry(image: image, sampleBuffer: sampleBuffer, cost: cost, lastUsed: clock(), scopes: [], orphanedAt: nil)
+        counters.stores += 1
+        entries[key] = Entry(image: image, identity: identity, sampleBuffer: sampleBuffer, cost: cost, lastUsed: clock(), scopes: [], orphanedAt: nil)
         keysByImage[ObjectIdentifier(image), default: []].append(key)
         totalCost += cost
-        released.append(contentsOf: evictIfNeeded())
+        let evicted = evictIfNeeded()
+        counters.evictions += evicted.count
+        released.append(contentsOf: evicted)
         startSweepTimerIfNeeded()
         lock.unlock()
+
+        if !evicted.isEmpty {
+            os_signpost(.event, log: imageCacheLog, name: "ImageCache evict", "%{public}s evicted %d", name, evicted.count)
+        }
 
         released.removeAll()
     }
 
-    public func image(forKey key: Int) -> (CGImage, CMSampleBuffer?)? {
+    public func image(forKey key: Int, identity: AnyHashable? = nil) -> (CGImage, CMSampleBuffer?)? {
+        lock.lock()
+        let result: (CGImage, CMSampleBuffer?)?
+        var collided = false
+        if let entry = entries[key] {
+            if let identity = identity, let stored = entry.identity, stored != identity {
+                counters.misses += 1
+                counters.collisions += 1
+                collided = true
+                result = nil
+            } else {
+                entries[key]?.lastUsed = clock()
+                counters.hits += 1
+                result = (entry.image, entry.sampleBuffer)
+            }
+        } else {
+            counters.misses += 1
+            result = nil
+        }
+        lock.unlock()
+
+        if collided {
+            os_signpost(.event, log: imageCacheLog, name: "ImageCache collision", "%{public}s", name)
+        } else if result != nil {
+            os_signpost(.event, log: imageCacheLog, name: "ImageCache hit", "%{public}s", name)
+        } else {
+            os_signpost(.event, log: imageCacheLog, name: "ImageCache miss", "%{public}s", name)
+        }
+        return result
+    }
+
+    public var statistics: ScopedImageCacheStatistics {
         lock.lock()
         defer { lock.unlock() }
-        guard let entry = entries[key] else {
-            return nil
-        }
-        entries[key]?.lastUsed = clock()
-        return (entry.image, entry.sampleBuffer)
+        return counters
     }
 
     public func removeImage(forKey key: Int) {
@@ -100,6 +158,7 @@ public final class ScopedImageCache {
     public func removeAll() {
         lock.lock()
         let removed = entries
+        counters.purged += removed.count
         entries.removeAll()
         keysByImage.removeAll()
         keysByScope.removeAll()
@@ -146,10 +205,17 @@ public final class ScopedImageCache {
                 released.append(entry)
             }
         }
+        counters.evictions += released.count
         if entries.isEmpty {
             stopSweepTimer()
         }
+        let report: String? = counters == lastReported ? nil : counters.summary(name: name, entries: entries.count, bytes: totalCost)
+        lastReported = counters
         lock.unlock()
+
+        if let report = report {
+            os_log("%{public}@", log: imageCacheLog, type: .info, report)
+        }
 
         released.removeAll()
     }
@@ -189,6 +255,7 @@ public final class ScopedImageCache {
                 if closedScopeGrace <= 0 {
                     if let entry = removeEntry(key) {
                         released.append(entry)
+                        counters.evictions += 1
                     }
                 } else {
                     entries[key]?.orphanedAt = now
@@ -286,6 +353,12 @@ extension ScopedImageCache {
     private static var registry: [WeakCache] = []
     private static var nextScopeId: Int = 0
     private static var scopeKey: UInt8 = 0
+
+    public static func diagnosticsSummary() -> String {
+        return liveCaches.map { cache in
+            cache.statistics.summary(name: cache.name, entries: cache.count, bytes: cache.cost)
+        }.joined(separator: "; ")
+    }
 
     private static func register(_ cache: ScopedImageCache) {
         registryLock.lock()
