@@ -24,6 +24,18 @@ final class CallCapturePolicyTests: XCTestCase {
         XCTAssertNil(callCameraSwitchTarget(newCameraId: nil, hasCapturer: true, isScreenCapture: false, isVideoAvailable: true))
     }
 
+    func testSwitchingBetweenCameraAndScreenReattachesTheCapturer() {
+        XCTAssertTrue(callCaptureNeedsReattach(hasCapturer: true, wasScreen: false, toScreen: true))
+        XCTAssertTrue(callCaptureNeedsReattach(hasCapturer: true, wasScreen: true, toScreen: false))
+    }
+
+    func testNoReattachWithoutACapturerOrWhenTheSourceKindStays() {
+        XCTAssertFalse(callCaptureNeedsReattach(hasCapturer: false, wasScreen: false, toScreen: true))
+        XCTAssertFalse(callCaptureNeedsReattach(hasCapturer: false, wasScreen: true, toScreen: false))
+        XCTAssertFalse(callCaptureNeedsReattach(hasCapturer: true, wasScreen: false, toScreen: false))
+        XCTAssertFalse(callCaptureNeedsReattach(hasCapturer: true, wasScreen: true, toScreen: true))
+    }
+
     func testTerminalStatesReleaseCapture() {
         XCTAssertTrue(callSessionReleasesCapture(.terminated(id: nil, reason: .ended(.hungUp), options: [])))
         XCTAssertTrue(callSessionReleasesCapture(.dropping(reason: .ended(.hungUp))))

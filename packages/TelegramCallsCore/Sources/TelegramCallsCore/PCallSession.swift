@@ -1253,6 +1253,7 @@ public class PCallSession {
                 self.installFailureHandler(videoCapturer)
                 self.videoIsForceDisabled = false
             }
+            let reattach = callCaptureNeedsReattach(hasCapturer: !requestVideo, wasScreen: self.isScreenCapture, toScreen: false)
             if self.isScreenCapture {
                 self.videoCapturer?.switchVideoInput(devicesContext.currentCameraId ?? "")
             }
@@ -1261,6 +1262,10 @@ public class PCallSession {
             self.isOutgoingVideoPaused = false
             
             if let videoCapturer = self.videoCapturer, requestVideo {
+                self.ongoingContext?.requestVideo(videoCapturer)
+            }
+            if reattach, let videoCapturer = self.videoCapturer {
+                self.ongoingContext?.disableVideo()
                 self.ongoingContext?.requestVideo(videoCapturer)
             }
             if let state = self.sessionState {
@@ -1285,6 +1290,7 @@ public class PCallSession {
             self.videoIsForceDisabled = false
         }
         
+        let reattach = callCaptureNeedsReattach(hasCapturer: !requestVideo, wasScreen: self.isScreenCapture, toScreen: true)
         self.isOutgoingVideoPaused = true
         self.isScreenCapture = true
         self.screenCaptureSource = source
@@ -1292,8 +1298,12 @@ public class PCallSession {
         if let videoCapturer = self.videoCapturer, requestVideo {
             self.ongoingContext?.requestVideo(videoCapturer)
         }
-        if !requestVideo {
-            self.videoCapturer?.switchVideoInput(id)
+        if !requestVideo, let videoCapturer = self.videoCapturer {
+            videoCapturer.switchVideoInput(id)
+            if reattach {
+                self.ongoingContext?.disableVideo()
+                self.ongoingContext?.requestVideo(videoCapturer)
+            }
         }
         //        setRequestedVideoAspect(Float(System.aspectRatio))
         
