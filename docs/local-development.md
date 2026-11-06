@@ -338,7 +338,7 @@ Xcode's automatic signing through the App Store Connect API key (`~/.config/tele
   `notarytool`'s polling times out after Apple has the upload, it waits on that submission id instead of failing.
   Check a dmg with `xcrun stapler validate <dmg>` and
   `spctl -a -t open --context context:primary-signature -vv <dmg>` ("accepted", "Notarized Developer ID").
-- Enhanced Security (soft mode) on a release, off by default: `NANOGRAM_ENHANCED_SECURITY=1 tools/dev/tg release-direct`
+- Enhanced Security (soft mode) on a release, off by default: `NANOGRAM_ENHANCED_SECURITY=1 tools/dev/tg release-direct --notes <file>`
   (or `tg testflight`). It signs the main app with the `*-EnhancedSecurity.entitlements` variant and, after the export,
   `check_exported_app` stops the release unless the exported app's signature carries the four soft-mode keys
   (`hardened-process`, `enhanced-security-version-string` "1", `checked-allocations`, `checked-allocations.soft-mode`),
