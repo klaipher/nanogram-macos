@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Crash recovery window links to Nanogram, not Telegram** (commit HASH; not built or run). The direct edition's window ("Open macos.telegram.org", "The newest Telegram is always at macos.telegram.org") sent users to the official site: the URL was chosen with `#if NANOGRAM` inside the `CrashRecoveryUI` package, where the app's compilation conditions are not set, so the Telegram URL always won. The edition is now decided in the app (`AppDelegate.crashRecoveryLinks()`, `NANOGRAM_MAS` / `NANOGRAM`) and passed as `CrashRecoveryLinks` (new, pure, `resolve(isNanogram:isAppStoreEdition:)`) to `runCrashRecovery(update:links:)`. Direct: Sparkle "Update" stays the primary action (`.updater`), the secondary link and the failure card open https://github.com/klaipher/nanogram-releases/releases/latest ("Open GitHub Releases", "The newest Nanogram is always on GitHub."). App Store/TestFlight edition: no GitHub link (`website` is nil), the card says updates arrive through TestFlight or the App Store. "Reset Local Data…" unchanged. English strings only (`CrashRecovery.OpenWebsite`, `WebsiteDetail`, `WebsiteLink`, `FailedDetail`, `AppStoreDetail`; no other locale carries these keys), `Localizable.swift` comments updated by hand (swiftgen is not installed here). Tests: `CrashRecoveryLinksTests`.
+
 ## 13.1.0 (202611061725) — 2026-11-06
 
 Source: `nanogram/integration` @ e3a71457 · core `klaipher/nanogram` `main` @ 30d1f328 (was b4703321 at the last release) · tgcalls `nanogram-shared` @ 57b914d (was 6f45f0cc) · tg_owt `nanogram-mac` @ 655db2eb · rlottie `telegram-ios-dev` @ 083f19a.

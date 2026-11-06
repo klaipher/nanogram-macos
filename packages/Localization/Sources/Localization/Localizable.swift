@@ -7332,7 +7332,7 @@ public final class L10n {
   public static var crashOnLaunchOK: String  { return L10n.tr("Localizable", "CrashOnLaunch.OK") }
   /// Update from the App Store
   public static var crashRecoveryAppStore: String  { return L10n.tr("Localizable", "CrashRecovery.AppStore") }
-  /// The App Store has the newest version of Telegram.
+  /// Telegram updates arrive through TestFlight or the App Store.
   public static var crashRecoveryAppStoreDetail: String  { return L10n.tr("Localizable", "CrashRecovery.AppStoreDetail") }
   /// Cancel
   public static var crashRecoveryCancel: String  { return L10n.tr("Localizable", "CrashRecovery.Cancel") }
@@ -7362,7 +7362,7 @@ public final class L10n {
   public static var crashRecoveryDownloadStarting: String  { return L10n.tr("Localizable", "CrashRecovery.DownloadStarting") }
   /// Couldn’t update Telegram
   public static var crashRecoveryFailed: String  { return L10n.tr("Localizable", "CrashRecovery.Failed") }
-  /// Try again, or download the latest version from macos.telegram.org.
+  /// Try again, or download the latest version from GitHub Releases.
   public static var crashRecoveryFailedDetail: String  { return L10n.tr("Localizable", "CrashRecovery.FailedDetail") }
   /// Install and Relaunch
   public static var crashRecoveryInstall: String  { return L10n.tr("Localizable", "CrashRecovery.Install") }
@@ -7374,7 +7374,7 @@ public final class L10n {
   public static var crashRecoveryInstallingDetail: String  { return L10n.tr("Localizable", "CrashRecovery.InstallingDetail") }
   /// Open App Store
   public static var crashRecoveryOpenAppStore: String  { return L10n.tr("Localizable", "CrashRecovery.OpenAppStore") }
-  /// Open macos.telegram.org
+  /// Open GitHub Releases
   public static var crashRecoveryOpenWebsite: String  { return L10n.tr("Localizable", "CrashRecovery.OpenWebsite") }
   /// Preparing…
   public static var crashRecoveryPreparingButton: String  { return L10n.tr("Localizable", "CrashRecovery.PreparingButton") }
@@ -7416,9 +7416,9 @@ public final class L10n {
   public static var crashRecoveryUpToDateDetail: String  { return L10n.tr("Localizable", "CrashRecovery.UpToDateDetail") }
   /// Download the latest version
   public static var crashRecoveryWebsite: String  { return L10n.tr("Localizable", "CrashRecovery.Website") }
-  /// The newest Telegram is always at macos.telegram.org.
+  /// The newest Nanogram is always on GitHub.
   public static var crashRecoveryWebsiteDetail: String  { return L10n.tr("Localizable", "CrashRecovery.WebsiteDetail") }
-  /// Download from macos.telegram.org
+  /// Open GitHub Releases
   public static var crashRecoveryWebsiteLink: String  { return L10n.tr("Localizable", "CrashRecovery.WebsiteLink") }
   /// Choose where to send the report to help fix it.
   public static var crashReportCardInfo: String  { return L10n.tr("Localizable", "CrashReport.CardInfo") }
