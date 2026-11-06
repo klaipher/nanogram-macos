@@ -38,14 +38,14 @@ public enum CrashRecoveryResult {
     case resetLocalData
 }
 
-public func runCrashRecovery(update: CrashRecoveryUpdate) -> CrashRecoveryResult {
+public func runCrashRecovery(update: CrashRecoveryUpdate, links: CrashRecoveryLinks) -> CrashRecoveryResult {
     let previousTheme = presentation
     let palette = systemPalette()
     updateTheme(PresentationTheme(colors: palette, search: previousTheme.search, inputTheme: previousTheme.inputTheme))
     defer {
         updateTheme(previousTheme)
     }
-    return CrashRecoveryWindowController(update: update, palette: palette).run()
+    return CrashRecoveryWindowController(update: update, links: links, palette: palette).run()
 }
 
 private func systemPalette() -> ColorPalette {
@@ -54,14 +54,6 @@ private func systemPalette() -> ColorPalette {
     }
     return whitePalette
 }
-
-#if NANOGRAM
-private let appStoreURL = URL(string: "macappstore://apps.apple.com/app/id6829268176")!
-private let websiteURL = URL(string: "https://github.com/klaipher/nanogram-releases/releases/latest")!
-#else
-private let appStoreURL = URL(string: "macappstore://apps.apple.com/app/id747648890")!
-private let websiteURL = URL(string: "https://macos.telegram.org")!
-#endif
 
 private enum Text {
     static let title = strings().crashRecoveryTitle
@@ -146,6 +138,7 @@ private func recoveryContent(update: CrashRecoveryUpdate, state: CrashRecoveryUp
 
 private final class CrashRecoveryWindowController: NSObject, NSWindowDelegate {
     private let update: CrashRecoveryUpdate
+    private let links: CrashRecoveryLinks
     private let window: Window
     private let view: CrashRecoveryView
     private let disposable = MetaDisposable()
@@ -155,8 +148,9 @@ private final class CrashRecoveryWindowController: NSObject, NSWindowDelegate {
     private var openedExternal = false
     private var result: CrashRecoveryResult = .continueLaunch
 
-    init(update: CrashRecoveryUpdate, palette: ColorPalette) {
+    init(update: CrashRecoveryUpdate, links: CrashRecoveryLinks, palette: ColorPalette) {
         self.update = update
+        self.links = links
         self.view = CrashRecoveryView(frame: NSMakeRect(0, 0, CrashRecoveryView.width, 400), palette: palette, title: Text.title, message: Text.message, continueTitle: Text.continueAnyway, websiteTitle: Text.websiteLink, resetTitle: Text.reset)
         self.window = Window(contentRect: NSMakeRect(0, 0, CrashRecoveryView.width, 400), styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         super.init()
@@ -182,8 +176,8 @@ private final class CrashRecoveryWindowController: NSObject, NSWindowDelegate {
         view.secondary = { [weak self] in
             self?.finish(.continueLaunch)
         }
-        view.website = {
-            NSWorkspace.shared.open(websiteURL)
+        view.website = { [weak self] in
+            self?.openWebsite()
         }
         view.reset = { [weak self] in
             self?.confirmReset()
@@ -287,13 +281,19 @@ private final class CrashRecoveryWindowController: NSObject, NSWindowDelegate {
                 NSApp.terminate(nil)
             } else {
                 if case .appStore = update {
-                    NSWorkspace.shared.open(appStoreURL)
+                    NSWorkspace.shared.open(links.appStore)
                 } else {
-                    NSWorkspace.shared.open(websiteURL)
+                    openWebsite()
                 }
                 openedExternal = true
                 render(animated: true)
             }
+        }
+    }
+
+    private func openWebsite() {
+        if let website = links.website {
+            NSWorkspace.shared.open(website)
         }
     }
 

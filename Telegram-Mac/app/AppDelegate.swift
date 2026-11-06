@@ -1484,7 +1484,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         }
         Logger.shared.log("CrashRecovery", "crashed on the previous launch, showing recovery")
         disarmCrashMarker()
-        let result = runCrashRecovery(update: crashRecoveryUpdate())
+        let result = runCrashRecovery(update: crashRecoveryUpdate(), links: crashRecoveryLinks())
         Logger.shared.log("CrashRecovery", "result: \(result)")
         if result == .resetLocalData {
             try? FileManager.default.removeItem(atPath: containerPath)
@@ -1493,6 +1493,16 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
             Logger.shared.log("CrashRecovery", "local data was reset")
         }
         armCrashMarker(folder: containerPath)
+    }
+    
+    private func crashRecoveryLinks() -> CrashRecoveryLinks {
+        #if NANOGRAM_MAS
+        return CrashRecoveryLinks.resolve(isNanogram: true, isAppStoreEdition: true)
+        #elseif NANOGRAM
+        return CrashRecoveryLinks.resolve(isNanogram: true, isAppStoreEdition: false)
+        #else
+        return CrashRecoveryLinks.resolve(isNanogram: false, isAppStoreEdition: false)
+        #endif
     }
     
     private func crashRecoveryUpdate() -> CrashRecoveryUpdate {
