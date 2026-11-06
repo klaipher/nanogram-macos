@@ -1611,6 +1611,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     }
     
     func applicationDidHide(_ notification: Notification) {
+        Logger.shared.flushPendingLogs()
         updatePeerPresence()
         updateRenderingVisibility()
     }
@@ -1710,6 +1711,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     
     func applicationDidResignActive(_ notification: Notification) {
+        Logger.shared.flushPendingLogs()
         updatePeerPresence()
         self.diskWriteReports?.report(reason: "background")
 
@@ -1720,6 +1722,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        Logger.shared.flushPendingLogsAndWait()
         self.terminated = true
         disarmCrashMarker()
         if let containerUrl = self.containerUrl {
