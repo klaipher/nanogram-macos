@@ -21,6 +21,10 @@ public func callCameraSwitchTarget(newCameraId: String?, hasCapturer: Bool, isSc
     return newCameraId
 }
 
+public func callCaptureNeedsReattach(hasCapturer: Bool, wasScreen: Bool, toScreen: Bool) -> Bool {
+    return hasCapturer && wasScreen != toScreen
+}
+
 public func callSessionReleasesCapture(_ state: CallSessionState) -> Bool {
     switch state {
     case .terminated, .dropping:
