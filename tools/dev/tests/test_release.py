@@ -472,6 +472,37 @@ class DirectReleaseTests(unittest.TestCase):
                          "<ul><li>Calls: screen sharing stops &lt;reliably&gt; &amp; fast.</li>"
                          "<li>Chats open faster.</li></ul>")
 
+    def test_release_notes_html_takes_only_the_first_list(self):
+        notes = ("**What's better**\n- First.\n\n- Second,\n  wrapped.\n\n"
+                 "## Requirements\n- macOS 15\n- Apple Silicon\n")
+        self.assertEqual(release.release_notes_html(notes), "<ul><li>First.</li><li>Second, wrapped.</li></ul>")
+        self.assertEqual(release.release_notes_html("- A\nText ends the list.\n- B\n"), "<ul><li>A</li></ul>")
+
+    def test_release_notes_html_keeps_non_ascii_text(self):
+        self.assertEqual(release.release_notes_html("- Дзвінки: краща картинка\n"),
+                         "<ul><li>Дзвінки: краща картинка</li></ul>")
+
+    def test_a_relative_notes_path_is_resolved_against_the_callers_directory(self):
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as elsewhere:
+            (Path(tmp) / "notes.md").write_text("- Дзвінки\n", encoding="utf-8")
+            with mock.patch.dict(release.os.environ, {release.CALLER_CWD_ENV: tmp}):
+                self.assertEqual(release.read_release_notes(Path("notes.md")), "- Дзвінки\n")
+            self.assertEqual(release.read_release_notes(Path("notes.md"), base=Path(tmp)), "- Дзвінки\n")
+            self.assertEqual(release.read_release_notes(Path(tmp) / "notes.md", base=Path(elsewhere)), "- Дзвінки\n")
+
+    def test_a_missing_or_undecodable_notes_file_is_a_release_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(release.ReleaseError):
+                release.read_release_notes(Path("missing.md"), base=Path(tmp))
+            (Path(tmp) / "bad.md").write_bytes(b"\xff\xfe- x")
+            with self.assertRaises(release.ReleaseError):
+                release.read_release_notes(Path("bad.md"), base=Path(tmp))
+
+    def test_main_reports_a_missing_notes_file_without_a_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch("sys.stderr"), \
+                mock.patch.dict(release.os.environ, {release.CALLER_CWD_ENV: tmp}):
+            self.assertEqual(release.main(["release-direct", "--notes", "missing.md"]), 1)
+
     def test_release_notes_html_rejects_notes_without_bullets(self):
         with self.assertRaises(release.ReleaseError):
             release.release_notes_html("Just a paragraph.\n")

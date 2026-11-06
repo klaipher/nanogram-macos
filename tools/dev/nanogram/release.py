@@ -48,6 +48,7 @@ ORDER_FILE = config.ROOT / "Telegram-Mac" / "OrderFiles" / "Telegram.order"
 # overridden on the command line, so the archive signs with the development set and the archived app is re-signed
 # with the distribution set before export (which provisions and signs it for the App Store).
 DISTRIBUTION_ENTITLEMENTS = {"mas": config.ROOT / "nanogram" / "entitlements" / "Nanogram-MAS.entitlements"}
+CALLER_CWD_ENV = "TG_CALLER_CWD"
 ENHANCED_SECURITY_ENV = "NANOGRAM_ENHANCED_SECURITY"
 BUILD_NUMBER_RE = re.compile(r"^\d+(\.\d+){0,2}$")
 ASC_API = "https://api.appstoreconnect.apple.com"
@@ -721,22 +722,50 @@ def download_url(version: str, build: str) -> str:
     return f"{RELEASES_REPO}/releases/download/v{version}-{build}/Nanogram-{version}-{build}.dmg"
 
 
+BULLET_MARKERS = ("- ", "* ", "• ")
+
+
 def release_notes_html(notes: str) -> str:
-    """The bullet lines of the public release notes as an HTML list for the appcast item, which the in-app
-    update screen shows. Markdown emphasis is dropped; everything that is not a bullet stays on GitHub only."""
+    """The first bullet list of the public release notes as an HTML list for the appcast item, which the in-app
+    update screen shows. The list starts at the first line beginning with "- ", "* " or "• " and ends at the first
+    line that is neither blank, a bullet, nor an indented continuation of the previous bullet (a heading, a
+    paragraph), so later lists (requirements, install steps) stay on GitHub only. Markdown emphasis is dropped."""
     from xml.sax.saxutils import escape
-    bullets = []
+    items: list[str] = []
     for line in notes.splitlines():
         stripped = line.strip()
-        for marker in ("- ", "* ", "• "):
-            if stripped.startswith(marker):
-                text = stripped[len(marker):].replace("**", "").strip()
-                if text:
-                    bullets.append(f"<li>{escape(text)}</li>")
-                break
+        marker = next((m for m in BULLET_MARKERS if stripped.startswith(m)), None)
+        if marker is not None:
+            items.append(stripped[len(marker):])
+        elif not items:
+            continue
+        elif not stripped:
+            continue
+        elif line[:1] in (" ", "\t"):
+            items[-1] += " " + stripped
+        else:
+            break
+    bullets = []
+    for item in items:
+        text = item.replace("**", "").strip()
+        if text:
+            bullets.append(f"<li>{escape(text)}</li>")
     if not bullets:
         raise ReleaseError("the release notes have no bullet lines (\"- ...\") for the in-app update screen")
     return "<ul>" + "".join(bullets) + "</ul>"
+
+
+def read_release_notes(path: Path, base: Path | None = None) -> str:
+    path = Path(path)
+    if not path.is_absolute():
+        base = Path(base) if base is not None else Path(os.environ.get(CALLER_CWD_ENV) or os.getcwd())
+        path = base / path
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ReleaseError(f"cannot read the release notes {path}: {error.strerror or error}") from error
+    except UnicodeDecodeError as error:
+        raise ReleaseError(f"the release notes {path} are not valid UTF-8") from error
 
 
 def _cdata(text: str) -> str:
@@ -783,14 +812,14 @@ def sign_appcast(feed: str, key_file: Path | None = None) -> str:
     content = feed if start < 0 else feed[:start]
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "appcast.xml"
-        path.write_bytes(content.encode())
+        path.write_bytes(content.encode("utf-8"))
         signature = sparkle.sign(path, key_file or sparkle.KEY_FILE)
-    return f"{content}{SIGNING_BLOCK_PREFIX}edSignature: {signature}\nlength: {len(content.encode())}\n-->\n"
+    return f"{content}{SIGNING_BLOCK_PREFIX}edSignature: {signature}\nlength: {len(content.encode("utf-8"))}\n-->\n"
 
 
 def write_signed_appcast(out_dir: Path, entries: list[str], key_file: Path | None = None) -> Path:
     path = Path(out_dir) / "appcast.xml"
-    path.write_text(sign_appcast(appcast(entries), key_file))
+    path.write_text(sign_appcast(appcast(entries), key_file), encoding="utf-8")
     return path
 
 
@@ -804,7 +833,7 @@ def _check(command: list[str], what: str) -> str:
 
 def release_direct(allow_dirty: bool = False, notes: Path | None = None) -> Path:
     from nanogram import sparkle
-    notes_html = release_notes_html(Path(notes).read_text()) if notes else None
+    notes_html = release_notes_html(read_release_notes(notes)) if notes else None
     key = asc_key()
     sparkle.public_key()
     build, version = build_number(), marketing_version()
@@ -856,7 +885,7 @@ def main(argv: list[str] | None = None) -> int:
             testflight(export_only=args.export_only)
         else:
             release_direct(allow_dirty=args.allow_dirty, notes=args.notes)
-    except config.ConfigError as error:
+    except (config.ConfigError, ReleaseError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 0
