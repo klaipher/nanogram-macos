@@ -36,11 +36,12 @@ final class LiquidGlassRebuildKeyTests: XCTestCase {
 
     func testBorderKeyChangesWithEachInput() {
         var cache = AppliedValueCache<LiquidGlassBorderKey>()
-        let base = LiquidGlassBorderKey(usesGlass: false, hasBorder: true, isDark: false)
+        let base = LiquidGlassBorderKey(usesGlass: false, hasBorder: true, isDark: false, highContrast: false)
         XCTAssertTrue(cache.needsWrite(base))
         XCTAssertFalse(cache.needsWrite(base))
-        XCTAssertTrue(cache.needsWrite(LiquidGlassBorderKey(usesGlass: false, hasBorder: true, isDark: true)))
-        XCTAssertTrue(cache.needsWrite(LiquidGlassBorderKey(usesGlass: false, hasBorder: false, isDark: true)))
-        XCTAssertTrue(cache.needsWrite(LiquidGlassBorderKey(usesGlass: true, hasBorder: false, isDark: true)))
+        XCTAssertTrue(cache.needsWrite(LiquidGlassBorderKey(usesGlass: false, hasBorder: true, isDark: true, highContrast: false)))
+        XCTAssertTrue(cache.needsWrite(LiquidGlassBorderKey(usesGlass: false, hasBorder: false, isDark: true, highContrast: false)))
+        XCTAssertTrue(cache.needsWrite(LiquidGlassBorderKey(usesGlass: true, hasBorder: false, isDark: true, highContrast: false)))
+        XCTAssertTrue(cache.needsWrite(LiquidGlassBorderKey(usesGlass: true, hasBorder: false, isDark: true, highContrast: true)))
     }
 }

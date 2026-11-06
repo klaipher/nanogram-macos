@@ -1,4 +1,76 @@
-import Foundation
+import Cocoa
+
+public struct GlassAccessibilityState: Equatable {
+    public var reduceTransparency: Bool
+    public var increaseContrast: Bool
+
+    public init(reduceTransparency: Bool, increaseContrast: Bool) {
+        self.reduceTransparency = reduceTransparency
+        self.increaseContrast = increaseContrast
+    }
+
+    public var prefersOpaque: Bool {
+        return reduceTransparency || increaseContrast
+    }
+
+    public static func current() -> GlassAccessibilityState {
+        let workspace = NSWorkspace.shared
+        return GlassAccessibilityState(
+            reduceTransparency: workspace.accessibilityDisplayShouldReduceTransparency,
+            increaseContrast: workspace.accessibilityDisplayShouldIncreaseContrast
+        )
+    }
+}
+
+public protocol GlassEnvironmentListener: AnyObject {
+    func glassEnvironmentDidChange()
+}
+
+public final class GlassAccessibilityMonitor {
+    public static let shared = GlassAccessibilityMonitor(read: GlassAccessibilityState.current, observesWorkspace: true)
+
+    public private(set) var state: GlassAccessibilityState
+    private let read: () -> GlassAccessibilityState
+    private let listeners = NSHashTable<AnyObject>.weakObjects()
+    private var observer: NSObjectProtocol?
+
+    public init(read: @escaping () -> GlassAccessibilityState, observesWorkspace: Bool = false) {
+        self.read = read
+        self.state = read()
+        if observesWorkspace {
+            observer = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.refresh()
+            }
+        }
+    }
+
+    deinit {
+        if let observer {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+    }
+
+    public func register(_ listener: GlassEnvironmentListener) {
+        listeners.add(listener)
+    }
+
+    @discardableResult
+    public func refresh() -> Bool {
+        let updated = read()
+        guard updated != state else {
+            return false
+        }
+        state = updated
+        for listener in listeners.allObjects {
+            (listener as? GlassEnvironmentListener)?.glassEnvironmentDidChange()
+        }
+        return true
+    }
+}
 
 public enum GlassGroup: String, CaseIterable {
     case chatHeader

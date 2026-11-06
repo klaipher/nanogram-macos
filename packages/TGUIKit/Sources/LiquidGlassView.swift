@@ -70,7 +70,7 @@ public final class AdaptiveGlassEffectView: NSGlassEffectView {
     }
 }
 
-open class LiquidGlassView: View {
+open class LiquidGlassView: View, GlassEnvironmentListener {
 
     public var cornerRadius: CGFloat {
         didSet {
@@ -131,11 +131,15 @@ open class LiquidGlassView: View {
         return GlassDebug.isDisabled(glassGroup)
     }
 
-    private var usesGlass: Bool {
-        return System.liquidGlass && !forceBlur && !groupDisabled
+    private var accessibilityState: GlassAccessibilityState {
+        return GlassAccessibilityMonitor.shared.state
     }
 
-    func glassEnvironmentDidChange() {
+    private var usesGlass: Bool {
+        return System.liquidGlass && !forceBlur && !accessibilityState.prefersOpaque && !groupDisabled
+    }
+
+    public func glassEnvironmentDidChange() {
         guard effectView != nil else {
             return
         }
@@ -237,6 +241,7 @@ open class LiquidGlassView: View {
         layer?.masksToBounds = false
         backgroundColor = .clear
 
+        GlassAccessibilityMonitor.shared.register(self)
         rebuildEffectView()
 
         applyForceAppearance()
@@ -497,7 +502,7 @@ open class LiquidGlassView: View {
     }
 
     private func applyBorder() {
-        let key = LiquidGlassBorderKey(usesGlass: usesGlass, hasBorder: hasBorder, isDark: presentation.colors.isDark)
+        let key = LiquidGlassBorderKey(usesGlass: usesGlass, hasBorder: hasBorder, isDark: presentation.colors.isDark, highContrast: accessibilityState.increaseContrast)
         guard appliedBorder.needsWrite(key) else {
             return
         }
@@ -505,7 +510,13 @@ open class LiquidGlassView: View {
             effectView.layer?.borderWidth = 0
             return
         }
-        if key.hasBorder {
+        if key.highContrast {
+            let borderColor = key.isDark
+                ? NSColor.white.withAlphaComponent(0.55)
+                : NSColor.black.withAlphaComponent(0.55)
+            effectView.layer?.borderColor = borderColor.cgColor
+            effectView.layer?.borderWidth = 1
+        } else if key.hasBorder {
             let borderColor = key.isDark
                 ? NSColor.white.withAlphaComponent(0.10)
                 : NSColor.black.withAlphaComponent(0.04)
@@ -562,4 +573,5 @@ struct LiquidGlassBorderKey: Equatable {
     let usesGlass: Bool
     let hasBorder: Bool
     let isDark: Bool
+    let highContrast: Bool
 }
