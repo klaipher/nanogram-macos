@@ -39,16 +39,20 @@ public final class GlassContainerView: FlippableView {
         ghosts.append(ghost)
         glassContent.addSubview(ghost)
         if mergesGhosts {
-            ghost.effectView.removeFromSuperview()
-            glassContent.addSubview(ghost.effectView)
-            ghost.effectView.frame = ghost.frame
+            ghost.mergeHost = glassContent
+            if ghost.hasGlassSurface {
+                ghost.effectView.removeFromSuperview()
+                glassContent.addSubview(ghost.effectView)
+                ghost.effectView.frame = ghost.frame
+            }
         }
         ghost.validGhostFrame = nil
     }
 
     public func removeGhost(_ ghost: LiquidGlassView) {
         ghosts.removeAll { $0 === ghost }
-        if mergesGhosts {
+        ghost.mergeHost = nil
+        if mergesGhosts, ghost.effectView.superview !== ghost {
             ghost.effectView.removeFromSuperview()
         }
         ghost.removeFromSuperview()
@@ -65,7 +69,9 @@ public final class GlassContainerView: FlippableView {
             switch transition {
             case .immediate:
                 ghost.frame = frame
-                ghost.effectView.frame = frame
+                if ghost.effectView.superview !== ghost {
+                    ghost.effectView.frame = frame
+                }
             case let .animated(duration, curve):
                 NSAnimationContext.runAnimationGroup({ context in
                     context.duration = duration
@@ -76,7 +82,9 @@ public final class GlassContainerView: FlippableView {
                     }
                     context.allowsImplicitAnimation = true
                     ghost.setAnimatorFrame(frame)
-                    ghost.effectView.animator().frame = frame
+                    if ghost.effectView.superview !== ghost {
+                        ghost.effectView.animator().frame = frame
+                    }
                 })
             }
         } else {

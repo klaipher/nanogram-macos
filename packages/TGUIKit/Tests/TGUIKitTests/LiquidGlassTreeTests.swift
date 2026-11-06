@@ -123,4 +123,89 @@ final class LiquidGlassTreeTests: XCTestCase {
         XCTAssertTrue(before === glass.effectView)
         XCTAssertEqual(glass.effectView.layer?.borderWidth, 0)
     }
+
+    private func forceReduceTransparency(_ on: Bool) {
+        MainActor.assumeIsolated {
+            GlassAccessibilityMonitor.shared.force(GlassAccessibilityState(reduceTransparency: on, increaseContrast: false))
+        }
+    }
+
+    private func visibleShadowHolders(_ glass: LiquidGlassView) -> [NSView] {
+        return [glass, glass.effectView].filter { $0.shadow != nil }
+    }
+
+    func testReduceTransparencyFallbackInAContainerKeepsItsShadowOnTheViewHoldingIt() throws {
+        guard System.liquidGlassAvailable else {
+            throw XCTSkip("liquid glass is not available")
+        }
+        System.liquidGlass = true
+        forceReduceTransparency(true)
+        let container = GlassContainerView(frame: NSMakeRect(0, 0, 200, 40), flipped: true, spacing: 5)
+        let glass = LiquidGlassView(frame: NSMakeRect(0, 0, 40, 40), cornerRadius: 20)
+        container.addGhost(glass)
+        container.setGhostFrame(glass, frame: NSMakeRect(10, 0, 40, 40), transition: .immediate)
+        XCTAssertFalse(glass.effectView is NSGlassEffectView)
+        XCTAssertTrue(visibleShadowHolders(glass).contains { $0 === glass.effectView.superview })
+        XCTAssertTrue(glass.effectView.superview === glass, "fallback stays inside the wrapper so the wrapper shadow composites it")
+        XCTAssertNotNil(glass.shadow)
+        XCTAssertEqual(glass.effectView.frame, glass.bounds)
+        XCTAssertEqual(glass.frame, NSMakeRect(10, 0, 40, 40))
+    }
+
+    func testGlassInAContainerDrawsNoShadowAndFallbackToggleMovesTheSurface() throws {
+        guard System.liquidGlassAvailable else {
+            throw XCTSkip("liquid glass is not available")
+        }
+        System.liquidGlass = true
+        forceReduceTransparency(false)
+        let container = GlassContainerView(frame: NSMakeRect(0, 0, 200, 40), flipped: true, spacing: 5)
+        let glass = LiquidGlassView(frame: NSMakeRect(0, 0, 40, 40), cornerRadius: 20)
+        container.addGhost(glass)
+        container.setGhostFrame(glass, frame: NSMakeRect(10, 0, 40, 40), transition: .immediate)
+        XCTAssertTrue(glass.effectView.superview === container.glassContent)
+        XCTAssertNil(glass.shadow)
+        forceReduceTransparency(true)
+        XCTAssertTrue(glass.effectView.superview === glass)
+        XCTAssertNotNil(glass.shadow)
+        XCTAssertEqual(glass.effectView.frame, glass.bounds)
+        forceReduceTransparency(false)
+        XCTAssertTrue(glass.effectView.superview === container.glassContent)
+        XCTAssertEqual(glass.effectView.frame, NSMakeRect(10, 0, 40, 40))
+        XCTAssertNil(glass.shadow)
+        XCTAssertEqual(container.glassContent.subviews.filter { $0 === glass.effectView }.count, 1)
+    }
+
+    func testEveryGhostOfAContainerKeepsItsShadowWithReduceTransparency() throws {
+        guard System.liquidGlassAvailable else {
+            throw XCTSkip("liquid glass is not available")
+        }
+        System.liquidGlass = true
+        forceReduceTransparency(true)
+        let container = GlassContainerView(frame: NSMakeRect(0, 0, 300, 40), flipped: true, spacing: 5)
+        let shadowed = [LiquidGlassView(frame: NSMakeRect(0, 0, 40, 40), cornerRadius: 20), LiquidGlassView(frame: NSMakeRect(0, 0, 40, 40), cornerRadius: 20)]
+        let flat = LiquidGlassView(frame: NSMakeRect(0, 0, 40, 40), cornerRadius: 20, hasShadow: false)
+        for (index, ghost) in (shadowed + [flat]).enumerated() {
+            container.addGhost(ghost)
+            container.setGhostFrame(ghost, frame: NSMakeRect(CGFloat(index) * 60, 0, 40, 40), transition: .immediate)
+        }
+        for ghost in shadowed {
+            XCTAssertNotNil(ghost.shadow)
+        }
+        XCTAssertNil(flat.shadow)
+    }
+
+    func testFallbackRemovedFromAContainerLeavesNothingBehind() throws {
+        guard System.liquidGlassAvailable else {
+            throw XCTSkip("liquid glass is not available")
+        }
+        System.liquidGlass = true
+        forceReduceTransparency(true)
+        let container = GlassContainerView(frame: NSMakeRect(0, 0, 200, 40), flipped: true, spacing: 5)
+        let glass = LiquidGlassView(frame: NSMakeRect(0, 0, 40, 40), cornerRadius: 20)
+        container.addGhost(glass)
+        container.removeGhost(glass)
+        XCTAssertNil(glass.superview)
+        XCTAssertTrue(glass.effectView.superview === glass)
+        XCTAssertEqual(container.glassContent.subviews.count, 0)
+    }
 }
