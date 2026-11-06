@@ -1398,6 +1398,17 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         nanogramDebugObservations.append(settings.observe("media.jpegWideGamut") { _ in
             applyJPEGWideGamut()
         })
+        settings.register(.toggle(id: GlassChromeReuse.debugOptionId, section: "Display", title: "Glass: reuse chat chrome", detail: "Experiment: chat buttons build their inner glass only when it is shown, and the chat header and input row reuse their glass surfaces from earlier chats instead of building new ones. Default: off. Applies to chats opened after the change.", defaultValue: false))
+        let applyGlassChromeReuse = {
+            GlassChromeReuse.isEnabled = settings.bool(GlassChromeReuse.debugOptionId)
+            if !GlassChromeReuse.isEnabled {
+                GlassGhostPool.shared.drain()
+            }
+        }
+        applyGlassChromeReuse()
+        nanogramDebugObservations.append(settings.observe(GlassChromeReuse.debugOptionId) { _ in
+            applyGlassChromeReuse()
+        })
         settings.register(DecoderIsolation.debugOption)
         settings.register(OnDeviceTranslation.legacyDebugOption)
         settings.register(LocalAudioTranscription.debugOption)

@@ -79,10 +79,10 @@ public final class InputMessageEffectView : Control {
 }
 
 private extension LiquidGlassView {
+    static let inputRowSpec = GlassGhostSpec(cornerRadius: 20, hasShadow: true, hasBorder: true, tintAlpha: 0.3, group: .inputRow)
+
     static func inputRowGhost() -> LiquidGlassView {
-        let view = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
-        view.glassGroup = .inputRow
-        return view
+        return GlassGhostPool.shared.acquire(inputRowSpec)
     }
 }
 
@@ -199,12 +199,9 @@ public final class ChatInputContainerView: FlippableView {
 
         addSubview(glassWrapper)
 
-        let attachGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
-        let textGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
-        let voiceGhost = LiquidGlassView(frame: .zero, cornerRadius: 20, hasShadow: true, hasBorder: true)
-        attachGhost.glassGroup = .inputRow
-        textGhost.glassGroup = .inputRow
-        voiceGhost.glassGroup = .inputRow
+        let attachGhost = LiquidGlassView.inputRowGhost()
+        let textGhost = LiquidGlassView.inputRowGhost()
+        let voiceGhost = LiquidGlassView.inputRowGhost()
         self.attachGhost = attachGhost
         self.textGhost = textGhost
         self.voiceGhost = voiceGhost
@@ -241,6 +238,10 @@ public final class ChatInputContainerView: FlippableView {
 
     public required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     public required init(frame frameRect: NSRect) { fatalError("use init(frame:chatInteraction:textInteractions:)") }
+
+    deinit {
+        GlassGhostPool.shared.release(from: glassWrapper)
+    }
 
     public var chatState: ChatState { chatInteraction.presentation.state }
 
