@@ -19,7 +19,7 @@ enum InstantVideoPIPCornerAlignment {
 }
 
 public class InstantVideoPIPView : GIFPlayerView {
-    nonisolated(unsafe) let playingProgressView: RadialProgressView = RadialProgressView(theme:RadialProgressTheme(backgroundColor: .clear, foregroundColor: NSColor.white.withAlphaComponent(0.8), lineWidth: 3), twist: false)
+    let playingProgressView: RadialProgressView = RadialProgressView(theme:RadialProgressTheme(backgroundColor: .clear, foregroundColor: NSColor.white.withAlphaComponent(0.8), lineWidth: 3), twist: false)
 
     public override init() {
         super.init()

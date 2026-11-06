@@ -237,6 +237,7 @@ def fake_app(root: Path) -> Path:
 
 
 DISTRIBUTION = "Apple Distribution: Owner (YGTMYL879P)"
+DEVELOPER_ID = "Developer ID Application: Owner (YGTMYL879P)"
 DEVELOPMENT = "Apple Development: owner@example.com (DC8G7G3PSH)"
 
 
@@ -721,21 +722,79 @@ class EnhancedSecurityToolTests(unittest.TestCase):
             self.assertIn("Share.appex", problems[0])
             (appex / "Contents").mkdir(exist_ok=True)
             (appex / "Contents" / "embedded.provisionprofile").write_bytes(b"cms")
-            self.assertEqual(release.enhanced_security_unbacked_problems(app, entitlements_of=hardened), [])
-            self.assertEqual(release.enhanced_security_unbacked_problems(app, entitlements_of=lambda item: {}), [])
+            granted = lambda item: {self.PREFIX: True}
+            self.assertEqual(release.enhanced_security_unbacked_problems(app, entitlements_of=hardened,
+                                                                         profile_of=granted), [])
+            self.assertEqual(release.enhanced_security_unbacked_problems(app, entitlements_of=lambda item: {},
+                                                                         profile_of=granted), [])
+
+    def test_an_extension_with_its_own_profile_that_does_not_grant_the_key_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            appex = app / "Contents" / "PlugIns" / "Share.appex"
+            appex.mkdir(exist_ok=True)
+            (appex / "Contents").mkdir(exist_ok=True)
+            (appex / "Contents" / "embedded.provisionprofile").write_bytes(b"cms")
+            hardened = lambda item: dict(self.KEYS) if item == appex else {}
+            ungranted = release.enhanced_security_unbacked_problems(app, entitlements_of=hardened,
+                                                                    profile_of=lambda item: {})
+            self.assertEqual(len(ungranted), 1)
+            self.assertIn("does not grant", ungranted[0])
+            self.assertIn("Share.appex", ungranted[0])
+            granted = release.enhanced_security_unbacked_problems(app, entitlements_of=hardened,
+                                                                  profile_of=lambda item: {self.PREFIX: True})
+            self.assertEqual(granted, [])
+            unsigned = release.enhanced_security_unbacked_problems(app, entitlements_of=lambda item: {},
+                                                                   profile_of=lambda item: {})
+            self.assertEqual(unsigned, [])
+
+    def failing_check(self, app, es_problems, unbacked_problems, enhanced_security=True):
+        with mock.patch.object(release, "_authority", return_value=DEVELOPER_ID), \
+                mock.patch.object(release, "enhanced_security_problems", return_value=es_problems) as es, \
+                mock.patch.object(release, "enhanced_security_unbacked_problems",
+                                  return_value=unbacked_problems) as unbacked:
+            with mock.patch("sys.stderr") as err:
+                try:
+                    release.check_exported_app(app, "direct", enhanced_security=enhanced_security)
+                    raised = False
+                except release.ReleaseError:
+                    raised = True
+        written = "".join(call.args[0] for call in err.write.call_args_list)
+        return raised, written, es, unbacked
 
     def test_the_release_stops_with_the_hint_when_the_check_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             app = fake_app(Path(tmp))
             release.unsign_resource_bundles(app)
-            with mock.patch.object(release, "_authority", return_value=DISTRIBUTION), \
-                    mock.patch.object(release, "signed_entitlements", return_value={}), \
-                    mock.patch.object(release, "embedded_profile_entitlements", return_value=None):
-                with self.assertRaises(release.ReleaseError), mock.patch("sys.stderr") as err:
-                    release.check_exported_app(app, "direct", enhanced_security=True)
-            written = "".join(call.args[0] for call in err.write.call_args_list)
+            raised, written, _, _ = self.failing_check(app, ["Nanogram.app embeds no provisioning profile"], [])
+            self.assertTrue(raised)
             self.assertIn("developer portal", written)
-            self.assertIn("embedded.provisionprofile", written)
+            self.assertIn("embeds no provisioning profile", written)
+            raised, written, _, _ = self.failing_check(app, [], ["Share.appex is signed without a profile"])
+            self.assertTrue(raised)
+            self.assertIn("developer portal", written)
+
+    def test_the_hint_is_not_printed_for_a_failure_unrelated_to_enhanced_security(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            release.unsign_resource_bundles(app)
+            fonts = [str(app / "Contents" / "Resources" / "SF-Pro.otf")]
+            with mock.patch.object(release, "apple_fonts", return_value=fonts):
+                raised, written, es, unbacked = self.failing_check(app, [], [])
+            self.assertTrue(raised)
+            self.assertIn("ITMS-91182", written)
+            self.assertNotIn("developer portal", written)
+            es.assert_called_once()
+            unbacked.assert_called_once()
+
+    def test_the_enhanced_security_checks_are_skipped_when_the_feature_is_off(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = fake_app(Path(tmp))
+            release.unsign_resource_bundles(app)
+            raised, written, es, unbacked = self.failing_check(app, ["x"], ["y"], enhanced_security=False)
+            self.assertFalse(raised)
+            es.assert_not_called()
+            unbacked.assert_not_called()
 
 
 class BuildRecordTests(unittest.TestCase):

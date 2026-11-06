@@ -371,16 +371,25 @@ def enhanced_security_problems(app: Path, entitlements_of=signed_entitlements,
     return problems
 
 
-def enhanced_security_unbacked_problems(app: Path, entitlements_of=signed_entitlements) -> list[str]:
+def enhanced_security_unbacked_problems(app: Path, entitlements_of=signed_entitlements,
+                                        profile_of=embedded_profile_entitlements) -> list[str]:
     problems = []
+    grant = enhanced_security_module.PREFIX
     for item in nested_code(app)[1:]:
-        if (item / "Contents" / "embedded.provisionprofile").is_file() or not item.is_dir():
+        if not item.is_dir():
             continue
-        carried = sorted(key for key in entitlements_of(item) if key.startswith(enhanced_security_module.PREFIX))
-        if carried:
-            where = item.relative_to(Path(app).parent)
+        carried = sorted(key for key in entitlements_of(item) if key.startswith(grant))
+        if not carried:
+            continue
+        where = item.relative_to(Path(app).parent)
+        profile = profile_of(item)
+        if profile is None:
             problems.append(f"{where} is signed with {', '.join(carried)} but embeds no provisioning profile; "
                             "a restricted entitlement without a profile keeps the bundle from launching")
+        elif profile.get(grant) is not True:
+            problems.append(f"{where} is signed with {', '.join(carried)} but its provisioning profile does not "
+                            f"grant {grant}; a restricted entitlement the profile does not grant keeps the bundle "
+                            "from launching")
     return problems
 
 
@@ -394,13 +403,15 @@ def check_exported_app(app: Path, edition: str, enhanced_security: bool | None =
         enhanced_security = enhanced_security_requested()
     problems = check_distribution_signing(app, edition)
     problems += [f"Apple system font in the bundle (ITMS-91182): {font}" for font in apple_fonts(app)]
+    enhanced_security_failed = False
     if enhanced_security:
-        problems += enhanced_security_problems(app)
-        problems += enhanced_security_unbacked_problems(app)
+        found = enhanced_security_problems(app) + enhanced_security_unbacked_problems(app)
+        enhanced_security_failed = bool(found)
+        problems += found
     if problems:
         for problem in problems:
             print(f"release: {problem}", file=sys.stderr)
-        if enhanced_security:
+        if enhanced_security_failed:
             print(f"release: {ENHANCED_SECURITY_HINT}", file=sys.stderr)
         raise ReleaseError(f"the exported {edition} app failed its signing checks ({len(problems)} problems, "
                            "see above)")
