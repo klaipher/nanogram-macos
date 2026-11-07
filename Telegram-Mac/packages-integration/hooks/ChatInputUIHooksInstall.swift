@@ -86,9 +86,15 @@ func installChatInputUIHooks() {
     }, makeForwardMessagesModal: { context, messages in
         return ShareModalController(ForwardMessagesObject(context as! AccountContext, messages: messages, emptyPerformOnClose: true))
     }, makeTranslateModal: { context, from, toLang, draft, onUse, onSend in
-        return TranslateModalController(context: context as! AccountContext, from: from, toLang: toLang, text: draft.inputText, entities: draft.messageTextEntities(), draft: draft, onUse: onUse, onSend: onSend)
+        guard let context = context as? AccountContext else {
+            return ModalViewController(frame: .zero)
+        }
+        return TranslateModalController(context: context, from: from, toLang: toLang, text: draft.inputText, entities: draft.messageTextEntities(), draft: draft, onUse: onUse, onSend: onSend)
     }, makeRichTranslateModal: { context, from, toLang, text, entities, richBlocks, onUseRich in
-        return TranslateModalController(context: context as! AccountContext, from: from, toLang: toLang, text: text, entities: entities, richBlocks: richBlocks, onUseRich: onUseRich)
+        guard let context = context as? AccountContext else {
+            return ModalViewController(frame: .zero)
+        }
+        return TranslateModalController(context: context, from: from, toLang: toLang, text: text, entities: entities, richBlocks: richBlocks, onUseRich: onUseRich)
     }, wallet: makeChatInputWalletHooks(), getAudioPlayer: { context in
         return (context as? AccountContext)?.sharedContext.getAudioPlayer()
     }, makeStickerPackPreview: { context, peerId, references in
@@ -152,10 +158,16 @@ func installChatInputUIHooks() {
         return result
     })
     hooks.makeTranslateModalWithContext = { context, from, toLang, draft, onUse, onSend in
-        TranslateModalController(context: context as! AccountContext, from: from, toLang: toLang, text: draft.inputText, entities: draft.messageTextEntities(), draft: draft, onUse: onUse, onSend: onSend)
+        guard let context = context as? AccountContext else {
+            return ModalViewController(frame: .zero)
+        }
+        return TranslateModalController(context: context, from: from, toLang: toLang, text: draft.inputText, entities: draft.messageTextEntities(), draft: draft, onUse: onUse, onSend: onSend)
     }
     hooks.makeRichTranslateModalWithContext = { context, from, toLang, text, entities, blocks, onUse in
-        TranslateModalController(context: context as! AccountContext, from: from, toLang: toLang, text: text, entities: entities, richBlocks: blocks, onUseRich: onUse)
+        guard let context = context as? AccountContext else {
+            return ModalViewController(frame: .zero)
+        }
+        return TranslateModalController(context: context, from: from, toLang: toLang, text: text, entities: entities, richBlocks: blocks, onUseRich: onUse)
     }
     hooks.makeEmojiPickerWithContext = { context, sendAnimatedEmoji, sendEmoji in
         let context = context as! AccountContext
