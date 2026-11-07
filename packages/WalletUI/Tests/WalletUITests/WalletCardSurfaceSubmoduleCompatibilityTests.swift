@@ -131,10 +131,11 @@ vertex WalletCardChipTestOutput walletCardChipTestVertex(uint vertexID [[vertex_
 
 fragment float4 walletCardChipTestFragment(WalletCardChipTestOutput input [[stage_in]],
     constant float4 &layout [[buffer(0)]], constant float4 &state [[buffer(1)]],
+    constant WalletCardStyle &style [[buffer(2)]],
     texture2d<float> noiseMap [[texture(0)]], texture2d<float> qrMap [[texture(1)]]) {
     float2 position = input.position.xy / layout.z - layout.w * layout.xy;
     float2 cp = position / layout.xy + float2(268.5, 82.0);
-    return walletCardQRChip(cp, state.xy, state.z, noiseMap, qrMap);
+    return walletCardQRChip(cp, state.xy, state.z, noiseMap, qrMap, position, style);
 }
 """
 
@@ -168,7 +169,7 @@ final class WalletCardSurfaceSubmoduleCompatibilityTests: XCTestCase {
             "var rotation = CATransform3DRotate(CATransform3DIdentity, CGFloat(pitch), 1.0, 0.0, 0.0)",
             "rotation = CATransform3DRotate(rotation, CGFloat(yaw), 0.0, 1.0, 0.0)",
             "return CGPoint(x: depth * rotation.m31, y: depth * rotation.m32)",
-            "let edgeShift = self.edgeShift(pitch: cardPitch, yaw: self.currentCardY)",
+            "let edgeShift = self.edgeShift(pitch: cardPitch, yaw: self.stickerYaw)",
             "let x = self.projectedPoint(corner, transform: perspectiveTransform).point.x - anchorX",
             "reachX = max(reachX, max(abs(x), abs(x + edgeShift.x)))",
             "let fitScale = reachX > anchorX ? anchorX / reachX : 1.0",
@@ -176,7 +177,7 @@ final class WalletCardSurfaceSubmoduleCompatibilityTests: XCTestCase {
             "var backTransform = CATransform3DConcat(perspectiveTransform, CATransform3DMakeTranslation(edgeShift.x * fitScale, edgeShift.y * fitScale, 0.0))",
             "perspectiveTransform = scrolled(perspectiveTransform) backTransform = scrolled(backTransform)",
             "perspectiveTransform.m34 = -1.0 / 650.0",
-            "CGFloat(-self.currentCardY * 3.0), CGFloat(self.currentCardX * 2.5),",
+            "CGFloat(-self.stickerYaw * 3.0), CGFloat(self.currentCardX * 2.5),",
             "let detailsFraction = max(0.0, min(1.0, (self.balanceTransitionFraction - 0.3) / 0.3))",
             "let easedDetailsFraction = detailsFraction * detailsFraction * (3.0 - 2.0 * detailsFraction)",
             "self.qrAlpha = detailsAlpha self.qrBlurRadius = easedDetailsFraction * 8.0",
@@ -318,6 +319,8 @@ final class WalletCardSurfaceSubmoduleCompatibilityTests: XCTestCase {
         var state = SIMD4<Float>(Float(surface.x), Float(surface.y), time, 0.0)
         encoder.setFragmentBytes(&layout, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
         encoder.setFragmentBytes(&state, length: MemoryLayout<SIMD4<Float>>.size, index: 1)
+        var neutralStyle = [Float](repeating: 0.0, count: 28)
+        encoder.setFragmentBytes(&neutralStyle, length: neutralStyle.count * MemoryLayout<Float>.size, index: 2)
         encoder.setFragmentTexture(noiseTexture, index: 0)
         encoder.setFragmentTexture(qrTexture, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)

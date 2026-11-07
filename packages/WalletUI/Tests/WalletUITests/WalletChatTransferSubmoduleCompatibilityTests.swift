@@ -173,12 +173,12 @@ final class WalletChatTransferSubmoduleCompatibilityTests: XCTestCase {
         XCTAssertTrue(chat.contains("chatInteraction?.walletTransferAnimation?.prepare(id: id)"))
         XCTAssertTrue(chat.contains("acceptedTransferAnimation = chatInteraction?.walletTransferAnimation?.receive(id: id, source: source) ?? false return acceptedTransferAnimation"))
         XCTAssertTrue(chat.contains("if !acceptedTransferAnimation { chatInteraction?.scrollToLatest(true) }"))
-        XCTAssertTrue(chat.contains("showWalletSendMoney(chatInteraction: chatInteraction, user: user, flyIntoChat: true)"), "the attachment menu flies like the submodule's")
+        XCTAssertTrue(chat.contains("showWalletSendMoney(chatInteraction: chatInteraction, user: user, flyIntoChat: true, morphSource:"), "the attachment menu flies like the submodule's")
     }
 
     func testSendingFromAMessageMenuDoesNotFlyLikeSubmodule() throws {
         try assertSubmodule("TelegramUI/Sources/ChatInterfaceStateContextMenus.swift", contains: [
-            "openResolved(result: .sendGrams(transfer: WalletSendRequest(recipient: .peer(peer), amountNanograms: nil)), sourceMessageId: message.id)"
+            "openResolved(result: .sendGrams(transfer: WalletSendRequest(recipient: recipient, amountNanograms: nil)), sourceMessageId: message.id)"
         ])
         try assertSubmodule("TelegramUI/Sources/OpenResolvedUrl.swift", contains: [
             "controller = WalletSendScreen( context: context, peer: peer, walletContext: walletContext, resolvedAddress: resolvedAddress, initialAmountNanograms: transfer.amountNanograms, completed: {",

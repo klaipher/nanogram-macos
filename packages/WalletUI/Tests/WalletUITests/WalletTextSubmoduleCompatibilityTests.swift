@@ -5,6 +5,10 @@ import TelegramCore
 import Localization
 @testable import WalletUI
 
+private func macStrings() -> L10n.Type {
+    return strings()
+}
+
 private func repositoryRoot() -> URL {
     return URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 }
@@ -281,7 +285,11 @@ final class WalletTextSubmoduleCompatibilityTests: XCTestCase {
         let text = try XCTUnwrap(strings["Wallet.Backup.CancelDisablingText"])
         let confirm = try XCTUnwrap(strings["Wallet.Backup.CancelDisabling"])
         let stay = try XCTUnwrap(strings["Wallet.Continue"])
-        XCTAssertTrue(actual.contains("header: \"\(title)\", information: \"\(text)\", ok: \"\(confirm)\", cancel: \"\(stay)\""))
+        XCTAssertTrue(actual.contains("header: strings().walletWordsControllerCancelDisablingTitle, information: strings().walletWordsControllerCancelDisablingInfo, ok: strings().walletWordsControllerCancelDisabling, cancel: strings().walletWordsControllerContinue"))
+        XCTAssertEqual(macStrings().walletWordsControllerCancelDisablingTitle, title)
+        XCTAssertEqual(macStrings().walletWordsControllerCancelDisablingInfo, text)
+        XCTAssertEqual(macStrings().walletWordsControllerCancelDisabling, confirm)
+        XCTAssertEqual(macStrings().walletWordsControllerContinue, stay)
     }
 
     func testWithdrawalMinimumMessageMatchesSubmodule() throws {
@@ -293,7 +301,9 @@ final class WalletTextSubmoduleCompatibilityTests: XCTestCase {
         let submoduleStars = try source("submodules/telegram-ios/submodules/TelegramUI/Components/Stars/StarsWithdrawalScreen/Sources/StarsRevenueWithdrawalController.swift")
         XCTAssertFalse(submoduleStars.contains("AmountTooSmallError"))
 
-        for (path, tonFlows) in [("packages/StarsUI/Sources/StarsUI/Star_ListScreen.swift", 1), ("packages/MonetizationUI/Sources/MonetizationUI/FragmentMonetizationController.swift", 2), ("packages/MonetizationUI/Sources/MonetizationUI/FragmentStarMonetizationController.swift", 0)] {
+        XCTAssertEqual(macStrings().starListScreenWithdrawMinimumGrams, message)
+        XCTAssertEqual(macStrings().fragmentMonetizationControllerWithdrawMinimum, message)
+        for (path, tonFlows, accessor) in [("packages/StarsUI/Sources/StarsUI/Star_ListScreen.swift", 1, "starListScreenWithdrawMinimumGrams"), ("packages/MonetizationUI/Sources/MonetizationUI/FragmentMonetizationController.swift", 2, "fragmentMonetizationControllerWithdrawMinimum"), ("packages/MonetizationUI/Sources/MonetizationUI/FragmentStarMonetizationController.swift", 0, "")] {
             let actual = try source(path)
             let requests = actual.components(separatedBy: "requestStarsRevenueWithdrawalUrl(").dropFirst()
             let ton = requests.filter { $0.prefix(while: { $0 != "\n" }).contains("ton: true") }
@@ -301,7 +311,7 @@ final class WalletTextSubmoduleCompatibilityTests: XCTestCase {
             for request in ton {
                 let mapping = try XCTUnwrap(request.components(separatedBy: "default:").first, path)
                 XCTAssertTrue(mapping.contains("case .amountTooSmall:"), path)
-                XCTAssertTrue(mapping.contains("return .custom(\"\(message)\")"), path)
+                XCTAssertTrue(mapping.contains("return .custom(strings().\(accessor))"), path)
             }
             for request in requests where !request.prefix(while: { $0 != "\n" }).contains("ton: true") {
                 let mapping = request.components(separatedBy: "default:").first ?? ""
