@@ -1149,7 +1149,7 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
                         }
                     }
                 case .savedMessages:
-                    foundRemotePeers = context.engine.messages.searchLocalSavedMessagesPeers(query: query, indexNameMapping: [:]) |> map { peers in
+                    foundRemotePeers = context.engine.messages.searchLocalSavedMessagesPeers(peerId: context.peerId, query: query, indexNameMapping: [:]) |> map { peers in
                         var local: [ChatListSearchEntry] = []
                         var index = 1000
                         for item in peers {

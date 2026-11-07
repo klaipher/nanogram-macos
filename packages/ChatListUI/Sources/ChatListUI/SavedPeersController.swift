@@ -241,7 +241,7 @@ public func SavedPeersController(context: any AccountContextProtocol) -> InputDa
         if state.request.isEmpty {
             return .single(.init(peers: nil, searchState: state))
         } else {
-            return context.engine.messages.searchLocalSavedMessagesPeers(query: state.request, indexNameMapping: [:])
+            return context.engine.messages.searchLocalSavedMessagesPeers(peerId: context.peerId, query: state.request, indexNameMapping: [:])
             |> map(Optional.init)
             |> map { .init(peers: $0, searchState: state) }
         }
