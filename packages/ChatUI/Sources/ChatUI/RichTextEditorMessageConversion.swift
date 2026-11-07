@@ -27,9 +27,11 @@ public func buttonAction(from action: ReplyMarkupButtonAction) -> ButtonAction {
         return .url(url)
     case let .copyText(payload):
         return .copyText(payload)
+    case let .openUserProfile(peerId):
+        return .userProfile(peerId: peerId.toInt64())
     case .disabled:
         return .disabled
-    case .callback, .urlAuth, .openWebView, .switchInline, .openUserProfile, .openWebApp, .payment,
+    case .callback, .urlAuth, .openWebView, .switchInline, .openWebApp, .payment,
          .text, .requestPhone, .requestMap, .setupPoll, .requestPeer:
         let encoder = PostboxEncoder()
         action.encode(encoder)
@@ -43,6 +45,12 @@ public func replyMarkupButtonAction(from action: ButtonAction) -> ReplyMarkupBut
         return .url(url)
     case let .copyText(payload):
         return .copyText(payload: payload)
+    case let .userProfile(peerId):
+        let peerId = PeerId(peerId)
+        guard peerId.namespace == Namespaces.Peer.CloudUser else {
+            return .disabled
+        }
+        return .openUserProfile(peerId: peerId)
     case .disabled:
         return .disabled
     case let .unsupported(kind, payload):

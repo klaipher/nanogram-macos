@@ -1810,7 +1810,7 @@ public final class RichTextEditorCoordinator {
         case .url: actionFooter = nil
         case let .copyText(payload): actionFooter = payload.isEmpty ? strings().richTextEditorButtonActionCopy : payload
         case .disabled: actionFooter = strings().richTextEditorButtonActionDisabled
-        case .unsupported: actionFooter = strings().richTextEditorButtonActionNotEditable
+        case .userProfile, .unsupported: actionFooter = strings().richTextEditorButtonActionNotEditable
         }
 
         let idLabel = InputDataIdentifier("_id_button_label")
