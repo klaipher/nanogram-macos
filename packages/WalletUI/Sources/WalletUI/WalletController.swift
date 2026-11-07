@@ -174,7 +174,9 @@ func walletListEntries<Value: Equatable>(_ values: [Value], hasLoadMore: Bool, h
 }
 
 private let walletTermsOfServiceUrl = "https://telegram.org/tos"
-let walletTermsText = strings().walletControllerTermsAgreement(walletTermsOfServiceUrl)
+var walletTermsText: String {
+    return strings().walletControllerTermsAgreement(walletTermsOfServiceUrl)
+}
 
 private let _id_card = InputDataIdentifier("_id_card")
 private let _id_walt_balance = InputDataIdentifier("_id_walt_balance")
