@@ -30,6 +30,7 @@ let package = Package(
         .package(name: "QRCodeUtils", path: "../QRCodeUtils"),
         .package(name: "UniqueGiftRenderer", path: "../UniqueGiftRenderer"),
         .package(name: "InlineStickerLayer", path: "../InlineStickerLayer"),
+        .package(name: "rnoise", path: "../../submodules/telegram-ios/third-party/rnnoise"),
     ],
     targets: [
         .target(
@@ -59,6 +60,6 @@ let package = Package(
             ],
             path: "Sources/WalletUI",
             resources: [.copy("Resources/ChatListNoResults.tgs"), .copy("Resources/GramDiamondLight.tgs"), .copy("Resources/WalletCommentLock.tgs"), .copy("Resources/WalletTransactionKey.pdf"), .copy("Resources/WalletTransactionKeyLarge.pdf"), .copy("Resources/WalletAddressInfo.pdf")]),
-        .testTarget(name: "WalletUITests", dependencies: ["WalletUI", .product(name: "GZIP", package: "GZIP"), .product(name: "SceneEffects", package: "SceneEffects"), .product(name: "PasscodeCore", package: "PasscodeCore"), .product(name: "WalletContext", package: "WalletContext")]),
+        .testTarget(name: "WalletUITests", dependencies: ["WalletUI", .product(name: "GZIP", package: "GZIP"), .product(name: "SceneEffects", package: "SceneEffects"), .product(name: "PasscodeCore", package: "PasscodeCore"), .product(name: "WalletContext", package: "WalletContext"), .product(name: "rnoise", package: "rnoise")]),
     ]
 )
