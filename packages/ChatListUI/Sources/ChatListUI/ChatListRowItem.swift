@@ -1965,7 +1965,7 @@ public class ChatListRowItem: TableRowItem {
                 }, itemImage: MenuAnimation.menu_read.value))
             }
             
-            if !peer.hasSensitiveContent(platform: "ios") {
+            if !peer.hasSensitiveContent(platform: "ios", contentSettings: context.contentSettings) {
                 items.append(ContextMenuItem(strings().chatListContextPreview, handler: {
                     ChatListRowItem.previewTopic(peerId: peer.id, threadId: threadId, context: context)
                 }, itemImage: MenuAnimation.menu_eye.value))
@@ -2660,7 +2660,7 @@ public class ChatListRowItem: TableRowItem {
         guard let peerId = peerId else {
             return
         }
-        if let peer = self.peer, !peer.hasSensitiveContent(platform: "ios") {
+        if let peer = self.peer, !peer.hasSensitiveContent(platform: "ios", contentSettings: context.contentSettings) {
             if case let .topic(threadId, _) = mode {
                 ChatListRowItem.previewTopic(peerId: peerId, threadId: threadId, context: context)
             } else {

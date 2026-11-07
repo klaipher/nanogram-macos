@@ -74,7 +74,7 @@ func navigateToChat(navigation: NavigationViewController?, context: AccountConte
                 context.bindings.mainViewController.chatList.navigationController?.push(controller)
                 return
             }
-            if peer.hasSensitiveContent(platform: "ios") {
+            if peer.hasSensitiveContent(platform: "ios", contentSettings: context.contentSettings) {
                 if !context.contentConfig.sensitiveContentEnabled, context.contentConfig.canAdjustSensitiveContent {
                     let need_verification = context.appConfiguration.getBoolValue("need_age_video_verification", orElse: false)
                     

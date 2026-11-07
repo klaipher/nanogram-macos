@@ -577,7 +577,7 @@ open class ChannelEventLogController<Context: AccountContextProtocol>: TelegramG
                     return current
                 }
             }
-            if message.isSensitiveContent(platform: "ios"), !context.contentConfig.sensitiveContentEnabled {
+            if message.isSensitiveContent(platform: "ios", contentSettings: context.contentSettings), !context.contentConfig.sensitiveContentEnabled {
                 if context.contentConfig.canAdjustSensitiveContent, context.appConfiguration.getBoolValue("need_age_video_verification", orElse: false) {
                     ChatNavigationHooks.shared.showVerifyAgeAlert(context, context.window)
                     return

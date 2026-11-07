@@ -994,7 +994,7 @@ public class ChatInteractiveContentView: ChatMediaContentView {
         
         let isSensitive: Bool
         if let parent = parent {
-            isSensitive = parent.isSensitiveContent(platform: "ios") && !context.contentConfig.sensitiveContentEnabled
+            isSensitive = parent.isSensitiveContent(platform: "ios", contentSettings: context.contentSettings) && !context.contentConfig.sensitiveContentEnabled
         } else {
             isSensitive = false
         }

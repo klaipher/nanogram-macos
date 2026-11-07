@@ -497,7 +497,7 @@ open class PeerMediaPhotosController<Context: AccountContextProtocol>: TableView
                 showChatGallery(context: context, message: message, supplyment, parameters, type: galleryType, reversed: true, chatMode: mode, chatLocation: chatLocation, contextHolder: contextHolder, cachedPeerData: self?.chatInteraction.presentation.cachedData)
             }
             
-            if message.isSensitiveContent(platform: "ios") {
+            if message.isSensitiveContent(platform: "ios", contentSettings: context.contentSettings) {
                 
                 if !context.contentConfig.sensitiveContentEnabled, context.contentConfig.canAdjustSensitiveContent {
                     let need_verification = context.appConfiguration.getBoolValue("need_age_video_verification", orElse: false)

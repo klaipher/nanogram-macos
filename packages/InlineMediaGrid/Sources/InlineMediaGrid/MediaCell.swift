@@ -73,11 +73,11 @@ public struct MediaCellLayoutItem : Equatable, MediaCellLayoutable {
         return self.message.isMediaSpoilered || self.message.containsSecretMedia
     }
     public var isSpoiler: Bool {
-        return self.message.isMediaSpoilered || self.message.isSensitiveContent(platform: "ios")
+        return self.message.isMediaSpoilered || self.message.isSensitiveContent(platform: "ios", contentSettings: context.contentSettings)
     }
     
     public var isSensitive: Bool {
-        return self.message.isSensitiveContent(platform: "ios") && !context.contentConfig.sensitiveContentEnabled
+        return self.message.isSensitiveContent(platform: "ios", contentSettings: context.contentSettings) && !context.contentConfig.sensitiveContentEnabled
     }
     
     public var id: MessageId {

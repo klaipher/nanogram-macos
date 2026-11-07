@@ -6536,7 +6536,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
         chatInteraction.revealMedia = { [weak self] message in
             
-            if message.isSensitiveContent(platform: "ios") {
+            if message.isSensitiveContent(platform: "ios", contentSettings: context.contentSettings) {
                 
                 if !context.contentConfig.sensitiveContentEnabled, context.contentConfig.canAdjustSensitiveContent {
                     let need_verification = context.appConfiguration.getBoolValue("need_age_video_verification", orElse: false)
