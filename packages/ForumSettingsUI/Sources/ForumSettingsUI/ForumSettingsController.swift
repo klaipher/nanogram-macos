@@ -29,6 +29,7 @@ private final class Arguments {
 private struct State : Equatable {
     public var isForum: Bool = false
     public var isMonoforum: Bool = false
+    public var displaysAsSidebar: Bool = false
 }
 
 private let _id_header = InputDataIdentifier("_id_header")
@@ -105,6 +106,7 @@ public func ForumSettingsController(context: any AccountContextProtocol, peerId:
                     var current = current
                     current.isForum = channel.flags.contains(.isForum)
                     current.isMonoforum = channel.flags.contains(.displayForumAsTabs)
+                    current.displaysAsSidebar = channel.flags.contains(.displayForumAsSidebar)
                     return current
                 }
             default:
@@ -115,7 +117,7 @@ public func ForumSettingsController(context: any AccountContextProtocol, peerId:
     
     let update:()->Void = {
         let state = stateValue.with { $0 }
-        _ = showModalProgress(signal: context.engine.peers.setChannelForumMode(id: peerId, isForum: state.isForum, displayForumAsTabs: state.isMonoforum), for: context.window).start()
+        _ = showModalProgress(signal: context.engine.peers.setChannelForumMode(id: peerId, isForum: state.isForum, displayForumAsTabs: state.isMonoforum, displayForumAsSidebar: state.displaysAsSidebar), for: context.window).start()
     }
 
     let arguments = Arguments(context: context, toggleForum: {
