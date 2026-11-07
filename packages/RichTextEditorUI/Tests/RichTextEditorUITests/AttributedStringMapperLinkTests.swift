@@ -29,7 +29,7 @@ final class AttributedStringMapperLinkTests: XCTestCase {
         XCTAssertNil(ca.foreground, "blue from link styling must not leak into the model")
     }
 
-    func test_readback_noLink_stillReadsForegroundAndUnderline() {
+    func test_readback_noLink_readsUnderlineButNotForeground() {
         let dict: [NSAttributedString.Key: Any] = [
             .foregroundColor: NSColor.red,
             .underlineStyle: NSUnderlineStyle.single.rawValue,
@@ -38,7 +38,7 @@ final class AttributedStringMapperLinkTests: XCTestCase {
         let ca = mapper.characterAttributes(from: dict)
         XCTAssertNil(ca.link)
         XCTAssertTrue(ca.underline, "underline is still read when there is no link")
-        XCTAssertNotNil(ca.foreground, "foreground is still read when there is no link")
+        XCTAssertNil(ca.foreground, "the theme's color is never baked into the model")
     }
 
     func test_roundTrip_linkOnly() {
