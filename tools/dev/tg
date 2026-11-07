@@ -466,6 +466,7 @@ main() {
     native) cmd_native "$@" ;;
     tests-audit) py testsaudit "$@" ;;
     credentials) cmd_credentials ;;
+    localfixes) cmd_localfixes ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;
     sparkle-key) cmd_sparkle_key "$@" ;;
