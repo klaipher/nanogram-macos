@@ -1497,11 +1497,11 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     
     private func crashRecoveryLinks() -> CrashRecoveryLinks {
         #if NANOGRAM_MAS
-        return CrashRecoveryLinks.resolve(isNanogram: true, isAppStoreEdition: true)
+        return CrashRecoveryLinks.resolve(isAppStoreEdition: true)
         #elseif NANOGRAM
-        return CrashRecoveryLinks.resolve(isNanogram: true, isAppStoreEdition: false)
+        return CrashRecoveryLinks.resolve(isAppStoreEdition: false)
         #else
-        return CrashRecoveryLinks.resolve(isNanogram: false, isAppStoreEdition: false)
+        return CrashRecoveryLinks(appStore: URL(string: "macappstore://apps.apple.com/app/id747648890")!, website: URL(string: "https://macos.telegram.org")!)
         #endif
     }
     

@@ -19,15 +19,7 @@ public struct CrashRecoveryLinks: Equatable {
         website: nil
     )
 
-    public static let telegram = CrashRecoveryLinks(
-        appStore: URL(string: "macappstore://apps.apple.com/app/id747648890")!,
-        website: URL(string: "https://macos.telegram.org")!
-    )
-
-    public static func resolve(isNanogram: Bool, isAppStoreEdition: Bool) -> CrashRecoveryLinks {
-        guard isNanogram else {
-            return .telegram
-        }
+    public static func resolve(isAppStoreEdition: Bool) -> CrashRecoveryLinks {
         return isAppStoreEdition ? .nanogramAppStore : .nanogramDirect
     }
 }

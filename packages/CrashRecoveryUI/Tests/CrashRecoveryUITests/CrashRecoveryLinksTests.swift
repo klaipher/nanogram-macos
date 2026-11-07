@@ -10,20 +10,23 @@ final class CrashRecoveryLinksTests: XCTestCase {
     }()
 
     func test_directEditionLinksToNanogramReleases() {
-        let links = CrashRecoveryLinks.resolve(isNanogram: true, isAppStoreEdition: false)
+        let links = CrashRecoveryLinks.resolve(isAppStoreEdition: false)
         XCTAssertEqual(links.website?.absoluteString, "https://github.com/klaipher/nanogram-releases/releases/latest")
         XCTAssertEqual(links, .nanogramDirect)
     }
 
     func test_appStoreEditionHasNoGitHubLink() {
-        let links = CrashRecoveryLinks.resolve(isNanogram: true, isAppStoreEdition: true)
+        let links = CrashRecoveryLinks.resolve(isAppStoreEdition: true)
         XCTAssertNil(links.website)
         XCTAssertEqual(links.appStore.absoluteString, "macappstore://apps.apple.com/app/id6829268176")
     }
 
-    func test_upstreamBuildKeepsTelegramLinks() {
-        let links = CrashRecoveryLinks.resolve(isNanogram: false, isAppStoreEdition: false)
-        XCTAssertEqual(links.website?.absoluteString, "https://macos.telegram.org")
+    func test_noEditionLinksToTelegram() {
+        for appStoreEdition in [false, true] {
+            let links = CrashRecoveryLinks.resolve(isAppStoreEdition: appStoreEdition)
+            XCTAssertFalse(links.appStore.absoluteString.contains("747648890"))
+            XCTAssertNotEqual(links.website?.host, "macos.telegram.org")
+        }
     }
 
     func test_recoveryTextsDoNotPointToTheTelegramSite() {
