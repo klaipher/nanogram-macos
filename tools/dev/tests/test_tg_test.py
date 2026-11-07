@@ -66,6 +66,10 @@ class TgTestRoutingTests(unittest.TestCase):
             handle.write('print({!r})\n'.format('\n'.join(name for name, _ in packages)))
         bin_dir = os.path.join(scratch, 'bin')
         os.makedirs(bin_dir)
+        os.makedirs(os.path.join(scratch, 'scripts'))
+        for script, label in (('prepare-telegram-api.py', 'prepare api'), ('prepare-flat-serialization.py', 'prepare flat')):
+            with open(os.path.join(scratch, 'scripts', script), 'w') as handle:
+                handle.write('import os\nopen(os.environ["FAKE_LOG"], "a").write("%s\\n")\n' % label)
         swift = os.path.join(bin_dir, 'swift')
         with open(swift, 'w') as handle:
             handle.write('#!/bin/bash\necho "swift $*" >> "$FAKE_LOG"\ncase "$*" in *Failing*) exit 1;; esac\n')
@@ -91,7 +95,12 @@ class TgTestRoutingTests(unittest.TestCase):
         result, calls = self.run_with([('NoTests', {'test_target': False})])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('no tests', result.stdout)
-        self.assertEqual(calls, '')
+        self.assertEqual(calls, 'prepare api\nprepare flat\n')
+
+    def test_generated_sources_are_prepared_before_any_package_is_tested(self):
+        result, calls = self.run_with([('Plain', {})])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(calls.startswith('prepare api\nprepare flat\n'), calls)
 
     def test_failing_runner_fails_the_run(self):
         result, calls = self.run_with([('Native', {'runner_exit': 1}), ('Plain', {})])

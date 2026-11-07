@@ -332,6 +332,8 @@ cmd_test() {
     done <<< "$listed"
     [ ${#packages[@]} != 0 ] || die "no packages to test: tglint affected-packages listed none (it always lists NanogramKit)"
   fi
+  python3 "$ROOT/scripts/prepare-telegram-api.py" || die "cannot generate the TelegramApi sources"
+  python3 "$ROOT/scripts/prepare-flat-serialization.py" || die "cannot generate the FlatSerialization sources"
   for package in "${packages[@]}"; do
     [ -f "$ROOT/packages/$package/Package.swift" ] || die "no package packages/$package"
     if [ -x "$ROOT/packages/$package/Tests/run-tests.sh" ]; then
