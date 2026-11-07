@@ -711,7 +711,7 @@ final class QrStudioView: View {
             guard let gift = self.look.gifts.first(where: { $0.id == giftId }) else {
                 return
             }
-            update = .gift(gift.reference ?? .slug(slug: gift.gift.slug))
+            update = .gift(gift: gift.gift, reference: gift.reference ?? .slug(slug: gift.gift.slug))
         }
         self.syncedServerLook = local
         self.pendingServerLook = nil
