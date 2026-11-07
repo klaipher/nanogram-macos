@@ -40,7 +40,8 @@ final class CanvasMediaBlockTests: AppKitTestCase {
         ], width: 400)
         XCTAssertTrue(v.boxes[0] is MediaBlockBox, "video renders as a hosted media view, like file/audio/map")
         XCTAssertFalse(v.boxes[0] is ImageBlockBox)
-        XCTAssertTrue(v.boxes[1] is ImageBlockBox, "image stays a drawn bitmap")
+        XCTAssertTrue(v.boxes[1] is MediaBlockBox, "image is hosted like video")
+        XCTAssertFalse(v.boxes[1] is ImageBlockBox)
     }
 
     func test_videoBleedsFullWidth_otherMediaDont() {
@@ -54,11 +55,11 @@ final class CanvasMediaBlockTests: AppKitTestCase {
         XCTAssertFalse(box(.map).mediaBleeds)
     }
 
-    func test_insertMediaBlock_ignoresImageKind() {
+    func test_insertMediaBlock_acceptsImageKind() {
         let (v, _) = seeded()
         v.setCaret(global: v.boxes[0].textStart)
-        v.insertMediaBlock(kind: .image, mediaID: "x")   // images must use insertImage; this is a guarded no-op
-        XCTAssertTrue(mediaBoxes(v).isEmpty)
+        v.insertMediaBlock(kind: .image, mediaID: "x")
+        XCTAssertEqual(mediaBoxes(v).map { $0.kind }, [.image], "an image is hosted media like video")
         XCTAssertFalse(v.boxes.contains { $0 is ImageBlockBox })
     }
 

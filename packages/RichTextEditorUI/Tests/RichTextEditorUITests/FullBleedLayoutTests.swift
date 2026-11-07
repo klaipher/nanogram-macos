@@ -25,8 +25,8 @@ final class FullBleedLayoutTests: XCTestCase {
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 100, height: 50),
                               caption: [TextRun(text: "Cap")]))
         ], width: 390)
-        let img = v.boxes[0] as! ImageBlockBox
-        let rect = img.imageRect()
+        let img = v.boxes[0] as! MediaBlockBox
+        let rect = img.mediaRect
         XCTAssertEqual(rect.minX, 0, accuracy: 0.5)          // bleeds to the left edge
         XCTAssertEqual(rect.width, 390, accuracy: 0.5)        // full canvas width
     }
@@ -36,7 +36,7 @@ final class FullBleedLayoutTests: XCTestCase {
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 100, height: 50),
                               caption: [TextRun(text: "Cap")]))
         ], width: 390)
-        let img = v.boxes[0] as! ImageBlockBox
+        let img = v.boxes[0] as! MediaBlockBox
         XCTAssertEqual(img.textOrigin.x, CanvasMetrics.pageMargin, accuracy: 0.5)   // caption at 16
     }
 

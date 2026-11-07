@@ -90,10 +90,8 @@ final class ImageBlockBoxTests: AppKitTestCase {
     func test_imageRect_respectsExplicitDisplayWidth() {
         let block = RichTextEditorUI.MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x",
                                displayWidth: 60, naturalSize: Size2D(width: 100, height: 50), caption: [])
-        let v = DocumentCanvasView()
-        v.setModelBlocks([.media(block)], width: 390)
-        v.frame = CGRect(x: 0, y: 0, width: 390, height: 400); v.layoutSubtreeIfNeeded()
-        let box = v.boxes[0] as! ImageBlockBox
+        let box = ImageBlockBox(media: block, mapper: AttributedStringMapper(), width: 390 - CanvasMetrics.pageMargin * 2)
+        box.frame = CGRect(x: CanvasMetrics.pageMargin, y: 0, width: 390 - CanvasMetrics.pageMargin * 2, height: box.height)
         XCTAssertEqual(box.imageRect().width, 60, accuracy: 0.5)   // explicit width honored, not stretched full-bleed
     }
 }

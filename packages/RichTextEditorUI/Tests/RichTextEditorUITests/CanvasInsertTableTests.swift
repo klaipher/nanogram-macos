@@ -71,7 +71,7 @@ final class CanvasInsertTableTests: XCTestCase {
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 50, height: 50))),
         ], width: 320)
         v.frame = CGRect(x: 0, y: 0, width: 320, height: 600); v.layoutSubtreeIfNeeded()
-        let img = v.boxes.first { $0 is ImageBlockBox }!
+        let img = v.boxes.first { $0 is MediaBlockBox }!
         v.anchor = img.nodeStart; v.head = img.nodeStart
         let before = v.currentModelBlocks().count
         v.insertTable(rows: 2, columns: 2)

@@ -27,8 +27,8 @@ final class GapCursorTests: AppKitTestCase {
 
     func test_tapOnImageArea_landsOnGap() {
         let v = canvas()
-        let img = v.boxes[1] as! ImageBlockBox
-        let p = CGPoint(x: img.imageRect().midX, y: img.imageRect().midY)
+        let img = v.boxes[1] as! MediaBlockBox
+        let p = CGPoint(x: img.mediaRect.midX, y: img.mediaRect.midY)
         XCTAssertEqual(v.closestGlobalPosition(to: p), img.nodeStart)
     }
 

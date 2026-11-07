@@ -154,7 +154,7 @@ final class CanvasTableNavTests: XCTestCase {
                 rows: [Row(id: BlockID("r0"), cells: [cell("a", "Alpha"), cell("b", "Beta")])]))),
         ], width: 340)
         v.frame = CGRect(x: 0, y: 0, width: 340, height: 500); v.layoutSubtreeIfNeeded()
-        let imageBox = v.boxes.first { $0 is ImageBlockBox }!
+        let imageBox = v.boxes.first { $0 is MediaBlockBox }!
         let ap = v.allLeafRegions().first { $0.ref == .paragraph(BlockID("ap")) }!
         let sizeBefore = v.documentSizeValue
         v.selectedGlobalRange = (ap.globalStart, ap.globalStart)
