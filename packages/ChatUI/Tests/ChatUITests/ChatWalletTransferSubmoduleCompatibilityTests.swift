@@ -268,7 +268,7 @@ final class ChatWalletTransferSubmoduleCompatibilityTests: XCTestCase {
     }
 
     func testSubmoduleTransferCardAcceptsSwipeToReply() throws {
-        let shouldBegin = try block(Self.bubbleItemPath, startingAt: "replyRecognizer.shouldBegin = { [weak self] in")
+        let shouldBegin = try block(Self.bubbleItemPath, startingAt: "replyRecognizer.shouldBegin = { [weak self, weak replyRecognizer] in")
         XCTAssertEqual(occurrences(of: "} else if case .gramTransfer = media.action {", in: shouldBegin), 1)
         XCTAssertEqual(occurrences(of: "let action = item.controllerInteraction.canSetupReply(item.message)", in: shouldBegin), 1)
         let gesture = try block(Self.bubbleItemPath, startingAt: "@objc private func swipeToReplyGesture(_ recognizer: ChatSwipeToReplyRecognizer) {")
