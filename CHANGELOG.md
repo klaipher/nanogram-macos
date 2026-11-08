@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- Core pin f059025a → 534f7c7e (961e39b4). For the Mac only the MtProtoKit change counts: a fresh direct TCP connection that stays silent is dropped after max(3 s, 10 × its setup time) instead of 12 s, so "Updating…" after waking or switching back no longer hangs 12 s on a dead connection (core cdb58dc5, `MTTcpResponseTimeoutPolicy`). The rest of the range is iOS-only (chat list rows, Debug Settings defaults, round video).
+
 ## 13.1.0 (202611071733) — 2026-11-07
 
 Source: `nanogram/integration` @ 2b30ef26 · core `klaipher/nanogram` `main` @ f059025a (was 30d1f328 at the last release; Telegram-iOS 13.2 merge plus our fixes) · tgcalls `nanogram-shared` @ ad275cac (was 57b914d) · tg_owt `nanogram-mac` @ 991142f9 (was 655db2eb; NetEq crossfade test for CVE-2026-9119) · rlottie `telegram-ios-dev` @ 083f19a.
