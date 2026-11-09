@@ -93,8 +93,6 @@
 	<string>$(SPARKLE_ED_PUBLIC_KEY)</string>
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
-	<key>SUEnableDownloaderService</key>
-	<true/>
 	<key>SURequireSignedFeed</key>
 	<true/>
 	<key>SUVerifyUpdateBeforeExtraction</key>

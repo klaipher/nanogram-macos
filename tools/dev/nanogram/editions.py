@@ -1,7 +1,7 @@
 """The two editions: what a built app must look like, and where tg build keeps a copy of each.
 
 mas: sandboxed, no Sparkle (not embedded, not referenced). direct: sandboxed with the same capabilities, hardened
-runtime, Sparkle 2 with its Installer and Downloader XPC services, a signed feed and verification before extraction.
+runtime, Sparkle 2 with its Installer XPC service, a signed feed and verification before extraction.
 Both: bundle org.klaipher.Nanogram, the same app group, the same data prefix (Info.plist SOURCE).
 """
 from __future__ import annotations
@@ -37,9 +37,10 @@ HOME_READ_ONLY = "com.apple.security.temporary-exception.files.home-relative-pat
 # (NanogramKit LegacyPreferences), because macOS skips container-migration.plist for an existing container.
 LEGACY_PREFERENCES = f"/Library/Preferences/{BUNDLE_ID}.plist"
 NETWORK_CLIENT = "com.apple.security.network.client"
-SPARKLE_XPC_SERVICES = ("Downloader.xpc", "Installer.xpc")
-SPARKLE_INFO_FLAGS = ("SUEnableInstallerLauncherService", "SUEnableDownloaderService", "SUVerifyUpdateBeforeExtraction",
-                      "SURequireSignedFeed")
+SPARKLE_XPC_SERVICES = ("Installer.xpc",)
+SPARKLE_UNWANTED_XPC_SERVICES = ("Downloader.xpc",)
+SPARKLE_INFO_FLAGS = ("SUEnableInstallerLauncherService", "SUVerifyUpdateBeforeExtraction", "SURequireSignedFeed")
+SPARKLE_UNWANTED_INFO_FLAGS = ("SUEnableDownloaderService",)
 SPARKLE_MACH_SERVICE_SUFFIXES = ("-spks", "-spki")
 SPARKLE_SYMBOL = re.compile(r"_OBJC_CLASS_\$_(SU|SPU)[A-Z]\w*|Sparkle")
 APPS_DIR = config.BUILD_OUTPUT / "apps"
@@ -207,9 +208,16 @@ def check_edition(facts: AppFacts, edition: str) -> list[str]:
         for service in SPARKLE_XPC_SERVICES:
             if service not in facts.sparkle_xpc_services:
                 problems.append(f"direct app does not embed Sparkle's {service} (needed by the sandbox)")
+        for service in SPARKLE_UNWANTED_XPC_SERVICES:
+            if service in facts.sparkle_xpc_services:
+                problems.append(f"direct app embeds Sparkle's {service}: the app downloads updates itself "
+                                f"({NETWORK_CLIENT})")
         for key in SPARKLE_INFO_FLAGS:
             if facts.info.get(key) is not True:
                 problems.append(f"direct app Info.plist does not set {key} to YES")
+        for key in SPARKLE_UNWANTED_INFO_FLAGS:
+            if key in facts.info:
+                problems.append(f"direct app Info.plist sets {key}: the app downloads updates itself ({NETWORK_CLIENT})")
         if "SUPublicDSAKeyFile" in facts.info or "SUPublicDSAKey" in facts.info:
             problems.append("direct app Info.plist has a DSA key entry (SUPublicDSAKeyFile): EdDSA only")
         if not facts.sparkle_embedded:

@@ -187,8 +187,8 @@ capabilities: network client and server (the server entitlement is for WebRTC's 
 Telegram's own sandbox set), camera, microphone, location, Downloads and user-selected files read-write, the app group.
 Every `tg build` also runs
 `tools/dev/nanogram/editions.py`, which fails the build if an edition is wrong (sandbox, app group, hardened
-runtime, any Sparkle symbol or load command in the mas binaries; for direct also Sparkle's Installer and Downloader XPC
-services, the four Sparkle Info.plist flags, the mach-lookup exceptions and the absence of a DSA key entry). It also keeps an APFS clone of each
+runtime, any Sparkle symbol or load command in the mas binaries; for direct also Sparkle's Installer XPC service and
+no Downloader service, the three Sparkle Info.plist flags and no `SUEnableDownloaderService`, the mach-lookup exceptions and the absence of a DSA key entry). It also keeps an APFS clone of each
 edition's app in `build-output/apps/<Configuration>-<edition>/`, so both editions exist side by side for tests.
 Switching edition changes a compilation condition, so the next build recompiles every Swift module.
 
@@ -274,10 +274,18 @@ from `SPARKLE_ED_PUBLIC_KEY` in the same file, and there is no DSA key. The mas 
   one state (tested).
 - `direct.xcconfig` does not build Sparkle's legacy `SUUpdater` (MainMenu.xib instantiates it and would start a
   second updater with the standard UI) or legacy DSA support. The direct app is sandboxed, so it embeds Sparkle's
-  Installer and Downloader XPC services (`SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE`,
-  `SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE`), `Info.plist` enables them (`SUEnableInstallerLauncherService`,
-  `SUEnableDownloaderService`), and `Nanogram-Direct.entitlements` allows the `<bundle id>-spks` and `-spki` mach
-  services (Sparkle 2 sandboxing guide). The release check also verifies the signature of these XPC services.
+  Installer XPC service (`SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE`), `Info.plist` enables it
+  (`SUEnableInstallerLauncherService`), and `Nanogram-Direct.entitlements` allows the `<bundle id>-spks` and `-spki`
+  mach services (Sparkle 2 sandboxing guide). The Downloader XPC service is not embedded
+  (`SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE = 0`, no `SUEnableDownloaderService`): the app has the network client
+  entitlement, so Sparkle fetches the feed and the archive in-process, as the guide asks. The release check also
+  verifies the signature of the Installer service.
+- XPC services inside a framework and a path's history: launchd remembers, per framework path, that a
+  `Sparkle.framework` had no XPC services, and until the Mac restarts it does not register the services a later build
+  brings to the same path (`launchd: failed lookup: name = org.sparkle-project.InstallerLauncher ... error = 3`).
+  Builds before 202611052243 had no XPC services in the framework, so a Mac that ran one of them from
+  `/Applications/Nanogram.app` and then installed a newer build there needs one restart before in-app updates
+  install. Reproduced with a test app on 2026-11-09; a new path, or a restart, registers them.
 - Update security: `SUVerifyUpdateBeforeExtraction` and `SURequireSignedFeed` are on, so the app checks the archive
   signature before unpacking and refuses an appcast without a valid EdDSA signature. `tg release-direct` appends
   Sparkle's `<!-- sparkle-signatures: -->` block to `appcast.xml` (`release.sign_appcast`, signature over every byte before the

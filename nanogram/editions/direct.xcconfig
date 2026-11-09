@@ -22,11 +22,12 @@ SPARKLE_ED_PUBLIC_KEY = F39QGJIjAKTk9EwQkYB2NE3UxjbGFA0zCTuUIdT1WH0=
 // Sparkle 2 (submodules/Sparkle, built from source). Telegram-Mac/updater/NanogramUpdater.swift drives an
 // SPUUpdater with its own user driver, so the legacy SUUpdater class (instantiated by MainMenu.xib, which would
 // start a second updater with Sparkle's standard UI) and DSA support are not built. The sandboxed app cannot launch
-// the installer or reach the network on Sparkle's behalf by itself, so the Installer and Downloader XPC services are
-// embedded in Sparkle.framework and switched on by SUEnableInstallerLauncherService and SUEnableDownloaderService
-// in Info.plist. The installer connection and status services are not needed: the sandbox exceptions for the
-// -spks and -spki mach services in Nanogram-Direct.entitlements cover them.
+// the installer by itself, so the Installer XPC service is embedded in Sparkle.framework and switched on by
+// SUEnableInstallerLauncherService in Info.plist. The Downloader XPC service stays out: the app has the network client
+// entitlement, so Sparkle fetches the feed and the update in-process, as its sandboxing guide asks. The installer
+// connection and status services are not needed: the sandbox exceptions for the -spks and -spki mach services in
+// Nanogram-Direct.entitlements cover them.
 SPARKLE_BUILD_LEGACY_SUUPDATER = 0
 SPARKLE_BUILD_LEGACY_DSA_SUPPORT = 0
 SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE = 1
-SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE = 1
+SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE = 0

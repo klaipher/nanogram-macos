@@ -26,8 +26,8 @@ DIRECT_ENTITLEMENTS = {"com.apple.security.app-sandbox": True,
                        "com.apple.security.network.client": True,
                        MACH_LOOKUP: ["org.klaipher.Nanogram-spks", "org.klaipher.Nanogram-spki"],
                        HOME_READ_ONLY: [LEGACY_PREFERENCES]}
-DIRECT_INFO = {"SUEnableInstallerLauncherService": True, "SUEnableDownloaderService": True,
-               "SUVerifyUpdateBeforeExtraction": True, "SURequireSignedFeed": True}
+DIRECT_INFO = {"SUEnableInstallerLauncherService": True, "SUVerifyUpdateBeforeExtraction": True,
+               "SURequireSignedFeed": True}
 
 
 def built(edition):
@@ -79,7 +79,7 @@ class EditionRulesTests(unittest.TestCase):
     def direct_facts(self, **overrides):
         base = dict(entitlements=dict(DIRECT_ENTITLEMENTS), sparkle_embedded=True, hardened_runtime=True,
                     sparkle_feed=editions.SPARKLE_FEED_URL, sparkle_public_key="A" * 43 + "=",
-                    sparkle_xpc_services=["Downloader.xpc", "Installer.xpc"], info=dict(DIRECT_INFO))
+                    sparkle_xpc_services=["Installer.xpc"], info=dict(DIRECT_INFO))
         base.update(overrides)
         return self.facts(**base)
 
@@ -92,15 +92,18 @@ class EditionRulesTests(unittest.TestCase):
     def test_sandboxed_direct_with_everything_is_clean(self):
         self.assertEqual(editions.check_edition(self.direct_facts(), "direct"), [])
 
-    def test_direct_requires_both_sparkle_xpc_services(self):
-        for missing in ("Downloader.xpc", "Installer.xpc"):
-            services = [s for s in ("Downloader.xpc", "Installer.xpc") if s != missing]
-            problems = editions.check_edition(self.direct_facts(sparkle_xpc_services=services), "direct")
-            self.assertTrue(any(missing in p for p in problems), problems)
+    def test_direct_requires_the_sparkle_installer_xpc_service(self):
+        problems = editions.check_edition(self.direct_facts(sparkle_xpc_services=[]), "direct")
+        self.assertTrue(any("Installer.xpc" in p for p in problems), problems)
+
+    def test_direct_rejects_the_sparkle_downloader_service(self):
+        embedded = self.direct_facts(sparkle_xpc_services=["Downloader.xpc", "Installer.xpc"])
+        self.assertTrue(any("Downloader.xpc" in p for p in editions.check_edition(embedded, "direct")))
+        switched_on = self.direct_facts(info=dict(DIRECT_INFO, SUEnableDownloaderService=True))
+        self.assertTrue(any("SUEnableDownloaderService" in p for p in editions.check_edition(switched_on, "direct")))
 
     def test_direct_requires_the_sparkle_service_and_security_keys(self):
-        for key in ("SUEnableInstallerLauncherService", "SUEnableDownloaderService",
-                    "SUVerifyUpdateBeforeExtraction", "SURequireSignedFeed"):
+        for key in ("SUEnableInstallerLauncherService", "SUVerifyUpdateBeforeExtraction", "SURequireSignedFeed"):
             info = dict(DIRECT_INFO)
             info[key] = False
             problems = editions.check_edition(self.direct_facts(info=info), "direct")
@@ -197,9 +200,9 @@ class DirectBuildSettingsTests(unittest.TestCase):
         match = re.search(rf"^{name} = (.*)$", text, re.M)
         return match.group(1).strip() if match else None
 
-    def test_both_sparkle_xpc_services_are_embedded(self):
+    def test_only_the_sparkle_installer_xpc_service_is_embedded(self):
         self.assertEqual(self.setting("SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE"), "1")
-        self.assertEqual(self.setting("SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE"), "1")
+        self.assertEqual(self.setting("SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE"), "0")
 
     def test_the_connection_and_status_services_stay_off(self):
         self.assertIsNone(self.setting("SPARKLE_EMBED_INSTALLER_CONNECTION_XPC_SERVICE"))
@@ -459,7 +462,7 @@ class BuiltEditionsTests(unittest.TestCase):
     def test_direct_is_sandboxed_with_sparkle_and_its_xpc_services(self):
         facts = editions.inspect_app(DIRECT)
         self.assertIs(facts.entitlements.get("com.apple.security.app-sandbox"), True)
-        self.assertEqual(sorted(facts.sparkle_xpc_services), ["Downloader.xpc", "Installer.xpc"])
+        self.assertEqual(sorted(facts.sparkle_xpc_services), ["Installer.xpc"])
         self.assertTrue(facts.sparkle_embedded, "direct does not embed Sparkle.framework")
         self.assertTrue(facts.hardened_runtime, "direct is not signed with the hardened runtime")
         self.assertEqual(editions.check_edition(facts, "direct"), [])

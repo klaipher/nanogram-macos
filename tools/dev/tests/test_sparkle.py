@@ -198,9 +198,9 @@ class RepositoryKeyTests(unittest.TestCase):
         self.assertEqual(info.get("SUPublicEDKey"), sparkle.ensure_keys())
         self.assertEqual(info.get("SUFeedURL"), sparkle.FEED_URL)
         self.assertNotIn("SUPublicDSAKeyFile", info)
-        for key in ("SURequireSignedFeed", "SUVerifyUpdateBeforeExtraction", "SUEnableInstallerLauncherService",
-                    "SUEnableDownloaderService"):
+        for key in ("SURequireSignedFeed", "SUVerifyUpdateBeforeExtraction", "SUEnableInstallerLauncherService"):
             self.assertIs(info.get(key), True, key)
+        self.assertNotIn("SUEnableDownloaderService", info)
 
 
 if __name__ == "__main__":
