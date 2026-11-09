@@ -42,6 +42,21 @@ cache_cleanup_auto() {
   python3 "$ROOT/tools/dev/cachegc/cachegc.py" auto --repo "$ROOT" || true
 }
 
+# tg apps [--dry-run]: one Nanogram in Spotlight and Launchpad. Every build, archive, export and mounted disk image
+# registers its Nanogram.app with LaunchServices; this unregisters all but /Applications/Nanogram.app (files stay).
+# It also runs by itself after every command that builds.
+cmd_apps() { py appregistry "$@"; }
+
+apps_tidy_auto() {
+  [ -z "${NANOGRAM_TG_LOCKED:-}" ] || return 0
+  py appregistry --quiet || true
+}
+
+after_build_command() {
+  cache_cleanup_auto
+  apps_tidy_auto
+}
+
 # Runs before every build command (not throttled): enforces the hard caps and removes what deleted checkouts left behind,
 # and refuses to start a build below the hard free-space floor (cache-policy.json; TG_ALLOW_LOW_DISK=1 overrides).
 # A command that calls another tg command (check -> build) is guarded once; so is everything under buildlock.
@@ -408,6 +423,7 @@ usage: tools/dev/tg <command> [options]
   testflight       archive and upload the mas edition [--export-only]
   release-direct   notarized dmg + appcast for the direct edition (local) --notes FILE [--allow-dirty]; FILE is relative to where you run tg
   clean            remove this checkout's build products [--all]
+  apps             keep one Nanogram in Spotlight: unregister build copies, keep /Applications/Nanogram.app [--dry-run]
   prune            list caches and build files, remove stale ones [--dry-run] [--max-gb N]
   cache-cleanup    shared cache cleanup (Bazel, Xcode, SwiftPM, builds, worktrees) [--dry-run] [--only A,B] | verify | report | guard
   worktree         add <name> [--branch B] [--from REF] | remove <name> [--force]: parallel checkout with its caches
@@ -451,7 +467,7 @@ main() {
   local cmd="${1:-help}"
   [ $# -gt 0 ] && shift
   case "$cmd" in
-    build|test|check|warnings|frameworks|testflight|release-direct|core-bump) trap cache_cleanup_auto EXIT ;;
+    build|test|check|warnings|frameworks|testflight|release-direct|core-bump|sync-upstream) trap after_build_command EXIT ;;
   esac
   case "$cmd" in
     build|test|check|warnings|testflight|release-direct) cache_guard ;;
@@ -464,6 +480,7 @@ main() {
     clean) cmd_clean "$@" ;;
     prune) cmd_prune "$@" ;;
     cache-cleanup) cmd_cache_cleanup "$@" ;;
+    apps) cmd_apps "$@" ;;
     worktree) cmd_worktree "$@" ;;
     native) cmd_native "$@" ;;
     tests-audit) py testsaudit "$@" ;;

@@ -428,6 +428,19 @@ What we changed in the build scripts:
 Upstream's universal run also failed twice in the wallet engine (the Rust host proc-macro bug above) before a
 manual workaround; the arm64 run built every library on the first try (webrtc after the 14.0 fix).
 
+## One Nanogram in Spotlight: `tg apps`
+
+macOS registers every `Nanogram.app` it sees with LaunchServices (builds in DerivedData, archives, exports, a mounted
+dmg, any copy that was launched), and Spotlight and Launchpad list each one. `tg apps` unregisters every Nanogram copy
+except `/Applications/Nanogram.app` (the newest copy when nothing is installed there); no file is touched, and
+`lsregister -f <path>` registers a copy again. It runs by itself after `build`, `test`, `check`, `warnings`,
+`frameworks`, `testflight`, `release-direct`, `core-bump` and `sync-upstream`; `tg apps --dry-run` lists what it would
+unregister. Left alone: iOS extensions and watch apps, the iPhone app that iPhone Mirroring shows (a system
+placeholder), anything under `~/.config/telegram-ios`. A copy launched by hand from a build folder shows up until the
+next `tg` build command or `tg apps`. Copies that Spotlight indexed before `build-output` became `build-output.noindex`
+(the release folders of 3-4 Nov) come back within seconds after each unregistration; only removing those app
+bundles stops that.
+
 ## Disk and caches
 
 Every build file outside the checkout lives under one cache root, `~/.cache/nanogram-macos`
