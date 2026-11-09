@@ -704,7 +704,7 @@ def push_hook(root: Path, remote: str, stdin_text: str, today: datetime.date) ->
     if os.environ.get("TG_PRE_PUSH") == "0" or os.environ.get("TG_PARITY") == "0":
         return 0
     config = load_config(root)
-    is_mac = (root / config.core_path / ".git").exists()
+    is_mac = gitlink(root, "HEAD", config.core_path) is not None
     report = Report()
     for local_ref, local_sha, remote_ref, remote_sha in parse_push_refs(stdin_text):
         if local_sha == ZERO_SHA or local_ref.startswith("refs/tags/"):

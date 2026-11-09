@@ -2,6 +2,7 @@ import contextlib
 import datetime
 import io
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -521,6 +522,16 @@ class MacCheckTests(unittest.TestCase):
         run(self.core, "update-ref", "refs/remotes/origin/main", foreign)
         report, levels = self.check(pin_override=foreign)
         self.assertEqual(levels["core-root"], "error")
+
+    def test_push_from_a_worktree_without_the_core_checked_out_is_checked_as_the_mac(self):
+        shutil.move(str(self.core / ".git"), str(self.mac.parent / "core-git"))
+        local = run(self.mac, "rev-parse", "HEAD")
+        stdin = f"refs/heads/main {local} refs/heads/main {parity.ZERO_SHA}\n"
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = parity.push_hook(self.mac, "origin", stdin, TODAY)
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertNotIn("history-root", err.getvalue())
 
     def test_cli_exit_codes(self):
         script = Path(parity.__file__)
