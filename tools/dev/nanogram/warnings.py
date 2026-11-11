@@ -46,22 +46,28 @@ def package_of(path: str, root: str) -> str:
 
 
 def count(log: str, root: str | None = None, only=None) -> dict[str, int]:
-    """Unique warning lines per package (`app` for app sources and paths outside the repo)."""
+    """Unique warning lines per package (`app` for app sources and paths outside the repo).
+
+    xcodebuild interleaves its output, which can cut a repeated warning line short; a line that is the start of another
+    line at the same position is that cut copy, not a second warning.
+    """
     root = str(config.ROOT) if root is None else root
-    counts: dict[str, int] = {}
-    seen: set[str] = set()
+    by_position: dict[str, tuple[str, set[str]]] = {}
     for match in WARNING_RE.finditer(log):
         line_end = log.find("\n", match.start())
         line = log[match.start():line_end if line_end != -1 else len(log)].rstrip()
-        if line in seen:
-            continue
-        seen.add(line)
-        if only is not None and not only.search(line):
-            continue
-        package = package_of(match.group("path"), root)
+        position = log[match.start():match.end()]
+        by_position.setdefault(position, (match.group("path"), set()))[1].add(line)
+    counts: dict[str, int] = {}
+    for path, lines in by_position.values():
+        package = package_of(path, root)
         if is_ours(package):
             continue
-        counts[package] = counts.get(package, 0) + 1
+        whole = [line for line in lines if not any(other != line and other.startswith(line) for other in lines)]
+        if only is not None:
+            whole = [line for line in whole if only.search(line)]
+        if whole:
+            counts[package] = counts.get(package, 0) + len(whole)
     return dict(sorted(counts.items()))
 
 

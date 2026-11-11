@@ -24,6 +24,13 @@ class CountTests(unittest.TestCase):
         other = "/ROOT/packages/TGUIKit/Sources/A.swift:1:2: warning: another warning on the same spot\n"
         self.assertEqual(warnings.count(line + other + line, root="/ROOT"), {"TGUIKit": 2})
 
+    def test_cut_off_copy_of_a_warning_counted_once(self):
+        full = "/ROOT/packages/InviteLinksUI/Sources/A.swift:132:13: warning: let 'x' is not concurrency-safe [#MutableGlobalVariable]\n"
+        cut = "/ROOT/packages/InviteLinksUI/Sources/A.swift:132:13: warning: let 'x' is not concurrency-safe [#MutableGlobalVa\n"
+        self.assertEqual(warnings.count(full + cut, root="/ROOT"), {"InviteLinksUI": 1})
+        self.assertEqual(warnings.count(cut + full, root="/ROOT"), {"InviteLinksUI": 1})
+        self.assertEqual(warnings.count(cut, root="/ROOT"), {"InviteLinksUI": 1})
+
     def test_package_attribution(self):
         self.assertEqual(warnings.count(fixture_log(), root="/ROOT"), {
             "TGUIKit": 2,             # packages/<P>/ (one line repeated, the indented excerpt not counted)
