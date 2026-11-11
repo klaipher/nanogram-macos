@@ -17,12 +17,12 @@ with its session keys and chats. Spec: security review 2026-11-04, "isolated dec
 | Release tooling | `tg` stamps and re-signs the service with the archive; `tg editions` checks it is sandboxed, hardened and has no network or file entitlements |
 
 Default behaviour is unchanged: with the switch off `makeLottieBridge` returns exactly the bridge the app created
-before (TLottie, or RLottie when forced or when the server kill switch is set), with no wrapper.
+before (TLottie: Telegram 13.2 dropped RLottie on the Mac, and so did the decoder service), with no wrapper.
 
 ## Decoder backend seam
 
 `LottieRenderHooks.makeRenderer` (shared by cached thumbnails, the slot machine, call and recorder animations) and
-`makeRLottie` (the animated sticker and emoji player) both call `makeLottieBridge(json:key:)`. With the switch on it
+`makeLottieRenderer` (the animated sticker and emoji player) both call `makeLottieBridge(json:)`. With the switch on it
 asks `IsolatedDecoderBackend.makeAnimation`, which returns:
 
 1. a renderer backed by the XPC service,

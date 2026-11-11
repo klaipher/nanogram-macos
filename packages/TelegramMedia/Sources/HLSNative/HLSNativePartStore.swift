@@ -102,15 +102,15 @@ final class HLSNativePartStore {
         self.makeDisposables.removeValue(forKey: key)?.dispose()
         self.makeDisposables[key] = (part |> deliverOnMainQueue).startStrict(next: { [weak self] part in
             guard let self else {
-                if let part {
-                    TempBox.shared.dispose(part.content.file)
+                if let file = part?.content.file {
+                    TempBox.shared.dispose(file)
                 }
                 return
             }
             self.makeDisposables.removeValue(forKey: key)?.dispose()
             if let part {
-                if let previous = self.parts[key] {
-                    self.pendingDisposal.append(previous.content.file)
+                if let file = self.parts[key]?.content.file {
+                    self.pendingDisposal.append(file)
                 }
                 self.parts[key] = part
                 completion(.appended(start: part.startTime, end: part.endTime))
@@ -133,8 +133,8 @@ final class HLSNativePartStore {
     func parts(for buffered: [HLSBufferedPart]) -> [ChunkMediaPlayerPart] {
         let bufferedKeys = Set(buffered.map(\.key))
         for key in Array(self.parts.keys) where !bufferedKeys.contains(key) && self.makeDisposables[key] == nil {
-            if let part = self.parts.removeValue(forKey: key) {
-                self.pendingDisposal.append(part.content.file)
+            if let file = self.parts.removeValue(forKey: key)?.content.file {
+                self.pendingDisposal.append(file)
             }
         }
         let result = buffered.compactMap({ self.parts[$0.key] }).sorted(by: { $0.startTime < $1.startTime })
@@ -145,8 +145,8 @@ final class HLSNativePartStore {
     func remove(keys: [HLSSegmentKey]) {
         for key in keys {
             self.makeDisposables.removeValue(forKey: key)?.dispose()
-            if let part = self.parts.removeValue(forKey: key) {
-                self.pendingDisposal.append(part.content.file)
+            if let file = self.parts.removeValue(forKey: key)?.content.file {
+                self.pendingDisposal.append(file)
             }
         }
     }
@@ -157,7 +157,9 @@ final class HLSNativePartStore {
         }
         self.makeDisposables.removeAll()
         for (_, part) in self.parts {
-            TempBox.shared.dispose(part.content.file)
+            if let file = part.content.file {
+                TempBox.shared.dispose(file)
+            }
         }
         self.parts.removeAll()
         for file in self.pendingDisposal {
