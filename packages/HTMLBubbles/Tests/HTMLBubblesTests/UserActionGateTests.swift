@@ -2,6 +2,11 @@ import XCTest
 @testable import HTMLBubbles
 
 final class UserActionGateTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     override func setUp() {
         HTMLBubbleUserAction.reset()
     }
@@ -20,6 +25,11 @@ final class UserActionGateTests: XCTestCase {
 }
 
 final class ContentLinkTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     func testOnlyAllowedSchemesReachTheLinkHandler() {
         XCTAssertNil(HTMLBubbleState.contentLink("file:///etc/passwd"))
         XCTAssertNil(HTMLBubbleState.contentLink("data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="))

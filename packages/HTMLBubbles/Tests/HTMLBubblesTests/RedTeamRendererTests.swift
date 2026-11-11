@@ -9,6 +9,11 @@ func log(_ text: String) {
 }
 
 final class RedTeamRendererTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     final class Run {
         let window: NSWindow
         let host: WidgetHost

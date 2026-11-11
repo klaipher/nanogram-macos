@@ -5,6 +5,11 @@ import TwidgetRenderer
 @testable import HTMLBubbles
 
 final class MagicMovePlanTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     private func page(_ order: [Int], step: Int) -> String {
         let colors = ["#ff3b30", "#ff9500", "#34c759", "#007aff", "#af52de"]
         let cards = order.map { "<div class=\"c\" data-key=\"k\($0)\" style=\"background-color: \(colors[$0])\">Item \($0)<br>\(step)</div>" }.joined()

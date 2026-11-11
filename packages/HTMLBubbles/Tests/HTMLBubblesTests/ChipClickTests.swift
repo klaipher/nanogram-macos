@@ -5,6 +5,11 @@ import TwidgetRenderer
 @testable import HTMLBubbles
 
 final class ChipClickTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     final class Space: WidgetFeedSpace {
         var slots: [WidgetFeedSlot] = []
         var viewport = CGRect(x: 0, y: 0, width: 440, height: 600)

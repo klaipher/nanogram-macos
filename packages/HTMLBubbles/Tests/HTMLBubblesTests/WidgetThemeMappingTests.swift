@@ -6,6 +6,11 @@ import ColorPalette
 @testable import HTMLBubbles
 
 final class WidgetThemeMappingTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     private let palette = dayClassicPalette
 
     private func theme(incoming: Bool, fontSize: CGFloat = 14) -> WidgetTheme {

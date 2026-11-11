@@ -5,6 +5,11 @@ import Postbox
 @testable import HTMLBubbles
 
 final class WidgetDataTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     func testForwardNeverReceivesChatData() {
         let widget = TelegramMediaWidget(width: 300, height: 120, payload: Data(), isCopy: true, chatData: Data("private".utf8), publicData: Data("public".utf8))
         XCTAssertEqual(HTMLWidgetStore.data(widget), WidgetData(chatData: nil, publicData: "public"))

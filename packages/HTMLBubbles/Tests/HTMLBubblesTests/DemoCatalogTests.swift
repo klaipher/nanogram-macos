@@ -3,6 +3,7 @@ import XCTest
 
 final class DemoCatalogTests: XCTestCase {
     override class func setUp() {
+        enableMessageWidgetsForTests()
         super.setUp()
         DemoFixtures.install()
     }

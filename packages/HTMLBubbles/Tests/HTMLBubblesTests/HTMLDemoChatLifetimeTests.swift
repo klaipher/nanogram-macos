@@ -9,6 +9,7 @@ import TwidgetRenderer
 
 final class HTMLDemoChatLifetimeTests: XCTestCase {
     override class func setUp() {
+        enableMessageWidgetsForTests()
         super.setUp()
         DemoFixtures.install()
     }

@@ -6,6 +6,7 @@ import LiteHTML
 
 final class LongArticleTests: XCTestCase {
     override class func setUp() {
+        enableMessageWidgetsForTests()
         super.setUp()
         DemoFixtures.install()
     }

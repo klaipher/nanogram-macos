@@ -6,6 +6,11 @@ import WidgetSandbox
 @testable import HTMLBubbles
 
 final class WidgetResizePresentationTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     private final class VisibleWindow: NSWindow {
         override var isVisible: Bool { true }
         override var occlusionState: NSWindow.OcclusionState { .visible }

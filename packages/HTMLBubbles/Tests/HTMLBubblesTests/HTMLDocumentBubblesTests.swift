@@ -4,6 +4,11 @@ import TelegramCore
 @testable import HTMLBubbles
 
 final class HTMLDocumentBubblesTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     private let botId: Int64 = 8736535756
 
     private func peerId(_ id: Int64, namespace: PeerId.Namespace = Namespaces.Peer.CloudUser) -> PeerId {

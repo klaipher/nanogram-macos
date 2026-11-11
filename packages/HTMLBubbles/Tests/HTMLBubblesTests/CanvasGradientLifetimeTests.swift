@@ -4,6 +4,11 @@ import WidgetSandbox
 @testable import HTMLBubbles
 
 final class CanvasGradientLifetimeTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     private final class Space: WidgetFeedSpace {
         var slots: [WidgetFeedSlot] = []
         var feedViewport: CGRect { CGRect(x: 0, y: 0, width: 120, height: 80) }

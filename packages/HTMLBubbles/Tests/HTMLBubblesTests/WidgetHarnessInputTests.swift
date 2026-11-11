@@ -3,6 +3,11 @@ import XCTest
 @testable import HTMLBubbles
 
 final class WidgetHarnessInputTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     func testHarnessClicksCountAsPointerActivation() throws {
         let message = #"{"type":"event","trusted":true,"ev":{"type":"click","targetId":5,"button":0}}"#
         let original = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(message.utf8)) as? [String: Any])

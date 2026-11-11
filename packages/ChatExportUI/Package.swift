@@ -27,6 +27,7 @@ let package = Package(
         .library(name: "ChatExportUI", targets: ["ChatExportUI"]),
     ],
     dependencies: [
+        .package(name: "rnoise", path: "../../submodules/telegram-ios/third-party/rnnoise"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
         .package(name: "TelegramCore", path: "../../submodules/telegram-ios/submodules/TelegramCore"),
         .package(name: "Postbox", path: "../../submodules/telegram-ios/submodules/Postbox"),
@@ -42,7 +43,7 @@ let package = Package(
             path: "Sources/ChatExportUI"),
         .testTarget(
             name: "ChatExportUITests",
-            dependencies: ["ChatExportUI"],
+            dependencies: ["ChatExportUI", .product(name: "rnoise", package: "rnoise")],
             path: "Tests/ChatExportUITests"),
     ]
 )

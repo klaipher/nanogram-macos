@@ -2,6 +2,11 @@ import XCTest
 @testable import HTMLBubbles
 
 final class WidgetPreviewLayoutTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     func testAutoHeightUsesPlaceholderThenReportedHeight() {
         let placeholder = HTMLWidgetPreviewLayout(width: 0, height: 0, availableWidth: 350, reportedHeight: nil)
         XCTAssertEqual(placeholder.contentSize, CGSize(width: 350, height: 160))

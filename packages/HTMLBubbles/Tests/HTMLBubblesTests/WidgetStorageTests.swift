@@ -4,6 +4,11 @@ import WidgetSandbox
 @testable import HTMLBubbles
 
 final class WidgetStorageTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     private func context(basePath: String, peer: Int64 = 1, message: Int32 = 1) -> HTMLWidgetContext {
         let peerId = PeerId(peer)
         return HTMLWidgetContext(accountPeerId: PeerId(100), basePath: basePath, messageId: MessageId(peerId: peerId, namespace: 0, id: message), locale: "en-US")

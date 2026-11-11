@@ -9,6 +9,11 @@ private final class OnScreenWindow: NSWindow {
 }
 
 final class MagicMoveTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     private static let html = """
     <style>.c { display: inline-block; width: 70px; height: 34px; margin: 4px; padding: 6px; border-radius: 8px; color: #ffffff; font-weight: 700; }</style>
     <div>fallback</div>

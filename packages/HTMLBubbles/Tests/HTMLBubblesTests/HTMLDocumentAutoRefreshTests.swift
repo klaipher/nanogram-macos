@@ -4,6 +4,11 @@ import TelegramCore
 @testable import HTMLBubbles
 
 final class HTMLDocumentAutoRefreshTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     private let id = MessageId(peerId: PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(8736535756)), namespace: Namespaces.Message.Cloud, id: 7)
     private let on = HTMLDocumentAutoRefresh.Conditions(visible: true, windowActive: true, appActive: true)
 

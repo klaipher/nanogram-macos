@@ -4,6 +4,11 @@ import WidgetSandbox
 @testable import HTMLBubbles
 
 final class WebKitBubbleTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        enableMessageWidgetsForTests()
+    }
+
     @MainActor
     func testWebKitBubbleMeasuresInteractsAndCapturesPreview() async throws {
         let state = HTMLBubbleState(html: "<style>body{margin:0}button{height:120px;width:100%}</style><button id='count'>0</button><script>var n=0; document.getElementById('count').onclick=function(){this.textContent=String(++n)}</script>", outgoing: false, engine: .webKit, selfContained: true)
