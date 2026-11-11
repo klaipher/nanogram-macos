@@ -30,7 +30,7 @@ fileprivate class AboutModalView : Control {
         formatter.dateFormat = "yyyy"
         
         
-        let copyrightLayout = TextViewLayout(.initialize(string: "Copyright © 2016 - \(formatter.string(from: Date(timeIntervalSinceReferenceDate: Date.timeIntervalSinceReferenceDate))) TELEGRAM MESSENGER", color: theme.colors.grayText, font: .normal(.text)), alignment: .center)
+        let copyrightLayout = TextViewLayout(.initialize(string: "© \(formatter.string(from: Date(timeIntervalSinceReferenceDate: Date.timeIntervalSinceReferenceDate))) klaipher\nBased on Telegram for macOS, © 2016 - \(formatter.string(from: Date(timeIntervalSinceReferenceDate: Date.timeIntervalSinceReferenceDate))) Telegram Messenger (GPL-2.0)", color: theme.colors.grayText, font: .normal(.text)), alignment: .center)
         copyrightLayout.measure(width:frameRect.width - 40)
         
         
@@ -47,7 +47,7 @@ fileprivate class AboutModalView : Control {
         
         
 
-        _ = attr.append(string: strings().aboutDescription, color: theme.colors.text, font: .normal(.text))
+        _ = attr.append(string: strings().nanogramAboutDescription, color: theme.colors.text, font: .normal(.text))
         
         let descLayout = TextViewLayout(attr, alignment: .center)
         descLayout.measure(width:frameRect.width - 40)
@@ -96,7 +96,7 @@ public class AboutModalController: ModalViewController {
     }
     
     public override init() {
-        super.init(frame: NSMakeRect(0, 0, 300, 190))
+        super.init(frame: NSMakeRect(0, 0, 300, 220))
         bar = .init(height: 0)
     }
     

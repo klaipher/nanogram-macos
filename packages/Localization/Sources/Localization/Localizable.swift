@@ -111,6 +111,14 @@ public final class L10n {
   public static var aiSummaryTitle: String  { return L10n.tr("Localizable", "AISummary.Title") }
   /// Free messaging app for macOS based on MTProto for speed and security.
   public static var aboutDescription: String  { return L10n.tr("Localizable", "About.Description") }
+  /// Unofficial Telegram client for Mac, built from Telegram for macOS and tuned to run lighter. Not affiliated with Telegram.
+  public static var nanogramAboutDescription: String  { return L10n.tr("Localizable", "Nanogram.About.Description") }
+  /// Launch at login
+  public static var nanogramLaunchAtLoginTitle: String  { return L10n.tr("Localizable", "Nanogram.LaunchAtLogin.Title") }
+  /// Keeps Nanogram running so your Mac shows new messages.
+  public static var nanogramLaunchAtLoginSubtitle: String  { return L10n.tr("Localizable", "Nanogram.LaunchAtLogin.Subtitle") }
+  /// Allow Nanogram in System Settings ▸ General ▸ Login Items.
+  public static var nanogramLaunchAtLoginApprovalHint: String  { return L10n.tr("Localizable", "Nanogram.LaunchAtLogin.ApprovalHint") }
   /// Cocoon (**Co**nfidential **Co**mpute **O**pen **N**etwork) handles AI tasks **safely** and **efficiently.
   public static var aboutCocoonDescription: String  { return L10n.tr("Localizable", "AboutCocoon.Description") }
   /// Want to integrate Cocoon into your projects?\nReach out at [t.me/cocoon](t.me/cocoon)

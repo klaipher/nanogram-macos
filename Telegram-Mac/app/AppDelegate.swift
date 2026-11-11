@@ -52,6 +52,7 @@ import SettingsUI
 import NanogramDebug
 import NanogramDebugUI
 import NanogramRuntime
+import NanogramKit
 import Mozjpeg
 import Translate
 import LocalAudioTranscription
@@ -317,6 +318,11 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         Queue.concurrentBackgroundQueue().async {
             migrateWallpapersToEightBitChannels()
         }
+        #if (NANOGRAM || NANOGRAM_MAS) && !DEBUG
+        Queue.concurrentBackgroundQueue().async {
+            LaunchAtLogin.applyDefault()
+        }
+        #endif
 
         _ = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { event in
             return BrowserStateContext.checkKey(event)

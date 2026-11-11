@@ -242,6 +242,14 @@ private func installQrStudioHooks() {
 
 func installSettingsUIHooks() {
     installQrStudioHooks()
+    #if (NANOGRAM || NANOGRAM_MAS) && !DEBUG
+    LaunchAtLoginHooks.install(LaunchAtLoginHooks(state: {
+        let row = launchAtLoginRowState(status: LaunchAtLogin.status)
+        return LaunchAtLoginHooks.State(isOn: row.isOn, needsApproval: row.needsApproval)
+    }, setEnabled: { enabled in
+        LaunchAtLogin.setEnabled(enabled)
+    }))
+    #endif
     SettingsNavigationHooks.install(makeSettingsNavigationHooks())
     var hooks = SettingsHooks(shareLink: { context, link in
         guard let context = context as? AccountContext else {

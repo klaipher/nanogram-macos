@@ -48,6 +48,7 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
     case previewChats(sectionId:Int, enabled: Bool, viewType: GeneralViewType)
     case previewChatsInfo(sectionId:Int)
     case showProfileId(sectionId:Int, enabled: Bool, viewType: GeneralViewType)
+    case launchAtLogin(sectionId:Int, enabled: Bool, needsApproval: Bool, viewType: GeneralViewType)
     public var stableId: Int {
         switch self {
         case let .header(_, uniqueId, _):
@@ -104,6 +105,8 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
             return 25
         case .previewChatsInfo:
             return 26
+        case .launchAtLogin:
+            return 27
         case let .section(id):
             return (id + 1) * 1000 - id
         }
@@ -162,6 +165,8 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
         case let .previewChatsInfo(sectionId):
             return (sectionId * 1000) + stableId
         case let .showProfileId(sectionId, _, _):
+            return (sectionId * 1000) + stableId
+        case let .launchAtLogin(sectionId, _, _, _):
             return (sectionId * 1000) + stableId
         case let .section(id):
             return (id + 1) * 1000 - id
@@ -270,6 +275,11 @@ private enum GeneralSettingsEntry : Comparable, Identifiable {
             return GeneralInteractedRowItem(initialSize, name: strings().generalSettingsShowProfileIdText, type: .switchable(value), viewType: viewType, action: arguments.showProfileId)
         case let .previewChats(_, value, viewType):
             return GeneralInteractedRowItem(initialSize, name: strings().generalSettingsPreviewChatsText, type: .switchable(value), viewType: viewType, action: arguments.togglePreviewChat)
+        case let .launchAtLogin(_, enabled, needsApproval, viewType):
+            let subtitle = needsApproval ? strings().nanogramLaunchAtLoginSubtitle + " " + strings().nanogramLaunchAtLoginApprovalHint : strings().nanogramLaunchAtLoginSubtitle
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().nanogramLaunchAtLoginTitle, description: subtitle, type: .switchable(enabled), viewType: viewType, action: {
+                arguments.toggleLaunchAtLogin(!enabled)
+            })
         case .previewChatsInfo:
             return GeneralTextRowItem(initialSize, stableId: stableId, text: strings().generalSettingsPreviewChatsInfo, viewType: .textBottomItem)
         }
@@ -303,7 +313,8 @@ private final class GeneralSettingsArguments {
     public let toggleSpellingKey:(String)->Void
     public let showProfileId:()->Void
     public let togglePreviewChat:()->Void
-    public init(context:any AccountContextProtocol, toggleCallsTab:@escaping(Bool)-> Void, toggleContactsTab:@escaping(Bool)-> Void, toggleInAppKeys: @escaping(Bool) -> Void, toggleInput: @escaping(SendingType)-> Void, toggleInAppSounds: @escaping (Bool) -> Void, toggleEmojiReplacements:@escaping(Bool) -> Void, toggleForceTouchAction: @escaping(ForceTouchAction)->Void, toggleInstantViewScrollBySpace: @escaping(Bool)->Void, toggleAutoplayGifs:@escaping(Bool) -> Void, toggleEmojiPrediction: @escaping(Bool) -> Void, toggleBigEmoji: @escaping(Bool) -> Void, toggleStatusBar: @escaping(Bool) -> Void, toggleRTFEnabled: @escaping(Bool)->Void, toggleLargePhotos: @escaping(Bool) -> Void, acceptSecretChats: @escaping(Bool)->Void, toggleWorkMode:@escaping(Bool)->Void, openShortcuts: @escaping()->Void, callSettings: @escaping() ->Void, openLiteMode: @escaping()->Void, toggleSpellingKey:@escaping(String)->Void, showProfileId:@escaping()->Void, togglePreviewChat:@escaping()->Void) {
+    public let toggleLaunchAtLogin:(Bool)->Void
+    public init(context:any AccountContextProtocol, toggleCallsTab:@escaping(Bool)-> Void, toggleContactsTab:@escaping(Bool)-> Void, toggleInAppKeys: @escaping(Bool) -> Void, toggleInput: @escaping(SendingType)-> Void, toggleInAppSounds: @escaping (Bool) -> Void, toggleEmojiReplacements:@escaping(Bool) -> Void, toggleForceTouchAction: @escaping(ForceTouchAction)->Void, toggleInstantViewScrollBySpace: @escaping(Bool)->Void, toggleAutoplayGifs:@escaping(Bool) -> Void, toggleEmojiPrediction: @escaping(Bool) -> Void, toggleBigEmoji: @escaping(Bool) -> Void, toggleStatusBar: @escaping(Bool) -> Void, toggleRTFEnabled: @escaping(Bool)->Void, toggleLargePhotos: @escaping(Bool) -> Void, acceptSecretChats: @escaping(Bool)->Void, toggleWorkMode:@escaping(Bool)->Void, openShortcuts: @escaping()->Void, callSettings: @escaping() ->Void, openLiteMode: @escaping()->Void, toggleSpellingKey:@escaping(String)->Void, showProfileId:@escaping()->Void, togglePreviewChat:@escaping()->Void, toggleLaunchAtLogin:@escaping(Bool)->Void) {
         self.context = context
         self.toggleCallsTab = toggleCallsTab
         self.toggleContactsTab = toggleContactsTab
@@ -326,6 +337,7 @@ private final class GeneralSettingsArguments {
         self.toggleSpellingKey = toggleSpellingKey
         self.showProfileId = showProfileId
         self.togglePreviewChat = togglePreviewChat
+        self.toggleLaunchAtLogin = toggleLaunchAtLogin
         self.toggleLargePhotos = toggleLargePhotos
     }
    
@@ -339,6 +351,12 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
     
     entries.append(.section(sectionId: sectionId))
     sectionId += 1
+    
+    if let launchAtLogin = LaunchAtLoginHooks.installed?.state() {
+        entries.append(.launchAtLogin(sectionId: sectionId, enabled: launchAtLogin.isOn, needsApproval: launchAtLogin.needsApproval, viewType: .singleItem))
+        entries.append(.section(sectionId: sectionId))
+        sectionId += 1
+    }
     
     entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsEnergySaving))
     headerUnique -= 1
@@ -473,6 +491,9 @@ open class GeneralSettingsViewController<Context: AccountContextProtocol>: Table
         
         let forceTouchPromise:ValuePromise<ForceTouchAction> = ValuePromise(FastSettings.forceTouchAction, ignoreRepeated: true)
         
+        let launchAtLoginRefresh: ValuePromise<Int> = ValuePromise(0, ignoreRepeated: true)
+        let launchAtLoginRefreshCounter = Atomic<Int>(value: 0)
+        
         let arguments = GeneralSettingsArguments(context: context, toggleCallsTab: { enable in
             _ = updateBaseAppSettingsInteractively(accountManager: context.sharedContext.accountManager, { settings -> BaseApplicationSettings in
                 return settings.withUpdatedShowCallsTab(enable)
@@ -540,6 +561,14 @@ open class GeneralSettingsViewController<Context: AccountContextProtocol>: Table
             _ = updateAdditionalSettingsInteractively(accountManager: context.sharedContext.accountManager, {
                 $0.withUpdatedPreviewChats(!$0.previewChats)
             }).startStandalone()
+        }, toggleLaunchAtLogin: { enable in
+            guard let hooks = LaunchAtLoginHooks.installed else {
+                return
+            }
+            Queue.concurrentDefaultQueue().async {
+                hooks.setEnabled(enable)
+                launchAtLoginRefresh.set(launchAtLoginRefreshCounter.modify { $0 + 1 })
+            }
         })
         
         let initialSize = atomicSize
@@ -548,7 +577,7 @@ open class GeneralSettingsViewController<Context: AccountContextProtocol>: Table
         
         let baseSettingsSignal: Signal<BaseApplicationSettings, NoError> = .single(context.sharedContext.baseSettings) |> then(baseAppSettings(accountManager: context.sharedContext.accountManager))
         
-        let signal = combineLatest(queue: prepareQueue, baseSettingsSignal, inputPromise.get(), forceTouchPromise.get(), appearanceSignal, appLaunchSettings(postbox: context.account.postbox), context.account.postbox.preferencesView(keys: [PreferencesKeys.secretChatSettings]), additionalSettings(accountManager: context.sharedContext.accountManager)) |> map { settings, _, _, appearance, launchSettings, preferencesView, additionalSettings -> TableUpdateTransition in
+        let signal = combineLatest(queue: prepareQueue, baseSettingsSignal, inputPromise.get(), forceTouchPromise.get(), appearanceSignal, appLaunchSettings(postbox: context.account.postbox), context.account.postbox.preferencesView(keys: [PreferencesKeys.secretChatSettings]), additionalSettings(accountManager: context.sharedContext.accountManager), launchAtLoginRefresh.get()) |> map { settings, _, _, appearance, launchSettings, preferencesView, additionalSettings, _ -> TableUpdateTransition in
             
             let baseSettings: BaseApplicationSettings = settings
             
