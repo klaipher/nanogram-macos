@@ -30,7 +30,6 @@
   "PollResultsUI": 1,
   "PremiumStatusUI": 2,
   "PrivateCallScreen": 5,
-  "RLottie_Xcode": 1,
   "Reachability": 7,
   "SettingsUI": 1,
   "StoriesUI": 1,
@@ -51,6 +50,5 @@
   "WalletUI": 1,
   "WallpaperUI": 4,
   "app": 17,
-  "rlottie": 4,
   "tgcalls": 10
 }

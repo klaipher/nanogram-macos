@@ -1,6 +1,6 @@
 # Upstream sync dry run
 
-`tg upstream-sync --tag <upstream tag>` answers, before any merge: which files conflict (grouped by area), and which pinned dependencies upstream bumped (tgcalls, webrtc, rlottie, mtproto-engine, ...) and whether upstream's new commits are already in our fork branches.
+`tg upstream-sync --tag <upstream tag>` answers, before any merge: which files conflict (grouped by area), and which pinned dependencies upstream bumped (tgcalls, webrtc, tlottie, mtproto-engine, ...) and whether upstream's new commits are already in our fork branches.
 
 The real merge is `tg sync-upstream`; this is the read-only preview of it. The tool works in a scratch bare repository (it borrows this repo's objects through alternates): it fetches the tag shallowly, makes a synthetic commit of the release we are based on (config `base_commit`, 24295527, the 13.1 merge) and one of the new tag, and runs `git merge-tree --write-tree --merge-base=<old> main <new>` - a real three-way merge in memory. Nothing is checked out, pushed or fetched into this repository.
 

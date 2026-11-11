@@ -77,13 +77,6 @@
    "fork_branch": "nanogram-mac"
   },
   {
-   "name": "rlottie",
-   "path": "submodules/rlottie",
-   "upstream_url": "https://github.com/macosswift/rlottie.git",
-   "fork_url": "https://github.com/klaipher/rlottie.git",
-   "fork_branch": "nanogram-mac"
-  },
-  {
    "name": "Sparkle",
    "path": "submodules/Sparkle",
    "upstream_url": "https://github.com/macosswift/sparkle.git"

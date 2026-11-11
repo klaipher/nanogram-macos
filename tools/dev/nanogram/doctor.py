@@ -12,7 +12,6 @@ from . import config
 REQUIRED_XCODE_MAJOR = 27
 MIN_FREE_GB = 40
 SUBMODULE_MARKERS = {
-    "rlottie": "submodules/rlottie/CMakeLists.txt",
     "tlottie": "submodules/tlottie/Cargo.toml",
     "telegram-ios": "submodules/telegram-ios/submodules/TelegramCore/Package.swift",
     # libvpx and libopus are built from the core's copies (nested submodule and tarball).

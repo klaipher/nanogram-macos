@@ -41,7 +41,7 @@ worktrees). The short version is in `AGENTS.md`; this is the full text. Identica
 
 ## Shared code
 
-The two apps share the Telegram core, the tgcalls/WebRTC stack, rlottie and libprisma. A fix in shared code lands
+The two apps share the Telegram core, the tgcalls/WebRTC stack and libprisma. A fix in shared code lands
 in both repositories in the same round: the iOS repo owns the core (`docs/mac-core-paths.txt` lists the shared paths,
 `tools/dev/parity/parity.py` checks them), and the Mac consumes it through `submodules/telegram-ios` (`tg core-bump`).
 tgcalls fixes also go through `tools/dev/tgcalls-port`. A push that touches shared paths prints a reminder; do not

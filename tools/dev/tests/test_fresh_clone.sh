@@ -14,7 +14,6 @@ git clone --quiet --recurse-submodules --jobs 8 --branch "$BRANCH" "$REPO_URL" "
     || fail "git clone --recurse-submodules failed"
 
 cd "$WORK/repo"
-[ -n "$(ls -A submodules/rlottie 2>/dev/null)" ] || fail "submodules/rlottie is empty"
 [ -s submodules/tlottie/Cargo.toml ] || fail "submodules/tlottie/Cargo.toml missing"
 [ -s submodules/telegram-ios/submodules/TelegramCore/Package.swift ] || fail "telegram-ios not populated"
 [ ! -e third-party/twidget ] || fail "private submodule third-party/twidget still referenced"

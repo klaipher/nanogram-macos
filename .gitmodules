@@ -5,10 +5,6 @@
 	path = submodules/telegram-ios
 	url = https://github.com/klaipher/nanogram.git
 	branch = main
-[submodule "submodules/rlottie"]
-	path = submodules/rlottie
-	url = https://github.com/klaipher/rlottie
-	branch = telegram-ios-dev
 [submodule "submodules/tgcalls"]
 	path = submodules/tgcalls
 	url = https://github.com/klaipher/tgcalls

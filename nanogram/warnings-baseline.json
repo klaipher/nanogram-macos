@@ -101,7 +101,6 @@
   "PushToTalk": 1,
   "QrStudioUI": 61,
   "QuickSwitcher": 78,
-  "RLottie_Xcode": 3,
   "Reachability": 15,
   "ReportUI": 16,
   "RichTextEditorUI": 48,
@@ -154,7 +153,6 @@
   "boost_regex": 6,
   "libprisma": 1,
   "minizip": 1,
-  "rlottie": 73,
   "sqlcipher": 194,
   "tgcalls": 26
 }

@@ -644,7 +644,7 @@ def ios_pins_published(report: Report, root: Path, config: Config, ref: str = "H
         ok, where = reachable_from_owner(path, sha, config.remote_owner)
         if ok:
             report.ok("pin-" + entry.name, f"{sha[:10]} is on {where}")
-        elif entry.name in ("tgcalls", "rlottie", "tlottie"):
+        elif entry.name in ("tgcalls", "tlottie"):
             report.error("pin-" + entry.name, f"{sha[:10]} is unpublished ({where}); a clone could not build. Push the submodule first")
         else:
             report.warn("pin-" + entry.name, f"{sha[:10]} is not on a {config.remote_owner} remote ({where})")

@@ -34,7 +34,6 @@ lts-ref origin/mac/core-lts
 lag commits=20 days=7 block-from=2026-11-18
 
 pin tgcalls ios=submodules/TgVoipWebrtc/tgcalls mac=submodules/tgcalls
-pin rlottie ios=submodules/rlottie/rlottie mac=submodules/rlottie warn-until=2026-11-18
 pin tlottie ios=submodules/tlottie/tlottie mac=submodules/tlottie external
 pin webrtc ios=third-party/webrtc/webrtc mac=submodules/tg_owt
 webrtc-root mac=src ios=
@@ -73,7 +72,6 @@ share submodules/ffmpeg
 share submodules/libphonenumber
 share submodules/sqlcipher
 share submodules/openssl
-share submodules/rlottie
 share submodules/tlottie
 share submodules/LottieBinding
 share third-party/rnnoise

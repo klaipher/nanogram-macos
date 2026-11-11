@@ -4,7 +4,7 @@
 Run by hand, before a merge; nothing runs it on a schedule. It answers three questions without touching either repo:
 
   1. Which files conflict if the new upstream tag is merged into our branch, grouped by area?
-  2. Which pinned dependencies (tgcalls, webrtc, rlottie, mtproto-engine, ...) did upstream bump, and are the new
+  2. Which pinned dependencies (tgcalls, webrtc, tlottie, mtproto-engine, ...) did upstream bump, and are the new
      upstream commits already in our fork branches?
   3. How much did upstream change, per area?
 

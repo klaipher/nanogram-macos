@@ -116,7 +116,7 @@ in a shared module), ship the decoder as an extension target that conforms to it
 platform neutral; only `DecoderListenerDelegate.run()` (service entry) and `DecoderXPCClient.init(serviceName:)`
 (connection factory) are macOS specific. Plan: move the package into the shared core, add an iOS extension target
 that hosts the same listener, and give it the same entitlement discipline (no network, no app group file access).
-tlottie and rlottie link into the extension as they do into the app. The iOS memory ceiling for extensions is low,
+tlottie links into the extension as they do into the app. The iOS memory ceiling for extensions is low,
 so frame size limits there should be tighter and the service should render at most one frame at a time.
 Owner steps for iOS: none known for the capability, but the extension needs its own bundle identifier and
 provisioning profile in the developer portal.

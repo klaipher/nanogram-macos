@@ -638,21 +638,21 @@ commit past the newest tag.
 
 Other forks we pin: `submodules/tgcalls` = `klaipher/tgcalls` branch `nanogram-shared` (one branch for iOS and the Mac;
 the parity check compares the `.gitmodules` branch names of both repos), `submodules/tg_owt` = `klaipher/tg_owt` branch
-`nanogram-mac`, `submodules/rlottie` = `klaipher/rlottie` branch `nanogram-mac`. Their records: `NANOGRAM-CHANGES.md` and
+`nanogram-mac` (rlottie is gone since 13.2, as upstream). Their records: `NANOGRAM-CHANGES.md` and
 `CHANGELOG.md` in each fork. Run
 `git submodule sync --recursive` after `.gitmodules` URLs change; existing checkouts keep their old remotes until then.
 
 ## Parity gate and `tg core-bump`
 
-The iOS and macOS apps share one core, tgcalls, rlottie/tlottie and WebRTC. `docs/mac-core-paths.txt` (identical in
+The iOS and macOS apps share one core, tgcalls, tlottie and WebRTC. `docs/mac-core-paths.txt` (identical in
 both repos) lists the shared paths and the intended differences. `tools/dev/parity/parity.py` (identical in both
 repos) enforces it; `tools/dev/tg parity` runs it here and `tg check` includes it, so the pre-push hook does too.
 
 - History roots: every core commit must be rooted at the import `b46f1ec6`; a push that reaches Telegram's history is
   stopped (both repos' pre-push hooks).
-- Pins published: core, tgcalls, rlottie and tg_owt pins must be on a `klaipher` remote (a network URL under
+- Pins published: core, tgcalls and tg_owt pins must be on a `klaipher` remote (a network URL under
   `klaipher/`; a local-path remote such as `/Users/klaipher/...` does not count).
-- Equal SHAs: tgcalls, rlottie and tlottie are the same commit on both sides (read from the core pin).
+- Equal SHAs: tgcalls and tlottie are the same commit on both sides (read from the core pin).
 - Core pin: an ancestor of iOS `main` (or `mac/core-lts`), lag limit 20 commits / 7 days of shared-path commits
   (warning until `block-from`, then an error), and no shared file that differs through a commit that is neither a
   `cherry-pick -x` of `main` nor allow-listed. A cherry-pick explains a file only when it adds and removes exactly the

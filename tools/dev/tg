@@ -270,7 +270,7 @@ cmd_xcode() {
 }
 
 # tg parity [--release] [--ios-repo DIR] [--ios-ref REF]: the iOS/macOS parity gate (tools/dev/parity/parity.py,
-# rules in docs/mac-core-paths.txt): history roots, published pins, equal tgcalls/rlottie/tlottie SHAs, core pin on
+# rules in docs/mac-core-paths.txt): history roots, published pins, equal tgcalls/tlottie SHAs, core pin on
 # iOS main and its lag, shared files without an allow entry, WebRTC differences. Exit 1 on any error.
 cmd_parity() { python3 "$ROOT/tools/dev/parity/parity.py" check --root "$ROOT" "$@"; }
 

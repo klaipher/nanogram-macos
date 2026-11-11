@@ -6,7 +6,7 @@ This file provides guidance to coding agents working with code in this repositor
 ## Hard rules
 
 - Marketing version follows upstream; only the build number changes. Never fetch upstream tags/branches into this repository by hand (`tg sync-upstream` only, released code only).
-- A fix in shared code (core, tgcalls, tg_owt, rlottie, libprisma) lands on both apps in the same round: iOS `main` first, then `tools/dev/tg core-bump` here.
+- A fix in shared code (core, tgcalls, tg_owt, libprisma) lands on both apps in the same round: iOS `main` first, then `tools/dev/tg core-bump` here.
 - Never `--no-verify`. Never read `~/.config/telegram-ios`, keychains or signing material. No scheduled jobs.
 - Agents do not build or launch the app (`tg build/check/test/warnings`, `xcodebuild`, `swift build/test`); one combined build at the end of a round. Pure-Python tests are fine.
 - Work in your own worktree and branch under `~/Projects/wt/`, never in the main checkout.
