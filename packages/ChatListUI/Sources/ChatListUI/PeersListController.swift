@@ -3551,7 +3551,7 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
                 ForumUI.open(peerId, addition: false, context: context, threadId: threadId)
             }
         case let .htmlDemo(id):
-            if let chat = HTMLDemoCatalog.chat(id) {
+            if MessageWidgetsSwitch.isEnabled, let chat = HTMLDemoCatalog.chat(id) {
                 let contents = htmlDemoContents.contents(chat: chat, accountPeerId: context.peerId, accountName: (context.myPeer as? TelegramUser)?.firstName ?? "You")
                 contents.openDemoRival = { [context] in
                     _ = (context.sharedContext.activeAccountsWithInfo |> take(1) |> deliverOnMainQueue).start(next: { accounts in

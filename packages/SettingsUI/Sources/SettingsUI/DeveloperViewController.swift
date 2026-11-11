@@ -33,6 +33,7 @@ private final class Arguments {
     public let toggleAccessibilityTree: () -> Void
     public let accessibilityAudit: () -> Void
     public let toggleGlassGrouping: () -> Void
+    public let toggleMessageWidgets: () -> Void
     public let resetApp: (DeveloperAppReset) -> Void
     public init(context: any AccountContextProtocol,
          toggleLogs: @escaping (Bool) -> Void,
@@ -47,6 +48,7 @@ private final class Arguments {
          toggleAccessibilityTree: @escaping () -> Void,
          accessibilityAudit: @escaping () -> Void,
          toggleGlassGrouping: @escaping () -> Void,
+         toggleMessageWidgets: @escaping () -> Void,
          resetApp: @escaping (DeveloperAppReset) -> Void) {
         self.context = context
         self.toggleLogs = toggleLogs
@@ -61,6 +63,7 @@ private final class Arguments {
         self.toggleAccessibilityTree = toggleAccessibilityTree
         self.accessibilityAudit = accessibilityAudit
         self.toggleGlassGrouping = toggleGlassGrouping
+        self.toggleMessageWidgets = toggleMessageWidgets
         self.resetApp = resetApp
     }
 }
@@ -75,6 +78,7 @@ private struct State: Equatable {
     public var useExperimentalDownload: Bool = true
     public var accessibilityTree: Bool = true
     public var glassGroupingSecondary: Bool = false
+    public var messageWidgets: Bool = false
 }
 
 private let _id_add_account = InputDataIdentifier("_id_add_account")
@@ -92,6 +96,7 @@ private let _id_glass_grouping = InputDataIdentifier("_id_glass_grouping")
 private let _id_clear_database = InputDataIdentifier("_id_clear_database")
 private let _id_clear_database_and_cache = InputDataIdentifier("_id_clear_database_and_cache")
 private let _id_nanogram_switches = InputDataIdentifier("_id_nanogram_switches")
+private let _id_message_widgets = InputDataIdentifier("_id_message_widgets")
 
 
 private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
@@ -107,8 +112,17 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
         entries.append(.desc(sectionId: sectionId, index: index, text: .plain("NANOGRAM"), data: .init(viewType: .textTopItem)))
         index += 1
 
-        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_nanogram_switches, data: InputDataGeneralData(name: "Debug Switches…", color: theme.colors.text, type: .next, viewType: .singleItem, action: openNanogramSwitches)))
+        let hasMessageWidgets = DeveloperHooks.shared.messageWidgets != nil
+        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_nanogram_switches, data: InputDataGeneralData(name: "Debug Switches…", color: theme.colors.text, type: .next, viewType: hasMessageWidgets ? .firstItem : .singleItem, action: openNanogramSwitches)))
         index += 1
+
+        if hasMessageWidgets {
+            entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_message_widgets, data: InputDataGeneralData(name: "Message widgets", color: theme.colors.text, type: .switchable(state.messageWidgets), viewType: .lastItem, action: arguments.toggleMessageWidgets)))
+            index += 1
+
+            entries.append(.desc(sectionId: sectionId, index: index, text: .plain("Widgets run a bot's script inside the message. Off for security. Turn on only for bots you trust."), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+            index += 1
+        }
 
         entries.append(.sectionId(sectionId, type: .normal))
         sectionId += 1
@@ -247,7 +261,8 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
         activeNetworkEngine: context.account.network.engineKind,
         useExperimentalDownload: DeveloperNetworkSwitches(settings: nil).downloadsV2,
         accessibilityTree: FastSettings.accessibilityTreeEnabled,
-        glassGroupingSecondary: SecondaryGlassGrouping.isEnabled
+        glassGroupingSecondary: SecondaryGlassGrouping.isEnabled,
+        messageWidgets: DeveloperHooks.isInstalled ? (DeveloperHooks.shared.messageWidgets?.isOn() ?? false) : false
     )
 
     let statePromise = ValuePromise(initialState, ignoreRepeated: true)
@@ -348,6 +363,16 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
         updateState { current in
             var current = current
             current.glassGroupingSecondary = SecondaryGlassGrouping.isEnabled
+            return current
+        }
+    }, toggleMessageWidgets: {
+        guard DeveloperHooks.isInstalled, let messageWidgets = DeveloperHooks.shared.messageWidgets else {
+            return
+        }
+        messageWidgets.setOn(!messageWidgets.isOn())
+        updateState { current in
+            var current = current
+            current.messageWidgets = messageWidgets.isOn()
             return current
         }
     }, resetApp: { action in

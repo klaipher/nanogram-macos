@@ -50,6 +50,7 @@ DEVELOPMENT_TEAM = YGTMYL879P
 NANOGRAM_BUNDLE_ID_Telegram = org.klaipher.Nanogram
 NANOGRAM_BUNDLE_ID_TelegramShare = org.klaipher.Nanogram.MacShare
 NANOGRAM_BUNDLE_ID_NanogramDecoder = org.klaipher.Nanogram.Decoder
+NANOGRAM_BUNDLE_ID_WidgetEngineService = org.klaipher.Nanogram.WidgetEngine
 PRODUCT_BUNDLE_IDENTIFIER = $(NANOGRAM_BUNDLE_ID_$(TARGET_NAME):default=$(inherited))
 
 // Local builds sign with the team's Apple Development identity, no provisioning profile

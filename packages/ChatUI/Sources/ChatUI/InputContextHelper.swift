@@ -1,4 +1,5 @@
 import Cocoa
+import HTMLBubbles
 import SwiftSignalKit
 import TGUIKit
 import Postbox
@@ -246,7 +247,7 @@ fileprivate func prepareEntries(left:[AppearanceWrapperEntry<InputContextEntry>]
 
             return ShortPeerRowItem(initialSize, peer: peer, account: context.account, context: context, height: 42, photoSize: NSMakeSize(30, 30), titleStyle: titleStyle, statusStyle: statusStyle, status: status, borderType: [], drawCustomSeparator: true, inset: NSEdgeInsets(left: 7))
         case let .contextResult(results,result,index):
-            if case .widget = result.message {
+            if MessageWidgetsSwitch.isEnabled, case .widget = result.message {
                 return ContextWidgetRowItem(initialSize, results, result, index, context, chatInteraction)
             }
             return ContextListRowItem(initialSize, results, result, index, context, chatInteraction)

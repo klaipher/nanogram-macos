@@ -2778,6 +2778,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
     
     let layoutDisposable:MetaDisposable = MetaDisposable()
+    let messageWidgetsDisposable:MetaDisposable = MetaDisposable()
     
     private var afterNextTransaction:(()->Void)?
     
@@ -3624,6 +3625,15 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             }
         }))
         
+        let messageWidgetsObserver = NotificationCenter.default.addObserver(forName: MessageWidgetsSwitch.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            if let table = self?.genericView.tableView {
+                ChatHTMLDocumentRows.rebuildVisibleRows(in: table)
+            }
+        }
+        messageWidgetsDisposable.set(ActionDisposable {
+            NotificationCenter.default.removeObserver(messageWidgetsObserver)
+        })
+
         selectTextController = ChatSelectText(genericView.tableView)
         
         let maxReadIndex:ValuePromise<MessageIndex?> = ValuePromise()
@@ -11608,6 +11618,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         self.urlPreviewQueryState?.1.dispose()
         botCallbackAlertMessageDisposable?.dispose()
         layoutDisposable.dispose()
+        messageWidgetsDisposable.dispose()
         shareContactDisposable.dispose()
         peerInputActivitiesDisposable.dispose()
         connectionStatusDisposable.dispose()

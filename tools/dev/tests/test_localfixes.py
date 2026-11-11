@@ -61,3 +61,43 @@ class ShaderFixTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WidgetQuickJSPinTests(unittest.TestCase):
+    def repo(self):
+        import subprocess
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@l", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@l",
+               "PATH": "/usr/bin:/bin:/opt/homebrew/bin"}
+        def git(*args):
+            return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True, env=env).stdout.strip()
+        git("init", "-q")
+        (root / "a").write_text("1")
+        git("add", "a")
+        git("commit", "-qm", "old")
+        old = git("rev-parse", "HEAD")
+        (root / "a").write_text("2")
+        git("commit", "-qam", "fixed")
+        fixed = git("rev-parse", "HEAD")
+        git("checkout", "-q", old)
+        return root, old, fixed, git
+
+    def test_moves_the_nested_quickjs_to_the_fixed_commit(self):
+        root, old, fixed, git = self.repo()
+        self.assertTrue(localfixes.pin_checkout(root, fixed))
+        self.assertEqual(git("rev-parse", "HEAD"), fixed)
+
+    def test_does_nothing_when_already_at_the_fixed_commit(self):
+        root, old, fixed, git = self.repo()
+        git("checkout", "-q", fixed)
+        self.assertFalse(localfixes.pin_checkout(root, fixed))
+        self.assertEqual(git("rev-parse", "HEAD"), fixed)
+
+    def test_skips_a_checkout_that_is_not_there(self):
+        self.assertFalse(localfixes.pin_checkout(Path("/nonexistent/quickjs"), "b526a817f188ef861eea7666d68361c7851673a0"))
+
+    def test_the_pin_is_the_quickjs_security_release(self):
+        self.assertEqual(localfixes.WIDGET_QUICKJS_COMMIT, "b526a817f188ef861eea7666d68361c7851673a0")
+        self.assertEqual(localfixes.WIDGET_QUICKJS_PATH, "third-party/widget-sandbox/packages/ios/Sources/CQuickJS/quickjs")

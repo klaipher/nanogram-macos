@@ -5,6 +5,9 @@ public enum HTMLBubblePage {
     private static let scriptRegex = try! NSRegularExpression(pattern: "<script\\b([^>]*)>([\\s\\S]*?)</script\\s*>", options: [.caseInsensitive])
 
     public static func write(source: String, appearance: HTMLBubbleAppearance) -> URL? {
+        guard MessageWidgetsSwitch.isEnabled else {
+            return nil
+        }
         let ns = source as NSString
         let range = NSRange(location: 0, length: ns.length)
         let styles = styleRegex.matches(in: source, range: range).map { ns.substring(with: $0.range) }.joined(separator: "\n")

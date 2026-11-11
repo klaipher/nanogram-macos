@@ -1278,7 +1278,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                     }
                 }
             }
-            if state.mode == .plain, state.forumPeer == nil, appConfiguration.getGeneralValue("dev", orElse: 0) == 1 {
+            if state.mode == .plain, state.forumPeer == nil, MessageWidgetPolicy.allowsDemoEntry(enabled: MessageWidgetsSwitch.isEnabled, serverAllowsDemo: appConfiguration.getGeneralValue("dev", orElse: 0) == 1) {
                 for (index, chat) in HTMLDemoCatalog.chats.enumerated() {
                     mapped.append(.htmlDemo(index, chat.id))
                 }

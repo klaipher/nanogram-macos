@@ -1550,7 +1550,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
             self.window.deminiaturize(self)
             if let context = self.contextValue?.context {
                 AppDelegate.eventProcessed = nil
-                if context.appConfiguration.getGeneralValue("dev", orElse: 0) == 1,
+                if MessageWidgetPolicy.allowsDemoEntry(enabled: MessageWidgetsSwitch.isEnabled, serverAllowsDemo: context.appConfiguration.getGeneralValue("dev", orElse: 0) == 1),
                    let components = URLComponents(string: url), components.scheme == "tg", components.host == "voxelclash",
                    let gameLink = components.queryItems?.first(where: { $0.name == "url" })?.value,
                    let gameURL = URL(string: gameLink), gameURL.scheme == "https", gameURL.host == "voxel-clash-production.up.railway.app",

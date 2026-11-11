@@ -1,6 +1,7 @@
 import AppAnalytics
 import TelegramContext
 import Cocoa
+import HTMLBubbles
 import CoreLocation
 import TGUIKit
 import Postbox
@@ -283,6 +284,9 @@ private func makeChatNavigationHooks() -> ChatNavigationHooks {
         context.bindings.rootNavigation().push(MessageStatsController(context, subject: .messageId(messageId), analyticsContext: analyticsContext))
     }
     hooks.openHTMLPage = { context, url in
+        guard MessageWidgetsSwitch.isEnabled else {
+            return
+        }
         BrowserStateContext.get(context).open(tab: .tonsite(url: url.absoluteString))
     }
     hooks.showVerifyAgeAlert = { context, window in

@@ -50,7 +50,7 @@ public final class ChatHTMLRowItem: ChatRowItem, HTMLTwidgetRow {
         self.appearance = HTMLBubbleStyle.appearance(theme: theme, incoming: incoming)
         self.fontSize = theme.fontSize
         super.init(initialSize, chatInteraction, context, object, theme: theme)
-        if let widget, !isWidgetPreview {
+        if let widget, !isWidgetPreview, MessageWidgetsSwitch.isEnabled {
             state.widgetRequestHandler = { [weak context] request, complete in
                 guard let context else { complete(.failure(.failed)); return }
                 guard !request.wallet || ChatNavigationHooks.shared.widgetWalletAvailable(context) else { complete(.failure(.notAllowed)); return }
@@ -147,11 +147,11 @@ public final class ChatHTMLRowItem: ChatRowItem, HTMLTwidgetRow {
     }
 
     var hasFullScreen: Bool {
-        return !isWidgetPreview && state.scene3D != nil
+        return MessageWidgetsSwitch.isEnabled && !isWidgetPreview && state.scene3D != nil
     }
 
     fileprivate func openFullScreen() {
-        guard let url = HTMLBubblePage.write(source: state.source, appearance: appearance) else {
+        guard MessageWidgetsSwitch.isEnabled, let url = HTMLBubblePage.write(source: state.source, appearance: appearance) else {
             return
         }
         ChatNavigationHooks.shared.openHTMLPage(context, url)

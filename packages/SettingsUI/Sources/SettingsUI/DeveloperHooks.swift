@@ -12,13 +12,25 @@ public struct DeveloperLogExport {
     }
 }
 
+public struct DeveloperSwitch {
+    public let isOn: () -> Bool
+    public let setOn: (Bool) -> Void
+
+    public init(isOn: @escaping () -> Bool, setOn: @escaping (Bool) -> Void) {
+        self.isOn = isOn
+        self.setOn = setOn
+    }
+}
+
 public struct DeveloperHooks {
     public let openNanogramSwitches: (() -> Void)?
+    public let messageWidgets: DeveloperSwitch?
     public let logExports: [DeveloperLogExport]
     public let sendLogs: ((NSWindow?) -> Void)?
 
-    public init(openNanogramSwitches: (() -> Void)? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
+    public init(openNanogramSwitches: (() -> Void)? = nil, messageWidgets: DeveloperSwitch? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
         self.openNanogramSwitches = openNanogramSwitches
+        self.messageWidgets = messageWidgets
         self.logExports = logExports
         self.sendLogs = sendLogs
     }

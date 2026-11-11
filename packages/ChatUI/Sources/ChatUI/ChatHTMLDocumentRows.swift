@@ -34,6 +34,19 @@ enum ChatHTMLDocumentRows {
         }
     }
 
+    static func rebuildVisibleRows(in table: TableView) {
+        var stale: [ChatRowItem] = []
+        table.enumerateItems(with: { item in
+            if let item = item as? ChatRowItem, MessageWidgetPolicy.isWidgetCandidate(item.message), item.index != -1 {
+                stale.append(item)
+            }
+            return true
+        })
+        for item in stale {
+            replace(item, attempts: 0)
+        }
+    }
+
     private static func replace(_ item: ChatRowItem, attempts: Int) {
         guard let table = item.table, item.index != -1 else {
             if attempts > 0 {

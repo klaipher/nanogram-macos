@@ -1,5 +1,6 @@
 #if DEBUG
 import Cocoa
+import HTMLBubbles
 import ImageIO
 import zlib
 import TGUIKit
@@ -250,7 +251,7 @@ private final class ChatNavigationLabSession {
         }
         let synthetic = Int(self.configuration.double("-PerfLabSynthetic", 0))
         if synthetic > 0 {
-            let widgets = ChatNavigationLabSession.syntheticWidgets(directory: self.configuration.string("-PerfLabSyntheticWidgets", ""), width: Int32(self.configuration.double("-PerfLabWidgetWidth", 0)), height: Int32(self.configuration.double("-PerfLabWidgetHeight", 0)))
+            let widgets = !MessageWidgetsSwitch.isEnabled ? [] : ChatNavigationLabSession.syntheticWidgets(directory: self.configuration.string("-PerfLabSyntheticWidgets", ""), width: Int32(self.configuration.double("-PerfLabWidgetWidth", 0)), height: Int32(self.configuration.double("-PerfLabWidgetHeight", 0)))
             let contents = ChatSyntheticContents(accountPeerId: context.peerId, count: synthetic, media: self.configuration.double("-PerfLabSyntheticMedia", 0) != 0, widgets: widgets, widgetEvery: Int(self.configuration.double("-PerfLabWidgetEvery", 3)), title: self.configuration.string("-PerfLabSyntheticTitle", "Perf Lab"), status: self.configuration.string("-PerfLabSyntheticStatus", "synthetic"))
             contents.storePhotoData(in: context.account.postbox.mediaBox)
             self.chatNotes = ["chat": "synthetic", "messages": "\(synthetic)", "widgets": "\(widgets.count)"]

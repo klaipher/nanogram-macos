@@ -73,3 +73,19 @@ not re-verified against the code; correct them on the next change in that area.
 - Sync: at the next release merge the picks resolve as already applied (`git cherry` shows them); keep our follow-ups
   (`Window.keyBelongsToInputMethod`, `TextViewLayout.copyableBlockQuoteText`, the `.voiceCallsP2P` request) and re-run
   `tools/tests/{privacy-page-save,translate-copy-restriction,file-preview-warning}` and `TGUIKitTests`.
+
+### Guarded HLS playlist parsing, bounded HLS fetches, chat export offline fallback
+- What: HLS playlist byte ranges use overflow-checked arithmetic and throw instead of trapping; every segment and init range
+  must lie inside the file; bandwidth and level dimensions are clamped; playlist and range fetches stop after 5 retries;
+  chat export decides copy protection from cached data when the refresh fails or times out (protected or unknown stays refused).
+- Why: a hostile playlist crashed the app, also during chat-scroll preload; unsatisfiable ranges refetched forever; export needed the network.
+- Where: `packages/HLSPlayback/Sources/HLSPlayback/{HLSMediaPlaylist,HLSLevel}.swift`, `packages/TelegramMedia/Sources/{HLSVideoContent,HLSVideoNativeContentView}.swift`, `HLSNative/HLSNativePlaylistLoader.swift`, `packages/ChatExportUI/Sources/ChatExportUI/ChatExportManager.swift`, key `ChatExport.Unverified`.
+- Upstream: the HLS files are upstream's 13.2 code with small edits; export gate is ours.
+- Sync: keep the `rangesFit`, `addingReportingOverflow` and `hlsBoundedRetry` call sites when upstream's lines change; add the key to the generated `Localizable.swift` on the next `tg` localization run.
+
+### Message widgets off by default
+- What: one switch (`MessageWidgetsSwitch`, `UserDefaults.standard` key `nanogram.messageWidgets.enabled.2`, default off, Developer screen row "Message widgets") gates every path that can run a widget: chat rows (`TelegramMediaWidget`, local `htmlBubbleState`, bot HTML documents and their auto-fetch), inline-result widget previews, the mini-app share preview, the full-screen page, demo chats, `tg://voxelclash`, the multiplayer demo client, and the engine, validator and shell prewarm in `HTMLBubbleState`. Off, a widget message is an upstream "unsupported" or plain text row. The widget engine service fallback name is now `org.klaipher.Nanogram.WidgetEngine` (xcconfig `NANOGRAM_BUNDLE_ID_WidgetEngineService`).
+- Why: widgets run a bot's script with no tap; a public report shows native code execution through the engine and Telegram's fixes do not close it.
+- Where: `packages/HTMLBubbles/Sources/HTMLBubbles/MessageWidgetsSwitch.swift` (switch and pure decisions), `HTMLBubbleState.swift`, `HTMLBubblePage.swift`, `HTMLDemoChatContents.swift`; `packages/ChatUI/Sources/ChatUI/{ChatRowItem,ChatHTMLRowItem,ChatHTMLDocumentRows,ContextListRowItem,InputContextHelper,ChatNavigationLab,ChatController}.swift`; `packages/ChatListUI` (`ChatListController`, `PeersListController`); `packages/SettingsUI` (`DeveloperHooks`, `DeveloperViewController`); `Telegram-Mac/app/AppDelegate.swift`, `Telegram-Mac/packages-integration/hooks/{BrowserHooksInstall,ChatUIHooksInstall,DeveloperHooksInstall,WidgetEngineInstall}.swift`, `nanogram/Nanogram.xcconfig`.
+- Upstream: all edits are one-line guards or small additions around upstream code; the switch file is ours. `third-party/widget-sandbox` is untouched (its `SandboxEngine.make` runs the engine in process when no remote factory is set, so our side never reaches it while the switch is off).
+- Sync: after a merge grep for `MessageWidgetsSwitch` and keep each guard; a new upstream path that builds `ChatHTMLRowItem`, `HTMLBubbleState` or a `WidgetBubble` needs one too.

@@ -165,7 +165,21 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
     }()
 
     static func prewarmLibraries() {
+        ensureSandboxLibraries()
+    }
+
+    private static func ensureSandboxLibraries() {
+        guard MessageWidgetsSwitch.isEnabled else {
+            return
+        }
         _ = HTMLBubbleState.sandboxLibraries
+    }
+
+    private static func ensureWidgetWarmup() {
+        guard MessageWidgetsSwitch.isEnabled else {
+            return
+        }
+        _ = HTMLBubbleState.widgetWarmup
     }
 
     private static let registeredSchemes: Void = {
@@ -178,7 +192,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
 
     init(html: String, outgoing: Bool, activeKeys: [String], conversationId: String?, engine: HTMLRenderEngine, selfContained: Bool, summary: HTMLBubbleSummary?) {
         _ = HTMLBubbleState.registeredSchemes
-        _ = HTMLBubbleState.sandboxLibraries
+        HTMLBubbleState.ensureSandboxLibraries()
         self.currentSource = html
         self.engine = engine
         self.selfContained = selfContained
@@ -422,7 +436,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
     }()
 
     private func twidgetOptions() -> WidgetHost.Options {
-        _ = HTMLBubbleState.sandboxLibraries
+        HTMLBubbleState.ensureSandboxLibraries()
         var options = WidgetHost.Options()
         if let context = widgetContext {
             options.locale = context.locale
@@ -468,7 +482,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
     /// waiting up to `wait` for the exact height. The bubble adopts the prepared host when it goes live.
     @discardableResult
     public func prepareTwidget(appearance: HTMLBubbleAppearance, width: CGFloat, wait: TimeInterval) -> Bool {
-        guard HTMLBubbleState.backgroundPrepare, engine == .twidget, width > 0 else {
+        guard MessageWidgetsSwitch.isEnabled, HTMLBubbleState.backgroundPrepare, engine == .twidget, width > 0 else {
             return false
         }
         if Thread.isMainThread {
@@ -512,7 +526,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
 
     @discardableResult
     func startTwidgetPrepare(appearance: HTMLBubbleAppearance, width: CGFloat) -> WidgetPrepared? {
-        guard engine == .twidget, !widgetStopped else { return nil }
+        guard MessageWidgetsSwitch.isEnabled, engine == .twidget, !widgetStopped else { return nil }
         let theme = appearance.dark ? "dark" : "light"
         let key = HTMLBubbleState.twidgetKey(width: width, theme: theme)
         lock.lock()
@@ -648,6 +662,9 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
         assert(Thread.isMainThread)
         let theme = appearance.dark ? "dark" : "light"
         if let bubble = twidgetBubble {
+            if !MessageWidgetsSwitch.isEnabled {
+                bubble.slot.create = { false }
+            }
             bubble.setTheme(appearance.widgetTheme)
             return bubble
         }
@@ -659,7 +676,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
             html = "<style>\(appearance.css)</style>" + wrap(currentSource, appearance: appearance)
             lock.unlock()
         }
-        _ = HTMLBubbleState.widgetWarmup
+        HTMLBubbleState.ensureWidgetWarmup()
         _ = HTMLBubbleMenus.installed
         var options = twidgetOptions()
         if engine == .webKit {
@@ -686,7 +703,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
             self?.onTwidgetRenderer { $0.preparesOffscreen = prepared }
         }
         bubble.preparedHost = { [weak self, weak bubble] in
-            guard let self = self, self.engine == .twidget, let host = self.takePreparedHost(width: width, theme: theme) ?? self.freshWidgetHost(bubble) else {
+            guard MessageWidgetsSwitch.isEnabled, let self = self, self.engine == .twidget, let host = self.takePreparedHost(width: width, theme: theme) ?? self.freshWidgetHost(bubble) else {
                 return nil
             }
             if let renderer = host.rendererObject as? LiteHTMLWidgetRenderer {
@@ -699,7 +716,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
             }
             return host
         }
-        if widgetStopped {
+        if widgetStopped || !MessageWidgetsSwitch.isEnabled {
             bubble.slot.create = { false }
         }
         bubble.configure = { [weak self, weak bubble] host in
@@ -876,7 +893,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
     }
 
     private func freshWidgetHost(_ bubble: WidgetBubble?) -> WidgetHost? {
-        guard isWidgetMessage, let bubble = bubble, bubbleStorageGeneration != widgetStorageGeneration else {
+        guard MessageWidgetsSwitch.isEnabled, isWidgetMessage, let bubble = bubble, bubbleStorageGeneration != widgetStorageGeneration else {
             return nil
         }
         _ = HTMLBubbleState.twidgetShells
@@ -959,7 +976,7 @@ public final class HTMLBubbleState: NSObject, HTMLScriptHost {
 
     func measureTwidget(appearance: HTMLBubbleAppearance, width: CGFloat, timeout: Double, completion: @escaping () -> Void) {
         assert(Thread.isMainThread)
-        guard !widgetStopped, twidgetBubble(appearance: appearance, width: width).ensureHost() != nil else {
+        guard MessageWidgetsSwitch.isEnabled, !widgetStopped, twidgetBubble(appearance: appearance, width: width).ensureHost() != nil else {
             completion()
             return
         }

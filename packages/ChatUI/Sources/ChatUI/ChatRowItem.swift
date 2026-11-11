@@ -670,7 +670,7 @@ public class ChatRowItem: TableRowItem {
                 }
                 return media.venue == nil
             }
-            return isBubbled && (media.isInteractiveMedia || media is TelegramMediaWidget) && (captionLayouts.isEmpty || invertMedia)
+            return isBubbled && (media.isInteractiveMedia || (media is TelegramMediaWidget && MessageWidgetsSwitch.isEnabled)) && (captionLayouts.isEmpty || invertMedia)
         }
         return false
     }
@@ -2081,7 +2081,7 @@ public class ChatRowItem: TableRowItem {
                     }
                     return media.venue == nil
                 }
-                return (media.isInteractiveMedia || media is TelegramMediaWidget) && (!hasGroupCaption || message.invertMedia)
+                return (media.isInteractiveMedia || (media is TelegramMediaWidget && MessageWidgetsSwitch.isEnabled)) && (!hasGroupCaption || message.invertMedia)
             } else if let message = message, bigEmojiMessage(context.sharedContext.baseSettings, message: message), renderType == .bubble {
                 return true
             }
@@ -2089,7 +2089,7 @@ public class ChatRowItem: TableRowItem {
         }
         
         var stateOverlayTextColor: NSColor {
-            if let media = message?.anyMedia, media.isInteractiveMedia || media is TelegramMediaMap || media is TelegramMediaWidget {
+            if let media = message?.anyMedia, media.isInteractiveMedia || media is TelegramMediaMap || (media is TelegramMediaWidget && MessageWidgetsSwitch.isEnabled) {
                  return NSColor(0xffffff)
             } else {
                 return theme.chatServiceItemTextColor
@@ -2996,13 +2996,14 @@ public class ChatRowItem: TableRowItem {
         }
         
         if let message = entry.message {
-            if let widget = message.media.first as? TelegramMediaWidget {
+            let widgetsEnabled = MessageWidgetsSwitch.isEnabled
+            if widgetsEnabled, let widget = message.media.first as? TelegramMediaWidget {
                 let context = interaction.interactionContext
                 let widgetContext = HTMLWidgetContext(accountPeerId: context.account.peerId, basePath: context.account.basePath, message: message, widget: widget, locale: appCurrentLanguage.languageCode, viewer: context.myPeer as? TelegramUser, isPremium: context.isPremium, walletAvailable: ChatNavigationHooks.shared.widgetWalletAvailable(context))
                 let state = HTMLWidgetStore.shared.state(mediaBox: context.account.postbox.mediaBox, message: message, widget: widget, context: widgetContext)
                 return ChatHTMLRowItem(initialSize, interaction, context, entry, theme: theme, document: nil, widget: widget, widgetState: state)
             }
-            if message.htmlBubbleState != nil {
+            if widgetsEnabled, message.htmlBubbleState != nil {
                 return ChatHTMLRowItem(initialSize, interaction, interaction.interactionContext, entry, theme: theme)
             }
             if message.attributes.contains(where: { $0 is RichTextMessageAttribute }) {
@@ -3010,7 +3011,7 @@ public class ChatRowItem: TableRowItem {
             }
             if message.adAttribute != nil {
                 return ChatMessageItem(initialSize, interaction, interaction.interactionContext, entry, theme: theme)
-            } else if message.media.count == 0 || message.anyMedia is TelegramMediaWebpage {
+            } else if message.media.count == 0 || message.anyMedia is TelegramMediaWebpage || (!widgetsEnabled && message.media.first is TelegramMediaWidget) {
                 return ChatMessageItem(initialSize, interaction, interaction.interactionContext, entry, theme: theme)
             } else {
                 if message.id.peerId.namespace != Namespaces.Peer.SecretChat, message.autoclearTimeout != nil {
@@ -3065,6 +3066,9 @@ public class ChatRowItem: TableRowItem {
                         return ChatMusicRowItem(initialSize,interaction, interaction.interactionContext, entry, theme: theme)
                     } else if file.isAnimatedSticker {
                         return ChatAnimatedStickerItem(initialSize,interaction, interaction.interactionContext, entry, theme: theme)
+                    }
+                    if !widgetsEnabled {
+                        return ChatFileMediaItem(initialSize,interaction, interaction.interactionContext, entry, theme: theme)
                     }
                     return ChatHTMLDocumentRows.item(initialSize, interaction: interaction, entry: entry, message: message, theme: theme, fallback: {
                         return ChatFileMediaItem(initialSize,interaction, interaction.interactionContext, entry, theme: theme)
@@ -3602,6 +3606,9 @@ public class ChatRowItem: TableRowItem {
         // message in a bot chat, so it may only gate the weaker case below — a message that is merely
         // empty, which upstream leaves blank there.
         if message.anyMedia is TelegramMediaUnsupported {
+            return true
+        }
+        if message.anyMedia is TelegramMediaWidget && !MessageWidgetsSwitch.isEnabled {
             return true
         }
         return message.media.isEmpty && message.inlinePeer == nil
@@ -4556,7 +4563,7 @@ public class ChatRowItem: TableRowItem {
             return NSColor(0xffffff)
         }
         
-       if media.isInteractiveMedia || media is TelegramMediaWidget {
+       if media.isInteractiveMedia || (media is TelegramMediaWidget && MessageWidgetsSwitch.isEnabled) {
             return NSColor(0xffffff)
        } else {
            return self.presentation.chatServiceItemTextColor

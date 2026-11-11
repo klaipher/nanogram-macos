@@ -135,7 +135,7 @@ public class ContextListRowItem: TableRowItem {
 
         self.text = attr.copy() as! NSAttributedString
         super.init(initialSize)
-        if case let .widget(media, _, _, _) = result.message {
+        if MessageWidgetsSwitch.isEnabled, case let .widget(media, _, _, _) = result.message {
             widgetState = HTMLWidgetStore.preview(widget: media, locale: appCurrentLanguage.languageCode)
             vClass = ContextListWidgetView.self
         }

@@ -1,4 +1,5 @@
 import AppAnalytics
+import HTMLBubbles
 import ChatHistoryModel
 import InputDataUI
 import PaymentsUI
@@ -179,7 +180,7 @@ func installBrowserUIHooks() {
     }, makeSharePreviewMessageItem: { initialSize, context, message, heightDidChange in
         let interactions = ChatInteraction(chatLocation: .peer(context.peerId), context: context, isLogInteraction: true)
         let entry = ChatHistoryEntry.MessageEntry(message, .init(message), true, theme.bubbled ? .bubble : .list, .Full(rank: nil, rankType: .none, header: .normal), nil, .init())
-        if let widget = message.media.first as? TelegramMediaWidget {
+        if MessageWidgetsSwitch.isEnabled, let widget = message.media.first as? TelegramMediaWidget {
             return ChatHTMLRowItem(initialSize, interactions, context, entry, theme: theme, previewWidget: widget, heightDidChange: heightDidChange)
         }
         return ChatRowItem.item(initialSize, from: entry, interaction: interactions, theme: theme)

@@ -52,7 +52,7 @@ public final class HTMLDemoChatContents: ChatCustomContentsProtocol {
         self.kind = .htmlDemo(title: chat.title, status: chat.status)
         self.accountPeer = HTMLDemoCatalog.makeUser(id: accountPeerId, name: strings().htmlDemoChatContentsYou, isBot: false)
         self.lastTimestamp = Int32(Date().timeIntervalSince1970)
-        if #available(macOS 10.15, *), chat.id == "html-voxel-clash" {
+        if #available(macOS 10.15, *), MessageWidgetsSwitch.isEnabled, chat.id == "html-voxel-clash" {
             self.multiplayerClient = HTMLMultiplayerDemoClient(name: accountName, accountKey: String(accountPeerId.toInt64()))
         }
         if let preset = chat.preset {
