@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Protected media showed as grey squares (upstream bug, also in Telegram 13.1.0 for Mac)**. Owner, 2026-11-11: in channels with saving and copying turned off, photos in the chat had no preview (grey), the viewer opened grey and after closing it the chat showed grey squares; official Telegram on the same Mac (macOS 27.2.1) did the same. Cause: `TransformImageView` puts protected images in a `CaptureProtectedContentLayer` (an `AVSampleBufferDisplayLayer` with `preventsCapture`) sized to its bounds when protection turns on, and resized it only in `frame`/`bounds` observers. The chat media view creates the image view at size zero and sizes it with `setFrameSize`, which runs neither observer (checked), so the protected layer stayed 0×0 and the grey placeholder behind it showed. The image itself, its sample buffer and the layer's on-screen protection work (checked on this Mac with a test app: large images, one buffer in two layers, a buffer sent again, a layer moved). Fix: `TransformImageView.setFrameSize` resizes the protected layer too. Tests: TGUIKitTests `TransformImageProtectedLayerTests` (the `setFrameSize` case failed before the fix); TGUIKit suite 727 tests pass. Not yet checked in the app.
+
 ## 13.1.0 (202611092254) — 2026-11-09
 
 Source: `nanogram/integration` @ e3a77efc · core `klaipher/nanogram` `main` @ 23385abd (was f059025a at the last release) · tgcalls, tg_owt and rlottie unchanged.

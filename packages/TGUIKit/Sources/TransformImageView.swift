@@ -295,7 +295,14 @@ open class TransformImageView: NSView, TransformImageRenderHost {
         }
     }
 
-    
+    open override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        if let captureProtectedContentLayer = self.captureProtectedContentLayer, captureProtectedContentLayer.frame != self.bounds {
+            captureProtectedContentLayer.frame = self.bounds
+        }
+    }
+
+
     private var captureProtectedContentLayer: CaptureProtectedContentLayer?
 
     

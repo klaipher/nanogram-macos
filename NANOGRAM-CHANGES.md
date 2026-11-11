@@ -57,6 +57,11 @@ not re-verified against the code; correct them on the next change in that area.
 - What: Nanogram name and Sphere app icon in both editions, Telegram-owned endpoints removed; a lint keeps Telegram's name and logo out.
 - Where: `nanogram/NanogramAppIcons`, `tools/dev/lint/branding.py` (check).
 
+### Upstream bug fixes
+- What: protected images (channels with saving and copying turned off) keep their protection layer at the image view's size when the view is resized with `setFrameSize`; upstream left it 0×0, so those images showed grey.
+- Where: `packages/TGUIKit/Sources/TransformImageView.swift` (`setFrameSize`).
+- Upstream: no (upstream bug in 13.1.0; could be sent as is).
+
 ### Early upstream picks
 - What: 15 telegram-macos master commits taken before their release (#117, #188, #205, #211, #212, #214, #216, #223,
   #225, #231, #233, #235, #237, #238, #239), and our fixes on top: code-block copy refused for protected layouts in the
