@@ -136,9 +136,11 @@ func installChatListUIHooks() {
                 nanogramCrashReportStore.markHandled(reports)
             })
         }
+    }, openDemoAccount: { context, id in
+        context.concrete.sharedContext.openAccount(id: id)
     })
-    hooks.navigateToChatWithContext = { navigation, context, chatLocation, mode, focusTarget, initialAction, holder, additional, style, callback in
-        navigateToChat(navigation: navigation, context: context.concrete, chatLocation: chatLocation, mode: mode, focusTarget: focusTarget, initialAction: initialAction, chatLocationContextHolder: holder, additional: additional, navigationStyle: style, callback: callback)
+    hooks.navigateToChatWithContext = { navigation, context, chatLocation, mode, focusTarget, initialAction, holder, additional, style, analyticsContext, callback in
+        navigateToChat(navigation: navigation, context: context.concrete, chatLocation: chatLocation, mode: mode, focusTarget: focusTarget, initialAction: initialAction, chatLocationContextHolder: holder, additional: additional, navigationStyle: style, callback: callback, analyticsContext: analyticsContext)
     }
     ChatListUIHooks.install(hooks)
 }

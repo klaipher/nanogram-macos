@@ -17,6 +17,7 @@ import TelegramIconsTheme
 import SystemPermissions
 import TelegramMediaUtils
 import AVFoundation
+import AppAnalytics
 
 public final class CallSettingsArguments {
     public let sharedContext: any SharedAccountContextProtocol
@@ -193,6 +194,7 @@ public func CallSettingsController(sharedContext: any SharedAccountContextProtoc
     }
     
     let controller = InputDataController(dataSignal: signal, title: strings().callSettingsTitle, hasDone: false)
+    controller.analyticsScreen = .settingsCalls
     
     
     controller.contextObject = combineLatest(requestCameraPermission(), requestMicrophonePermission()).start()

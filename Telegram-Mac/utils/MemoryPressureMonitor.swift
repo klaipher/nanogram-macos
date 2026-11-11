@@ -50,7 +50,6 @@ public final class MemoryPressureMonitor {
         let event = self.source.data
         let imageCaches = ScopedImageCache.diagnosticsSummary()
         purgeImageCachesForMemoryPressure()
-        TelegramThemeHooks.shared.purgeLottieCache()
         #if !SHARE
         UniqueGiftBackgroundCache.shared.removeAll()
         UniqueGiftPatternGlyphs.shared.removeAll()

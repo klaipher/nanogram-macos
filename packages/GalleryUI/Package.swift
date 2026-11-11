@@ -40,7 +40,7 @@ let deps: [(String, String)] = [
     ("InputDataUI", "../InputDataUI"),
     ("PerfLab", "../PerfLab"),
     ("NanogramRuntime", "../NanogramRuntime"),
-
+    ("AppAnalytics", "../AppAnalytics"),
 ]
 
 let package = Package(

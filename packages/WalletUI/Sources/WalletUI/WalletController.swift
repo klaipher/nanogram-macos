@@ -10,6 +10,7 @@ import SwiftSignalKit
 import TelegramCore
 import Postbox
 import WalletContext
+import AppAnalytics
 
 
 enum WalletMainTab: Equatable {
@@ -551,18 +552,37 @@ private func walletHeaderBalanceText(_ walletState: WalletContext.State?) -> (ti
 
 @available(macOS 10.15, *)
 public func showWallet(context: any AccountContextProtocol, environment: WalletUIEnvironment, walletContext: WalletContext?, for window: Window, morphSource: (() -> NSView?)? = nil, opensCollectibles: Bool = false) {
-    presentWallet(context: context, environment: environment, walletContext: walletContext, for: window, morphSource: morphSource, opensCollectibles: opensCollectibles)
+    presentWallet(context: context, environment: environment, walletContext: walletContext, for: window, morphSource: morphSource, analyticsContext: nil, opensCollectibles: opensCollectibles)
 }
 
 @available(macOS 10.15, *)
-private func presentWallet(context: any AccountContextProtocol, environment: WalletUIEnvironment, walletContext: WalletContext?, for window: Window, morphSource: (() -> NSView?)?, opensCollectibles: Bool) {
+public func showWallet(context: any AccountContextProtocol, environment: WalletUIEnvironment, walletContext: WalletContext?, for window: Window, morphSource: (() -> NSView?)? = nil, analyticsContext: AnalyticsContext, opensCollectibles: Bool = false) {
+    presentWallet(context: context, environment: environment, walletContext: walletContext, for: window, morphSource: morphSource, analyticsContext: analyticsContext, opensCollectibles: opensCollectibles)
+}
+
+@available(macOS 10.15, *)
+private func presentWallet(context: any AccountContextProtocol, environment: WalletUIEnvironment, walletContext: WalletContext?, for window: Window, morphSource: (() -> NSView?)?, analyticsContext: AnalyticsContext?, opensCollectibles: Bool) {
     guard let walletContext = walletContext else {
         return
     }
 
+    let presentation = analyticsContext?.beginPresentation()
+    let prepare: (InputDataModalController) -> InputDataModalController = { controller in
+        if let analyticsContext {
+            controller.analyticsContext = analyticsContext
+            controller.current.analyticsContext = analyticsContext
+            let onDeinit = controller.onDeinit
+            controller.onDeinit = {
+                onDeinit?()
+                presentation?.end()
+            }
+        }
+        return controller
+    }
+
     switch walletContext.stateValue.phase {
     case .restoring, .empty, .creating, .wallet:
-        showModal(with: WalletController(context: context, environment: environment, walletContext: walletContext, opensCollectibles: opensCollectibles), for: window, morphSource: morphSource)
+        showModal(with: prepare(WalletController(context: context, environment: environment, walletContext: walletContext, opensCollectibles: opensCollectibles)), for: window, morphSource: morphSource)
     case let .failed(error):
         let errorText: String
         switch error {
@@ -573,7 +593,7 @@ private func presentWallet(context: any AccountContextProtocol, environment: Wal
         case .keychainStatus:
             errorText = strings().walletControllerErrorStorageUnavailable
         }
-        showModal(with: WalletSettingsController(context: context, environment: environment, walletContext: walletContext), for: window)
+        showModal(with: prepare(WalletSettingsController(context: context, environment: environment, walletContext: walletContext)), for: window)
         environment.alert(for: window, info: errorText)
     }
 }
@@ -1027,6 +1047,7 @@ public func WalletController(context: any AccountContextProtocol, environment: W
 
     let title = strings().walletControllerMoney
     let controller = InputDataController(dataSignal: signal, title: title, hasDone: false)
+    controller.analyticsScreen = .wallet
 
     controller.onDeinit = {
         actionsDisposable.dispose()
@@ -1197,7 +1218,9 @@ private func walletProcessConnectValue(_ value: String, context: any AccountCont
         return false
     }
     if WalletContext.isTonConnectUrl(value) {
-        walletContext.processTonConnectUrl(value)
+        walletEnsureSigningAccess(context: context, environment: environment, walletContext: walletContext, window: context.window, next: {
+            walletContext.processTonConnectUrl(value)
+        })
         return true
     }
     if let address = WalletContext.transferAddress(from: value) {
@@ -1671,6 +1694,9 @@ public func WalletTonConnectController(
     context: any AccountContextProtocol, environment: WalletUIEnvironment,
     walletContext: WalletContext,
     subject: WalletTonConnectSubject,
+    showConnectionSuccess: Bool = true,
+    requestingBot: Peer? = nil,
+    inputDelay: TimeInterval = 0,
     approve: @escaping (@escaping (Result<Void, WalletContext.WalletError>) -> Void) -> Void,
     cancelled: @escaping () -> Void,
     closed: @escaping () -> Void
@@ -1707,6 +1733,13 @@ public func WalletTonConnectController(
     let controller = InputDataController(dataSignal: signal, title: title, hasDone: false, getBackgroundColor: {
         isSigning ? theme.colors.listBackground : theme.colors.background
     })
+    switch subject {
+    case .connection:
+        controller.analyticsScreen = AnalyticsScreen.walletTonConnectConnect
+    case .operation:
+        controller.analyticsScreen = isSigning ? AnalyticsScreen.walletTonConnectSignData : AnalyticsScreen.walletTonConnectOperation
+    }
+
     weak var modalController: InputDataModalController?
     let completion = WalletTonConnectCompletion()
     var closeWithoutReject: (() -> Void)?
@@ -1715,7 +1748,10 @@ public func WalletTonConnectController(
         completion.rejectAndClose(cancelled: cancelled, close: close)
     }
 
+    var inputGate = WalletTonConnectInputGate()
+    inputGate.appear(now: ProcessInfo.processInfo.systemUptime, delay: inputDelay)
     let submit: () -> Void = {
+        guard inputGate.allowsInput(now: ProcessInfo.processInfo.systemUptime) else { return }
         let requiresAuthorization: Bool
         switch subject {
         case .connection: requiresAuthorization = false
@@ -1728,7 +1764,7 @@ public func WalletTonConnectController(
                 return state
             }
         }, approve: approve, finish: finish, close: { closeWithoutReject?() }, connectionSucceeded: {
-            if case let .connection(request) = subject {
+            if showConnectionSuccess, case let .connection(request) = subject {
                 Queue.mainQueue().after(0.25) {
                     let title = strings().walletControllerConnectionSuccessful
                     let text = strings().walletControllerConnectedTo(request.applicationName)
@@ -1772,8 +1808,8 @@ public func WalletTonConnectController(
     let headerAppIcon: () -> CGImage? = {
         return walletAppIconImage(data: stateValue.with { $0.iconData }, applicationName: subject.applicationName, size: 36, cornerRadius: 18)
     }
-    if isSigning {
-        controller.centerModalHeader = ModalHeaderData(title: title, subtitle: subject.domain)
+    if isSigning || requestingBot != nil {
+        controller.centerModalHeader = ModalHeaderData(title: requestingBot.map { environment.peerTitle($0, compact: false) } ?? title, subtitle: subject.domain)
         controller.rightModalHeader = ModalHeaderData(image: headerAppIcon(), isCloseButton: false)
     } else {
         controller.centerModalHeader = ModalHeaderData(title: nil)
@@ -1789,6 +1825,7 @@ public func WalletTonConnectController(
             return InputDataSignalValue(entries: walletTonConnectPreviewEntries(state, request: request))
         }
         let preview = InputDataController(dataSignal: previewSignal, title: strings().walletControllerConfirmAction, hasDone: false)
+        preview.analyticsScreen = .walletTonConnectConfirmation
         preview.leftModalHeader = ModalHeaderData(image: theme.icons.chatNavigationBack, handler: { [weak modal] in
             modal?.pop(animated: true)
         }, isCloseButton: false)
@@ -1803,13 +1840,29 @@ public func WalletTonConnectController(
         modal.push(preview, animated: true)
     }
     controller.afterTransaction = { [weak interactions] _ in
-        interactions?.updateEnables(!stateValue.with({ $0.processing }))
+        interactions?.updateEnables(inputGate.allowsInput(now: ProcessInfo.processInfo.systemUptime) && !stateValue.with({ $0.processing }))
+    }
+    controller.didAppear = { [weak interactions] _ in
+        inputGate.appear(now: ProcessInfo.processInfo.systemUptime, delay: inputDelay)
+        interactions?.updateEnables(inputDelay <= 0 && !stateValue.with { $0.processing })
+        Queue.mainQueue().after(inputDelay) { [weak interactions] in
+            interactions?.updateEnables(!stateValue.with { $0.processing })
+        }
     }
     controller.validateData = { _ in
         submit()
         return .none
     }
+    let inputGateOwner = NSObject()
+    if inputDelay > 0 {
+        for type: NSEvent.EventType in [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp] {
+            context.window.set(mouseHandler: { _ in
+                inputGate.allowsInput(now: ProcessInfo.processInfo.systemUptime) ? .invokeNext : .invoked
+            }, with: inputGateOwner, for: type, priority: .supreme)
+        }
+    }
     controller.onDeinit = {
+        context.window.removeAllHandlers(for: inputGateOwner)
         disposables.dispose()
         closed()
     }
@@ -1830,7 +1883,16 @@ public func WalletTonConnectController(
         }
     }))
 
-    disposables.add((walletFetchAppIcon(context: context, icon: subject.icon) |> deliverOnMainQueue).start(next: { [weak controller] data in
+    let iconSignal: Signal<Data?, NoError>
+    if let requestingBot {
+        iconSignal = environment.ownerAvatar(requestingBot, size: NSMakeSize(88, 88), font: .medium(40)) |> map { image in
+            guard let image else { return nil }
+            return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+        }
+    } else {
+        iconSignal = walletFetchAppIcon(context: context, icon: subject.icon)
+    }
+    disposables.add((iconSignal |> deliverOnMainQueue).start(next: { [weak controller] data in
         guard let data else {
             return
         }
@@ -1839,7 +1901,7 @@ public func WalletTonConnectController(
             current.iconData = data
             return current
         }
-        if isSigning {
+        if isSigning || requestingBot != nil {
             controller?.rightModalHeader = ModalHeaderData(image: headerAppIcon(), isCloseButton: false)
         }
         previewController?.rightModalHeader = ModalHeaderData(image: headerAppIcon(), isCloseButton: false)

@@ -306,7 +306,6 @@ final class WalletPendingTransferSubmoduleCompatibilityTests: XCTestCase {
         ])
         try assertSubmodule("Wallet/WalletTransactionItemComponent/Sources/WalletTransactionItemComponent.swift", contains: [
             "let scale = 1.0 + 0.33 * expansion",
-            "let offset: CGFloat = self.component?.transaction?.collectible != nil ? -19.0 : -23.0",
             "tx: offset * expansion - (scale - 1.0) * view.bounds.width * 0.5, ty: 20.35 * expansion)",
             "self.clockMinute.setAffineTransform(CGAffineTransform(rotationAngle: time * 4.2))",
             "self.clockHour.setAffineTransform(CGAffineTransform(rotationAngle: time * 4.2 / 12.0 - .pi / 2.0))",

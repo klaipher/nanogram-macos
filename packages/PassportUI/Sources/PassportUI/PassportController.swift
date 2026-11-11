@@ -21,6 +21,7 @@ import TGPassportMRZ
 import OCR
 import FilePanels
 import ObjcUtils
+import AppAnalytics
 
 private let _id_street1 = InputDataIdentifier("street_line1")
 private let _id_street2 = InputDataIdentifier("street_line2")
@@ -1095,7 +1096,6 @@ private final class AddressIntermediateState : Equatable {
         self.postcode = postcode
     }
     
-
     convenience init(_ data: [InputDataIdentifier : InputDataValue]) {
         self.init(street1: data[_id_street1], street2: data[_id_street2], city: data[_id_city], state: data[_id_state], countryCode: data[_id_country], postcode: data[_id_postcode])
     }
@@ -2505,6 +2505,7 @@ public class PassportController: GenericViewController<PassportControllerView> {
         self.peer = peer
         self.request = request
         super.init()
+        self.analyticsScreen = form == nil ? AnalyticsScreen.passportSettings : AnalyticsScreen.passport
     }
 
 
@@ -3154,7 +3155,7 @@ public class PassportController: GenericViewController<PassportControllerView> {
                             f(true)
                         }
                         
-                    }, getBackgroundColor: { theme.colors.background }))
+                    }, getBackgroundColor: { theme.colors.background }).analytics(.passportAddress))
                 }
 
                 if let editSettings = editSettings {
@@ -3487,7 +3488,7 @@ public class PassportController: GenericViewController<PassportControllerView> {
                             f(true)
                         }
                         
-                    }, getBackgroundColor: { theme.colors.background }))
+                    }, getBackgroundColor: { theme.colors.background }).analytics(.passportIdentity))
                 }
 
                 if let editSettings = editSettings {
@@ -3589,7 +3590,7 @@ public class PassportController: GenericViewController<PassportControllerView> {
                         updateState { current in
                             return current.withUpdatedIntermediateEmailState(nil)
                         }
-                    }, identifier: "passport", getBackgroundColor: { theme.colors.background }))
+                    }, identifier: "passport", getBackgroundColor: { theme.colors.background }).analytics(.passportEmail))
                 }
 
             case .phone:
@@ -3655,7 +3656,7 @@ public class PassportController: GenericViewController<PassportControllerView> {
                                                             }
                                                         }
                                                         return .fail(.none)
-                                                    }, identifier: "passport", getBackgroundColor: { theme.colors.background }))
+                                                    }, identifier: "passport", getBackgroundColor: { theme.colors.background }).analytics(.passportPhoneCode))
                                                 }, error: { error in
                                                     alert(for: context.window, info: "\(error)")
                                                 }))
@@ -3680,7 +3681,7 @@ public class PassportController: GenericViewController<PassportControllerView> {
                         return phoneNumberEntries(state, updateState: updateState)
                         } |> map { InputDataSignalValue(entries: $0) }, title: title, validateData: validate, afterDisappear: {
 
-                    }, identifier: "passport", getBackgroundColor: { theme.colors.background }))
+                    }, identifier: "passport", getBackgroundColor: { theme.colors.background }).analytics(.passportPhone))
                 }
             default:
                 fatalError()
@@ -3773,6 +3774,7 @@ public class PassportController: GenericViewController<PassportControllerView> {
                     f(.enabled(strings().navigationNext))
                 }
             }, identifier: "passport", getBackgroundColor: { theme.colors.background })
+            controller.analyticsScreen = .passportPasswordSetup
 
             presentController(controller)
         }, abortVerification: {
@@ -3904,7 +3906,7 @@ public class PassportController: GenericViewController<PassportControllerView> {
                             })
                             })
                         
-                    }, identifier: "passport", getBackgroundColor: { theme.colors.background }))
+                    }, identifier: "passport", getBackgroundColor: { theme.colors.background }).analytics(.passportPasswordRecovery))
                 }))
             })
             

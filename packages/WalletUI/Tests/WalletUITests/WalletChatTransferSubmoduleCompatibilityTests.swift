@@ -173,7 +173,7 @@ final class WalletChatTransferSubmoduleCompatibilityTests: XCTestCase {
         XCTAssertTrue(chat.contains("chatInteraction?.walletTransferAnimation?.prepare(id: id)"))
         XCTAssertTrue(chat.contains("acceptedTransferAnimation = chatInteraction?.walletTransferAnimation?.receive(id: id, source: source) ?? false return acceptedTransferAnimation"))
         XCTAssertTrue(chat.contains("if !acceptedTransferAnimation { chatInteraction?.scrollToLatest(true) }"))
-        XCTAssertTrue(chat.contains("showWalletSendMoney(chatInteraction: chatInteraction, user: user, flyIntoChat: true, morphSource:"), "the attachment menu flies like the submodule's")
+        XCTAssertTrue(chat.contains("showWalletSendMoney(chatInteraction: chatInteraction, user: user, flyIntoChat: true, morphSource: { [weak self] in self?.button })"), "the attachment menu flies like the submodule's")
     }
 
     func testSendingFromAMessageMenuDoesNotFlyLikeSubmodule() throws {
@@ -185,7 +185,7 @@ final class WalletChatTransferSubmoduleCompatibilityTests: XCTestCase {
             "chatController.scrollToEndOfHistory()"
         ])
         let menu = try actualSource("packages/ChatUI/Sources/ChatUI/ChatMessageMenuItems.swift")
-        XCTAssertTrue(menu.contains("showWalletSendMoney(chatInteraction: data.chatInteraction, user: user, flyIntoChat: false)"))
+        XCTAssertTrue(menu.contains("showWalletSendMoney(chatInteraction: data.chatInteraction, recipient: recipient, flyIntoChat: false)"))
         let chat = try actualSource("packages/ChatUI/Sources/ChatUI/ChatInputAttachView.swift")
         XCTAssertTrue(chat.contains("transferAnimationWillStart: !flyIntoChat ? nil :"))
         XCTAssertTrue(chat.contains("transferAnimation: !flyIntoChat ? nil :"))

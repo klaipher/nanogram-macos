@@ -65,6 +65,7 @@ public final class GlassContainerView: FlippableView {
             return
         }
         ghost.validGhostFrame = frame
+        ghost.updateCornerRadius(size: frame.size)
         if mergesGhosts {
             switch transition {
             case .immediate:

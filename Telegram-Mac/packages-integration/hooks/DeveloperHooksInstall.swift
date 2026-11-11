@@ -5,12 +5,6 @@ import NanogramLogExport
 
 func installDeveloperUIHooks() {
     DeveloperHooks.install(DeveloperHooks(
-        forceRLottieBackend: {
-            return LottieBackend.forceRLottie
-        },
-        toggleForceRLottieBackend: {
-            LottieBackend.forceRLottie = !LottieBackend.forceRLottie
-        },
         openNanogramSwitches: {
             NanogramDebugMenu.showSwitches()
         },

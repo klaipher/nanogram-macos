@@ -13,7 +13,7 @@ import TelegramMediaPlayer
 import CoreMedia
 import VP9Hardware
 
-public protocol R_LottieBridge: NSObject {
+public protocol LottieRendererBridge: NSObject {
     func renderFrame(with index: Int32, into buffer: UnsafeMutablePointer<UInt8>, width: Int32, height: Int32, bytesPerRow: Int32)
     func startFrame() -> Int32
     func endFrame() -> Int32
@@ -21,7 +21,7 @@ public protocol R_LottieBridge: NSObject {
     func setColor(_ color: NSColor, forKeyPath keyPath: String)
 }
 
-public var makeRLottie:((String, String)->R_LottieBridge?)? = nil
+public var makeLottieRenderer:((String)->LottieRendererBridge?)? = nil
 
 
 final class RenderAtomic<T> {
@@ -1701,7 +1701,7 @@ final class WebmRenderer : RenderContainer {
 private final class LottieRenderer : RenderContainer {
     
     private let animation: LottieAnimation
-    private let bridgeValue: Atomic<R_LottieBridge?>
+    private let bridgeValue: Atomic<LottieRendererBridge?>
     private let appliedColors: Atomic<[(String, NSColor)]> = Atomic(value: [])
     private let restoreState: Atomic<(restored: Bool, failed: Bool)> = Atomic(value: (false, false))
     private let fileSupplyment: TRLotFileSupplyment?
@@ -1709,7 +1709,7 @@ private final class LottieRenderer : RenderContainer {
     private let animationEndFrame: Int32
     private let animationStartFrame: Int32
     
-    init(animation: LottieAnimation, bridge: R_LottieBridge?, fileSupplyment: TRLotFileSupplyment?) {
+    init(animation: LottieAnimation, bridge: LottieRendererBridge?, fileSupplyment: TRLotFileSupplyment?) {
         self.animation = animation
         self.bridgeValue = Atomic(value: bridge)
         self.fileSupplyment = fileSupplyment
@@ -1717,7 +1717,7 @@ private final class LottieRenderer : RenderContainer {
         self.animationEndFrame = bridge?.endFrame() ?? fileSupplyment?.endFrame ?? 0
         self.animationStartFrame = bridge?.startFrame() ?? fileSupplyment?.startFrame ?? 0
     }
-    private var bridge: R_LottieBridge? {
+    private var bridge: LottieRendererBridge? {
         return bridgeValue.with { $0 }
     }
     var fps: Int {
@@ -1756,7 +1756,7 @@ private final class LottieRenderer : RenderContainer {
             }
         }
     }
-    private func restoreBridge() -> R_LottieBridge? {
+    private func restoreBridge() -> LottieRendererBridge? {
         if self.restoreState.with({ $0.failed }) {
             return nil
         }
@@ -1802,7 +1802,7 @@ private final class LottieRenderer : RenderContainer {
         }
         if data == nil {
             let bridge = self.bridge ?? (fileSupplyment != nil ? restoreBridge() : nil)
-            func renderFrame(s: (w: Int, h: Int), bridge: R_LottieBridge?, frame: Int32) -> Data? {
+            func renderFrame(s: (w: Int, h: Int), bridge: LottieRendererBridge?, frame: Int32) -> Data? {
                 let bytesPerRow = DeviceGraphicsContextSettings.shared.bytesPerRow(forWidth: s.w)
                 let bufferSize = s.h * bytesPerRow
 
@@ -1966,7 +1966,7 @@ public final class LottieAnimation : Equatable {
     }
     
     
-    fileprivate func makeBridge() -> R_LottieBridge? {
+    fileprivate func makeBridge() -> LottieRendererBridge? {
         let data: Data = TGGUnzipData(self.compressed, 8 * 1024 * 1024) ?? self.compressed
         if !data.isEmpty {
             let modified: Data
@@ -1977,7 +1977,7 @@ public final class LottieAnimation : Equatable {
             }
            
             if let json = String(data: modified, encoding: .utf8) {
-                if let bridge = makeRLottie?(json, self.cacheKey) {
+                if let bridge = makeLottieRenderer?(json) {
                     for color in self.colors {
                         bridge.setColor(color.color, forKeyPath: color.keyPath)
                     }

@@ -606,11 +606,7 @@ public class MediaVideoCell : MediaCell {
                             guard let fileAndRange else {
                                 return .complete()
                             }
-                            return freeMediaFileResourceInteractiveFetched(postbox: context.account.postbox, userLocation: .peer(layoutItem.peerId), fileReference: fileAndRange.0, resource: fileAndRange.0.media.resource, range: (fileAndRange.1, .default))
-                            |> ignoreValues
-                            |> `catch` { _ -> Signal<Never, NoError> in
-                                return .complete()
-                            }
+                            return fetchedResourceRangeUntilOnDisk(mediaBox: context.account.postbox.mediaBox, resource: fileAndRange.0.media.resource, range: fileAndRange.1, fetch: freeMediaFileResourceInteractiveFetched(postbox: context.account.postbox, userLocation: .peer(layoutItem.peerId), fileReference: fileAndRange.0, resource: fileAndRange.0.media.resource, range: (fileAndRange.1, .default)))
                         }
                         partDisposable.set(fetchSignal.start())
                     } else {

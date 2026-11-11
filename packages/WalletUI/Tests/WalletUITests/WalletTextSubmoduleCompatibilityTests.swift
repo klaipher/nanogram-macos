@@ -5,16 +5,17 @@ import TelegramCore
 import Localization
 @testable import WalletUI
 
-private func macStrings() -> L10n.Type {
-    return strings()
-}
-
 private func repositoryRoot() -> URL {
     return URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
 }
 
 private func submoduleStrings() throws -> [String: String] {
     let data = try Data(contentsOf: repositoryRoot().appendingPathComponent("submodules/telegram-ios/Telegram/Telegram-iOS/en.lproj/Localizable.strings"))
+    return try XCTUnwrap(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String])
+}
+
+private func nativeEnglishStrings() throws -> [String: String] {
+    let data = try Data(contentsOf: repositoryRoot().appendingPathComponent("Telegram-Mac/en.lproj/Localizable.strings"))
     return try XCTUnwrap(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String])
 }
 
@@ -285,11 +286,12 @@ final class WalletTextSubmoduleCompatibilityTests: XCTestCase {
         let text = try XCTUnwrap(strings["Wallet.Backup.CancelDisablingText"])
         let confirm = try XCTUnwrap(strings["Wallet.Backup.CancelDisabling"])
         let stay = try XCTUnwrap(strings["Wallet.Continue"])
+        let english = try nativeEnglishStrings()
+        XCTAssertEqual(english["Wallet.WordsController.CancelDisablingTitle"], title)
+        XCTAssertEqual(english["Wallet.WordsController.CancelDisablingInfo"], text)
+        XCTAssertEqual(english["Wallet.WordsController.CancelDisabling"], confirm)
+        XCTAssertEqual(english["Wallet.WordsController.Continue"], stay)
         XCTAssertTrue(actual.contains("header: strings().walletWordsControllerCancelDisablingTitle, information: strings().walletWordsControllerCancelDisablingInfo, ok: strings().walletWordsControllerCancelDisabling, cancel: strings().walletWordsControllerContinue"))
-        XCTAssertEqual(macStrings().walletWordsControllerCancelDisablingTitle, title)
-        XCTAssertEqual(macStrings().walletWordsControllerCancelDisablingInfo, text)
-        XCTAssertEqual(macStrings().walletWordsControllerCancelDisabling, confirm)
-        XCTAssertEqual(macStrings().walletWordsControllerContinue, stay)
     }
 
     func testWithdrawalMinimumMessageMatchesSubmodule() throws {
@@ -301,9 +303,7 @@ final class WalletTextSubmoduleCompatibilityTests: XCTestCase {
         let submoduleStars = try source("submodules/telegram-ios/submodules/TelegramUI/Components/Stars/StarsWithdrawalScreen/Sources/StarsRevenueWithdrawalController.swift")
         XCTAssertFalse(submoduleStars.contains("AmountTooSmallError"))
 
-        XCTAssertEqual(macStrings().starListScreenWithdrawMinimumGrams, message)
-        XCTAssertEqual(macStrings().fragmentMonetizationControllerWithdrawMinimum, message)
-        for (path, tonFlows, accessor) in [("packages/StarsUI/Sources/StarsUI/Star_ListScreen.swift", 1, "starListScreenWithdrawMinimumGrams"), ("packages/MonetizationUI/Sources/MonetizationUI/FragmentMonetizationController.swift", 2, "fragmentMonetizationControllerWithdrawMinimum"), ("packages/MonetizationUI/Sources/MonetizationUI/FragmentStarMonetizationController.swift", 0, "")] {
+        for (path, tonFlows) in [("packages/StarsUI/Sources/StarsUI/Star_ListScreen.swift", 1), ("packages/MonetizationUI/Sources/MonetizationUI/FragmentMonetizationController.swift", 2), ("packages/MonetizationUI/Sources/MonetizationUI/FragmentStarMonetizationController.swift", 0)] {
             let actual = try source(path)
             let requests = actual.components(separatedBy: "requestStarsRevenueWithdrawalUrl(").dropFirst()
             let ton = requests.filter { $0.prefix(while: { $0 != "\n" }).contains("ton: true") }
@@ -311,7 +311,10 @@ final class WalletTextSubmoduleCompatibilityTests: XCTestCase {
             for request in ton {
                 let mapping = try XCTUnwrap(request.components(separatedBy: "default:").first, path)
                 XCTAssertTrue(mapping.contains("case .amountTooSmall:"), path)
-                XCTAssertTrue(mapping.contains("return .custom(strings().\(accessor))"), path)
+                let accessor = path.contains("Star_ListScreen") ? "strings().starListScreenWithdrawMinimumGrams" : "strings().fragmentMonetizationControllerWithdrawMinimum"
+                XCTAssertTrue(mapping.contains("return .custom(\(accessor))"), path)
+                let key = path.contains("Star_ListScreen") ? "Star.ListScreen.WithdrawMinimumGrams" : "FragmentMonetization.Controller.WithdrawMinimum"
+                XCTAssertEqual(try nativeEnglishStrings()[key], message, path)
             }
             for request in requests where !request.prefix(while: { $0 != "\n" }).contains("ton: true") {
                 let mapping = request.components(separatedBy: "default:").first ?? ""
@@ -350,6 +353,8 @@ final class WalletTextSubmoduleCompatibilityTests: XCTestCase {
         let text = try XCTUnwrap(strings["Wallet.TermsText"])
         let url = try XCTUnwrap(strings["Wallet.TermsText_URL"])
         XCTAssertEqual(text.components(separatedBy: "]()").count, 2)
-        XCTAssertEqual(walletTermsText, text.replacingOccurrences(of: "]()", with: "](\(url))"))
+        let template = try XCTUnwrap(try nativeEnglishStrings()["Wallet.Controller.TermsAgreement"])
+        XCTAssertEqual(template.replacingOccurrences(of: "%1$@", with: url), text.replacingOccurrences(of: "]()", with: "](\(url))"))
+        XCTAssertTrue(try source("packages/WalletUI/Sources/WalletUI/WalletController.swift").contains("let walletTermsText = strings().walletControllerTermsAgreement(walletTermsOfServiceUrl)"))
     }
 }

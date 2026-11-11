@@ -18,6 +18,7 @@ import TelegramUtils
 import TelegramMediaUtils
 import ChatUI
 import InputDataUI
+import AppAnalytics
 
 enum PeerMediaMonthEntry : TableItemListNodeEntry {
     case line(index: MessageIndex, stableId: MessageIndex, items: [Message], galleryType: GalleryAppearType, viewType: GeneralViewType, gap: Int)
@@ -400,6 +401,11 @@ open class PeerMediaPhotosController<Context: AccountContextProtocol>: TableView
         self.tags = tags
         super.init(context)
         bar = .init(height: 0)
+        if tags.contains(.gif) {
+            analyticsScreen = .peerInfoMediaGifs
+        } else {
+            analyticsScreen = .peerInfoMediaPhotos
+        }
     }
     
     private var perRowCount: Int {

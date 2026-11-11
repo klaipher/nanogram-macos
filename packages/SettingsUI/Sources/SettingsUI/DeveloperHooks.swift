@@ -13,15 +13,11 @@ public struct DeveloperLogExport {
 }
 
 public struct DeveloperHooks {
-    public let forceRLottieBackend: () -> Bool
-    public let toggleForceRLottieBackend: () -> Void
     public let openNanogramSwitches: (() -> Void)?
     public let logExports: [DeveloperLogExport]
     public let sendLogs: ((NSWindow?) -> Void)?
 
-    public init(forceRLottieBackend: @escaping () -> Bool, toggleForceRLottieBackend: @escaping () -> Void, openNanogramSwitches: (() -> Void)? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
-        self.forceRLottieBackend = forceRLottieBackend
-        self.toggleForceRLottieBackend = toggleForceRLottieBackend
+    public init(openNanogramSwitches: (() -> Void)? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
         self.openNanogramSwitches = openNanogramSwitches
         self.logExports = logExports
         self.sendLogs = sendLogs
@@ -46,8 +42,5 @@ public struct DeveloperHooks {
         _shared = hooks
     }
 
-    public static let placeholder = DeveloperHooks(
-        forceRLottieBackend: { false },
-        toggleForceRLottieBackend: { }
-    )
+    public static let placeholder = DeveloperHooks()
 }

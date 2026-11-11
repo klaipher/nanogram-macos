@@ -295,7 +295,12 @@ private final class ChatExportRun {
                 if chatExportSkipsMessage(entry.message) {
                     continue
                 }
-                appendMessage(entry.message)
+                do {
+                    try appendMessage(entry.message)
+                } catch {
+                    emit(.failed("Could not write export files: \(error.localizedDescription)"))
+                    return false
+                }
                 processedCount += 1
                 if processedCount % 15 == 0 {
                     emitProgress()
@@ -320,7 +325,12 @@ private final class ChatExportRun {
         }
 
         if format.includesHtml {
-            resultEntryURL = writer.finish()
+            do {
+                resultEntryURL = try writer.finish()
+            } catch {
+                emit(.failed("Could not write export files: \(error.localizedDescription)"))
+                return false
+            }
         }
         resultMessageCount = processedCount
 
@@ -384,12 +394,12 @@ private final class ChatExportRun {
 
     // MARK: - Message → model
 
-    private func appendMessage(_ message: Message) {
+    private func appendMessage(_ message: Message) throws {
         if message.media.first is TelegramMediaAction {
             let (text, entities, _) = serviceMessageText(message, account: context.account)
             let html = ChatExportHtmlWriter.renderEntities(text: text, entities: entities)
             if format.includesHtml, !html.isEmpty {
-                writer.appendService(id: message.id.id, html: html, timestamp: message.timestamp)
+                try writer.appendService(id: message.id.id, html: html, timestamp: message.timestamp)
             }
             if format.includesJson {
                 jsonSink?(buildServiceJson(message, actionText: text))
@@ -433,7 +443,7 @@ private final class ChatExportRun {
 
         let model = ExportMessageModel(id: message.id.id, timestamp: message.timestamp, authorId: authorPeer?.id, authorName: name, colorIndex: colorIndex, initials: initials, textHtml: textHtml, forwardedFrom: forwarded, replyToId: replyToId, viaBot: nil, editedSuffix: editedSuffix, media: media, reactions: reactions, signature: nil, avatarSrc: authorAvatarSrc(authorPeer))
         if format.includesHtml {
-            writer.appendMessage(model)
+            try writer.appendMessage(model)
         }
         if format.includesJson {
             jsonSink?(buildMessageJson(message, model: model, media: media))

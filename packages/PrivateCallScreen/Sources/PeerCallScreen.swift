@@ -8,6 +8,7 @@ import MetalEngine
 import AppKit
 import KeyboardKey
 import Localization
+import AppAnalytics
 
 protocol CallViewUpdater {
     func updateState(_ state: PeerCallState, arguments: Arguments, transition: ContainedViewLayoutTransition)
@@ -437,6 +438,7 @@ public final class PeerCallScreen : ViewController {
                 CallWindowTransition.dismiss(window: self.screen, content: self.view, source: self.transitionSource, cornerRadius: CallWindowTransition.windowCornerRadius)
             }
             self.callEnded = true
+            Analytics.shared.screens.hide(ObjectIdentifier(self))
 
             self.onCompletion?()
             self.onCompletion = nil
@@ -448,6 +450,8 @@ public final class PeerCallScreen : ViewController {
     }
     
     public func show(source: CallWindowSource? = nil, animated: Bool = false) {
+        Analytics.shared.screens.show(ObjectIdentifier(self), screen: isConference ? AnalyticsScreen.callConferenceIncoming : AnalyticsScreen.callActive)
+        
         if self.presentTransition != nil {
             return
         }

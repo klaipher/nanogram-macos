@@ -237,7 +237,7 @@ final class WalletReceiveQrSubmoduleCompatibilityTests: XCTestCase {
         XCTAssertEqual(walletReceiveQrDiamondIntroFrame(elapsed: 0.0)?.openingScale ?? 0, 5.0, accuracy: 1e-9)
     }
 
-    func testSubmoduleDropInIsStillTheCopiedOne() throws {
+    func testNativeDropInAndReviewedIOSRevealVariant() throws {
         let screen = collapsed(try source(submoduleReceivePath))
         for line in [
             "private static let introDelay = 0.03",
@@ -320,7 +320,7 @@ final class WalletReceiveQrSubmoduleCompatibilityTests: XCTestCase {
         XCTAssertGreaterThan(meanDistance(Array(nonEmpty.prefix(6)).flatMap { $0 }), meanDistance(Array(nonEmpty.suffix(6)).flatMap { $0 }))
     }
 
-    func testRevealTimingMatchesSubmodule() throws {
+    func testNativeRevealTimingAndReviewedIOSCenteredVariant() throws {
         for index in 0 ..< 48 {
             XCTAssertEqual(walletReceiveQrRevealBatchDelay(index: index, delay: 0.03, duration: 0.5), submoduleRevealBatchDelay(index: index, delay: 0.03, duration: 0.5), accuracy: 1e-12)
         }
@@ -328,7 +328,10 @@ final class WalletReceiveQrSubmoduleCompatibilityTests: XCTestCase {
         let submodule = collapsed(try source(submoduleRevealPath))
         for line in [
             "static let revealTime: Double = 0.6",
-            "func update(time: Double)"
+            "let k = Self.clamp01(time / Self.revealTime)",
+            "let center = Double(n - 1) / 2.0",
+            "let reach = hypot(center, center)",
+            "width: 7.0 * moduleSide,"
         ] {
             XCTAssertTrue(submodule.contains(collapsed(line)), line)
         }

@@ -13,6 +13,7 @@ import GeneralRows
 import MessageUtils
 import InputDataUI
 import ShortPeerRow
+import AppAnalytics
 
 private final class Arguments {
     let context: any AccountContextProtocol
@@ -174,6 +175,7 @@ public func SavedPeersController(context: any AccountContextProtocol) -> InputDa
     }
     
     let controller = InputDataController(dataSignal: signal, title: " ")
+    controller.analyticsScreen = .peerInfoMediaSavedChats
     controller.bar = .init(height: 0)
     let search = InputDataMediaSearchContext()
     

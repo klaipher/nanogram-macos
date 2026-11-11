@@ -120,6 +120,8 @@ private func submoduleBevelWeight(normal: CGPoint, light: CGPoint) -> CGFloat {
 }
 
 private let walletCardChipHarness = """
+constant WalletCardStyle walletCardClassicStyle = {};
+
 struct WalletCardChipTestOutput { float4 position [[position]]; };
 
 vertex WalletCardChipTestOutput walletCardChipTestVertex(uint vertexID [[vertex_id]]) {
@@ -131,11 +133,10 @@ vertex WalletCardChipTestOutput walletCardChipTestVertex(uint vertexID [[vertex_
 
 fragment float4 walletCardChipTestFragment(WalletCardChipTestOutput input [[stage_in]],
     constant float4 &layout [[buffer(0)]], constant float4 &state [[buffer(1)]],
-    constant WalletCardStyle &style [[buffer(2)]],
     texture2d<float> noiseMap [[texture(0)]], texture2d<float> qrMap [[texture(1)]]) {
     float2 position = input.position.xy / layout.z - layout.w * layout.xy;
     float2 cp = position / layout.xy + float2(268.5, 82.0);
-    return walletCardQRChip(cp, state.xy, state.z, noiseMap, qrMap, position, style);
+    return walletCardQRChip(cp, state.xy, state.z, noiseMap, qrMap, cp, walletCardClassicStyle);
 }
 """
 
@@ -319,8 +320,6 @@ final class WalletCardSurfaceSubmoduleCompatibilityTests: XCTestCase {
         var state = SIMD4<Float>(Float(surface.x), Float(surface.y), time, 0.0)
         encoder.setFragmentBytes(&layout, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
         encoder.setFragmentBytes(&state, length: MemoryLayout<SIMD4<Float>>.size, index: 1)
-        var neutralStyle = [Float](repeating: 0.0, count: 28)
-        encoder.setFragmentBytes(&neutralStyle, length: neutralStyle.count * MemoryLayout<Float>.size, index: 2)
         encoder.setFragmentTexture(noiseTexture, index: 0)
         encoder.setFragmentTexture(qrTexture, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)

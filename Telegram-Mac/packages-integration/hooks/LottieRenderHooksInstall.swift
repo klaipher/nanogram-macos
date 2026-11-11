@@ -1,12 +1,10 @@
 import Cocoa
-import RLottie
 import TLottie
 import TelegramMedia
 import TelegramMediaUtils
 import NanogramDebug
 import NanogramDecoder
 
-extension RLottieBridge: @retroactive LottieFrameRenderer {}
 extension TLottieBridge: @retroactive LottieFrameRenderer {}
 
 enum DecoderIsolation {
@@ -21,12 +19,12 @@ enum DecoderIsolation {
     static let backend = IsolatedDecoderBackend(client: DecoderXPCClient())
 }
 
-typealias LottieBridge = NSObject & R_LottieBridge & LottieFrameRenderer
+typealias LottieBridge = NSObject & LottieRendererBridge & LottieFrameRenderer
 
 private final class LegacyLottieAnimation: AnimationRendering {
-    private let bridge: R_LottieBridge
+    private let bridge: LottieRendererBridge
 
-    init(bridge: R_LottieBridge) {
+    init(bridge: LottieRendererBridge) {
         self.bridge = bridge
     }
 
@@ -43,7 +41,7 @@ private final class LegacyLottieAnimation: AnimationRendering {
     }
 }
 
-final class IsolatedLottieBridge: NSObject, R_LottieBridge, LottieFrameRenderer {
+final class IsolatedLottieBridge: NSObject, LottieRendererBridge, LottieFrameRenderer {
     private let renderer: AnimationRendering
 
     init(renderer: AnimationRendering) {
@@ -75,22 +73,19 @@ final class IsolatedLottieBridge: NSObject, R_LottieBridge, LottieFrameRenderer 
     }
 }
 
-private func makeLegacyLottieBridge(json: String, key: String) -> LottieBridge? {
-    if LottieBackend.usesTLottie {
-        return TLottieBridge(json: json)
-    }
-    return RLottieBridge(json: json, key: key)
+private func makeLegacyLottieBridge(json: String) -> LottieBridge? {
+    return TLottieBridge(json: json)
 }
 
-func makeLottieBridge(json: String, key: String) -> LottieBridge? {
+func makeLottieBridge(json: String) -> LottieBridge? {
     guard DecoderIsolation.isEnabled else {
-        return makeLegacyLottieBridge(json: json, key: key)
+        return makeLegacyLottieBridge(json: json)
     }
     guard let data = json.data(using: .utf8) else {
         return nil
     }
-    let renderer = DecoderIsolation.backend.makeAnimation(json: data, preferTLottie: LottieBackend.usesTLottie, fallback: {
-        return makeLegacyLottieBridge(json: json, key: key).map { LegacyLottieAnimation(bridge: $0) }
+    let renderer = DecoderIsolation.backend.makeAnimation(json: data, preferTLottie: true, fallback: {
+        return makeLegacyLottieBridge(json: json).map { LegacyLottieAnimation(bridge: $0) }
     })
     return renderer.map { IsolatedLottieBridge(renderer: $0) }
 }
@@ -103,8 +98,8 @@ private func makeCGImage(_ bitmap: DecodedBitmap) -> CGImage? {
 }
 
 func installLottieRenderHooks() {
-    LottieRenderHooks.install(LottieRenderHooks(makeRenderer: { json, key in
-        return makeLottieBridge(json: json, key: key)
+    LottieRenderHooks.install(LottieRenderHooks(makeRenderer: { json in
+        return makeLottieBridge(json: json)
     }))
     StickerImageDecodeHooks.install(StickerImageDecodeHooks(decodeFitting: { data, pixelSize in
         guard DecoderIsolation.isEnabled else {

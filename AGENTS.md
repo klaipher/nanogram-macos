@@ -44,6 +44,7 @@ Read the matching document before starting the task.
 |---|---|
 | Creating a new screen or controller | [docs/swift/TemplateController/README.md](docs/swift/TemplateController/README.md), template in [TemplateController.swift](docs/swift/TemplateController/TemplateController.swift) |
 | Checking whether a feature exists on iOS, on the Mac or in official Telegram | [docs/feature-parity.md](docs/feature-parity.md) (identical in both repos; update the row when a feature lands) |
+| HLS (adaptive) video playback | [packages/HLSPlayback/README.md](packages/HLSPlayback/README.md) |
 
 
 ## Architecture Overview
