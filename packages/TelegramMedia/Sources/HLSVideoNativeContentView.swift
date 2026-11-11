@@ -22,11 +22,11 @@ public final class HLSVideoNativeContentView: NSView, UniversalVideoContentView 
             let dimensions = qualityFile.media.dimensions?.size ?? CGSize(width: 1280.0, height: 720.0)
             let bandwidth: Int
             if let duration = qualityFile.media.duration ?? file.media.duration, duration > 0.0 {
-                bandwidth = Int(Double(size) / duration) * 8
+                bandwidth = HLSLevels.estimatedBandwidth(size: size, duration: duration)
             } else {
                 bandwidth = 1_000_000
             }
-            let level = HLSLevel(key: key, width: Int(dimensions.width), height: Int(dimensions.height), bandwidth: bandwidth)
+            let level = HLSLevel(key: key, width: HLSLevels.clampedDimension(Double(dimensions.width)), height: HLSLevels.clampedDimension(Double(dimensions.height)), bandwidth: bandwidth)
             candidates.append((level, qualityFile, playlistFile, size))
         }
         if candidates.isEmpty {

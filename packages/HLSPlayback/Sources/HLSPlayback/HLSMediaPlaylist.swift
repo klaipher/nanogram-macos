@@ -101,8 +101,12 @@ public struct HLSMediaPlaylist: Equatable {
                     throw HLSPlaylistError.malformedTag("EXT-X-BYTERANGE")
                 }
                 let start = byteRange.offset ?? segments.last?.byteRange.upperBound ?? 0
+                let (end, overflow) = start.addingReportingOverflow(byteRange.length)
+                if overflow {
+                    throw HLSPlaylistError.malformedTag("EXT-X-BYTERANGE")
+                }
                 let duration = pendingDuration ?? 0.0
-                segments.append(Segment(index: segments.count, start: totalDuration, duration: duration, byteRange: start ..< (start + byteRange.length)))
+                segments.append(Segment(index: segments.count, start: totalDuration, duration: duration, byteRange: start ..< end))
                 totalDuration += duration
                 pendingDuration = nil
                 pendingByteRange = nil
@@ -134,7 +138,11 @@ public struct HLSMediaPlaylist: Equatable {
                         throw HLSPlaylistError.malformedTag("EXT-X-MAP")
                     }
                     let start = byteRange.offset ?? 0
-                    initSegment = start ..< (start + byteRange.length)
+                    let (end, overflow) = start.addingReportingOverflow(byteRange.length)
+                    if overflow {
+                        throw HLSPlaylistError.malformedTag("EXT-X-MAP")
+                    }
+                    initSegment = start ..< end
                 }
             case "#EXT-X-VERSION":
                 if version != nil {
@@ -184,7 +192,7 @@ public struct HLSMediaPlaylist: Equatable {
             throw HLSPlaylistError.noSegments
         }
         // Without one, the longest segment rounded up.
-        let resolvedTargetDuration = targetDuration ?? max(1, Int((segments.map(\.duration).max() ?? 1.0).rounded(.up)))
+        let resolvedTargetDuration = targetDuration ?? max(1, Int(min((segments.map(\.duration).max() ?? 1.0).rounded(.up), 1e9)))
         // Without a byte range for it, the init is everything before the first segment.
         guard let initSegment = initSegment ?? (segments[0].byteRange.lowerBound > 0 ? 0 ..< segments[0].byteRange.lowerBound : nil) else {
             throw HLSPlaylistError.missingInitSegment
@@ -227,6 +235,11 @@ public struct HLSMediaPlaylist: Equatable {
     
     // Bytes from the start of the resource (init included) to the end of the first segments whose durations add up to
     // at least `seconds`, or of every segment when the playlist is shorter.
+    public func rangesFit(fileSize: Int64) -> Bool {
+        let ranges = [self.initSegment] + self.segments.map(\.byteRange)
+        return ranges.allSatisfy { 0 <= $0.lowerBound && $0.lowerBound <= $0.upperBound && $0.upperBound <= fileSize }
+    }
+    
     public func prefixRange(seconds: Double) -> Range<Int64>? {
         var upperBound: Int64 = 0
         var accumulated: Double = 0.0

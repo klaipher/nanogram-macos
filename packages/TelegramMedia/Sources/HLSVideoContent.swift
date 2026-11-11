@@ -120,13 +120,13 @@ public final class HLSVideoContent : UniversalVideoContent {
             var fetchDisposable: Disposable?
             if autofetchPlaylist {
                 fetchDisposable = (fetchedMediaResource(mediaBox: postbox.mediaBox, userLocation: userLocation, userContentType: MediaResourceUserContentType(file: fileSet.playlist.media), reference: fileSet.playlist.resourceReference(fileSet.playlist.media.resource))
-                |> retry(2.0, maxDelay: 30.0, onQueue: Queue.concurrentDefaultQueue())).start()
+                |> hlsBoundedRetry()).start()
             }
             let dataDisposable = postbox.mediaBox.resourceData(fileSet.playlist.media.resource).start(next: { data in
                 if !data.complete {
                     return
                 }
-                guard let data = try? Data(contentsOf: URL(fileURLWithPath: data.path)), let text = String(data: data, encoding: .utf8), let playlist = try? HLSMediaPlaylist.parse(text) else {
+                guard let data = try? Data(contentsOf: URL(fileURLWithPath: data.path)), let text = String(data: data, encoding: .utf8), let playlist = try? HLSMediaPlaylist.parse(text), let fileSize = fileSet.file.media.size, playlist.rangesFit(fileSize: fileSize) else {
                     subscriber.putNext(nil)
                     subscriber.putCompletion()
                     return
@@ -159,7 +159,19 @@ public func fetchedResourceRangeUntilOnDisk(mediaBox: MediaBox, resource: MediaR
         return ranges.isSuperset(of: RangeSet(range)) ? .complete() : .fail(.generic)
     }
     return (fetch |> ignoreValues |> then(isOnDisk))
-    |> retry(2.0, maxDelay: 30.0, onQueue: Queue.concurrentDefaultQueue())
+    |> hlsBoundedRetry()
+}
+
+let hlsFetchMaxRetries = 5
+
+func hlsBoundedRetry<T, E>(maxRetries: Int = hlsFetchMaxRetries) -> (_ signal: Signal<T, E>) -> Signal<T, NoError> {
+    return { signal in
+        return signal
+        |> retry(retryOnError: { _ in true }, delayIncrement: 2.0, maxDelay: 30.0, maxRetries: maxRetries, onQueue: Queue.concurrentDefaultQueue())
+        |> `catch` { _ -> Signal<T, NoError> in
+            return .complete()
+        }
+    }
 }
 
 public final class HLSQualitySet {

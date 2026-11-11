@@ -56,3 +56,29 @@ final class HLSLevelTests: XCTestCase {
         XCTAssertEqual(HLSLevels.startLevel(cap: 3, preloadLevel: 2, manualLevel: nil, estimateLevel: 3, isOpeningOnDisk: { $0 == 1 }), 1)
     }
 }
+
+final class HLSBandwidthEstimateTests: XCTestCase {
+    func testBandwidthEstimateOfZeroDurationIsClampedInsteadOfTrapping() {
+        XCTAssertEqual(HLSLevels.estimatedBandwidth(size: Int64.max, duration: 0.0), 1_000_000_000_000)
+    }
+    
+    func testBandwidthEstimateOfTinyDurationIsClampedInsteadOfTrapping() {
+        XCTAssertEqual(HLSLevels.estimatedBandwidth(size: Int64.max, duration: 1e-300), 1_000_000_000_000)
+    }
+    
+    func testBandwidthEstimateOfNaNDurationFallsBackToClampedDuration() {
+        XCTAssertEqual(HLSLevels.estimatedBandwidth(size: 1000, duration: Double.nan), 80_000)
+    }
+    
+    func testBandwidthEstimateOfNormalFileIsBitsPerSecond() {
+        XCTAssertEqual(HLSLevels.estimatedBandwidth(size: 1_000_000, duration: 10.0), 800_000)
+    }
+    
+    func testDimensionClampHandlesNonFiniteAndHugeValues() {
+        XCTAssertEqual(HLSLevels.clampedDimension(Double.nan), 0)
+        XCTAssertEqual(HLSLevels.clampedDimension(Double.infinity), 0)
+        XCTAssertEqual(HLSLevels.clampedDimension(1e300), 1_000_000)
+        XCTAssertEqual(HLSLevels.clampedDimension(-5.0), 0)
+        XCTAssertEqual(HLSLevels.clampedDimension(720.0), 720)
+    }
+}

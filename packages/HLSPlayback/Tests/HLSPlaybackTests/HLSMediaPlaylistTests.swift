@@ -113,4 +113,89 @@ final class HLSMediaPlaylistTests: XCTestCase {
         let p = try HLSMediaPlaylist.parse(Fixtures.realShape)
         XCTAssertEqual(p.firstFrameRange(), 0 ..< 437905)
     }
+    
+    private func playlist(map: String, segmentRange: String) -> String {
+        return """
+#EXTM3U
+#EXT-X-TARGETDURATION:5
+#EXT-X-VERSION:6
+#EXT-X-MAP:URI="mtproto:42",BYTERANGE="\(map)"
+#EXTINF:5.0
+#EXT-X-BYTERANGE:\(segmentRange)
+mtproto:42
+#EXT-X-ENDLIST
+"""
+    }
+    
+    func testSegmentByteRangeOverflowThrowsMalformedInsteadOfTrapping() {
+        assertParseError(playlist(map: "1000@0", segmentRange: "9223372036854775807@1"), .malformedTag("EXT-X-BYTERANGE"))
+    }
+    
+    func testInitByteRangeOverflowThrowsMalformedInsteadOfTrapping() {
+        assertParseError(playlist(map: "9223372036854775807@1", segmentRange: "100@1000"), .malformedTag("EXT-X-MAP"))
+    }
+    
+    func testImplicitOffsetOverflowThrowsMalformedInsteadOfTrapping() {
+        let text = """
+#EXTM3U
+#EXT-X-TARGETDURATION:5
+#EXT-X-MAP:URI="mtproto:42",BYTERANGE="1000@0"
+#EXTINF:5.0
+#EXT-X-BYTERANGE:9223372036854775000@1000
+mtproto:42
+#EXTINF:5.0
+#EXT-X-BYTERANGE:9223372036854775000
+mtproto:42
+#EXT-X-ENDLIST
+"""
+        assertParseError(text, .malformedTag("EXT-X-BYTERANGE"))
+    }
+    
+    func testHugeSegmentDurationDoesNotTrapWhenTargetDurationIsMissing() throws {
+        let text = """
+#EXTM3U
+#EXT-X-MAP:URI="mtproto:42",BYTERANGE="1000@0"
+#EXTINF:1e300
+#EXT-X-BYTERANGE:100@1000
+mtproto:42
+#EXT-X-ENDLIST
+"""
+        let p = try HLSMediaPlaylist.parse(text)
+        XCTAssertGreaterThan(p.targetDuration, 0)
+    }
+    
+    func testRangesWithinFileAreAccepted() throws {
+        let p = try HLSMediaPlaylist.parse(Fixtures.realShape)
+        XCTAssertTrue(p.rangesFit(fileSize: 2163625))
+    }
+    
+    func testSegmentRangeBeyondFileIsRejected() throws {
+        let p = try HLSMediaPlaylist.parse(Fixtures.realShape)
+        XCTAssertFalse(p.rangesFit(fileSize: 2163624))
+    }
+    
+    func testInitRangeBeyondFileIsRejected() throws {
+        let text = playlist(map: "5000@0", segmentRange: "100@5000")
+        let p = try HLSMediaPlaylist.parse(text)
+        XCTAssertTrue(p.rangesFit(fileSize: 5100))
+        let oversizedInit = try HLSMediaPlaylist.parse(playlist(map: "6000@0", segmentRange: "100@6000"))
+        XCTAssertFalse(oversizedInit.rangesFit(fileSize: 5000))
+    }
+    
+    func testMiddleSegmentBeyondFileIsRejectedEvenWhenLastSegmentFits() throws {
+        let text = """
+#EXTM3U
+#EXT-X-TARGETDURATION:5
+#EXT-X-MAP:URI="mtproto:42",BYTERANGE="1000@0"
+#EXTINF:5.0
+#EXT-X-BYTERANGE:900000@1000
+mtproto:42
+#EXTINF:5.0
+#EXT-X-BYTERANGE:100@2000
+mtproto:42
+#EXT-X-ENDLIST
+"""
+        let p = try HLSMediaPlaylist.parse(text)
+        XCTAssertFalse(p.rangesFit(fileSize: 100000))
+    }
 }

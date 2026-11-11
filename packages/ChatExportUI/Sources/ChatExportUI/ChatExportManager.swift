@@ -88,26 +88,60 @@ public func chatExportIsRestricted(peer: Peer, cachedData: CachedPeerData?) -> B
     return false
 }
 
-private let chatExportUnverifiedText = "Could not check this chat"
+enum ChatExportRestrictionVerdict: Equatable {
+    case allowed
+    case restricted
+    case unverified
+}
+
+func chatExportRestrictionVerdict(isFresh: Bool, peerFound: Bool, peerRestricted: Bool, cachedDataRestricted: Bool?) -> ChatExportRestrictionVerdict {
+    if !peerFound {
+        return .unverified
+    }
+    if peerRestricted || cachedDataRestricted == true {
+        return .restricted
+    }
+    if cachedDataRestricted == false || isFresh {
+        return .allowed
+    }
+    return .unverified
+}
+
+private var chatExportUnverifiedText: String {
+    return translate(key: "ChatExport.Unverified", [])
+}
+
+private let chatExportRefreshTimeout = 20.0
 
 private func chatExportVerifiedRestriction(context: any AccountContextProtocol, peerId: PeerId) -> Signal<Bool?, NoError> {
     let refreshed: Signal<Bool, NoError>
     if peerId.namespace == Namespaces.Peer.CloudUser, peerId != context.peerId {
         refreshed = context.engine.peers.fetchAndUpdateCachedPeerData(peerId: peerId)
+        |> then(.single(false))
+        |> take(1)
+        |> timeout(chatExportRefreshTimeout, queue: Queue.concurrentDefaultQueue(), alternate: .single(false))
     } else {
         refreshed = .single(true)
     }
     return refreshed
     |> take(1)
     |> mapToSignal { isFresh -> Signal<Bool?, NoError> in
-        guard isFresh else {
-            return .single(nil)
-        }
         return context.account.postbox.transaction { transaction -> Bool? in
-            guard let peer = transaction.getPeer(peerId) else {
+            let peer = transaction.getPeer(peerId)
+            let cachedData = transaction.getPeerCachedData(peerId: peerId)
+            var cachedDataRestricted: Bool?
+            if let cachedUserData = cachedData as? CachedUserData {
+                cachedDataRestricted = cachedUserData.flags.contains(.copyProtectionEnabled) || cachedUserData.flags.contains(.myCopyProtectionEnabled)
+            }
+            let peerRestricted = peer.map { $0 is TelegramSecretChat || $0.isCopyProtectionEnabled } ?? false
+            switch chatExportRestrictionVerdict(isFresh: isFresh, peerFound: peer != nil, peerRestricted: peerRestricted, cachedDataRestricted: cachedDataRestricted) {
+            case .allowed:
+                return false
+            case .restricted:
+                return true
+            case .unverified:
                 return nil
             }
-            return chatExportIsRestricted(peer: peer, cachedData: transaction.getPeerCachedData(peerId: peerId))
         }
     }
 }

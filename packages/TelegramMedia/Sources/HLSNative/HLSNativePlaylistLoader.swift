@@ -162,7 +162,7 @@ final class HLSNativePlaylistLoader {
             self.reject(level: level)
             return
         }
-        if let lastSegment = playlist.segments.last, lastSegment.byteRange.upperBound > file.size {
+        if !playlist.rangesFit(fileSize: file.size) {
             self.onLog?("playlist ranges exceed the file level=\(level)")
             self.reject(level: level)
             return
