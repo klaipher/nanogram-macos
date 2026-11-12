@@ -360,7 +360,8 @@ cmd_test() {
       say "no tests: packages/$package has no test target, skipped"
     else
       say "swift test packages/$package"
-      local scratch="${NANOGRAM_CACHE_DIR:-$HOME/.cache/nanogram-macos}/spm-$(basename "$ROOT")-$package"
+      local scratch
+      scratch="${NANOGRAM_CACHE_DIR:-$HOME/.cache/nanogram-macos}/spm-$(basename "$ROOT")-$package"
       if swift test --package-path "$ROOT/packages/$package" --scratch-path "$scratch"; then
         [ "${TG_TEST_DROP_SCRATCH:-0}" != 1 ] || rm -rf "$scratch"
       else

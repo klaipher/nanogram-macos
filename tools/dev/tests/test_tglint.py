@@ -172,6 +172,39 @@ class FilterTests(unittest.TestCase):
         self.assertEqual(kept[0]['severity'], 'error')
 
 
+class UpstreamMergeTests(RepoTestCase):
+    path = 'Telegram-Mac/A.swift'
+
+    def setUp(self):
+        super().setUp()
+        write(self.repo, self.path, 'let a = 1\n')
+        self.base = commit_all(self.repo)
+
+    def branch_with_line(self, branch, line):
+        run(['git', 'checkout', '-q', '-b', branch, self.base], self.repo)
+        write(self.repo, self.path, 'let a = 1\n' + line + '\n')
+        commit_all(self.repo, branch)
+        run(['git', 'checkout', '-q', 'main'], self.repo)
+
+    def merge_then_add_ours(self, branch):
+        run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', 'merge', '-q', '--no-ff', '-m', 'merge', branch], self.repo)
+        with open(os.path.join(self.repo, self.path)) as f:
+            text = f.read()
+        write(self.repo, self.path, text + 'let ours = y as! Z\n')
+        return commit_all(self.repo, 'ours')
+
+    def test_lines_merged_from_upstream_are_not_ours(self):
+        self.branch_with_line('upstream', 'let theirs = x as! Y')
+        head = self.merge_then_add_ours('upstream')
+        self.assertEqual(tglint.changed_lines_commits(self.base, head), {self.path: {3}})
+        self.assertEqual(tglint.changed_lines_worktree(self.base), {self.path: {3}})
+
+    def test_lines_merged_from_our_own_branch_stay_ours(self):
+        self.branch_with_line('feature', 'let theirs = x as! Y')
+        head = self.merge_then_add_ours('feature')
+        self.assertEqual(tglint.changed_lines_commits(self.base, head), {self.path: {2, 3}})
+
+
 class AffectedPackagesTests(RepoTestCase):
     def setUp(self):
         super().setUp()

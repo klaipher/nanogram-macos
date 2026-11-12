@@ -148,12 +148,53 @@ def changed_lines_worktree(base):
         with open(full, encoding='utf-8', errors='replace') as f:
             count = sum(1 for _ in f)
         changed[path] = set(range(1, count + 1))
+    changed = drop_upstream_lines(changed, upstream_merge_parents(base, 'HEAD'), None)
     return {p: l for p, l in changed.items() if is_lintable(p) and l}
 
 
 def changed_lines_commits(base, head):
     diff = git('diff', '-U0', '--no-color', '--no-ext-diff', '--diff-filter=AMR', '-M', base, head, '--', '*.swift')
-    return {p: l for p, l in parse_unified_diff(diff).items() if is_lintable(p) and l}
+    changed = drop_upstream_lines(parse_unified_diff(diff), upstream_merge_parents(base, head), head)
+    return {p: l for p, l in changed.items() if is_lintable(p) and l}
+
+
+# Where Telegram's own history lives: the `upstream` branch tg sync-upstream fast-forwards, its pushed copy,
+# and the telegram remote.
+UPSTREAM_REFS = ('refs/heads/upstream', 'refs/remotes/origin/upstream', 'refs/remotes/telegram/master')
+
+
+def is_ancestor(commit, ref):
+    return subprocess.run(['git', 'merge-base', '--is-ancestor', commit, ref], cwd=ROOT, capture_output=True).returncode == 0
+
+
+def upstream_merge_parents(base, head):
+    """The merged-in parents of merges in base..head that are upstream commits."""
+    refs = [r for r in UPSTREAM_REFS if git('rev-parse', '--verify', '-q', r, check=False).strip()]
+    if not refs:
+        return []
+    parents = []
+    for line in git('rev-list', '--merges', '--parents', '{}..{}'.format(base, head), check=False).splitlines():
+        for parent in line.split()[2:]:
+            if any(is_ancestor(parent, r) for r in refs):
+                parents.append(parent)
+    return parents
+
+
+def drop_upstream_lines(changed, parents, head):
+    """Drops changed lines whose text is in the merged upstream version of the file: upstream's code, not ours."""
+    if not parents:
+        return changed
+    kept = {}
+    for path, lines in changed.items():
+        theirs = set()
+        for parent in parents:
+            theirs.update(git('show', '{}:{}'.format(parent, path), check=False).split('\n'))
+        if head is None:
+            ours = read_lines(os.path.join(ROOT, path))
+        else:
+            ours = git('show', '{}:{}'.format(head, path), check=False).split('\n')
+        kept[path] = {n for n in lines if not (0 < n <= len(ours) and ours[n - 1] in theirs)}
+    return kept
 
 
 # --- Violations ------------------------------------------------------------------
