@@ -355,6 +355,6 @@ final class WalletTextSubmoduleCompatibilityTests: XCTestCase {
         XCTAssertEqual(text.components(separatedBy: "]()").count, 2)
         let template = try XCTUnwrap(try nativeEnglishStrings()["Wallet.Controller.TermsAgreement"])
         XCTAssertEqual(template.replacingOccurrences(of: "%1$@", with: url), text.replacingOccurrences(of: "]()", with: "](\(url))"))
-        XCTAssertTrue(try source("packages/WalletUI/Sources/WalletUI/WalletController.swift").contains("let walletTermsText = strings().walletControllerTermsAgreement(walletTermsOfServiceUrl)"))
+        XCTAssertTrue(try source("packages/WalletUI/Sources/WalletUI/WalletController.swift").contains("var walletTermsText: String {\n    return strings().walletControllerTermsAgreement(walletTermsOfServiceUrl)\n}"))
     }
 }
