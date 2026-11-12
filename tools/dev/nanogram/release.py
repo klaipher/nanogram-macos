@@ -26,7 +26,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from nanogram import branding, buildcheck, config, editions
+from nanogram import branding, buildcheck, config, editions, localfixes
 from nanogram import enhanced_security as enhanced_security_module
 from nanogram import dmg as disk_image
 
@@ -671,11 +671,33 @@ SPARKLE_NS = "http://www.andymatuschak.org/xml-namespaces/sparkle"
 MIN_MACOS = buildcheck.MIN_OS
 
 
-def tracked_changes(root: Path = config.ROOT) -> list[str]:
+LOCAL_PINS = {localfixes.WIDGET_QUICKJS_PATH: localfixes.WIDGET_QUICKJS_COMMIT}
+
+
+def _git_out(cwd: Path, *args: str) -> str:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True).stdout
+
+
+def _only_local_pins(root: Path, path: str, pins: dict[str, str]) -> bool:
+    """True when submodule `path` is at its recorded commit and differs only by nested checkouts that tg localfixes
+    moves on purpose, each at its pinned commit (the source archive takes every checkout's HEAD, so it matches)."""
+    nested = {rel[len(path) + 1:]: commit for rel, commit in pins.items() if rel.startswith(path + "/")}
+    if not nested or not (Path(root) / path / ".git").exists():
+        return False
+    recorded = _git_out(Path(root), "ls-tree", "HEAD", path).split()
+    if len(recorded) < 3 or _git_out(Path(root) / path, "rev-parse", "HEAD").strip() != recorded[2]:
+        return False
+    out = _git_out(Path(root) / path, "status", "--porcelain", "--untracked-files=no")
+    changed = [line[3:] for line in out.splitlines() if line.strip()]
+    return bool(changed) and all(
+        c in nested and _git_out(Path(root) / path / c, "rev-parse", "HEAD").strip() == nested[c] for c in changed)
+
+
+def tracked_changes(root: Path = config.ROOT, local_pins: dict[str, str] | None = None) -> list[str]:
     """Tracked files (and submodules) that differ from HEAD: the source archive would not match the binary."""
-    out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=root, capture_output=True,
-                         text=True, check=True).stdout
-    return [line[3:] for line in out.splitlines() if line.strip()]
+    pins = LOCAL_PINS if local_pins is None else local_pins
+    out = _git_out(Path(root), "status", "--porcelain", "--untracked-files=no")
+    return [line[3:] for line in out.splitlines() if line.strip() and not _only_local_pins(root, line[3:], pins)]
 
 
 def _submodule_paths(root: Path) -> list[str]:
