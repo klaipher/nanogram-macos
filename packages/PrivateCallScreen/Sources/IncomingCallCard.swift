@@ -85,12 +85,12 @@ final class IncomingCallCard {
         let declineAction = IncomingCallCardAction(decline)
 
         let buttonWidth: CGFloat = (size.width - 84 - 16 - 8) / 2
-        let decline = IncomingCallCard.makeButton(title: L10n.callDecline, color: .systemRed, action: declineAction)
-        decline.frame = NSMakeRect(84, 12, buttonWidth, 28)
-        background.addSubview(decline)
-        let accept = IncomingCallCard.makeButton(title: L10n.callAccept, color: .systemGreen, action: acceptAction)
-        accept.frame = NSMakeRect(84 + buttonWidth + 8, 12, buttonWidth, 28)
-        background.addSubview(accept)
+        let declineButton = IncomingCallCard.makeButton(title: L10n.callDecline, color: .systemRed, action: declineAction)
+        declineButton.frame = NSMakeRect(84, 12, buttonWidth, 28)
+        background.addSubview(declineButton)
+        let acceptButton = IncomingCallCard.makeButton(title: L10n.callAccept, color: .systemGreen, action: acceptAction)
+        acceptButton.frame = NSMakeRect(84 + buttonWidth + 8, 12, buttonWidth, 28)
+        background.addSubview(acceptButton)
 
         self.panel = panel
         self.titleLabel = titleLabel
