@@ -63,13 +63,22 @@ private class SuggestionControllerView : View {
     }
 }
 
+public func suggestedLocalizationSeenCode(stored: String?, requested: String) -> String {
+    if let stored = stored, !stored.isEmpty {
+        return stored
+    }
+    return requested
+}
+
 public class SuggestionLocalizationViewController: ModalViewController {
     private let context:any AccountContextProtocol
     private let suggestionInfo:SuggestedLocalizationInfo
+    private let seenLanguageCode: String
     private var languageCode:String = "en"
-    public init(_ context: any AccountContextProtocol, suggestionInfo: SuggestedLocalizationInfo) {
+    public init(_ context: any AccountContextProtocol, suggestionInfo: SuggestedLocalizationInfo, storedLanguageCode: String? = nil) {
         self.context = context
         self.suggestionInfo = suggestionInfo
+        self.seenLanguageCode = suggestedLocalizationSeenCode(stored: storedLanguageCode, requested: suggestionInfo.languageCode)
         super.init(frame: NSMakeRect(0, 0, 280, 198))
         bar = .init(height: 0)
     }
@@ -83,7 +92,7 @@ public class SuggestionLocalizationViewController: ModalViewController {
             if let strongSelf = self {
                 strongSelf.close()
                 let engine = strongSelf.context.engine.localization
-                _ = engine.markSuggestedLocalizationAsSeenInteractively(languageCode: strongSelf.suggestionInfo.languageCode).start()
+                strongSelf.markSeen()
                 _ = showModalProgress(signal: engine.downloadAndApplyLocalization(accountManager: strongSelf.context.sharedContext.accountManager, languageCode: strongSelf.languageCode), for: strongSelf.context.window).start()
             }
         }, singleButton: true)
@@ -93,6 +102,10 @@ public class SuggestionLocalizationViewController: ModalViewController {
         return self.view as! SuggestionControllerView
     }
     
+    private func markSeen() {
+        _ = self.context.engine.localization.markSuggestedLocalizationAsSeenInteractively(languageCode: self.seenLanguageCode).start()
+    }
+    
     public override var closable: Bool {
         return false
     }
@@ -100,6 +113,7 @@ public class SuggestionLocalizationViewController: ModalViewController {
     public override func viewDidLoad() {
         super.viewDidLoad()
         
+        markSeen()
 
         genericView.updateHeaderTexts(suggestionInfo.localizedKey("Suggest.Localization.Header"))
         let swap = languages.firstIndex(of: self.suggestionInfo.languageCode) != nil
@@ -154,8 +168,7 @@ public class SuggestionLocalizationViewController: ModalViewController {
             if let strongSelf = self {
                 strongSelf.close()
                 strongSelf.context.bindings.rootNavigation().push(LanguageController(strongSelf.context))
-                let engine = strongSelf.context.engine.localization
-                _ = engine.markSuggestedLocalizationAsSeenInteractively(languageCode: strongSelf.suggestionInfo.languageCode).start()
+                strongSelf.markSeen()
             }
         }, reversed: true))
     

@@ -902,7 +902,7 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
         }))
         
         
-        suggestedLocalizationDisposable.set(( context.account.postbox.preferencesView(keys: [PreferencesKeys.suggestedLocalization]) |> mapToSignal { preferences -> Signal<SuggestedLocalizationInfo, NoError> in
+        suggestedLocalizationDisposable.set(( context.account.postbox.preferencesView(keys: [PreferencesKeys.suggestedLocalization]) |> mapToSignal { preferences -> Signal<(SuggestedLocalizationInfo, String?), NoError> in
             
             let preferences = preferences.values[PreferencesKeys.suggestedLocalization]?.get(SuggestedLocalizationEntry.self)
             if preferences == nil || !preferences!.isSeen, preferences?.languageCode != appCurrentLanguage.languageCode, preferences?.languageCode != "en" {
@@ -910,13 +910,14 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
                 let split = current.split(separator: "-")
                 let lan: String = !split.isEmpty ? String(split[0]) : "en"
                 if lan != "en" {
-                    return context.engine.localization.suggestedLocalizationInfo(languageCode: lan, extractKeys: ["Suggest.Localization.Header", "Suggest.Localization.Other"]) |> take(1)
+                    let storedCode = preferences?.languageCode
+                    return context.engine.localization.suggestedLocalizationInfo(languageCode: lan, extractKeys: ["Suggest.Localization.Header", "Suggest.Localization.Other"]) |> take(1) |> map { ($0, storedCode) }
                 }
             }
             return .complete()
-        } |> deliverOnMainQueue).start(next: { suggestionInfo in
+        } |> deliverOnMainQueue).start(next: { suggestionInfo, storedCode in
             if suggestionInfo.availableLocalizations.count >= 2 {
-                showModal(with: SuggestionLocalizationViewController(context, suggestionInfo: suggestionInfo), for: window)
+                showModal(with: SuggestionLocalizationViewController(context, suggestionInfo: suggestionInfo, storedLanguageCode: storedCode), for: window)
             }
         }))
         
