@@ -1,5 +1,6 @@
 import XCTest
 import TelegramCore
+import InAppSettings
 @testable import TelegramCallsCore
 
 final class CallToneTests: XCTestCase {
@@ -67,8 +68,8 @@ final class CallToneTests: XCTestCase {
 
 final class InitialDataFallbackTests: XCTestCase {
     func testFallbackKeepsProvidedSettings() {
-        let data = PCallSession.InitialData.fallback(voiceSettings: VoiceCallSettings.defaultSettings, proxyServerSettings: nil, networkType: .cellular)
-        XCTAssertEqual(data.networkType, .cellular)
+        let data = PCallSession.InitialData.fallback(voiceSettings: VoiceCallSettings.defaultSettings, proxyServerSettings: nil, networkType: NetworkType.none)
+        XCTAssertEqual(data.networkType, NetworkType.none)
         XCTAssertNil(data.peer)
     }
 }

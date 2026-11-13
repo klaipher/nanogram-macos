@@ -288,7 +288,7 @@ func socksCallProxy(from proxy: ProxySettings) -> ProxyServerSettings? {
     return nil
 }
 
-public func getPrivateCallSessionData(_ account: Account, accountManager: AccountManager<TelegramAccountManagerTypes>, peerId: PeerId, timeout: Double? = nil) -> Signal<PCallSession.InitialData, NoError> {
+public func getPrivateCallSessionData(_ account: Account, accountManager: AccountManager<TelegramAccountManagerTypes>, peerId: PeerId, timeout timeoutSeconds: Double? = nil) -> Signal<PCallSession.InitialData, NoError> {
     let settings = combineLatest(voiceCallSettings(accountManager), proxySettings(accountManager: accountManager)) |> take(1)
     let stored: Signal<(PreferencesView, Peer?), NoError> = combineLatest(
         account.postbox.preferencesView(keys: [PreferencesKeys.voipConfiguration, ApplicationSpecificPreferencesKeys.voipDerivedState, PreferencesKeys.appConfiguration]),
@@ -298,9 +298,9 @@ public func getPrivateCallSessionData(_ account: Account, accountManager: Accoun
     ) |> take(1)
     var network: Signal<NetworkType, NoError> = account.networkType |> take(1)
     var storedOrNil: Signal<(PreferencesView, Peer?)?, NoError> = stored |> map { Optional($0) }
-    if let timeout = timeout {
-        storedOrNil = storedOrNil |> timeout(timeout, queue: Queue.mainQueue(), alternate: .single(nil))
-        network = network |> timeout(timeout, queue: Queue.mainQueue(), alternate: .single(.wifi))
+    if let timeoutSeconds {
+        storedOrNil = storedOrNil |> timeout(timeoutSeconds, queue: Queue.mainQueue(), alternate: .single(nil))
+        network = network |> timeout(timeoutSeconds, queue: Queue.mainQueue(), alternate: .single(.wifi))
     }
     return combineLatest(storedOrNil, settings, network) |> take(1) |> map { stored, settings, networkType in
         let voiceSettings = settings.0
