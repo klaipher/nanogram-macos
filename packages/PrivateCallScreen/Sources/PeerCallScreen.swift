@@ -43,9 +43,9 @@ public final class PeerCallScreen : ViewController {
     public var hidesIncomingCaller: Bool = false {
         didSet {
             if oldValue != hidesIncomingCaller {
-                let state = self.stateValue.with { $0 }
+                let (showsCard, callerName) = self.stateValue.with { (peerCallShowsIncomingCard($0.externalState), $0.title) }
                 MainActor.assumeIsolated {
-                    self.updateIncomingCard(state)
+                    self.updateIncomingCard(showsCard: showsCard, callerName: callerName)
                 }
             }
         }
@@ -435,8 +435,10 @@ public final class PeerCallScreen : ViewController {
         let transition: ContainedViewLayoutTransition = animated ? .animated(duration: 0.2, curve: .spring) : .immediate
         genericView.updateState(state, videoViewState: videoViewState, arguments: arguments, transition: transition)
         genericView.updateLayout(size: self.frame.size, transition: transition)
+        let showsCard = peerCallShowsIncomingCard(state.externalState)
+        let callerName = state.title
         MainActor.assumeIsolated {
-            self.updateIncomingCard(state)
+            self.updateIncomingCard(showsCard: showsCard, callerName: callerName)
         }
         
         if state.externalState.canBeRemoved, self.onCompletion != nil {
@@ -493,8 +495,8 @@ public final class PeerCallScreen : ViewController {
     }
     
     @MainActor
-    private func updateIncomingCard(_ state: PeerCallState) {
-        guard peerCallShowsIncomingCard(state.externalState) else {
+    private func updateIncomingCard(showsCard: Bool, callerName: String?) {
+        guard showsCard else {
             self.incomingCard?.hide()
             return
         }
@@ -510,7 +512,7 @@ public final class PeerCallScreen : ViewController {
             self.incomingCard = card
         }
         let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? ""
-        let title = IncomingCallPolicy.displayTitle(callerName: state.title, hidesCaller: self.hidesIncomingCaller, appName: appName)
+        let title = IncomingCallPolicy.displayTitle(callerName: callerName, hidesCaller: self.hidesIncomingCaller, appName: appName)
         card.update(title: title, subtitle: L10n.callStatusCalling)
         card.show()
     }
@@ -610,4 +612,6 @@ public final class PeerCallScreen : ViewController {
     }
 }
 
-
+// Main-thread confined like every window controller: the incoming card work hops to the main actor
+// with MainActor.assumeIsolated, which needs the controller to be sendable.
+extension PeerCallScreen: @unchecked Sendable {}

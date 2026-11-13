@@ -324,9 +324,9 @@ public func callScreen(_ result:PCallResult, source: CallWindowSource? = nil) {
             screen.show(source: source, animated: IncomingCallPolicy.shouldAnimateWindow(isIncoming: isIncoming, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion))
         }
         if isIncoming {
-            let window = screen.window
             let internalId = session.internalId
             MainActor.assumeIsolated {
+                let window = screen.window
                 CallDiagnostics.log("ring: window ordered front for call \(internalId), visible \(window?.isVisible == true), onActiveSpace \(window?.isOnActiveSpace == true), appActive \(NSApp.isActive), appHidden \(NSApp.isHidden), miniaturized \(window?.isMiniaturized == true)")
             }
         }
