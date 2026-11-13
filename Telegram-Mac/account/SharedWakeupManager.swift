@@ -154,8 +154,7 @@ class SharedWakeupManager {
                     |> filter { IncomingCallPolicy.isRingReady(isUpdating: $0, graceElapsed: $1) }
                     |> take(1)
                     return ready |> mapToSignal { _ -> Signal<(CallSessionRingingState, PCallSession.InitialData)?, NoError> in
-                        return getPrivateCallSessionData(account, accountManager: accountManager, peerId: state.peerId)
-                        |> timeout(IncomingCallPolicy.sessionDataTimeout, queue: Queue.mainQueue(), alternate: .single(PCallSession.InitialData.fallback))
+                        return getPrivateCallSessionData(account, accountManager: accountManager, peerId: state.peerId, timeout: IncomingCallPolicy.sessionDataTimeout)
                         |> map { data -> (CallSessionRingingState, PCallSession.InitialData)? in
                             return (state, data)
                         }
@@ -176,10 +175,10 @@ class SharedWakeupManager {
                     let initialData = data.1
                     
                     let active: IncomingCallActiveCall<CallSessionInternalId>?
-                    if let p2p = self.sharedContext.p2pCall {
-                        active = .p2p(id: p2p.internalId, isEnded: p2p.isEnded)
-                    } else if self.sharedContext.hasActiveCall {
+                    if self.sharedContext.getCrossAccountGroupCall() != nil {
                         active = .group
+                    } else if let p2p = self.sharedContext.p2pCall {
+                        active = .p2p(id: p2p.internalId, isEnded: p2p.isEnded)
                     } else {
                         active = nil
                     }
@@ -194,7 +193,9 @@ class SharedWakeupManager {
                     case .present, .replaceEndedSession:
                         if action == .replaceEndedSession {
                             CallDiagnostics.log("ring: replacing the ended session with call \(state.id)")
-                            self.sharedContext.dropCrossCall()
+                            if let ended = self.sharedContext.p2pCall {
+                                self.sharedContext.dropCrossCall(ownedBy: ended)
+                            }
                         }
                         
                         var otherParticipants: [EnginePeer] = state.otherParticipants

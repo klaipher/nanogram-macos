@@ -64,3 +64,11 @@ final class CallToneTests: XCTestCase {
         XCTAssertNil(tone(.terminated(nil, .ended(.switchedToConference(slug: "x")), false), previous: .switchedToConference(slug: "x")))
     }
 }
+
+final class InitialDataFallbackTests: XCTestCase {
+    func testFallbackKeepsProvidedSettings() {
+        let data = PCallSession.InitialData.fallback(voiceSettings: VoiceCallSettings.defaultSettings, proxyServerSettings: nil, networkType: .cellular)
+        XCTAssertEqual(data.networkType, .cellular)
+        XCTAssertNil(data.peer)
+    }
+}

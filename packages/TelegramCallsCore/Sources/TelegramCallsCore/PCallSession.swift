@@ -281,27 +281,38 @@ private func getAuxiliaryServers(appConfiguration: AppConfiguration) -> [CallAux
     return result
 }
 
-public func getPrivateCallSessionData(_ account: Account, accountManager: AccountManager<TelegramAccountManagerTypes>, peerId: PeerId) -> Signal<PCallSession.InitialData, NoError> {
-    return combineLatest(
+func socksCallProxy(from proxy: ProxySettings) -> ProxyServerSettings? {
+    if proxy.useForCalls, let activeServer = proxy.effectiveActiveServer, case .socks5 = activeServer.connection {
+        return activeServer
+    }
+    return nil
+}
+
+public func getPrivateCallSessionData(_ account: Account, accountManager: AccountManager<TelegramAccountManagerTypes>, peerId: PeerId, timeout: Double? = nil) -> Signal<PCallSession.InitialData, NoError> {
+    let settings = combineLatest(voiceCallSettings(accountManager), proxySettings(accountManager: accountManager)) |> take(1)
+    let stored: Signal<(PreferencesView, Peer?), NoError> = combineLatest(
         account.postbox.preferencesView(keys: [PreferencesKeys.voipConfiguration, ApplicationSpecificPreferencesKeys.voipDerivedState, PreferencesKeys.appConfiguration]),
         account.postbox.transaction { transaction -> Peer? in
             return transaction.getPeer(peerId)
-        },
-        voiceCallSettings(accountManager),
-        proxySettings(accountManager: accountManager),
-        account.networkType
-    ) |> take(1) |> map { preferences, peer, voiceSettings, proxy, networkType in
-        
+        }
+    ) |> take(1)
+    var network: Signal<NetworkType, NoError> = account.networkType |> take(1)
+    var storedOrNil: Signal<(PreferencesView, Peer?)?, NoError> = stored |> map { Optional($0) }
+    if let timeout = timeout {
+        storedOrNil = storedOrNil |> timeout(timeout, queue: Queue.mainQueue(), alternate: .single(nil))
+        network = network |> timeout(timeout, queue: Queue.mainQueue(), alternate: .single(.wifi))
+    }
+    return combineLatest(storedOrNil, settings, network) |> take(1) |> map { stored, settings, networkType in
+        let voiceSettings = settings.0
+        let callProxy = socksCallProxy(from: settings.1)
+        guard let stored = stored else {
+            return PCallSession.InitialData.fallback(voiceSettings: voiceSettings, proxyServerSettings: callProxy, networkType: networkType)
+        }
+        let preferences = stored.0
+        let peer = stored.1
         let configuration = preferences.values[PreferencesKeys.voipConfiguration]?.get(VoipConfiguration.self) ?? VoipConfiguration.defaultValue
         let appConfiguration = preferences.values[PreferencesKeys.appConfiguration]?.get(AppConfiguration.self) ?? AppConfiguration.defaultValue
         let derivedState = preferences.values[ApplicationSpecificPreferencesKeys.voipDerivedState]?.get(VoipDerivedState.self) ?? VoipDerivedState.default
-        
-        let callProxy: ProxyServerSettings?
-        if proxy.useForCalls, let activeServer = proxy.effectiveActiveServer, case .socks5 = activeServer.connection {
-            callProxy = activeServer
-        } else {
-            callProxy = nil
-        }
         return PCallSession.InitialData(configuration: configuration, appConfiguration: appConfiguration, derivedState: derivedState, peer: peer, voiceSettings: voiceSettings, proxyServerSettings: callProxy, networkType: networkType)
     }
 }
@@ -317,7 +328,10 @@ public class PCallSession {
         public let proxyServerSettings: ProxyServerSettings?
         public let networkType: NetworkType
         public static var fallback: InitialData {
-            return InitialData(configuration: VoipConfiguration.defaultValue, appConfiguration: AppConfiguration.defaultValue, derivedState: VoipDerivedState.default, peer: nil, voiceSettings: VoiceCallSettings.defaultSettings, proxyServerSettings: nil, networkType: .wifi)
+            return fallback(voiceSettings: VoiceCallSettings.defaultSettings, proxyServerSettings: nil, networkType: .wifi)
+        }
+        public static func fallback(voiceSettings: VoiceCallSettings, proxyServerSettings: ProxyServerSettings?, networkType: NetworkType) -> InitialData {
+            return InitialData(configuration: VoipConfiguration.defaultValue, appConfiguration: AppConfiguration.defaultValue, derivedState: VoipDerivedState.default, peer: nil, voiceSettings: voiceSettings, proxyServerSettings: proxyServerSettings, networkType: networkType)
         }
         public init(configuration: VoipConfiguration, appConfiguration: AppConfiguration, derivedState: VoipDerivedState, peer: Peer?, voiceSettings: VoiceCallSettings, proxyServerSettings: ProxyServerSettings?, networkType: NetworkType) {
             self.configuration = configuration
