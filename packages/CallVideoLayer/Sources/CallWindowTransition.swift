@@ -1,5 +1,6 @@
 import Cocoa
 import TGUIKit
+import SwiftSignalKit
 
 public final class CallWindowSource {
     private static let maxControlSize = NSMakeSize(200, 120)
@@ -268,11 +269,11 @@ public final class CallWindowTransition {
             completion?()
         }
         transition.animate(from: transition.local(rect), to: transition.local(frame), cornerRadius: cornerRadius, opening: true, sourceView: source?.control, completion: finish)
-        DispatchQueue.main.asyncAfter(deadline: .now() + CallWindowTransition.maximumDuration + CallWindowTransition.completionFailsafe) { [weak transition] in
+        Queue.mainQueue().after(CallWindowTransition.maximumDuration + CallWindowTransition.completionFailsafe, { [weak transition] in
             if let transition, !transition.isCancelled {
                 finish()
             }
-        }
+        })
         return transition
     }
 

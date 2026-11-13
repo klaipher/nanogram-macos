@@ -5,7 +5,8 @@ import TGUIKit
 import TelegramCore
 import NanogramRuntime
 
-final class IncomingCallPresenter {
+// Main-thread confined: begin and end assert it, respond hops to the main queue.
+final class IncomingCallPresenter: @unchecked Sendable {
     static let shared = IncomingCallPresenter()
 
     private struct Entry {
@@ -28,7 +29,9 @@ final class IncomingCallPresenter {
         sharedContext?.peerCall?.hidesIncomingCaller = hidesCaller
 
         let callId = id.uuidString
-        let attention: Int? = NSApp.isActive ? nil : NSApp.requestUserAttention(.criticalRequest)
+        let attention: Int? = MainActor.assumeIsolated {
+            NSApp.isActive ? nil : NSApp.requestUserAttention(.criticalRequest)
+        }
         let info = IncomingCallNotificationInfo(callId: callId, accountId: account.id.int64, isVideo: session.isVideo)
         let title = IncomingCallPolicy.displayTitle(callerName: callerName, hidesCaller: hidesCaller, appName: appName)
         notifications?.postIncomingCall(info, title: title, body: strings().callStatusCalling)
@@ -58,7 +61,9 @@ final class IncomingCallPresenter {
         }
         entry.disposable.dispose()
         if let attention = entry.attentionRequest {
-            NSApp.cancelUserAttentionRequest(attention)
+            MainActor.assumeIsolated {
+                NSApp.cancelUserAttentionRequest(attention)
+            }
         }
         UNUserNotifications.current?.removeIncomingCall(callId: entry.callId)
         CallDiagnostics.log("ring: presentation for call \(entry.callId) ended")
@@ -73,13 +78,19 @@ final class IncomingCallPresenter {
             }
             switch target.action {
             case .open:
-                NSApp.activate(ignoringOtherApps: true)
-                sharedContext.peerCall?.window?.makeKeyAndOrderFront(nil)
+                let window = sharedContext.peerCall?.window
+                MainActor.assumeIsolated {
+                    NSApp.activate(ignoringOtherApps: true)
+                    window?.makeKeyAndOrderFront(nil)
+                }
             case .accept:
                 CallDiagnostics.log("ring: call \(target.callId) accepted from the notification")
                 session.acceptCallSession()
-                NSApp.activate(ignoringOtherApps: true)
-                sharedContext.peerCall?.window?.makeKeyAndOrderFront(nil)
+                let window = sharedContext.peerCall?.window
+                MainActor.assumeIsolated {
+                    NSApp.activate(ignoringOtherApps: true)
+                    window?.makeKeyAndOrderFront(nil)
+                }
             case .decline:
                 CallDiagnostics.log("ring: call \(target.callId) declined from the notification")
                 session.setToRemovableState()

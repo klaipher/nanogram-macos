@@ -43,7 +43,10 @@ public final class PeerCallScreen : ViewController {
     public var hidesIncomingCaller: Bool = false {
         didSet {
             if oldValue != hidesIncomingCaller {
-                self.updateIncomingCard(self.stateValue.with { $0 })
+                let state = self.stateValue.with { $0 }
+                MainActor.assumeIsolated {
+                    self.updateIncomingCard(state)
+                }
             }
         }
     }
@@ -95,8 +98,10 @@ public final class PeerCallScreen : ViewController {
         self.screen.isMovableByWindowBackground = true
         self.screen.isReleasedWhenClosed = false
         super.init()
-        self.screen.closeInterceptor = { [weak self] in
-            return self?.interceptWindowClose() ?? false
+        MainActor.assumeIsolated {
+            self.screen.closeInterceptor = { [weak self] in
+                return self?.interceptWindowClose() ?? false
+            }
         }
         actionsDisposable.add(audioLevelDisposable)
         actionsDisposable.add(peerDisposable)
@@ -430,7 +435,9 @@ public final class PeerCallScreen : ViewController {
         let transition: ContainedViewLayoutTransition = animated ? .animated(duration: 0.2, curve: .spring) : .immediate
         genericView.updateState(state, videoViewState: videoViewState, arguments: arguments, transition: transition)
         genericView.updateLayout(size: self.frame.size, transition: transition)
-        self.updateIncomingCard(state)
+        MainActor.assumeIsolated {
+            self.updateIncomingCard(state)
+        }
         
         if state.externalState.canBeRemoved, self.onCompletion != nil {
             closeAllModals(window: screen)
@@ -452,7 +459,9 @@ public final class PeerCallScreen : ViewController {
                 CallWindowTransition.dismiss(window: self.screen, content: self.view, source: self.transitionSource, cornerRadius: CallWindowTransition.windowCornerRadius)
             }
             self.callEnded = true
-            self.incomingCard?.hide()
+            MainActor.assumeIsolated {
+                self.incomingCard?.hide()
+            }
             Analytics.shared.screens.hide(ObjectIdentifier(self))
 
             self.onCompletion?()
@@ -483,6 +492,7 @@ public final class PeerCallScreen : ViewController {
         }
     }
     
+    @MainActor
     private func updateIncomingCard(_ state: PeerCallState) {
         guard peerCallShowsIncomingCard(state.externalState) else {
             self.incomingCard?.hide()
@@ -505,6 +515,7 @@ public final class PeerCallScreen : ViewController {
         card.show()
     }
     
+    @MainActor
     private func acceptFromIncomingCard() {
         self.external.acceptcall()
         NSApp.activate(ignoringOtherApps: true)
@@ -517,9 +528,11 @@ public final class PeerCallScreen : ViewController {
     }
     
     public func presentIncoming() {
-        NSApp.unhide(nil)
-        if self.screen.isMiniaturized {
-            self.screen.deminiaturize(nil)
+        MainActor.assumeIsolated {
+            NSApp.unhide(nil)
+            if self.screen.isMiniaturized {
+                self.screen.deminiaturize(nil)
+            }
         }
         self.show(source: nil, animated: false)
     }
@@ -584,7 +597,11 @@ public final class PeerCallScreen : ViewController {
     private var isScreenVisible = false
 
     deinit {
-        self.incomingCard?.hide()
+        if let incomingCard = self.incomingCard {
+            Task { @MainActor in
+                incomingCard.hide()
+            }
+        }
         if let occlusionObserver = self.occlusionObserver {
             NotificationCenter.default.removeObserver(occlusionObserver)
         }

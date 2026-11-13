@@ -1,7 +1,7 @@
 import Foundation
 import UserNotifications
 
-public struct IncomingCallNotificationInfo: Equatable {
+public struct IncomingCallNotificationInfo: Equatable, Sendable {
     public let callId: String
     public let accountId: Int64
     public let isVideo: Bool

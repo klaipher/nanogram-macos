@@ -17,10 +17,11 @@ private final class IncomingCallCardButton: NSButton {
     }
 }
 
+@MainActor
 private final class IncomingCallCardAction: NSObject {
-    private let handler: () -> Void
+    private let handler: @MainActor () -> Void
 
-    init(_ handler: @escaping () -> Void) {
+    init(_ handler: @escaping @MainActor () -> Void) {
         self.handler = handler
         super.init()
     }
@@ -30,6 +31,7 @@ private final class IncomingCallCardAction: NSObject {
     }
 }
 
+@MainActor
 final class IncomingCallCard {
     private let panel: NSPanel
     private let titleLabel: NSTextField
@@ -37,7 +39,7 @@ final class IncomingCallCard {
     private let acceptAction: IncomingCallCardAction
     private let declineAction: IncomingCallCardAction
 
-    init(accept: @escaping () -> Void, decline: @escaping () -> Void) {
+    init(accept: @escaping @MainActor () -> Void, decline: @escaping @MainActor () -> Void) {
         let size = IncomingCallPanelConfiguration.size
         let panel = IncomingCallPanel(contentRect: NSMakeRect(0, 0, size.width, size.height), styleMask: IncomingCallPanelConfiguration.styleMask, backing: .buffered, defer: true)
         panel.isReleasedWhenClosed = false
