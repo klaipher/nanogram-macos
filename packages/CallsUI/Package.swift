@@ -35,6 +35,7 @@ let deps: [(String, String)] = [
     ("PushToTalk", "../PushToTalk"),
     ("PerfLab", "../PerfLab"),
     ("SceneEffects", "../SceneEffects"),
+    ("NanogramRuntime", "../NanogramRuntime"),
 ]
 
 let package = Package(

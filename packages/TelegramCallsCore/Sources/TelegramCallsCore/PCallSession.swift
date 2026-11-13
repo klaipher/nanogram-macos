@@ -316,6 +316,9 @@ public class PCallSession {
         public let voiceSettings: VoiceCallSettings
         public let proxyServerSettings: ProxyServerSettings?
         public let networkType: NetworkType
+        public static var fallback: InitialData {
+            return InitialData(configuration: VoipConfiguration.defaultValue, appConfiguration: AppConfiguration.defaultValue, derivedState: VoipDerivedState.default, peer: nil, voiceSettings: VoiceCallSettings.defaultSettings, proxyServerSettings: nil, networkType: .wifi)
+        }
         public init(configuration: VoipConfiguration, appConfiguration: AppConfiguration, derivedState: VoipDerivedState, peer: Peer?, voiceSettings: VoiceCallSettings, proxyServerSettings: ProxyServerSettings?, networkType: NetworkType) {
             self.configuration = configuration
             self.appConfiguration = appConfiguration
@@ -372,7 +375,7 @@ public class PCallSession {
     private var didSetCanBeRemoved = false {
         didSet {
             if didSetCanBeRemoved {
-                sharedContext.dropCrossCall()
+                sharedContext.dropCrossCall(ownedBy: self)
             }
         }
     }
@@ -1368,6 +1371,7 @@ public class PCallSession {
     
     public func hangUpCurrentCall(_ external: Bool) -> Signal<Bool, NoError> {
         CallDiagnostics.log("call \(self.internalId) hangUpCurrentCall requested, \(external ? "external" : "by the user")")
+        self.stopRingtoneIfRinging()
         completed = external
         var reason:CallSessionTerminationReason = .ended(.hungUp)
         if let session = sessionState {
@@ -1384,7 +1388,42 @@ public class PCallSession {
         return canBeRemovedPromise.get()
     }
     
+    public var isEnded: Bool {
+        if self.didSetCanBeRemoved {
+            return true
+        }
+        if let state = self.sessionState {
+            switch state.state {
+            case .terminated, .dropping:
+                return true
+            default:
+                break
+            }
+        }
+        return false
+    }
+    
+    public var isRingingIncoming: Bool {
+        guard !self.isOutgoing else {
+            return false
+        }
+        guard let state = self.sessionState else {
+            return !self.didSetCanBeRemoved
+        }
+        if case .ringing = state.state {
+            return true
+        }
+        return false
+    }
+    
+    private func stopRingtoneIfRinging() {
+        if self.isRingingIncoming {
+            self.stopTone()
+        }
+    }
+    
     public func setToRemovableState() {
+        self.stopRingtoneIfRinging()
         if !self.didSetCanBeRemoved {
             self.didSetCanBeRemoved = true
         }

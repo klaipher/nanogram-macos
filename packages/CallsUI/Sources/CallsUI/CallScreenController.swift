@@ -19,6 +19,7 @@ import TelegramContext
 import TelegramUtils
 import CallVideoLayer
 import AppAnalytics
+import NanogramRuntime
 
 private func insertSpacesBetweenEmojis(in text: String) -> String {
     var newString = ""
@@ -316,7 +317,15 @@ public func callScreen(_ result:PCallResult, source: CallWindowSource? = nil) {
         
         
         screen.update(arguments: arguments)
-        screen.show(source: source, animated: true)
+        let isIncoming = !session.isOutgoing
+        if isIncoming && session.isRingingIncoming {
+            screen.presentIncoming()
+        } else {
+            screen.show(source: source, animated: IncomingCallPolicy.shouldAnimateWindow(isIncoming: isIncoming, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion))
+        }
+        if isIncoming {
+            CallDiagnostics.log("ring: window ordered front for call \(session.internalId), visible \(screen.window?.isVisible == true), onActiveSpace \(screen.window?.isOnActiveSpace == true), appActive \(NSApp.isActive), appHidden \(NSApp.isHidden), miniaturized \(screen.window?.isMiniaturized == true)")
+        }
         
         session.window = screen.window
         

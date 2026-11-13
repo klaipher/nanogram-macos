@@ -135,7 +135,8 @@ public func makeNewCallConfirmation(sharedContext: any SharedAccountContextProto
             currentAccount = groupCall.call.account
             currentCallType = .voiceChat
         } else {
-            fatalError("wtf")
+            CallDiagnostics.log("new call confirmation: the active call is gone, continuing without a prompt")
+            return .single(true)
         }
         if ignoreSame, newPeerId == currentPeerId {
             return .single(true)

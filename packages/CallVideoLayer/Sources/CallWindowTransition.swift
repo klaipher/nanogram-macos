@@ -77,6 +77,7 @@ public final class CallWindowTransition {
     private static let margin: CGFloat = 100
     private static let sampleRate: Double = 120
     private static let maximumDuration: Double = 2
+    private static let completionFailsafe: Double = 0.6
     private static let geometryTolerance: CGFloat = 0.2
     private static let unitTolerance: CGFloat = 0.002
     private static let shadowOpacity: CGFloat = 0.69
@@ -243,7 +244,12 @@ public final class CallWindowTransition {
         if let source {
             transition.capture(source)
         }
-        transition.animate(from: transition.local(rect), to: transition.local(frame), cornerRadius: cornerRadius, opening: true, sourceView: source?.control, completion: {
+        var finished = false
+        let finish: () -> Void = {
+            if finished {
+                return
+            }
+            finished = true
             window.disableScreenUpdatesUntilFlush()
             content.removeFromSuperview()
             attach()
@@ -260,7 +266,13 @@ public final class CallWindowTransition {
             }
             transition.transitionWindow.orderOut(nil)
             completion?()
-        })
+        }
+        transition.animate(from: transition.local(rect), to: transition.local(frame), cornerRadius: cornerRadius, opening: true, sourceView: source?.control, completion: finish)
+        DispatchQueue.main.asyncAfter(deadline: .now() + CallWindowTransition.maximumDuration + CallWindowTransition.completionFailsafe) { [weak transition] in
+            if let transition, !transition.isCancelled {
+                finish()
+            }
+        }
         return transition
     }
 

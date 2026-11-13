@@ -720,6 +720,7 @@
 		9F3EAB4520A5ED2F003FE7E3 /* ocr_nn.bin in Resources */ = {isa = PBXBuildFile; fileRef = 9F3EAB3F20A5ED2F003FE7E3 /* ocr_nn.bin */; };
 		9F4EEF8421D4F59C002C3B33 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F4EEF8321D4F59C002C3B33 /* Accelerate.framework */; };
 		9F7B740F2229618E006610E4 /* SharedWakeupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7B740E2229618E006610E4 /* SharedWakeupManager.swift */; };
+		A1C0DE0000000000000000F2 /* IncomingCallPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE0000000000000000F1 /* IncomingCallPresenter.swift */; };
 		9F7B741122296FD7006610E4 /* SharedNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7B741022296FD7006610E4 /* SharedNotificationManager.swift */; };
 		9F7D422A22240404007B68BB /* AccountContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D422922240403007B68BB /* AccountContext.swift */; };
 		9F7D422C222415C9007B68BB /* SharedAccountContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7D422B222415C9007B68BB /* SharedAccountContext.swift */; };
@@ -1754,6 +1755,7 @@
 		9F52E74E2074C12B0048791C /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		9F6FF3212248E298004364FE /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
 		9F7B740E2229618E006610E4 /* SharedWakeupManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedWakeupManager.swift; sourceTree = "<group>"; };
+		A1C0DE0000000000000000F1 /* IncomingCallPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingCallPresenter.swift; sourceTree = "<group>"; };
 		9F7B741022296FD7006610E4 /* SharedNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedNotificationManager.swift; sourceTree = "<group>"; };
 		726D2C319EBD3AB2BA2C237F /* AccountManagerSetup.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AccountManagerSetup.swift; sourceTree = "<group>"; };
 		9F7D422922240403007B68BB /* AccountContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountContext.swift; sourceTree = "<group>"; };
@@ -3064,6 +3066,7 @@
 				9F7D422B222415C9007B68BB /* SharedAccountContext.swift */,
 				27CEA34C27B2A31B00472CB1 /* SupportAccountContext.swift */,
 				9F7B740E2229618E006610E4 /* SharedWakeupManager.swift */,
+				A1C0DE0000000000000000F1 /* IncomingCallPresenter.swift */,
 				9F7B741022296FD7006610E4 /* SharedNotificationManager.swift */,
 				9F0F8E81226DCD1C00A97F6A /* OpmizeDatabaseView.swift */,
 			);
@@ -4882,6 +4885,7 @@
 				27CEA34D27B2A31B00472CB1 /* SupportAccountContext.swift in Sources */,
 				9F7B741122296FD7006610E4 /* SharedNotificationManager.swift in Sources */,
 				9F7B740F2229618E006610E4 /* SharedWakeupManager.swift in Sources */,
+				A1C0DE0000000000000000F2 /* IncomingCallPresenter.swift in Sources */,
 				9F3D5F6322044D8700CB0CAA /* AppUpdateViewController.swift in Sources */,
 				4E414E4F5469ECD8583860F2 /* NanogramUpdater.swift in Sources */,
 				C2303E8A1D9A76D800098E12 /* MainViewController.swift in Sources */,

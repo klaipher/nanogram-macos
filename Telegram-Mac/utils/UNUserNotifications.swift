@@ -124,6 +124,18 @@ class UNUserNotifications : NSObject {
         
     }
     
+    var isLockedForCalls: Bool {
+        return manager.isLocked
+    }
+    
+    func postIncomingCall(_ info: IncomingCallNotificationInfo, title: String, body: String) {
+        
+    }
+    
+    func removeIncomingCall(callId: String) {
+        
+    }
+    
     func clearNotifies(_ peerId:PeerId, maxId:MessageId) {
         
     }
@@ -156,6 +168,15 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
     
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
     
+        let callUserInfo = response.notification.request.content.userInfo
+        if IncomingCallNotification.isCall(userInfo: callUserInfo) {
+            if response.actionIdentifier != UNNotificationDismissActionIdentifier, let target = IncomingCallNotification.target(actionIdentifier: response.actionIdentifier, userInfo: callUserInfo) {
+                IncomingCallPresenter.shared.respond(to: target)
+            }
+            completionHandler()
+            return
+        }
+        
         switch response.actionIdentifier {
         case UNNotificationDismissActionIdentifier: // Notification was dismissed by user
             completionHandler()
@@ -181,7 +202,8 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
         
         
         let replyCategory = UNNotificationCategory(identifier: "reply", actions: [replyAction], intentIdentifiers: [], options: [])
-        UNUserNotificationCenter.current().setNotificationCategories([replyCategory])
+        let callCategory = IncomingCallNotification.makeCategory(acceptTitle: strings().callAccept, declineTitle: strings().callDecline)
+        UNUserNotificationCenter.current().setNotificationCategories([replyCategory, callCategory])
         
         UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
             self?.soundSettings = settings.soundSetting
@@ -238,6 +260,19 @@ final class UNUserNotificationsNew : UNUserNotifications, UNUserNotificationCent
                         
            
         })
+    }
+    
+    override func postIncomingCall(_ info: IncomingCallNotificationInfo, title: String, body: String) {
+        let request = IncomingCallNotification.makeRequest(info, title: title, body: body)
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: { error in
+            CallDiagnostics.log("ring: notification for call \(info.callId) \(error == nil ? "posted" : "failed")")
+        })
+    }
+    
+    override func removeIncomingCall(callId: String) {
+        let identifiers = IncomingCallNotification.removalIdentifiers(callId: callId)
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: identifiers)
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
     }
     
     override func authorize(completion: @escaping (UNUserNotifications) -> Void) {

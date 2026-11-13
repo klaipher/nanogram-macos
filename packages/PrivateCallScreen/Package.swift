@@ -43,6 +43,7 @@ let package = Package(
         .package(name: "Localization", path: "../Localization"),
         .package(name: "CallVideoLayer", path: "../CallVideoLayer"),
         .package(name: "AppAnalytics", path: "../AppAnalytics"),
+        .package(name: "NanogramRuntime", path: "../NanogramRuntime"),
         .package(name: "TelegramVoip", path: "../../submodules/telegram-ios/submodules/TelegramVoip"),
         .package(name: "rnoise", path: "../../submodules/telegram-ios/third-party/rnnoise"),
     ],
@@ -60,7 +61,8 @@ let package = Package(
                            .product(name: "KeyboardKey", package: "KeyboardKey", condition: nil),
                            .product(name: "ColorPalette", package: "ColorPalette", condition: nil),
                            .product(name: "CallVideoLayer", package: "CallVideoLayer", condition: nil),
-                           .product(name: "AppAnalytics", package: "AppAnalytics", condition: nil)],
+                           .product(name: "AppAnalytics", package: "AppAnalytics", condition: nil),
+                           .product(name: "NanogramRuntime", package: "NanogramRuntime", condition: nil)],
             path: "Sources/",
             resources: [.process("Resources/Assets.xcassets")]),
         .testTarget(

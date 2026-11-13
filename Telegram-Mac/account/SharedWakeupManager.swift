@@ -45,6 +45,7 @@ class SharedWakeupManager {
     
     private var stateManagmentReseted: Set<AccountRecordId> = Set()
     private var ringingStatesDisposables: [AccountRecordId: Disposable] = [:]
+    private var ringLedgers: [AccountRecordId: IncomingCallRingLedger<CallSessionInternalId>] = [:]
     private var inForeground: Bool = false
     private let appliedFlags = AccountWakeupFlagsCache<AccountRecordId>()
 
@@ -64,7 +65,7 @@ class SharedWakeupManager {
     
     init(sharedContext: SharedAccountContext, inForeground: Signal<Bool, NoError>) {
         self.sharedContext = sharedContext
-        
+        IncomingCallPresenter.shared.sharedContext = sharedContext
         
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveSystemSleepNote(_:)), name: NSWorkspace.willSleepNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveSystemWakeNote(_:)), name: NSWorkspace.didWakeNotification, object: nil)
@@ -127,32 +128,74 @@ class SharedWakeupManager {
         for (id, disposable) in self.ringingStatesDisposables where !activeIds.contains(id) {
             disposable.dispose()
             self.ringingStatesDisposables.removeValue(forKey: id)
+            self.ringLedgers.removeValue(forKey: id)
         }
         let accountManager = sharedContext.accountManager
         for account in accounts {
             if self.ringingStatesDisposables[account.id] == nil {
                 
-                let combine = combineLatest(account.stateManager.isUpdating, account.callSessionManager.ringingStates()) |> mapToSignal { loading, states -> Signal<(Bool, CallSessionRingingState, PCallSession.InitialData)?, NoError> in
-                    if let state = states.first {
-                        return getPrivateCallSessionData(account, accountManager: accountManager, peerId: state.peerId) |> map {
-                            (loading, state, $0)
-                        }
-                    } else {
+                let ringing = account.callSessionManager.ringingStates()
+                |> deliverOnMainQueue
+                |> map { [weak self] states -> [CallSessionRingingState] in
+                    self?.ringLedgers[account.id, default: IncomingCallRingLedger()].prune(keeping: Set(states.map { $0.id }))
+                    return states
+                }
+                let isUpdating = account.stateManager.isUpdating
+                let combine = ringing
+                |> map { $0.first }
+                |> distinctUntilChanged(isEqual: { $0?.id == $1?.id })
+                |> mapToSignal { state -> Signal<(CallSessionRingingState, PCallSession.InitialData)?, NoError> in
+                    guard let state = state else {
                         return .single(nil)
                     }
-                }
-                |> filter { $0 != nil && !$0!.0 }
-                |> map { $0! }
-                |> deliverOnMainQueue
-                self.ringingStatesDisposables[account.id] = combine.start(next: { data in
-                    let state = data.1
-                    let initialData = data.2
-                    
-                    if self.sharedContext.hasActiveCall {
-                        if self.sharedContext.p2pCall?.internalId != state.id {
-                            account.callSessionManager.drop(internalId: state.id, reason: .missed, debugLog: .single(nil))
+                    CallDiagnostics.log("ring: state received for call \(state.id)")
+                    let graceElapsed: Signal<Bool, NoError> = .single(false) |> then(.single(true) |> delay(IncomingCallPolicy.ringGateGrace, queue: Queue.mainQueue()))
+                    let ready = combineLatest(isUpdating, graceElapsed)
+                    |> filter { IncomingCallPolicy.isRingReady(isUpdating: $0, graceElapsed: $1) }
+                    |> take(1)
+                    return ready |> mapToSignal { _ -> Signal<(CallSessionRingingState, PCallSession.InitialData)?, NoError> in
+                        return getPrivateCallSessionData(account, accountManager: accountManager, peerId: state.peerId)
+                        |> timeout(IncomingCallPolicy.sessionDataTimeout, queue: Queue.mainQueue(), alternate: .single(PCallSession.InitialData.fallback))
+                        |> map { data -> (CallSessionRingingState, PCallSession.InitialData)? in
+                            return (state, data)
                         }
+                    }
+                }
+                |> mapToSignal { value -> Signal<(CallSessionRingingState, PCallSession.InitialData), NoError> in
+                    if let value = value {
+                        return .single(value)
+                    }
+                    return .complete()
+                }
+                |> deliverOnMainQueue
+                self.ringingStatesDisposables[account.id] = combine.start(next: { [weak self] data in
+                    guard let self else {
+                        return
+                    }
+                    let state = data.0
+                    let initialData = data.1
+                    
+                    let active: IncomingCallActiveCall<CallSessionInternalId>?
+                    if let p2p = self.sharedContext.p2pCall {
+                        active = .p2p(id: p2p.internalId, isEnded: p2p.isEnded)
+                    } else if self.sharedContext.hasActiveCall {
+                        active = .group
                     } else {
+                        active = nil
+                    }
+                    
+                    let action = self.ringLedgers[account.id, default: IncomingCallRingLedger()].decide(ringId: state.id, active: active)
+                    switch action {
+                    case .ignore:
+                        return
+                    case .rejectBusy:
+                        CallDiagnostics.log("ring: call \(state.id) answered busy, the active call is live")
+                        account.callSessionManager.drop(internalId: state.id, reason: .busy, debugLog: .single(nil))
+                    case .present, .replaceEndedSession:
+                        if action == .replaceEndedSession {
+                            CallDiagnostics.log("ring: replacing the ended session with call \(state.id)")
+                            self.sharedContext.dropCrossCall()
+                        }
                         
                         var otherParticipants: [EnginePeer] = state.otherParticipants
                         
@@ -163,9 +206,11 @@ class SharedWakeupManager {
                         
                         #endif
                         
-                        
                         if state.peerId != account.peerId {
-                            showCallWindow(PCallSession(sharedContext: self.sharedContext, account: account, isOutgoing: false, incomingConferenceSource: state.conferenceSource, incomingParticipants: otherParticipants, peerId: state.peerId, id: state.id, initialState: nil, startWithVideo: state.isVideo, isVideoPossible: state.isVideoPossible, data: initialData))
+                            let session = PCallSession(sharedContext: self.sharedContext, account: account, isOutgoing: false, incomingConferenceSource: state.conferenceSource, incomingParticipants: otherParticipants, peerId: state.peerId, id: state.id, initialState: nil, startWithVideo: state.isVideo, isVideoPossible: state.isVideoPossible, data: initialData)
+                            CallDiagnostics.log("ring: session created for call \(state.id)")
+                            showCallWindow(session)
+                            IncomingCallPresenter.shared.begin(session: session, account: account, callerName: initialData.peer?.displayTitle)
                         }
                     }
                 })

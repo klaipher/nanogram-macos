@@ -763,6 +763,12 @@ class SharedAccountContext {
         _ = crossCallSession.swap(nil)
     }
     
+    func dropCrossCall(ownedBy session: AnyObject) {
+        _ = crossCallSession.modify { current in
+            return current === session ? nil : current
+        }
+    }
+    
     func endCurrentCall() -> Signal<Bool, NoError> {
         if let groupCall = crossGroupCall.with({ $0 }) {
             return groupCall.leaveSignal() |> filter { $0 }

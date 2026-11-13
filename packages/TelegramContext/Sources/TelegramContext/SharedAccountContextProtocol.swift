@@ -23,6 +23,7 @@ public protocol SharedAccountContextProtocol: AnyObject {
     var hasActiveCall: Bool { get }
     var callStatusBarMenuItems: (() -> [ContextMenuItem])? { get set }
     func dropCrossCall()
+    func dropCrossCall(ownedBy session: AnyObject)
     func endCurrentCall() -> Signal<Bool, NoError>
     func endGroupCall(terminate: Bool) -> Signal<Bool, NoError>
     func updateStatusBarImage(_ image: NSImage?) -> Void

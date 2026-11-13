@@ -9,6 +9,7 @@ import AppKit
 import KeyboardKey
 import Localization
 import AppAnalytics
+import NanogramRuntime
 
 protocol CallViewUpdater {
     func updateState(_ state: PeerCallState, arguments: Arguments, transition: ContainedViewLayoutTransition)
@@ -37,6 +38,15 @@ public final class PeerCallScreen : ViewController {
     private var presentTransition: CallWindowTransition?
     private var isHostedInTransition: Bool = false
     private var animatesWindow: Bool = false
+    private var incomingCard: IncomingCallCard?
+    
+    public var hidesIncomingCaller: Bool = false {
+        didSet {
+            if oldValue != hidesIncomingCaller {
+                self.updateIncomingCard(self.stateValue.with { $0 })
+            }
+        }
+    }
 
     
     private let statePromise = ValuePromise<PeerCallState>(ignoreRepeated: true)
@@ -85,6 +95,9 @@ public final class PeerCallScreen : ViewController {
         self.screen.isMovableByWindowBackground = true
         self.screen.isReleasedWhenClosed = false
         super.init()
+        self.screen.closeInterceptor = { [weak self] in
+            return self?.interceptWindowClose() ?? false
+        }
         actionsDisposable.add(audioLevelDisposable)
         actionsDisposable.add(peerDisposable)
         actionsDisposable.add(stateDisposable)
@@ -417,6 +430,7 @@ public final class PeerCallScreen : ViewController {
         let transition: ContainedViewLayoutTransition = animated ? .animated(duration: 0.2, curve: .spring) : .immediate
         genericView.updateState(state, videoViewState: videoViewState, arguments: arguments, transition: transition)
         genericView.updateLayout(size: self.frame.size, transition: transition)
+        self.updateIncomingCard(state)
         
         if state.externalState.canBeRemoved, self.onCompletion != nil {
             closeAllModals(window: screen)
@@ -438,6 +452,7 @@ public final class PeerCallScreen : ViewController {
                 CallWindowTransition.dismiss(window: self.screen, content: self.view, source: self.transitionSource, cornerRadius: CallWindowTransition.windowCornerRadius)
             }
             self.callEnded = true
+            self.incomingCard?.hide()
             Analytics.shared.screens.hide(ObjectIdentifier(self))
 
             self.onCompletion?()
@@ -447,6 +462,66 @@ public final class PeerCallScreen : ViewController {
         self.videoViewState = videoViewState
         self.previousState = state
         self.updateScreenSleep()
+    }
+    
+    private func interceptWindowClose() -> Bool {
+        let external = self.stateValue.with { $0.externalState }
+        if external.canBeRemoved {
+            return false
+        }
+        switch peerCallCloseAction(for: external.state) {
+        case .closeWindow:
+            return false
+        case .declineCall:
+            CallDiagnostics.log("call window closed while ringing, declining")
+            self.external.endcall(external)
+            return true
+        case .removeSession:
+            CallDiagnostics.log("call window closed after the call ended, removing the session")
+            self.external.endcall(external)
+            return true
+        }
+    }
+    
+    private func updateIncomingCard(_ state: PeerCallState) {
+        guard peerCallShowsIncomingCard(state.externalState) else {
+            self.incomingCard?.hide()
+            return
+        }
+        let card: IncomingCallCard
+        if let current = self.incomingCard {
+            card = current
+        } else {
+            card = IncomingCallCard(accept: { [weak self] in
+                self?.acceptFromIncomingCard()
+            }, decline: { [weak self] in
+                self?.declineFromIncomingCard()
+            })
+            self.incomingCard = card
+        }
+        let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? ""
+        let title = IncomingCallPolicy.displayTitle(callerName: state.title, hidesCaller: self.hidesIncomingCaller, appName: appName)
+        card.update(title: title, subtitle: L10n.callStatusCalling)
+        card.show()
+    }
+    
+    private func acceptFromIncomingCard() {
+        self.external.acceptcall()
+        NSApp.activate(ignoringOtherApps: true)
+        self.screen.makeKeyAndOrderFront(nil)
+    }
+    
+    private func declineFromIncomingCard() {
+        let external = self.stateValue.with { $0.externalState }
+        self.external.endcall(external)
+    }
+    
+    public func presentIncoming() {
+        NSApp.unhide(nil)
+        if self.screen.isMiniaturized {
+            self.screen.deminiaturize(nil)
+        }
+        self.show(source: nil, animated: false)
     }
     
     public func show(source: CallWindowSource? = nil, animated: Bool = false) {
@@ -509,6 +584,7 @@ public final class PeerCallScreen : ViewController {
     private var isScreenVisible = false
 
     deinit {
+        self.incomingCard?.hide()
         if let occlusionObserver = self.occlusionObserver {
             NotificationCenter.default.removeObserver(occlusionObserver)
         }
