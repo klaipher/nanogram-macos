@@ -9,6 +9,7 @@ final class HLSNativePartStore {
     private static let readTimeout: Double = 10.0
 
     private let engine: TelegramEngine
+    private let mediaBox: MediaBox
     private let files: [HLSNativeQualityFile]
     private let queue = Queue(name: "HLSNativePartStore")
 
@@ -18,6 +19,7 @@ final class HLSNativePartStore {
 
     init(engine: TelegramEngine, files: [HLSNativeQualityFile]) {
         self.engine = engine
+        self.mediaBox = engine.account.postbox.mediaBox
         self.files = files
     }
 
@@ -33,6 +35,9 @@ final class HLSNativePartStore {
         let qualityFile = self.files[level]
         let resource = EngineMediaResource(qualityFile.file.media.resource)
         let size = qualityFile.size
+        let mediaBox = self.mediaBox
+        let initRange = request.initRange
+        let dataRange = request.dataRange
         let queue = self.queue
 
         let initData: Signal<Data?, NoError>
@@ -68,25 +73,33 @@ final class HLSNativePartStore {
                     subscriber.putCompletion()
                     return
                 }
-                let tempFile = TempBox.shared.tempFile(fileName: "data.mp4")
                 var combined = Data()
                 combined.reserveCapacity(initData.count + segmentData.count)
                 combined.append(initData)
                 combined.append(segmentData)
-                guard let _ = try? combined.write(to: URL(fileURLWithPath: tempFile.path), options: .atomic), let trackTiming = HLSNativePartStore.trackTiming(data: combined, path: tempFile.path), let timing = HLSPartTiming.range(audio: trackTiming.audio, video: trackTiming.video) else {
-                    TempBox.shared.dispose(tempFile)
+                guard let trackTiming = HLSNativePartStore.trackTiming(data: combined), let timing = HLSPartTiming.range(audio: trackTiming.audio, video: trackTiming.video) else {
                     subscriber.putNext(nil)
                     subscriber.putCompletion()
                     return
                 }
                 if isCancelled.with({ $0 }) {
-                    TempBox.shared.dispose(tempFile)
+                    return
+                }
+                guard let content = HLSStreamingStorage.nativePartContent(mediaBox: mediaBox, resource: qualityFile.file.media.resource, resourceSize: size, initRange: initRange, dataRange: dataRange, initData: initData, segmentData: segmentData, codecName: trackTiming.videoCodecName) else {
+                    subscriber.putNext(nil)
+                    subscriber.putCompletion()
+                    return
+                }
+                if isCancelled.with({ $0 }) {
+                    if let file = content.file {
+                        TempBox.shared.dispose(file)
+                    }
                     return
                 }
                 subscriber.putNext(ChunkMediaPlayerPart(
                     startTime: timing.start,
                     endTime: timing.end,
-                    content: ChunkMediaPlayerPart.TempFile(file: tempFile, ignoreAudioEditList: true),
+                    content: content,
                     codecName: trackTiming.videoCodecName,
                     offsetTime: 0.0
                 ))
@@ -120,13 +133,29 @@ final class HLSNativePartStore {
         })
     }
 
-    static func trackTiming(data: Data, path: String) -> (audio: (start: Double, duration: Double)?, video: (start: Double, duration: Double)?, videoCodecName: String?)? {
+    typealias TrackTiming = (audio: (start: Double, duration: Double)?, video: (start: Double, duration: Double)?, videoCodecName: String?)
+
+    static func trackTiming(data: Data, path: String) -> TrackTiming? {
         if let info = HLSFragmentTiming.parse(data) {
             return (info.audio.map { ($0.start, $0.duration) }, info.video.map { ($0.start, $0.duration) }, info.videoCodecName)
         }
         guard let mediaInfo = extractFFMpegMediaInfo(path: path) else {
             return nil
         }
+        return trackTiming(mediaInfo: mediaInfo)
+    }
+
+    static func trackTiming(data: Data) -> TrackTiming? {
+        if let info = HLSFragmentTiming.parse(data) {
+            return (info.audio.map { ($0.start, $0.duration) }, info.video.map { ($0.start, $0.duration) }, info.videoCodecName)
+        }
+        guard let mediaInfo = extractFFMpegMediaInfo(data: data) else {
+            return nil
+        }
+        return trackTiming(mediaInfo: mediaInfo)
+    }
+
+    private static func trackTiming(mediaInfo: FFMpegMediaInfo) -> TrackTiming {
         return (mediaInfo.audio.map { ($0.startTime.seconds, $0.duration.seconds) }, mediaInfo.video.map { ($0.startTime.seconds, $0.duration.seconds) }, mediaInfo.video?.codecName)
     }
 
