@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Core**: iOS commit with the `ProbeIncomingCall` build fix (the `timeout` parameter hid the SignalKit operator).
+
 - **Build fix**: `LinkHygiene.standardList` is public. It is the default argument of the public `strippingTracking(_:list:)`, which Swift requires to be public (first release build of link hygiene).
 
 - **Build fix**: twidget 4913fd0e adds the `litehtml/no-public-headers` folder. Xcode 27's SwiftPM refused to resolve packages because the `TwidgetLitehtml` publicHeadersPath was missing ("public headers directory path ... is invalid"). The core moves to iOS ff1ac29b (same twidget and nanogram-deps 484b22e9 pins).
