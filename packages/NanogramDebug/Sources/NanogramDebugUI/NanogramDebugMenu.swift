@@ -9,7 +9,6 @@ public final class NanogramDebugMenu: NSObject {
 
     private let settings: NanogramDebugSettings
     private let openDeveloperScreen: () -> Bool
-    private(set) var windowController: NanogramDebugWindowController?
 
     public init(settings: NanogramDebugSettings = .shared, openDeveloperScreen: @escaping () -> Bool) {
         self.settings = settings
@@ -24,16 +23,6 @@ public final class NanogramDebugMenu: NSObject {
             NanogramReportMenu.install(in: mainMenu)
         }
         installed = menu
-    }
-
-    public static func showSwitches() {
-        if let installed = installed {
-            installed.showWindow()
-        } else {
-            let menu = NanogramDebugMenu(openDeveloperScreen: { false })
-            installed = menu
-            menu.showWindow()
-        }
     }
 
     public func install(in mainMenu: NSMenu) {
@@ -60,25 +49,11 @@ public final class NanogramDebugMenu: NSObject {
     }
 
     public func open() {
-        if NSApp?.currentEvent?.modifierFlags.contains(.option) == true {
-            self.showWindow()
-            return
-        }
         if self.openDeveloperScreen() {
             return
         }
-        self.showWindow()
-    }
-
-    public func showWindow() {
-        let controller: NanogramDebugWindowController
-        if let current = self.windowController {
-            controller = current
-        } else {
-            controller = NanogramDebugWindowController(settings: self.settings)
-            self.windowController = controller
-        }
-        controller.showWindow(nil)
-        controller.window?.makeKeyAndOrderFront(nil)
+        let alert = NSAlert()
+        alert.messageText = "Sign in to open the debug settings." //TODOLANG
+        alert.runModal()
     }
 }

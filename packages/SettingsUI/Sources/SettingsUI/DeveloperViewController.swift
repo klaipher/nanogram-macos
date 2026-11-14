@@ -35,6 +35,7 @@ private final class Arguments {
     public let toggleGlassGrouping: () -> Void
     public let toggleMessageWidgets: () -> Void
     public let resetApp: (DeveloperAppReset) -> Void
+    public let nanogramChanged: () -> Void
     public init(context: any AccountContextProtocol,
          toggleLogs: @escaping (Bool) -> Void,
          navigateToLogs: @escaping () -> Void,
@@ -49,7 +50,8 @@ private final class Arguments {
          accessibilityAudit: @escaping () -> Void,
          toggleGlassGrouping: @escaping () -> Void,
          toggleMessageWidgets: @escaping () -> Void,
-         resetApp: @escaping (DeveloperAppReset) -> Void) {
+         resetApp: @escaping (DeveloperAppReset) -> Void,
+         nanogramChanged: @escaping () -> Void) {
         self.context = context
         self.toggleLogs = toggleLogs
         self.navigateToLogs = navigateToLogs
@@ -65,6 +67,7 @@ private final class Arguments {
         self.toggleGlassGrouping = toggleGlassGrouping
         self.toggleMessageWidgets = toggleMessageWidgets
         self.resetApp = resetApp
+        self.nanogramChanged = nanogramChanged
     }
 }
 
@@ -79,6 +82,7 @@ private struct State: Equatable {
     public var accessibilityTree: Bool = true
     public var glassGroupingSecondary: Bool = false
     public var messageWidgets: Bool = false
+    public var nanogramRevision: Int = 0
 }
 
 private let _id_add_account = InputDataIdentifier("_id_add_account")
@@ -95,7 +99,6 @@ private let _id_accessibility_audit = InputDataIdentifier("_id_accessibility_aud
 private let _id_glass_grouping = InputDataIdentifier("_id_glass_grouping")
 private let _id_clear_database = InputDataIdentifier("_id_clear_database")
 private let _id_clear_database_and_cache = InputDataIdentifier("_id_clear_database_and_cache")
-private let _id_nanogram_switches = InputDataIdentifier("_id_nanogram_switches")
 private let _id_message_widgets = InputDataIdentifier("_id_message_widgets")
 
 
@@ -108,25 +111,21 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     entries.append(.sectionId(sectionId, type: .normal))
     sectionId += 1
 
-    if DeveloperHooks.isInstalled, let openNanogramSwitches = DeveloperHooks.shared.openNanogramSwitches {
+    if DeveloperHooks.isInstalled, DeveloperHooks.shared.messageWidgets != nil {
         entries.append(.desc(sectionId: sectionId, index: index, text: .plain("NANOGRAM"), data: .init(viewType: .textTopItem)))
         index += 1
 
-        let hasMessageWidgets = DeveloperHooks.shared.messageWidgets != nil
-        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_nanogram_switches, data: InputDataGeneralData(name: "Debug Switches…", color: theme.colors.text, type: .next, viewType: hasMessageWidgets ? .firstItem : .singleItem, action: openNanogramSwitches)))
+        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_message_widgets, data: InputDataGeneralData(name: "Message widgets", color: theme.colors.text, type: .switchable(state.messageWidgets), viewType: .singleItem, action: arguments.toggleMessageWidgets)))
         index += 1
 
-        if hasMessageWidgets {
-            entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_message_widgets, data: InputDataGeneralData(name: "Message widgets", color: theme.colors.text, type: .switchable(state.messageWidgets), viewType: .lastItem, action: arguments.toggleMessageWidgets)))
-            index += 1
-
-            entries.append(.desc(sectionId: sectionId, index: index, text: .plain("Widgets run a bot's script inside the message. Off for security. Turn on only for bots you trust."), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
-            index += 1
-        }
+        entries.append(.desc(sectionId: sectionId, index: index, text: .plain("Widgets run a bot's script inside the message. Off for security. Turn on only for bots you trust."), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+        index += 1
 
         entries.append(.sectionId(sectionId, type: .normal))
         sectionId += 1
     }
+
+    entries.append(contentsOf: nanogramDeveloperEntries(sectionId: &sectionId, index: &index, changed: arguments.nanogramChanged))
 
     entries.append(.desc(sectionId: sectionId, index: index, text: .plain("ACCOUNTS"), data: .init(viewType: .textTopItem)))
     index += 1
@@ -397,6 +396,12 @@ public func DeveloperViewController(context: any AccountContextProtocol) -> Inpu
                     alert(for: context.window, header: "Reset App", info: "Could not prepare to restart Telegram. Please try again.")
                 }
             }))
+        }
+    }, nanogramChanged: {
+        updateState { current in
+            var current = current
+            current.nanogramRevision += 1
+            return current
         }
     })
 

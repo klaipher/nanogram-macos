@@ -12,6 +12,7 @@ import CrashReports
 import ApiCredentials
 import NanogramLogExport
 import NanogramDebug
+import NanogramDebugUI
 
 let nanogramCrashReportStore = CrashReportStore(handledKey: "crashReports.handledUntil." + ApiEnvironment.prefix)
 
@@ -170,7 +171,8 @@ private func nanogramLogCollector(_ kind: NanogramLogExportKind) -> NanogramLogC
                 NanogramReportSection(folder: "logs", title: "App logs and critical logs", sources: logs.map { [$0] } ?? []), //TODOLANG
             ]
             let staging = NanogramLogExportFiles.stagingRoot(under: NanogramLogExportFiles.defaultRoot())
-            guard let staged = try? NanogramReport.stage(device: NanogramReportDevice.current(), sections: sections, settings: settingsLines, in: staging) else {
+            let energy = NanogramExperimentEnergy.reportText()
+            guard let staged = try? NanogramReport.stage(device: NanogramReportDevice.current(), sections: sections, settings: settingsLines, extraFiles: [(NanogramReport.energyFileName, energy)], in: staging) else {
                 return []
             }
             return [staged]

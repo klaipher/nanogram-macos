@@ -212,20 +212,11 @@ final class NanogramLogExportDeliveryTests: XCTestCase {
         XCTAssertFalse(NanogramLogExportGate.shared.isRunning)
     }
 
-    @MainActor
-    func testDebugWindowOffersOnlyAvailableExports() {
-        let recorder = DeliveryRecorder()
-        self.install(recorder, availableKinds: [.fullReport, .appLogs, .callLogs, .metricKit])
-        let controller = NanogramDebugWindowController()
-        XCTAssertEqual(NanogramLogExportKind.allCases.compactMap { controller.logButton(for: $0)?.title }, ["Send Report…", "Send App Logs…", "Send Call Logs…", "Send MetricKit Reports…"])
-        XCTAssertEqual(controller.logNotes, ["Crash reports aren't available in the App Store edition."])
-    }
-
     func testUserFacingStringsAreMarkedForLocalization() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         var paths = ["Telegram-Mac/packages-integration/hooks/NanogramLogExportHooksInstall.swift"]
         let exportDirectory = "packages/NanogramDebug/Sources/NanogramLogExport"
-        for name in try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(exportDirectory).path) where name.hasSuffix(".swift") && name != "NanogramReportReadme.swift" {
+        for name in try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(exportDirectory).path) where name.hasSuffix(".swift") && name != "NanogramReportReadme.swift" && name != "NanogramEnergy.swift" {
             paths.append(exportDirectory + "/" + name)
         }
         let literal = try NSRegularExpression(pattern: "\"((?:[^\"\\\\]|\\\\.)*)\"")

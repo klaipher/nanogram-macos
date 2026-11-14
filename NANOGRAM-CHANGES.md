@@ -77,12 +77,12 @@ not re-verified against the code; correct them on the next change in that area.
 - Sync note: expect conflicts in `ChatHeaderBubblesView.swift`, `ChatController.swift` (`updateFrame`, `headerHeight`, `updateHeaderInsets`) and `ChatHeaderController.swift` at the next upstream merge; keep our side.
 
 ### Features and switches
-- What: Nanogram Debug Settings window (experiments off by default except on-device voice transcription), HTML
+- What: Nanogram debug switches (experiments off by default except on-device voice transcription; listed inline on the Developer screen), HTML
   message widgets, iOS-style first display, accessibility work. (check)
 - Where: `packages/NanogramDebug`, `packages/NanogramRuntime`, `packages/NanogramKit`, docs/accessibility/.
 - Call experiments (hardware decode, hardware crop, native decode format, screen-share hardware encoder, thermal video limits,
   10-video cap in group calls, RNNoise-only group noise suppression) default to on in the Mac app; each can still be switched
-  off in the Debug Settings window. Upstream has none of these. `packages/CallVideoLayer`.
+  off on the Developer screen. Upstream has none of these. `packages/CallVideoLayer`.
 
 ### Branding
 - What: Nanogram name and Sphere app icon in both editions, Telegram-owned endpoints removed; a lint keeps Telegram's name and logo out.
@@ -163,8 +163,12 @@ not re-verified against the code; correct them on the next change in that area.
 - libopus builds from the core's xiph/opus v1.6.1 submodule with CMake + Ninja and the shared option file `opus-cmake-args.sh` (NEON presumed), floating point (was fixed-point); libwebp builds with Ninja (2026-11-14). Where: `core-xprojects/libopus`, `core-xprojects/libwebp`. Upstream: no. Sync: keep ours.
 
 ## One Send Report button (macOS)
-- What: Help > Send Report… bundles app logs with critical logs, call logs, crash and hang reports, MetricKit reports and debug-switch values into one zip with a README (Mac model, chip, macOS, app build). A note before sending lists what is included; no messages, contacts or phone numbers. The crash card and the Developer screen use it too; the four fine-grained exports stay in the debug windows only.
+- What: Help > Send Report… bundles app logs with critical logs, call logs, crash and hang reports, MetricKit reports and debug-switch values into one zip with a README (Mac model, chip, macOS, app build). A note before sending lists what is included; no messages, contacts or phone numbers. The crash card and the Developer screen use it too; the four fine-grained exports stay on the Developer screen only.
 - Where: `packages/NanogramDebug` (`NanogramReport.swift`, `NanogramReportReadme.swift`, `NanogramReportMenu.swift`, the `fullReport` kind) and the hooks in `Telegram-Mac/packages-integration/hooks`.
 - Upstream: no, Nanogram-only.
 - Sync: none beyond keeping the hook installs.
 
+## Energy numbers and inline debug switches (macOS)
+- What: the report zip gains `energy.txt` (CPU time, billed and task energy, instructions, cycles, wakeups of the app process since launch and per experiment switch since it last changed; battery, power source, Low Power Mode, thermal state). The Developer screen lists all Nanogram switches inline, generated from `NanogramDebugSettings`; the separate debug-switches window is removed.
+- Where: `packages/NanogramDebug` (`NanogramEnergy.swift`, `NanogramExperimentEnergy.swift`, `NanogramReport.stage(extraFiles:)`), upstream hook: `DeveloperHooks.nanogramSections` and one `nanogramDeveloperEntries` call in `DeveloperViewController.swift` (rows in the new `DeveloperNanogramSections.swift`), `Telegram-Mac/packages-integration/hooks/DeveloperHooksInstall.swift`.
+- Sync note: upstream `DeveloperViewController.swift` conflicts are small: the NANOGRAM block, the `nanogramChanged` argument, `nanogramRevision` state.

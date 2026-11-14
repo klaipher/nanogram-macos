@@ -32,6 +32,11 @@ public struct NanogramDebugOption: Equatable, Sendable {
         self.kind = kind
     }
 
+    public var footnote: String? {
+        let notes = [self.detail, self.requiresRelaunch ? "Applies after relaunch." : nil].compactMap { $0 } //TODOLANG
+        return notes.isEmpty ? nil : notes.joined(separator: " ")
+    }
+
     public static func toggle(id: String, section: String, title: String, detail: String? = nil, requiresRelaunch: Bool = false, defaultValue: Bool) -> NanogramDebugOption {
         return NanogramDebugOption(id: id, section: section, title: title, detail: detail, requiresRelaunch: requiresRelaunch, kind: .toggle(defaultValue: defaultValue))
     }

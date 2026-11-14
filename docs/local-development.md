@@ -692,11 +692,13 @@ push touches Mac-shared paths. It never builds the Mac core, so an iOS hotfix is
 ## Debug Settings and feature switches
 
 The app menu has **Nanogram → Debug Settings…** (`packages/NanogramDebug`, installed by `AppDelegate`). Signed in,
-it opens upstream's Developer screen, which gains a **Debug Switches…** row; signed out, or with Option held, it
-opens the switches window. Upstream's five-click gesture still works.
+it opens upstream's Developer screen, which lists every switch inline as ordinary settings sections (generated from
+the `NanogramDebugSettings` descriptors through one `DeveloperHooks.nanogramSections` hook; Reset Nanogram Switches
+at the end); signed out it says to sign in. There is no separate switches window any more. Upstream's five-click
+gesture still works.
 
 Switches are `NanogramDebugOption`s registered in `NanogramDebugSettings.shared`, stored in the app's
-UserDefaults as `nanogram.debug.<id>`; an unset key means the default. Reset one or all from the window.
+UserDefaults as `nanogram.debug.<id>`; an unset key means the default. Reset all from the Developer screen.
 
 | Switch (`id`) | Section | Default | Effect |
 |---|---|---|---|

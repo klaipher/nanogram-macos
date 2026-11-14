@@ -52,9 +52,10 @@ public struct NanogramReportSection: Equatable, Sendable {
 }
 
 public enum NanogramReport {
-    public static let includedNote = "Includes app logs, call logs, crash info and diagnostic settings. No messages, contacts or phone numbers." //TODOLANG
+    public static let includedNote = "Includes app logs, call logs, crash info, energy and CPU numbers and diagnostic settings. No messages, contacts or phone numbers." //TODOLANG
     public static let readmeFileName = "README.txt"
     public static let settingsFileName = "settings.txt"
+    public static let energyFileName = "energy.txt"
 
     public static let totalByteLimit = 40 * 1024 * 1024
     public static let sectionByteLimit = 16 * 1024 * 1024
@@ -63,7 +64,7 @@ public enum NanogramReport {
     /// Copies every section into `<root>/nanogram-report-<stamp>/<folder>/`, newest files first and under the size caps,
     /// then writes the settings and the README listing every file and every file left out. Returns the staged folder,
     /// ready to zip.
-    public static func stage(device: NanogramReportDevice, sections: [NanogramReportSection], settings: [String], date: Date = Date(), totalBytes: Int = totalByteLimit, sectionBytes: Int = sectionByteLimit, fileBytes: Int = fileByteLimit, in root: URL) throws -> URL {
+    public static func stage(device: NanogramReportDevice, sections: [NanogramReportSection], settings: [String], extraFiles: [(name: String, text: String)] = [], date: Date = Date(), totalBytes: Int = totalByteLimit, sectionBytes: Int = sectionByteLimit, fileBytes: Int = fileByteLimit, in root: URL) throws -> URL {
         let fileManager = FileManager.default
         let directory = root.appendingPathComponent("nanogram-report-\(stamp(date))-\(UUID().uuidString.prefix(6))", isDirectory: true)
         do {
@@ -126,7 +127,10 @@ public enum NanogramReport {
             }
             let settingsText = settingsFileText(settings)
             try Data(settingsText.utf8).write(to: directory.appendingPathComponent(settingsFileName))
-            let readme = readme(device: device, sections: counts, omitted: omitted, date: date)
+            for extra in extraFiles {
+                try Data(extra.text.utf8).write(to: directory.appendingPathComponent(extra.name))
+            }
+            let readme = readme(device: device, sections: counts, omitted: omitted, extraFiles: extraFiles.map { $0.name }, date: date)
             try Data(readme.utf8).write(to: directory.appendingPathComponent(readmeFileName))
         } catch {
             try? fileManager.removeItem(at: directory)

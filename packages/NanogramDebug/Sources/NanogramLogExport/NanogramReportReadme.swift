@@ -6,7 +6,7 @@ extension NanogramReport {
         return lines.isEmpty ? "No diagnostic settings are registered in this build.\n" : lines.joined(separator: "\n") + "\n"
     }
 
-    public static func readme(device: NanogramReportDevice, sections: [(title: String, files: [(path: String, size: Int)])], omitted: [(path: String, size: Int, reason: String)] = [], date: Date) -> String {
+    public static func readme(device: NanogramReportDevice, sections: [(title: String, files: [(path: String, size: Int)])], omitted: [(path: String, size: Int, reason: String)] = [], extraFiles: [String] = [], date: Date) -> String {
         var lines = [
             "Nanogram diagnostic report",
             "",
@@ -36,6 +36,9 @@ extension NanogramReport {
             }
         }
         lines.append("- Diagnostic settings: \(settingsFileName)")
+        for name in extraFiles {
+            lines.append("- \(name)")
+        }
         lines.append("")
         lines.append("Not included: message text, contact lists, phone numbers beyond what the logs already redact.")
         return lines.joined(separator: "\n") + "\n"

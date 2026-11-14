@@ -22,14 +22,45 @@ public struct DeveloperSwitch {
     }
 }
 
+public struct DeveloperOption {
+    public enum Kind {
+        case toggle(isOn: Bool, set: (Bool) -> Void)
+        case choice(titles: [String], selected: Int, select: (Int) -> Void)
+    }
+
+    public let id: String
+    public let title: String
+    public let footnote: String?
+    public let kind: Kind
+
+    public init(id: String, title: String, footnote: String?, kind: Kind) {
+        self.id = id
+        self.title = title
+        self.footnote = footnote
+        self.kind = kind
+    }
+}
+
+public struct DeveloperOptionSection {
+    public let title: String
+    public let options: [DeveloperOption]
+
+    public init(title: String, options: [DeveloperOption]) {
+        self.title = title
+        self.options = options
+    }
+}
+
 public struct DeveloperHooks {
-    public let openNanogramSwitches: (() -> Void)?
+    public let nanogramSections: (() -> [DeveloperOptionSection])?
+    public let resetNanogramSections: (() -> Void)?
     public let messageWidgets: DeveloperSwitch?
     public let logExports: [DeveloperLogExport]
     public let sendLogs: ((NSWindow?) -> Void)?
 
-    public init(openNanogramSwitches: (() -> Void)? = nil, messageWidgets: DeveloperSwitch? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
-        self.openNanogramSwitches = openNanogramSwitches
+    public init(nanogramSections: (() -> [DeveloperOptionSection])? = nil, resetNanogramSections: (() -> Void)? = nil, messageWidgets: DeveloperSwitch? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
+        self.nanogramSections = nanogramSections
+        self.resetNanogramSections = resetNanogramSections
         self.messageWidgets = messageWidgets
         self.logExports = logExports
         self.sendLogs = sendLogs

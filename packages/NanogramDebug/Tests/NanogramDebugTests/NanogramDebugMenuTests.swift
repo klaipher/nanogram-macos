@@ -2,7 +2,6 @@ import AppKit
 import XCTest
 @testable import NanogramDebug
 @testable import NanogramDebugUI
-import NanogramLogExport
 
 final class NanogramDebugMenuTests: XCTestCase {
     private func makeMainMenu() -> NSMenu {
@@ -45,43 +44,17 @@ final class NanogramDebugMenuTests: XCTestCase {
         menu.install(in: main)
         menu.open()
         XCTAssertEqual(asked, 1)
-        XCTAssertNil(menu.windowController)
     }
 
-    func testShowsOwnWindowWithoutLogin() {
-        let menu = NanogramDebugMenu(settings: makeSettings().0, openDeveloperScreen: { false })
-        menu.open()
-        XCTAssertNotNil(menu.windowController)
-        menu.windowController?.close()
+    func testFootnoteJoinsDetailAndRelaunchNote() {
+        XCTAssertNil(NanogramDebugOption.toggle(id: "a", section: "S", title: "A", defaultValue: false).footnote)
+        XCTAssertEqual(NanogramDebugOption.toggle(id: "a", section: "S", title: "A", detail: "Detail.", requiresRelaunch: true, defaultValue: false).footnote, "Detail. Applies after relaunch.")
+        XCTAssertEqual(NanogramDebugOption.toggle(id: "a", section: "S", title: "A", requiresRelaunch: true, defaultValue: false).footnote, "Applies after relaunch.")
     }
 
-    func testWindowControlsWriteSettings() {
+    func testSectionsKeepRegistrationOrderForTheInlinePage() {
         let (settings, _) = makeSettings()
-        let controller = NanogramDebugWindowController(settings: settings)
-        let toggle = controller.control(for: "video.hardware") as? NSButton
-        XCTAssertEqual(toggle?.state, .on)
-        toggle?.state = .off
-        toggle?.performClick(nil)
-        XCTAssertEqual(settings.bool("video.hardware"), toggle?.state == .on)
-        let popup = controller.control(for: "display.cap") as? NSPopUpButton
-        XCTAssertEqual(popup?.indexOfSelectedItem, 0)
-        popup?.selectItem(at: 1)
-        popup?.sendAction(popup?.action, to: popup?.target)
-        XCTAssertEqual(settings.choice("display.cap"), "60")
-        settings.set("display.cap", choice: "off")
-        XCTAssertEqual(popup?.indexOfSelectedItem, 0)
-        controller.close()
-    }
-
-    @MainActor
-    func testWindowListsEveryLogExport() {
-        let controller = NanogramDebugWindowController(settings: makeSettings().0)
-        XCTAssertEqual(NanogramLogExportKind.allCases.compactMap { controller.logButton(for: $0)?.title }, ["Send Report…", "Send App Logs…", "Send Call Logs…", "Send Crash Reports…", "Send MetricKit Reports…"])
-        let gate = NanogramLogExportGate.shared
-        XCTAssertTrue(gate.begin())
-        XCTAssertFalse(controller.logButton(for: .appLogs)?.isEnabled ?? true)
-        gate.end()
-        XCTAssertTrue(controller.logButton(for: .appLogs)?.isEnabled ?? false)
-        controller.close()
+        XCTAssertEqual(settings.sections.map { $0.title }, ["Video", "Display"])
+        XCTAssertEqual(settings.sections.flatMap { $0.options.map { $0.id } }, ["video.hardware", "display.cap"])
     }
 }
