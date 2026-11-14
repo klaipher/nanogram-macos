@@ -69,4 +69,12 @@ final class PhotoSourceReadingTests: XCTestCase {
         created.append(url)
         XCTAssertEqual(PhotoSourceReading.pixelSize(at: url.path), CGSize(width: 1, height: 1))
     }
+
+    func testPixelSizeOfAnimatedWebPIsCanvasSize() throws {
+        let data = try XCTUnwrap(Data(base64Encoded: "UklGRpAAAABXRUJQVlA4WAoAAAACAAAAPwAALwAAQU5JTQYAAAD/////AABBTk1GLgAAAAAAAAAAAD8AAC8AAGQAAAJWUDhMFQAAAC8/wAsABxD9j/4HgITwf70Y0f/UDwBBTk1GLgAAAAAAAAAAAD8AAC8AAGQAAABWUDhMFQAAAC8/wAsABxDR//4HgITwf70Y0f/UDwA="))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("anim-\(UUID().uuidString).webp")
+        try data.write(to: url)
+        created.append(url)
+        XCTAssertEqual(PhotoSourceReading.pixelSize(at: url.path), CGSize(width: 64, height: 48))
+    }
 }

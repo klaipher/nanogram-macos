@@ -513,7 +513,7 @@ public class Sender: NSObject {
             }
             attrs.append(TelegramMediaFileAttribute.FileName(fileName: path.nsstring.lastPathComponent.nsstring.deletingPathExtension.appending(".mp4")))
 
-        } else if mime.hasPrefix("image"), let image = NSImage(contentsOf: URL(fileURLWithPath: path)), !mime.hasPrefix("image/webp") {
+        } else if mime.hasPrefix("image"), !mime.hasPrefix("image/webp"), let image = NSImage(contentsOf: URL(fileURLWithPath: path)) {
             var size = image.size
             if size.width == .infinity || size.height == .infinity {
                 size = image.cgImage(forProposedRect: nil, context: nil, hints: nil)!.size
