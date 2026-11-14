@@ -10,18 +10,18 @@ Generated from `tools/dev/native/module-settings.json` by `tools/dev/native/modu
 | Swift optimisation, Debug | -Onone (fastbuild/dbg) | -Onone | yes |
 | Whole-module optimisation, Release | on (swift.opt_uses_wmo) | on (SWIFT_COMPILATION_MODE=wholemodule) | yes |
 | C, C++, Objective-C LTO, Release | ThinLTO (-flto=thin) | ThinLTO (LLVM_LTO=YES_THIN), also -O3 | yes |
-| Rust LTO, Release | fat | thin (Cargo.toml release profile) | no, by design |
+| Rust LTO, Release | fat | fat (--config in core-xprojects scripts) | yes |
 | Dead-code stripping, Release | on (--features=dead_strip) | on (DEAD_CODE_STRIPPING=YES) | yes |
 
 Why the platform differences stay:
 
 - Mac builds 12 cold feature modules -Osize in Release to keep the binary small (NANOGRAM_SWIFT_OPT_* in nanogram/Nanogram.xcconfig); iOS builds every module -O. Both are -Onone in Debug.
-- iOS links Rust with fat LTO (cross-crate); the Mac builds the Rust engines with the Cargo release profile (thin LTO). Same compiler (native-libs.json, rust). Kept platform-specific: fat LTO costs link time the Mac loop cannot afford.
-- The Mac Release link uses an order file (tools/dev/orderfile.py); iOS does not.
+- iOS links Rust with fat LTO (cross-crate); the Mac builds the Rust engines with fat LTO too (--config in the core-xprojects build scripts: tlottie via its crate profile, wallet-engine and mtproto-engine via --config). Same compiler (native-libs.json, rust). Native libraries are cached by stamp, so the link time is not paid in the dev loop.
+- Both apps link Release with order files: iOS for MtProtoKit, SwiftSignalKit, Postbox, TelegramCore and TelegramUI (Telegram/BUILD, OrderFiles/*.order); the Mac through tools/dev/orderfile.py. The files are separate.
 
 ## Swift language mode per module
 
-iOS builds 822 Swift modules (41 in Swift 6 mode); the Mac builds 258 package targets (8 in Swift 6 mode). 43 modules are built by both apps; 6 of them differ in language mode.
+iOS builds 903 Swift modules (44 in Swift 6 mode); the Mac builds 258 package targets (8 in Swift 6 mode). 43 modules are built by both apps; 6 of them differ in language mode.
 
 | Module | iOS | Mac | Status |
 |---|---|---|---|

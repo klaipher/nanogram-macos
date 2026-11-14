@@ -86,8 +86,8 @@
   "rust_lto": {
    "label": "Rust LTO, Release",
    "ios": "fat",
-   "mac": "thin (Cargo.toml release profile)",
-   "equal": "no, by design",
+   "mac": "fat (--config in core-xprojects scripts)",
+   "equal": "yes",
    "probes": {
     "ios": [
      {
@@ -98,9 +98,19 @@
     ],
     "mac": [
      {
-      "id": "Cargo.toml",
-      "file": "submodules/telegram-ios/third-party/mtproto-engine/Cargo.toml",
-      "regex": "lto = \"(thin)\""
+      "id": "wallet-engine build.sh",
+      "file": "core-xprojects/wallet-engine/wallet-engine/build.sh",
+      "regex": "(?s)--crate-type staticlib.*profile\\.release\\.lto=\"(fat)\""
+     },
+     {
+      "id": "mtproto-engine build.sh",
+      "file": "core-xprojects/mtproto-engine/mtproto-engine/build.sh",
+      "regex": "(?s)CARGO_BIN\" rustc.*--crate-type staticlib.*profile\\.release\\.lto=\"(fat)\""
+     },
+     {
+      "id": "tlottie build.sh (no lto override)",
+      "file": "core-xprojects/tlottie/build.sh",
+      "regex": "\\A(?![\\s\\S]*profile\\.release\\.lto=false)[\\s\\S]*(--crate-type staticlib)"
      }
     ]
    }
@@ -311,8 +321,8 @@
   "RangeSet": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk"
  },
  "counts": {
-  "ios_swift_modules": 822,
-  "ios_swift6": 41,
+  "ios_swift_modules": 903,
+  "ios_swift6": 44,
   "mac_swift_targets": 258,
   "mac_swift6": 8,
   "built_by_both": 43,
