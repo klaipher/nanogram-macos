@@ -11,10 +11,10 @@ let package = Package(
     targets: [
         .target(
             name: "HLSPlayback",
-            path: "Sources/HLSPlayback"),
+            path: "Sources"),
         .testTarget(
             name: "HLSPlaybackTests",
             dependencies: ["HLSPlayback"],
-            path: "Tests/HLSPlaybackTests"),
+            path: "Tests"),
     ]
 )

@@ -21,7 +21,10 @@ let package = Package(
         .target(
             name: "EDSunriseSet",
             dependencies: [],
-            path: ".",
-            publicHeadersPath: "Sources/EDSunriseSet"),
+            // The one EDSunriseSet: the iOS core's submodules/Sunrise (the symlink keeps the target inside this package).
+            path: "CoreSources",
+            exclude: ["BUILD"],
+            sources: ["Sources"],
+            publicHeadersPath: "PublicHeaders"),
     ]
 )
