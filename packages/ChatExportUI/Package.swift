@@ -43,7 +43,7 @@ let package = Package(
             path: "Sources/ChatExportUI"),
         .testTarget(
             name: "ChatExportUITests",
-            dependencies: ["ChatExportUI", .product(name: "rnoise", package: "rnoise")],
+            dependencies: ["ChatExportUI", .product(name: "rnoise", package: "rnoise"), .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil)],
             path: "Tests/ChatExportUITests"),
     ]
 )
