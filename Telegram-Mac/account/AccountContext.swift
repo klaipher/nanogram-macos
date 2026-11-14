@@ -16,7 +16,7 @@ import WalletContext
 import HTMLBubbles
 #endif
 import ApiCredentials
-import TelegramContext
+import struct TelegramContext.StorePurchasePolicy
 
 
 #if !SHARE

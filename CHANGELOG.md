@@ -4,7 +4,7 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
-- **Build fix**: `AccountContext.swift` and `InAppLinks.swift` import `TelegramContext`, which defines `StorePurchasePolicy` (the store-build purchase switch); the first release build of that switch stopped on "cannot find 'StorePurchasePolicy' in scope".
+- **Build fix**: `AccountContext.swift` and `InAppLinks.swift` import `struct TelegramContext.StorePurchasePolicy` (a scoped import: the whole module clashes with the app's own `ChatLocation` and `AccountContextBindings`), which defines it (the store-build purchase switch); the first release build of that switch stopped on "cannot find 'StorePurchasePolicy' in scope".
 
 - **Core**: iOS commit with the `ProbeIncomingCall` build fix (the `timeout` parameter hid the SignalKit operator).
 
