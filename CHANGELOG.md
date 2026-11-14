@@ -4,6 +4,11 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Round videos (circles) are recorded like on iOS (branch `fix/round-video-like-ios`, not built or run)**. Before, the Mac followed the server's `round_video_encoding` (384 px, 1000 kbps).
+  - Size: `max(server diameter, 480)`, even, at most 640 (`RoundVideoEncodingPolicy.side`), so a larger server value is still honoured. Bitrate: `max(server video_bitrate, 1200)` kbps, audio `max(server audio_bitrate, 64)` kbps AAC. H.264 High auto level and CABAC were already set; like iOS there is no keyframe-interval key.
+  - Capture: 30 fps is set on the webcam when its format supports it, and the camera format is the smallest whose shorter side is at least 480 x 1.25 = 600 px (`bestCaptureFormat`); a smaller webcam uses its largest format. The writer size is capped to what the renderer really produces (`effectiveSide`), so a small webcam never claims more pixels than it has.
+  - The trim/send path of a recorded circle is a passthrough export, so it keeps the recorded size and bitrate. Tests: MediaRecorderUI RoundVideoEncodingPolicyTests. iOS already sends 480, so other clients see no change.
+
 
 - **Mac concurrency and app-lifecycle cleanups (modernization review, stream mac-conc; branch `mod/mac-conc`, not built or run)**.
   - MACOS-ACTIVATE-1 (fbc6ff7f): all 28 `NSApp.activate(ignoringOtherApps: true)` calls are `NSApp.activate()` (the 13 sites in macOS 10.13 packages use `if #available(macOS 14.0, *)` with the old call as fallback) (the flag has had no effect since macOS 14); no hand-off we control needed `yieldActivation`.

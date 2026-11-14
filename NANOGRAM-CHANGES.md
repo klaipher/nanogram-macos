@@ -128,3 +128,9 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: `TGUIKit` (`ModernizationFlag.swift`, `TableRelayoutPlan.swift`, `TableView.layoutItems`, `TableView.remove(range:)`), `TelegramTheme/PhotoCacheSizing.swift` (+ `TelegramThemeShare` symlink), `TelegramMediaUtils/CoalescedProgress.swift`, `ChatUI/ChatMediaFilePromise.swift`, `ChatFileContentView`, `ChatInteractiveContentView`, `ChatMediaContentView`.
 - Upstream: no.
 - Sync: conflicts possible in `TableView.swift` and `ChatMediaContentView.swift`.
+
+### Round videos like iOS (480 px, 1.2 Mbps)
+- What: circles are recorded at `max(server diameter, 480)` px (even, at most 640), `max(server video_bitrate, 1200)` kbps and `max(server audio_bitrate, 64)` kbps, 30 fps, with the smallest camera format whose short side is at least 600 px. Upstream follows the server values (384 px, 1000 kbps).
+- Where: `packages/MediaRecorderUI` (`RoundVideoEncodingPolicy.swift`, `VideoRecorderPipeline.swift`).
+- Upstream: no; `VideoMessageConfig` and the server reading are untouched.
+- Sync: re-apply the policy calls in `VideoRecorderPipeline` (init, `setSelectedVideoDevice`, `configureRecorderTracks`) after a merge.
