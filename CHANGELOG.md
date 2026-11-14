@@ -4,6 +4,14 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+## 13.2.0 (202611142334) — 2026-11-14
+
+Source: `nanogram/integration` @ f098d353 · core `klaipher/nanogram` @ 8cbfdb5f (iOS integration; twidget 4913fd0e, nanogram-deps 484b22e9).
+Artifacts: `Nanogram-13.2.0-202611142334.dmg` (Developer ID, notarized and stapled, app submission b40a4bba, dmg submission ca9cb520; Sparkle EdDSA-signed), `appcast.xml`, `Nanogram-13.2.0-202611142334-source.tar.gz` (kept locally), `BUILD-INFO.txt`; published as https://github.com/klaipher/nanogram-releases/releases/tag/v13.2.0-202611142334 (Latest).
+Changes since 13.2.0 (202611132157, 82fbeb79): `git log 82fbeb79..f098d353` and the core round of 2026-11-14 (entries below).
+Public notes (short): call decline shows "declined"; one ringing window on every desktop; Nanogram Features (search operators, cleaner links, on-device transcription and translation, off by default); centered chat header option (off by default); link-hover preview hides when the mouse leaves; Help > Send Report; smaller encryption library (BoringSSL) and leaner components; server settings read correctly in more places.
+Not verified yet: in-app update from 202611132157; the header switch and the hover fix on the owner's Mac.
+
 - **Centered chat header is now a switch, off by default (not built or run)**: Settings > Nanogram Features > "Centered chat header" (option `chat.centeredHeader`, `CenteredChatHeader` in NanogramRuntime, registered in `AppDelegate.installNanogramDebugMenu`; stored in `NanogramDebugSettings` like the other switches, so "Reset to Defaults" turns it off). Off is the upstream layout again; on is the centred layout of the previous Unreleased entries unchanged.
   - One choice point: `ChatControllerView.centeredHeader` (cached; re-read when the setting changes) is copied to `ChatHeaderBubblesView.centeredHeader` in every `updateFrame`. Off: the upstream `headerHeight` (now `currentHeaderHeight(for:)`), `inlineHeaderFrame`, `hasInlinePinnedMessage`, `compactTitle`, `displaysInlineHeader`, `inlinePinnedMessageFrame`, `inlineHeaderFrame` (bubbles view), the inline pinned frame passed to `ChatHeaderController.updateLayout`, `mergeGlassOnRemoval`, and the title capsule filling the room between the controls, all restored as they were before 12dea001; `ChatHeaderInlineLayout` and its tests are back. On: `ChatHeaderLayout.titleCapsuleFrame` and `accessoryFrame`, `fitsCenteredCapsule`, and the animated relayout when the text width changes (only while on).
   - Relayout: the controller observes the setting; a change relayouts every open chat with a 0.2 s animation (`updateFrame` with the current inset). `ChatHeaderController` already handled a nil inline frame by removing the inline container, so on to off to on needs no extra reset.
