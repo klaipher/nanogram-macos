@@ -237,18 +237,11 @@ public class TabAllBadgeItem: TabAnimatedItem {
         }))
     }
 
+    deinit {
+        accountsDisposable.dispose()
+    }
+
     private func currentHasMultipleAccounts() -> Bool {
-        if let cached = hasMultipleAccounts.with({ $0 }) {
-            return cached
-        }
-        let semaphore = DispatchSemaphore(value: 0)
-        let hasMultipleAccounts = self.hasMultipleAccounts
-        let disposable = (context.sharedContext.activeAccounts |> take(1)).start(next: { accounts in
-            _ = hasMultipleAccounts.swap(accounts.accounts.count > 1)
-            semaphore.signal()
-        })
-        _ = semaphore.wait(timeout: .now() + 0.25)
-        disposable.dispose()
         return hasMultipleAccounts.with { $0 } ?? true
     }
     
