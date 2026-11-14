@@ -131,7 +131,7 @@ class PinnedVersionsTests(unittest.TestCase):
         amalgamation = sources / "amalgamation"
         self.assertIn('#define SQLITE_VERSION        "3.54.1"', read(amalgamation / "headers" / "sqlcipher" / "sqlite3.h"))
         self.assertIn("#define CIPHER_VERSION_NUMBER 4.20.0", read(amalgamation / "sqlite3.c"))
-        self.assertEqual(gitlink(TG_IOS, "submodules/sqlcipher/amalgamation"), "9948d5af4e4dc808e223917c228622f2952fcda5")
+        self.assertEqual(gitlink(TG_IOS, "submodules/sqlcipher/amalgamation"), "010c1b1174ac79856766b9ece9179c784645053b")
 
     def test_tde2e(self):
         self.assertEqual(gitlink(TG_IOS, "third-party/td/td"), "0e88653dcbf4e44c73cb655a05b58cd749a91169")
@@ -185,7 +185,7 @@ class PinnedVersionsTests(unittest.TestCase):
     def test_tgcalls_is_the_klaipher_fork_pin_shared_with_ios(self):
         self.assertEqual(gitlink(ROOT, "submodules/tgcalls"), gitlink(TG_IOS, "submodules/TgVoipWebrtc/tgcalls"))
         modules = read(ROOT / ".gitmodules")
-        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-shared\n', modules)
+        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls.git\n\tbranch = nanogram-shared\n\tshallow = true\n', modules)
 
     def test_widget_stack_is_the_klaipher_forks_shared_with_ios(self):
         modules = read(ROOT / ".gitmodules")
