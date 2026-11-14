@@ -184,7 +184,7 @@ public class StickerMediaContentView: ChatMediaContentView {
                 }
             }
             
-            if media.isPremiumSticker, !media.noPremium, !context.premiumIsBlocked, let parent = parent {
+            if media.isPremiumSticker, !media.noPremium, context.isPremium || !context.premiumIsBlocked, let parent = parent {
                 self.playIfNeeded(true)
                 parameters?.runPremiumScreenEffect(parent)
                 return

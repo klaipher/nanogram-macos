@@ -704,25 +704,32 @@ private func accountInfoEntries<Context: AccountContextProtocol>(peerView:PeerVi
         index += 1
     }
     
-    if !context.premiumIsBlocked {
-        entries.append(.premium(index: index, viewType: .singleItem))
-        index += 1
+    let showsPremiumRows = !context.premiumIsBlocked || context.isPremium
+    let stars_purchase_blocked = context.appConfiguration.getBoolValue("stars_purchase_blocked", orElse: true) || StorePurchasePolicy.blocks(.starsTopUp)
+    let hasStars = stars.map { $0.balance.value > 0 || !$0.transactions.isEmpty } ?? false
+    let hasTon = ton.map { $0.balance.value > 0 || !$0.transactions.isEmpty } ?? false
+    
+    // Owned balances and the Premium features a user pays for stay reachable; only the sale is hidden.
+    do {
+        if showsPremiumRows {
+            entries.append(.premium(index: index, viewType: .singleItem))
+            index += 1
+        }
         
-        
-        let stars_purchase_blocked = context.appConfiguration.getBoolValue("stars_purchase_blocked", orElse: true)
-        
-        if !stars_purchase_blocked, let stars  {
+        if let stars, !stars_purchase_blocked || hasStars {
             entries.append(.stars(index: index, count: stars.balance, viewType: .singleItem))
             index += 1
         }
         
-        if let ton, ton.balance.value > 0 || !ton.transactions.isEmpty  {
+        if let ton, hasTon {
             entries.append(.ton(index: index, count: ton.balance, viewType: .singleItem))
             index += 1
         }
 
-        entries.append(.business(index: index, viewType: .singleItem))
-        index += 1
+        if showsPremiumRows {
+            entries.append(.business(index: index, viewType: .singleItem))
+            index += 1
+        }
         
         entries.append(.giftPremium(index: index, viewType: .singleItem))
         index += 1

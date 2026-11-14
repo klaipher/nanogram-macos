@@ -442,7 +442,7 @@ private func stickersEntries(view: ItemCollectionsView?, context: any AccountCon
                 for item in view.orderedItemListsViews[1].items {
                     if let entry = item.contents.get(SavedStickerItem.self) {
                         if let id = entry.file._parse().id, ids[id] == nil {
-                            if !entry.file.isPremiumSticker || !context.premiumIsBlocked {
+                            if !entry.file.isPremiumSticker || context.isPremium || !context.premiumIsBlocked {
                                 ids[id] = id
                                 files.append(entry.file._parse())
                             }
@@ -468,7 +468,7 @@ private func stickersEntries(view: ItemCollectionsView?, context: any AccountCon
                     if let entry = item.contents.get(RecentMediaItem.self) {
                         let file = entry.media._parse()
                         if let id = file.id, ids[id] == nil, file.isStaticSticker || file.isAnimatedSticker {
-                            if !file.isPremiumSticker || !context.premiumIsBlocked {
+                            if !file.isPremiumSticker || context.isPremium || !context.premiumIsBlocked {
                                 ids[id] = id
                                 files.append(file)
                             }
@@ -507,7 +507,7 @@ private func stickersEntries(view: ItemCollectionsView?, context: any AccountCon
                     if let item = item as? StickerPackItem {
                         let file = item.file._parse()
                         if let id = file.id, ids[id] == nil, file.isStaticSticker || file.isAnimatedSticker {
-                            if !file.isPremiumSticker || !context.premiumIsBlocked {
+                            if !file.isPremiumSticker || context.isPremium || !context.premiumIsBlocked {
                                 ids[id] = id
                                 files.append(file)
                             }
@@ -530,7 +530,7 @@ private func stickersEntries(view: ItemCollectionsView?, context: any AccountCon
                         if entry.index.collectionId == info.id {
                             if let item = available.remove(at: i).item as? StickerPackItem {
                                 let file = item.file._parse()
-                                if !file.isPremiumSticker || !context.premiumIsBlocked {
+                                if !file.isPremiumSticker || context.isPremium || !context.premiumIsBlocked {
                                     files.insert(file, at: 0)
                                 }
                             }

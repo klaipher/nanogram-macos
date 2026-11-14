@@ -9,7 +9,6 @@ public enum StorePurchaseEntryPoint: CaseIterable, Sendable {
     case starsTopUp
     case starsGiftToFriends
     case tonTopUp
-    case adsTopUp
     case paidBoost
 
     case premiumStatus
@@ -18,13 +17,14 @@ public enum StorePurchaseEntryPoint: CaseIterable, Sendable {
     case sendGiftWithOwnedStars
     case receiveOrConvertGift
     case botPaymentPhysicalGoods
+    case spendEarnedRevenueOnAds
 
     /// True when the entry point sells a Telegram product for money (or leads straight to buying one).
     public var sellsTelegramProduct: Bool {
         switch self {
-        case .premiumSubscription, .premiumGift, .premiumGiveaway, .starsTopUp, .starsGiftToFriends, .tonTopUp, .adsTopUp, .paidBoost:
+        case .premiumSubscription, .premiumGift, .premiumGiveaway, .starsTopUp, .starsGiftToFriends, .tonTopUp, .paidBoost:
             return true
-        case .premiumStatus, .premiumFeaturesYouHave, .spendOwnedStars, .sendGiftWithOwnedStars, .receiveOrConvertGift, .botPaymentPhysicalGoods:
+        case .premiumStatus, .premiumFeaturesYouHave, .spendOwnedStars, .sendGiftWithOwnedStars, .receiveOrConvertGift, .botPaymentPhysicalGoods, .spendEarnedRevenueOnAds:
             return false
         }
     }

@@ -15,14 +15,14 @@ final class StorePurchasePolicyTests: XCTestCase {
     }
 
     func test_storePolicyKeepsWhatTheUserAlreadyHas() {
-        let kept: [StorePurchaseEntryPoint] = [.premiumStatus, .premiumFeaturesYouHave, .spendOwnedStars, .sendGiftWithOwnedStars, .receiveOrConvertGift, .botPaymentPhysicalGoods]
+        let kept: [StorePurchaseEntryPoint] = [.premiumStatus, .premiumFeaturesYouHave, .spendOwnedStars, .sendGiftWithOwnedStars, .receiveOrConvertGift, .botPaymentPhysicalGoods, .spendEarnedRevenueOnAds]
         for entry in kept {
             XCTAssertTrue(StorePurchasePolicy.store.allows(entry), "\(entry)")
         }
     }
 
     func test_topUpsAndSubscriptionsAreSoldEntryPoints() {
-        let sold: [StorePurchaseEntryPoint] = [.premiumSubscription, .premiumGift, .premiumGiveaway, .starsTopUp, .starsGiftToFriends, .tonTopUp, .adsTopUp, .paidBoost]
+        let sold: [StorePurchaseEntryPoint] = [.premiumSubscription, .premiumGift, .premiumGiveaway, .starsTopUp, .starsGiftToFriends, .tonTopUp, .paidBoost]
         XCTAssertEqual(Set(sold.map { "\($0)" }), Set(StorePurchaseEntryPoint.allCases.filter { $0.sellsTelegramProduct }.map { "\($0)" }))
     }
 

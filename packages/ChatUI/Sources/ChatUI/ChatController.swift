@@ -10888,7 +10888,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 if let item = item as? ChatRowItem, let view = item.view, let message = item.message {
                     var target: ChatPlayEffectTarget?
                     if let file = message.anyMedia as? TelegramMediaFile {
-                        if !file.noPremium, !context.premiumIsBlocked, file.isPremiumSticker {
+                        if !file.noPremium, context.isPremium || !context.premiumIsBlocked, file.isPremiumSticker {
                             target = .premiumSticker
                         } else if file.isEmojiAnimatedSticker || file.isCustomEmoji, file.isPremiumEmoji {
                             if message.globallyUniqueId != nil || message.flags.contains(.Incoming) {
