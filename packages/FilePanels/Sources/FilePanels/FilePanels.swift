@@ -21,6 +21,7 @@ public func filePanel(with exts:[String]? = nil, allowMultiple:Bool = true, canC
     presentFilePanel(with: exts, allowMultiple: allowMultiple, canChooseDirectories: canChooseDirectories, for: window, appearance: appearance, analyticsContext: analyticsContext, cancelled: cancelled, completion: completion)
 }
 
+@available(macOS 11, *)
 public func filePanelContentTypes(for exts: [String]) -> [UTType] {
     var types: [UTType] = []
     for ext in exts {
@@ -41,7 +42,11 @@ private func presentFilePanel(with exts: [String]?, allowMultiple: Bool, canChoo
         panel.appearance = appearance
         panel.canCreateDirectories = true
         if let exts = exts {
-            panel.allowedContentTypes = filePanelContentTypes(for: exts)
+            if #available(macOS 11, *) {
+                panel.allowedContentTypes = filePanelContentTypes(for: exts)
+            } else {
+                panel.allowedFileTypes = exts
+            }
         }
         panel.allowsMultipleSelection = allowMultiple
         Analytics.shared.screens.showStandalone(.systemFilePicker, owner: panel, context: analyticsContext)

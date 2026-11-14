@@ -2,6 +2,7 @@ import XCTest
 import UniformTypeIdentifiers
 @testable import FilePanels
 
+@available(macOS 11, *)
 final class FilePanelContentTypesTests: XCTestCase {
     func testMediaExtensionsMapToTypes() {
         let types = filePanelContentTypes(for: mediaExts)
