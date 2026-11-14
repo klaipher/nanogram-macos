@@ -38,19 +38,10 @@ public final class PeerCallScreen : ViewController {
     private var presentTransition: CallWindowTransition?
     private var isHostedInTransition: Bool = false
     private var animatesWindow: Bool = false
-    private var incomingCard: IncomingCallCard?
+    private var isRingingPresentation = false
+    private let normalCollectionBehavior: NSWindow.CollectionBehavior
+    private let normalLevel: NSWindow.Level
     
-    public var hidesIncomingCaller: Bool = false {
-        didSet {
-            if oldValue != hidesIncomingCaller {
-                let (showsCard, callerName) = self.stateValue.with { (peerCallShowsIncomingCard($0.externalState), $0.title) }
-                MainActor.assumeIsolated {
-                    self.updateIncomingCard(showsCard: showsCard, callerName: callerName)
-                }
-            }
-        }
-    }
-
     
     private let statePromise = ValuePromise<PeerCallState>(ignoreRepeated: true)
     private let stateValue = Atomic<PeerCallState>(value: .init())
@@ -97,6 +88,8 @@ public final class PeerCallScreen : ViewController {
         self.screen.titlebarAppearsTransparent = true
         self.screen.isMovableByWindowBackground = true
         self.screen.isReleasedWhenClosed = false
+        self.normalCollectionBehavior = self.screen.collectionBehavior
+        self.normalLevel = self.screen.level
         super.init()
         MainActor.assumeIsolated {
             self.screen.closeInterceptor = { [weak self] in
@@ -435,10 +428,8 @@ public final class PeerCallScreen : ViewController {
         let transition: ContainedViewLayoutTransition = animated ? .animated(duration: 0.2, curve: .spring) : .immediate
         genericView.updateState(state, videoViewState: videoViewState, arguments: arguments, transition: transition)
         genericView.updateLayout(size: self.frame.size, transition: transition)
-        let showsCard = peerCallShowsIncomingCard(state.externalState)
-        let callerName = state.title
         MainActor.assumeIsolated {
-            self.updateIncomingCard(showsCard: showsCard, callerName: callerName)
+            self.updateRingingPresentation(for: state.externalState)
         }
         
         if state.externalState.canBeRemoved, self.onCompletion != nil {
@@ -461,9 +452,6 @@ public final class PeerCallScreen : ViewController {
                 CallWindowTransition.dismiss(window: self.screen, content: self.view, source: self.transitionSource, cornerRadius: CallWindowTransition.windowCornerRadius)
             }
             self.callEnded = true
-            MainActor.assumeIsolated {
-                self.incomingCard?.hide()
-            }
             Analytics.shared.screens.hide(ObjectIdentifier(self))
 
             self.onCompletion?()
@@ -495,42 +483,24 @@ public final class PeerCallScreen : ViewController {
     }
     
     @MainActor
-    private func updateIncomingCard(showsCard: Bool, callerName: String?) {
-        guard showsCard else {
-            self.incomingCard?.hide()
+    private func updateRingingPresentation(for state: ExternalPeerCallState) {
+        self.setRingingPresentation(peerCallIsRinging(state))
+    }
+
+    @MainActor
+    private func setRingingPresentation(_ ringing: Bool) {
+        guard ringing != self.isRingingPresentation else {
             return
         }
-        let card: IncomingCallCard
-        if let current = self.incomingCard {
-            card = current
-        } else {
-            card = IncomingCallCard(accept: { [weak self] in
-                self?.acceptFromIncomingCard()
-            }, decline: { [weak self] in
-                self?.declineFromIncomingCard()
-            })
-            self.incomingCard = card
-        }
-        let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? ""
-        let title = IncomingCallPolicy.displayTitle(callerName: callerName, hidesCaller: self.hidesIncomingCaller, appName: appName)
-        card.update(title: title, subtitle: L10n.callStatusCalling)
-        card.show()
+        self.isRingingPresentation = ringing
+        let presentation = peerCallWindowPresentation(ringing: ringing, normalBehavior: self.normalCollectionBehavior, normalLevel: self.normalLevel)
+        self.screen.collectionBehavior = presentation.collectionBehavior
+        self.screen.level = presentation.level
     }
-    
-    @MainActor
-    private func acceptFromIncomingCard() {
-        self.external.acceptcall()
-        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
-        self.screen.makeKeyAndOrderFront(nil)
-    }
-    
-    private func declineFromIncomingCard() {
-        let external = self.stateValue.with { $0.externalState }
-        self.external.endcall(external)
-    }
-    
+
     public func presentIncoming() {
         MainActor.assumeIsolated {
+            self.setRingingPresentation(true)
             NSApp.unhide(nil)
             if self.screen.isMiniaturized {
                 self.screen.deminiaturize(nil)
@@ -599,11 +569,6 @@ public final class PeerCallScreen : ViewController {
     private var isScreenVisible = false
 
     deinit {
-        if let incomingCard = self.incomingCard {
-            Task { @MainActor in
-                incomingCard.hide()
-            }
-        }
         if let occlusionObserver = self.occlusionObserver {
             NotificationCenter.default.removeObserver(occlusionObserver)
         }
@@ -612,6 +577,6 @@ public final class PeerCallScreen : ViewController {
     }
 }
 
-// Main-thread confined like every window controller: the incoming card work hops to the main actor
+// Main-thread confined like every window controller: the ringing window work hops to the main actor
 // with MainActor.assumeIsolated, which needs the controller to be sendable.
 extension PeerCallScreen: @unchecked Sendable {}

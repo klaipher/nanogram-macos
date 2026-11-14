@@ -52,51 +52,35 @@ final class PeerCallWindowPolicyTests: XCTestCase {
         XCTAssertEqual(peerCallEndSteps(for: .terminated(.ended(.hungUp))), [])
     }
 
-    func testIncomingCardShowsOnlyWhileRinging() {
-        XCTAssertTrue(peerCallShowsIncomingCard(makeExternal(.ringing)))
-        XCTAssertFalse(peerCallShowsIncomingCard(makeExternal(.ringing, canBeRemoved: true)))
-        XCTAssertFalse(peerCallShowsIncomingCard(makeExternal(.connecting)))
-        XCTAssertFalse(peerCallShowsIncomingCard(makeExternal(.active(startTime: 0, reception: nil, emoji: ""))))
-        XCTAssertFalse(peerCallShowsIncomingCard(makeExternal(.terminated(.ended(.busy)))))
-        XCTAssertFalse(peerCallShowsIncomingCard(makeExternal(.requesting(ringing: true))))
+    func testOnlyAnUnremovedRingingCallCountsAsRinging() {
+        XCTAssertTrue(peerCallIsRinging(makeExternal(.ringing)))
+        XCTAssertFalse(peerCallIsRinging(makeExternal(.ringing, canBeRemoved: true)))
+        XCTAssertFalse(peerCallIsRinging(makeExternal(.connecting)))
+        XCTAssertFalse(peerCallIsRinging(makeExternal(.active(startTime: 0, reception: nil, emoji: ""))))
+        XCTAssertFalse(peerCallIsRinging(makeExternal(.terminated(.ended(.busy)))))
+        XCTAssertFalse(peerCallIsRinging(makeExternal(.requesting(ringing: true))))
     }
 
-    func testPanelJoinsEverySpaceAndFullScreenWithoutActivating() {
-        let behavior = IncomingCallPanelConfiguration.collectionBehavior
-        XCTAssertTrue(behavior.contains(.canJoinAllSpaces))
-        XCTAssertTrue(behavior.contains(.fullScreenAuxiliary))
-        XCTAssertTrue(behavior.contains(.ignoresCycle))
-        XCTAssertTrue(IncomingCallPanelConfiguration.styleMask.contains(.nonactivatingPanel))
-        XCTAssertGreaterThanOrEqual(IncomingCallPanelConfiguration.level.rawValue, NSWindow.Level.floating.rawValue)
+    func testRingingWindowJoinsEverySpaceAndFullScreenAboveNormalWindows() {
+        let normal: NSWindow.CollectionBehavior = [.managed]
+        let ringing = peerCallWindowPresentation(ringing: true, normalBehavior: normal, normalLevel: .normal)
+        XCTAssertTrue(ringing.collectionBehavior.contains(.canJoinAllSpaces))
+        XCTAssertTrue(ringing.collectionBehavior.contains(.fullScreenAuxiliary))
+        XCTAssertTrue(ringing.collectionBehavior.contains(.managed))
+        XCTAssertGreaterThanOrEqual(ringing.level.rawValue, NSWindow.Level.floating.rawValue)
     }
 
-    func testCardTextNeverOverlapsTheButtons() {
-        let layout = IncomingCallPanelConfiguration.layout
-        let bounds = NSRect(origin: .zero, size: IncomingCallPanelConfiguration.size)
-        let frames = [layout.icon, layout.title, layout.subtitle, layout.decline, layout.accept]
-        for frame in frames {
-            XCTAssertTrue(bounds.contains(frame), "\(frame) outside \(bounds)")
-        }
-        XCTAssertFalse(layout.title.intersects(layout.subtitle))
-        XCTAssertFalse(layout.subtitle.intersects(layout.decline))
-        XCTAssertFalse(layout.subtitle.intersects(layout.accept))
-        XCTAssertFalse(layout.decline.intersects(layout.accept))
-        XCTAssertGreaterThan(layout.subtitle.minY, layout.decline.maxY)
-        XCTAssertGreaterThan(layout.title.minY, layout.subtitle.minY)
+    func testWindowReturnsToNormalBehaviourOnceTheCallIsNotRinging() {
+        let normal: NSWindow.CollectionBehavior = [.fullScreenPrimary]
+        let presentation = peerCallWindowPresentation(ringing: false, normalBehavior: normal, normalLevel: .normal)
+        XCTAssertEqual(presentation, PeerCallWindowPresentation(collectionBehavior: normal, level: .normal))
+        XCTAssertFalse(presentation.collectionBehavior.contains(.canJoinAllSpaces))
+        XCTAssertFalse(presentation.collectionBehavior.contains(.fullScreenAuxiliary))
     }
 
-    func testCardLabelsAreTallEnoughForTheirFonts() {
-        let layout = IncomingCallPanelConfiguration.layout
-        let lineHeight = { (font: NSFont) in ceil(font.ascender - font.descender + font.leading) }
-        XCTAssertGreaterThanOrEqual(layout.title.height, lineHeight(IncomingCallPanelConfiguration.titleFont))
-        XCTAssertGreaterThanOrEqual(layout.subtitle.height, lineHeight(IncomingCallPanelConfiguration.subtitleFont))
-    }
-
-    func testPanelSitsInTheTopRightCorner() {
-        let frame = NSMakeRect(0, 0, 1440, 900)
-        let origin = IncomingCallPanelConfiguration.origin(in: frame)
-        let size = IncomingCallPanelConfiguration.size
-        XCTAssertEqual(origin.x + size.width + IncomingCallPanelConfiguration.margin, frame.maxX)
-        XCTAssertEqual(origin.y + size.height + IncomingCallPanelConfiguration.margin, frame.maxY)
+    func testEveryDeclineEntryPointHangsUpBeforeRemoving() {
+        // End in the window, closing the ringing window, the card-less notification Decline and the Dock all use these steps.
+        XCTAssertEqual(peerCallCloseAction(for: .ringing), .declineCall)
+        XCTAssertEqual(peerCallEndSteps(for: .ringing), [.hangUp, .markRemovable])
     }
 }

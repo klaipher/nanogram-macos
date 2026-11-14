@@ -253,6 +253,7 @@ public func callScreen(_ result:PCallResult, source: CallWindowSource? = nil) {
             for step in peerCallEndSteps(for: state.state) {
                 switch step {
                 case .hangUp:
+                    CallDiagnostics.log("call \(session.internalId) end/decline from the call window: hang up, discard reason hangup")
                     _ = session.hangUpCurrentCall().start()
                 case .markRemovable:
                     session.setToRemovableState()

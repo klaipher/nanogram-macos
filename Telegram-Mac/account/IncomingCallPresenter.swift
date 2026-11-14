@@ -4,6 +4,7 @@ import Postbox
 import TGUIKit
 import TelegramCore
 import NanogramRuntime
+import PrivateCallScreen
 
 // Main-thread confined: begin and end assert it, respond hops to the main queue.
 final class IncomingCallPresenter: @unchecked Sendable {
@@ -26,7 +27,6 @@ final class IncomingCallPresenter: @unchecked Sendable {
         }
         let notifications = UNUserNotifications.current
         let hidesCaller = IncomingCallPolicy.hidesCaller(isLocked: notifications?.isLockedForCalls ?? false, previewsEnabled: true)
-        sharedContext?.peerCall?.hidesIncomingCaller = hidesCaller
 
         let callId = id.uuidString
         let attention: Int? = MainActor.assumeIsolated {
@@ -93,8 +93,15 @@ final class IncomingCallPresenter: @unchecked Sendable {
                 }
             case .decline:
                 CallDiagnostics.log("ring: call \(target.callId) declined from the notification")
-                session.setToRemovableState()
-                _ = session.hangUpCurrentCall().start()
+                for step in peerCallEndSteps(for: .ringing) {
+                    switch step {
+                    case .hangUp:
+                        CallDiagnostics.log("call \(session.internalId) decline from the notification: hang up, discard reason hangup")
+                        _ = session.hangUpCurrentCall().start()
+                    case .markRemovable:
+                        session.setToRemovableState()
+                    }
+                }
             }
         }
     }
