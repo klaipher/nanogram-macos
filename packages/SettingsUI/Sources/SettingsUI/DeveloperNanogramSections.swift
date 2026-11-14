@@ -2,6 +2,8 @@ import Cocoa
 import TGUIKit
 import InputDataUI
 import GeneralRows
+import TelegramTheme
+import ColorPalette
 
 private let _id_nanogram_reset = InputDataIdentifier("_id_nanogram_reset")
 
