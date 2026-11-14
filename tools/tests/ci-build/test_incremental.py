@@ -35,7 +35,10 @@ class FlatSerializationTests(TemporaryTest):
     def setUp(self):
         super().setUp()
         (self.root / "scripts").mkdir()
-        (self.root / "scripts/flatc").symlink_to(ROOT / "scripts/flatc")
+        flatc = flat_generation.cached_flatc() or (ROOT / "scripts/flatc")
+        if not (flatc.is_file() and os.access(flatc, os.X_OK)):
+            self.skipTest("no flatc cached; run scripts/prepare-flat-serialization.py once (needs network and cmake)")
+        (self.root / "scripts/flatc").symlink_to(flatc)
         base = self.root / "submodules/telegram-ios/submodules/TelegramCore/FlatSerialization"
         self.model = write(base / "Models/Sample.fbs", "namespace Test;\ntable Sample { value:int (id: 0); }\n")
         self.output = base / "Sources/Sample_generated.swift"

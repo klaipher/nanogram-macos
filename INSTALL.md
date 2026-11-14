@@ -79,7 +79,7 @@ sh scripts/configure_frameworks.sh
 This takes a while, mostly because of WebRTC. The script:
 
 1. Generates TelegramApi's SwiftPM sources with SwiftTL, then the FlatSerialization
-   sources for TelegramCore with the bundled `scripts/flatc`.
+   sources for TelegramCore with flatc 25.12.19, which `scripts/prepare-flat-serialization.py` downloads (sha256-checked) and builds with CMake on first use into a per-user cache shared by all worktrees (`~/Library/Caches/nanogram/flatc/25.12.19`, base overridable with `NANOGRAM_CACHE_DIR`); the first run needs network and cmake.
 2. Builds, in order, `OpenH264`, `OpenSSLEncryption`, `libopus`, `libvpx`, `Mozjpeg`,
    `libwebp`, `dav1d`, `ffmpeg`, `webrtc` (tg_owt), `tde2e` and `WalletEngine` through
    their projects in `core-xprojects/<lib>/`. Outputs land in `core-xprojects/<lib>/build`,

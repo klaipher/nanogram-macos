@@ -545,11 +545,11 @@
     ],
     "mac": [
      {
-      "id": "flatc binary",
+      "id": "prepare-flat-serialization.py",
       "what": "version",
       "kind": "regex",
-      "file": "scripts/flatc",
-      "regex": "flatbuffers-([\\d.]+)/grpc"
+      "file": "scripts/prepare-flat-serialization.py",
+      "regex": "flatbuffers/archive/refs/tags/v([\\d.]+)\\.zip"
      }
     ]
    },
