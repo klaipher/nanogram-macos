@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Build fix**: `LinkHygiene.standardList` is public. It is the default argument of the public `strippingTracking(_:list:)`, which Swift requires to be public (first release build of link hygiene).
+
 - **Build fix**: twidget 4913fd0e adds the `litehtml/no-public-headers` folder. Xcode 27's SwiftPM refused to resolve packages because the `TwidgetLitehtml` publicHeadersPath was missing ("public headers directory path ... is invalid"). The core moves to iOS ff1ac29b (same twidget and nanogram-deps 484b22e9 pins).
 
 - **Build fix**: the WebRTC CMake configure passes `-DCMAKE_CXX_STANDARD=20` (`core-xprojects/webrtc/webrtc/build.sh`). Abseil LTS 20260817 refuses to configure when the compiler default is below C++17 and nothing sets the standard; every WebRTC target already uses C++20. The regenerated `WalletEngineFFI.swift` (UniFFI bindings from the shared wallet-engine pin: encrypt/decrypt envelope) is committed with the binary it matches.

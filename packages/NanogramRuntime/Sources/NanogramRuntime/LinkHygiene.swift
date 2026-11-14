@@ -83,7 +83,7 @@ public enum LinkHygiene {
     }
 
     // Mirrors docs/specs/link-tracking-params.txt, which the iOS repo owns; a test compares the two.
-    static let standardList = TrackingParameterList(fileContents: """
+    public static let standardList = TrackingParameterList(fileContents: """
     utm_*
     fbclid
     gclid
