@@ -159,9 +159,11 @@ public extension TextRecognizing {
         return all
     }
 
-    private static func makeSubject(_ buffer: CVPixelBuffer) -> Subject? {
+    static let sharedBufferContext = CIContext(options: nil)
+
+    static func makeSubject(_ buffer: CVPixelBuffer) -> Subject? {
         let ciImage = CIImage(cvPixelBuffer: buffer)
-        let context = CIContext(options: nil)
+        let context = sharedBufferContext
         guard let full = context.createCGImage(ciImage, from: ciImage.extent) else {
             return nil
         }
