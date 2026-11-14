@@ -150,6 +150,7 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
     case attach(index: Int, AttachMenuBot, viewType: GeneralViewType)
     case general(index: Int, viewType: GeneralViewType)
     case stickers(index: Int, viewType: GeneralViewType)
+    case nanogramFeatures(index: Int, viewType: GeneralViewType)
     case notifications(index: Int, viewType: GeneralViewType, status: NotificationAuthorizationStatus)
     case language(index: Int, viewType: GeneralViewType, current: String)
     case appearance(index: Int, viewType: GeneralViewType)
@@ -229,6 +230,8 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
             return .index(25)
         case .wallet:
             return .index(999)
+        case .nanogramFeatures:
+            return .index(998)
         case .about:
             return .index(26)
         case let .attach(index, _, _):
@@ -263,6 +266,8 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
         case let  .proxy(index, _, _):
             return index
         case let .stickers(index, _):
+            return index
+        case let .nanogramFeatures(index, _):
             return index
         case let .notifications(index, _, _):
             return index
@@ -414,6 +419,10 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
         case let .stickers(_, viewType):
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsStickersAndEmoji, icon: theme.icons.settingsStickers, activeIcon: theme.icons.settingsStickersActive, type: .next, viewType: viewType, action: {
                 arguments.presentController(SettingsNavigationHooks.shared.makeInstalledStickerPacksController(arguments.context, nil), true)
+            }, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
+        case let .nanogramFeatures(_, viewType):
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: "Nanogram Features", icon: theme.icons.settingsGeneral, activeIcon: theme.icons.settingsGeneralActive, type: .next, viewType: viewType, action: { //TODOLANG
+                arguments.presentController(NanogramFeaturesViewController(context: arguments.context), true)
             }, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .notifications(_, viewType, status):
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsNotifications, icon: theme.icons.settingsNotifications, activeIcon: theme.icons.settingsNotificationsActive, type: status == .denied ? .image(TelegramThemeHooks.shared.image(.iconMessageSentFailed).precomposed()) : .next, viewType: viewType, action: {
@@ -667,6 +676,11 @@ private func accountInfoEntries<Context: AccountContextProtocol>(peerView:PeerVi
     index += 1
     entries.append(.stickers(index: index, viewType: .singleItem))
     index += 1
+    
+    if DeveloperHooks.isInstalled, DeveloperHooks.shared.nanogramFeatureSections != nil {
+        entries.append(.nanogramFeatures(index: index, viewType: .singleItem))
+        index += 1
+    }
     
     if hasFilters {
         entries.append(.filters(index: index, viewType: .singleItem))

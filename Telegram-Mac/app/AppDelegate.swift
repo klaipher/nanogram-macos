@@ -1408,6 +1408,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
 
     private func installNanogramDebugMenu() {
         let settings = NanogramDebugSettings.shared
+        settings.register(SearchOperators.debugOption)
+        settings.register(LinkHygiene.stripOption)
+        settings.register(LinkHygiene.confirmOption)
         settings.register(.choice(id: "display.maxFrameRate", section: "Display", title: "Frame-rate cap", detail: "Caps the shared display link that drives app animations.", options: [NanogramDebugChoice(id: "off", title: "Off"), NanogramDebugChoice(id: "60", title: "60 Hz"), NanogramDebugChoice(id: "30", title: "30 Hz")], defaultValue: "off"))
         let applyFrameRateCap = {
             SharedDisplayLinkDriver.shared.maximumFramesPerSecondLimit = settings.choice("display.maxFrameRate").flatMap { Int($0) }
@@ -1417,7 +1420,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
             applyFrameRateCap()
         })
         settings.register(.toggle(id: VideoFirstFrameGenerator.debugOptionId, section: "Media", title: "Async video thumbnails", detail: "Experiment: first-frame video thumbnails use the asynchronous AVFoundation generator and no temporary symlink, so cache threads are not blocked. Default: off. Applies to thumbnails made after the change.", defaultValue: false))
-        settings.register(.toggle(id: "media.jpegWideGamut", section: "Media", title: "Keep wide-gamut colour in sent photos", detail: "Display P3 photos are sent with their ICC profile instead of being flattened to sRGB.", defaultValue: false))
+        settings.register(.toggle(id: "media.jpegWideGamut", section: "Media", title: "Keep wide-gamut colour in sent photos", detail: "Display P3 photos are sent with their ICC profile instead of being flattened to sRGB.", defaultValue: false).userFacing())
         let applyJPEGWideGamut = {
             setJPEGPreservesWideGamut(settings.bool("media.jpegWideGamut"))
         }
@@ -1436,10 +1439,10 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         nanogramDebugObservations.append(settings.observe(GlassChromeReuse.debugOptionId) { _ in
             applyGlassChromeReuse()
         })
-        settings.register(DecoderIsolation.debugOption)
-        settings.register(OnDeviceTranslation.legacyDebugOption)
-        settings.register(LocalAudioTranscription.debugOption)
-        settings.register(SystemPictureInPicture.debugOption)
+        settings.register(DecoderIsolation.debugOption.userFacing())
+        settings.register(OnDeviceTranslation.legacyDebugOption.userFacing())
+        settings.register(LocalAudioTranscription.debugOption.userFacing())
+        settings.register(SystemPictureInPicture.debugOption.userFacing())
         nanogramDebugObservations.append(contentsOf: installCallVideoDebugOptions(settings))
         NanogramExperimentEnergy.install()
         NanogramDebugMenu.install(openDeveloperScreen: { [weak self] in

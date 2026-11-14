@@ -13,6 +13,7 @@ import TelegramMedia
 import InAppSettings
 import WalletContext
 import AppAnalytics
+import NanogramRuntime
 
 
 
@@ -176,7 +177,7 @@ var globalLinkExecutor:TextViewInteractions {
         }, localizeLinkCopy: { type in
             return copyContextText(from: type)
         }, resolveLink: { link in
-            return (link as? inAppLink)?.link
+            return (link as? inAppLink).map { LinkHygiene.cleanedIfEnabled($0.link) }
         }, copyAttributedString: { string in
             let pb = NSPasteboard.general
 
@@ -1008,7 +1009,7 @@ func execute(inapp:inAppLink, window: Window? = nil, isExternal: Bool = false, a
     execute(inapp: inapp, window: window, isExternal: isExternal, afterComplete: afterComplete, analyticsContext: nil)
 }
 
-func execute(inapp:inAppLink, window: Window? = nil, isExternal: Bool = false, afterComplete: @escaping(Bool)->Void = { _ in }, analyticsContext: AnalyticsContext?) {
+func execute(inapp:inAppLink, window: Window? = nil, isExternal: Bool = false, afterComplete: @escaping(Bool)->Void = { _ in }, analyticsContext: AnalyticsContext?, telegramLinkConfirmed: Bool = false) {
     let analyticsContext: AnalyticsContext? = analyticsLinkContext(inapp, inherited: analyticsContext)
     let presentation = analyticsContext?.beginPresentation()
     defer { presentation?.end() }
@@ -1017,6 +1018,24 @@ func execute(inapp:inAppLink, window: Window? = nil, isExternal: Bool = false, a
         return window ?? context.window
     }
     
+    let needsTelegramLinkConfirmation: Bool = {
+        if telegramLinkConfirmed || !LinkHygiene.confirmsTelegramLinks {
+            return false
+        }
+        if case .external = inapp {
+            return false
+        }
+        return LinkHygiene.isTelegramLink(inapp.link)
+    }()
+    if needsTelegramLinkConfirmation {
+        confirmExternalLink(window: window ?? mainWindow, information: strings().inAppLinksConfirmOpenExternalNew(inapp.link), origin: InAppLinkOrigin(analyticsContext), success: {
+            execute(inapp: inapp, window: window, isExternal: isExternal, afterComplete: afterComplete, analyticsContext: analyticsContext, telegramLinkConfirmed: true)
+        }, cancel: {
+            afterComplete(false)
+        })
+        return
+    }
+
     if let linkKind = analyticsLinkKind(inapp) {
         Analytics.shared.send(AnalyticsEvents.linkOpen(linkKind: linkKind), scope: analyticsContext?.scope)
     }
@@ -1050,6 +1069,7 @@ func execute(inapp:inAppLink, window: Window? = nil, isExternal: Bool = false, a
                 url = "http://" + url
             }
         }
+        url = LinkHygiene.cleanedIfEnabled(url)
         
         let urlValue = url
 

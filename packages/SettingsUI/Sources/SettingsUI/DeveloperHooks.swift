@@ -54,13 +54,17 @@ public struct DeveloperOptionSection {
 public struct DeveloperHooks {
     public let nanogramSections: (() -> [DeveloperOptionSection])?
     public let resetNanogramSections: (() -> Void)?
+    public let nanogramFeatureSections: (() -> [DeveloperOptionSection])?
+    public let resetNanogramFeatures: (() -> Void)?
     public let messageWidgets: DeveloperSwitch?
     public let logExports: [DeveloperLogExport]
     public let sendLogs: ((NSWindow?) -> Void)?
 
-    public init(nanogramSections: (() -> [DeveloperOptionSection])? = nil, resetNanogramSections: (() -> Void)? = nil, messageWidgets: DeveloperSwitch? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
+    public init(nanogramSections: (() -> [DeveloperOptionSection])? = nil, resetNanogramSections: (() -> Void)? = nil, nanogramFeatureSections: (() -> [DeveloperOptionSection])? = nil, resetNanogramFeatures: (() -> Void)? = nil, messageWidgets: DeveloperSwitch? = nil, logExports: [DeveloperLogExport] = [], sendLogs: ((NSWindow?) -> Void)? = nil) {
         self.nanogramSections = nanogramSections
         self.resetNanogramSections = resetNanogramSections
+        self.nanogramFeatureSections = nanogramFeatureSections
+        self.resetNanogramFeatures = resetNanogramFeatures
         self.messageWidgets = messageWidgets
         self.logExports = logExports
         self.sendLogs = sendLogs

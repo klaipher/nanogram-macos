@@ -21,15 +21,21 @@ public struct NanogramDebugOption: Equatable, Sendable {
     public let title: String
     public let detail: String?
     public let requiresRelaunch: Bool
+    public let isUserFacing: Bool
     public let kind: Kind
 
-    public init(id: String, section: String, title: String, detail: String? = nil, requiresRelaunch: Bool = false, kind: Kind) {
+    public init(id: String, section: String, title: String, detail: String? = nil, requiresRelaunch: Bool = false, isUserFacing: Bool = false, kind: Kind) {
         self.id = id
         self.section = section
         self.title = title
         self.detail = detail
         self.requiresRelaunch = requiresRelaunch
+        self.isUserFacing = isUserFacing
         self.kind = kind
+    }
+
+    public func userFacing() -> NanogramDebugOption {
+        return NanogramDebugOption(id: self.id, section: self.section, title: self.title, detail: self.detail, requiresRelaunch: self.requiresRelaunch, isUserFacing: true, kind: self.kind)
     }
 
     public var footnote: String? {
@@ -107,9 +113,13 @@ public final class NanogramDebugSettings: @unchecked Sendable {
     }
 
     public var sections: [NanogramDebugSection] {
+        return self.sections(userFacing: nil)
+    }
+
+    public func sections(userFacing: Bool?) -> [NanogramDebugSection] {
         var order: [String] = []
         var grouped: [String: [NanogramDebugOption]] = [:]
-        for option in self.options {
+        for option in self.options where userFacing == nil || option.isUserFacing == userFacing {
             if grouped[option.section] == nil {
                 order.append(option.section)
             }
@@ -185,7 +195,13 @@ public final class NanogramDebugSettings: @unchecked Sendable {
     }
 
     public func resetAll() {
-        for option in self.options {
+        for option in self.options where !option.isUserFacing {
+            self.reset(option.id)
+        }
+    }
+
+    public func resetUserFacing() {
+        for option in self.options where option.isUserFacing {
             self.reset(option.id)
         }
     }

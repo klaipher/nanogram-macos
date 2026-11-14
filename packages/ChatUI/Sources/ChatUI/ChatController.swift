@@ -568,14 +568,20 @@ public class ChatControllerView : View, ChatInputDelegate {
             guard let chatInteraction = chatInteraction else {
                 return .never()
             }
-            let location: SearchMessagesLocation
-            switch chatInteraction.chatLocation {
-            case let .peer(peerId):
-                location = .peer(peerId: peerId, fromId: fromId, tags: chatInteraction.mode.tagMask, reactions: tags.map { $0.tag.reaction }, threadId: chatInteraction.chatLocation.threadId, minDate: nil, maxDate: nil)
-            case let .thread(data):
-                location = .peer(peerId: data.peerId, fromId: fromId, tags: nil, reactions: tags.map { $0.tag.reaction }, threadId: data.threadId, minDate: nil, maxDate: nil)
+            let parsed = SearchOperators.isEnabled ? SearchOperators.parse(query) : SearchOperatorQuery(text: query)
+            return chatSearchSender(parsed.sender, fallback: fromId, engine: context.engine) |> mapToSignal { sender -> Signal<([Message], SearchMessagesState?, Int32), NoError> in
+                if !sender.isResolved || parsed.isEmptyRange {
+                    return .single(([], nil, 0))
+                }
+                let location: SearchMessagesLocation
+                switch chatInteraction.chatLocation {
+                case let .peer(peerId):
+                    location = .peer(peerId: peerId, fromId: sender.peerId, tags: parsed.type?.messageTags ?? chatInteraction.mode.tagMask, reactions: tags.map { $0.tag.reaction }, threadId: chatInteraction.chatLocation.threadId, minDate: parsed.minDate, maxDate: parsed.maxDate)
+                case let .thread(data):
+                    location = .peer(peerId: data.peerId, fromId: sender.peerId, tags: parsed.type?.messageTags, reactions: tags.map { $0.tag.reaction }, threadId: data.threadId, minDate: parsed.minDate, maxDate: parsed.maxDate)
+                }
+                return context.engine.messages.searchMessages(location: location, query: parsed.text, state: state) |> map {($0.0.messages.filter({ !($0.extendedMedia is TelegramMediaAction) }), $0.1, $0.0.totalCount)}
             }
-            return context.engine.messages.searchMessages(location: location, query: query, state: state) |> map {($0.0.messages.filter({ !($0.extendedMedia is TelegramMediaAction) }), $0.1, $0.0.totalCount)}
         })
         
         

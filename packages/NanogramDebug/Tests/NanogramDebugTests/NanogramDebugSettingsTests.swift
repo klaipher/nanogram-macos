@@ -84,4 +84,33 @@ final class NanogramDebugSettingsTests: XCTestCase {
         XCTAssertEqual(settings.sections.map { $0.title }, ["Video", "Audio"])
         XCTAssertEqual(settings.sections.map { $0.options.map { $0.id } }, [["a", "c"], ["b"]])
     }
+
+    func testUserFacingOptionsAreSeparatedFromDeveloperOnes() {
+        let settings = NanogramDebugSettings(defaults: defaults)
+        settings.register(.toggle(id: "dev", section: "Video", title: "Dev", defaultValue: false))
+        settings.register(NanogramDebugOption.toggle(id: "user", section: "Media", title: "User", defaultValue: false).userFacing())
+        XCTAssertEqual(settings.sections(userFacing: false).flatMap { $0.options.map { $0.id } }, ["dev"])
+        XCTAssertEqual(settings.sections(userFacing: true).flatMap { $0.options.map { $0.id } }, ["user"])
+        XCTAssertEqual(settings.sections.flatMap { $0.options.map { $0.id } }, ["dev", "user"])
+    }
+
+    func testUserFacingFlagKeepsTheStorageKeyAndDefault() {
+        let settings = NanogramDebugSettings(defaults: defaults)
+        defaults.set(true, forKey: settings.storageKey("user"))
+        settings.register(NanogramDebugOption.toggle(id: "user", section: "Media", title: "User", defaultValue: false).userFacing())
+        XCTAssertTrue(settings.bool("user"))
+    }
+
+    func testResetAllLeavesUserFacingOptionsAlone() {
+        let settings = NanogramDebugSettings(defaults: defaults)
+        settings.register(.toggle(id: "dev", section: "Video", title: "Dev", defaultValue: false))
+        settings.register(NanogramDebugOption.toggle(id: "user", section: "Media", title: "User", defaultValue: false).userFacing())
+        settings.set("dev", bool: true)
+        settings.set("user", bool: true)
+        settings.resetAll()
+        XCTAssertFalse(settings.bool("dev"))
+        XCTAssertTrue(settings.bool("user"))
+        settings.resetUserFacing()
+        XCTAssertFalse(settings.bool("user"))
+    }
 }

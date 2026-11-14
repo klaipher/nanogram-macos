@@ -5,28 +5,38 @@ import NanogramLogExport
 import NanogramDebug
 import HTMLBubbles
 
+private func developerOptionSections(userFacing: Bool) -> [DeveloperOptionSection] {
+    let settings = NanogramDebugSettings.shared
+    return settings.sections(userFacing: userFacing).map { section in
+        DeveloperOptionSection(title: section.title, options: section.options.map { option in
+            switch option.kind {
+            case .toggle:
+                return DeveloperOption(id: option.id, title: option.title, footnote: option.footnote, kind: .toggle(isOn: settings.bool(option.id), set: { settings.set(option.id, bool: $0) }))
+            case let .choice(choices, _):
+                let selected = settings.choice(option.id).flatMap { value in choices.firstIndex(where: { $0.id == value }) } ?? 0
+                return DeveloperOption(id: option.id, title: option.title, footnote: option.footnote, kind: .choice(titles: choices.map { $0.title }, selected: selected, select: { index in
+                    if choices.indices.contains(index) {
+                        settings.set(option.id, choice: choices[index].id)
+                    }
+                }))
+            }
+        })
+    }
+}
+
 func installDeveloperUIHooks() {
     DeveloperHooks.install(DeveloperHooks(
         nanogramSections: {
-            let settings = NanogramDebugSettings.shared
-            return settings.sections.map { section in
-                DeveloperOptionSection(title: section.title, options: section.options.map { option in
-                    switch option.kind {
-                    case .toggle:
-                        return DeveloperOption(id: option.id, title: option.title, footnote: option.footnote, kind: .toggle(isOn: settings.bool(option.id), set: { settings.set(option.id, bool: $0) }))
-                    case let .choice(choices, _):
-                        let selected = settings.choice(option.id).flatMap { value in choices.firstIndex(where: { $0.id == value }) } ?? 0
-                        return DeveloperOption(id: option.id, title: option.title, footnote: option.footnote, kind: .choice(titles: choices.map { $0.title }, selected: selected, select: { index in
-                            if choices.indices.contains(index) {
-                                settings.set(option.id, choice: choices[index].id)
-                            }
-                        }))
-                    }
-                })
-            }
+            return developerOptionSections(userFacing: false)
         },
         resetNanogramSections: {
             NanogramDebugSettings.shared.resetAll()
+        },
+        nanogramFeatureSections: {
+            return developerOptionSections(userFacing: true)
+        },
+        resetNanogramFeatures: {
+            NanogramDebugSettings.shared.resetUserFacing()
         },
         messageWidgets: DeveloperSwitch(isOn: {
             return MessageWidgetsSwitch.isEnabled

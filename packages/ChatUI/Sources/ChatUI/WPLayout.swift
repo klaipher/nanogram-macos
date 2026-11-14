@@ -15,6 +15,7 @@ import TelegramTheme
 import TelegramUtils
 import InlineStickerLayer
 import StarsUI
+import NanogramRuntime
 
 
 public struct WPLayoutPresentation {
@@ -209,7 +210,7 @@ public class WPLayout: Equatable {
                             break
                         }
                     }
-                    return link.link
+                    return LinkHygiene.cleanedIfEnabled(link.link)
                 }
                 return nil
                 

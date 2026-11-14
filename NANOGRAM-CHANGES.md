@@ -84,6 +84,11 @@ not re-verified against the code; correct them on the next change in that area.
   10-video cap in group calls, RNNoise-only group noise suppression) default to on in the Mac app; each can still be switched
   off on the Developer screen. Upstream has none of these. `packages/CallVideoLayer`.
 
+### Nanogram Features screen, search operators, link hygiene
+- What: Settings > Nanogram Features lists the user-facing Nanogram options (search operators, link hygiene, system picture-in-picture, isolated sticker decoding, on-device translation and transcription, wide-gamut photos). In-chat search understands `from:`, `before:`, `after:`, `date:`, `type:`. Links can lose tracking parameters when opened or copied, and t.me / tg:// links can ask first. Ideas from Mercurygram (GPL-2.0 Android, GPLv3+ mdesktop), reimplemented; no code copied. (check)
+- Where: `packages/NanogramRuntime` (`SearchOperators`, `LinkHygiene`), `packages/NanogramDebug` (`isUserFacing`), `packages/SettingsUI` (`NanogramFeaturesViewController`, `DeveloperHooks.nanogramFeatureSections`, one row in `AccountViewController`), `packages/ChatUI` (`ChatController` search request, `ChatSearchOperators`, `WPLayout`), `Telegram-Mac/utils/InAppLinks.swift`. Docs: `docs/specs/search-operators.md`, `docs/specs/link-hygiene.md`, `docs/mercurygram-port.md`.
+- Sync note: the upstream hooks are the `AccountViewController` row, the `searchRequest` closure in `ChatController`, and three lines in `InAppLinks.swift` (`execute`, `.external`, `resolveLink`).
+
 ### Branding
 - What: Nanogram name and Sphere app icon in both editions, Telegram-owned endpoints removed; a lint keeps Telegram's name and logo out.
 - Where: `nanogram/NanogramAppIcons`, `tools/dev/lint/branding.py` (check).

@@ -10,8 +10,21 @@ func nanogramDeveloperEntries(sectionId: inout Int32, index: inout Int32, change
     guard DeveloperHooks.isInstalled, let makeSections = DeveloperHooks.shared.nanogramSections else {
         return []
     }
+    var entries = nanogramOptionEntries(sections: makeSections(), sectionId: &sectionId, index: &index, changed: changed)
+    if !entries.isEmpty, let reset = DeveloperHooks.shared.resetNanogramSections {
+        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_nanogram_reset, data: InputDataGeneralData(name: "Reset Nanogram Switches", color: theme.colors.redUI, type: .none, viewType: .singleItem, action: {
+            reset()
+            changed()
+        })))
+        index += 1
+        entries.append(.sectionId(sectionId, type: .normal))
+        sectionId += 1
+    }
+    return entries
+}
+
+func nanogramOptionEntries(sections: [DeveloperOptionSection], sectionId: inout Int32, index: inout Int32, changed: @escaping () -> Void) -> [InputDataEntry] {
     var entries: [InputDataEntry] = []
-    let sections = makeSections()
     for section in sections where !section.options.isEmpty {
         entries.append(.desc(sectionId: sectionId, index: index, text: .plain(section.title.uppercased()), data: .init(viewType: .textTopItem)))
         index += 1
@@ -41,15 +54,6 @@ func nanogramDeveloperEntries(sectionId: inout Int32, index: inout Int32, change
             entries.append(.desc(sectionId: sectionId, index: index, text: .plain(notes.joined(separator: "\n")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
             index += 1
         }
-        entries.append(.sectionId(sectionId, type: .normal))
-        sectionId += 1
-    }
-    if !sections.isEmpty, let reset = DeveloperHooks.shared.resetNanogramSections {
-        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_nanogram_reset, data: InputDataGeneralData(name: "Reset Nanogram Switches", color: theme.colors.redUI, type: .none, viewType: .singleItem, action: {
-            reset()
-            changed()
-        })))
-        index += 1
         entries.append(.sectionId(sectionId, type: .normal))
         sectionId += 1
     }
