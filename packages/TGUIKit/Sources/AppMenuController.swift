@@ -477,11 +477,21 @@ final class AppMenuController : NSObject  {
             self?.closeAll()
             return .invoked
         }, with: self, for: .Escape, priority: .supreme)
+
+        if self.dismissOnPointerExit {
+            // Link-hover preview behaves like a tooltip: scrolling the window under it hides it, and the scroll still goes through.
+            self.parent?.set(mouseHandler: { [weak self] _ in
+                self?.close()
+                return .rejected
+            }, with: self, for: .scrollWheel, priority: .supreme)
+        }
         
 
         self.tick = .init(timeout: 0.05, repeat: true, completion: { [weak self] in
             if self?.parentView?.window == nil {
                 self?.close()
+            } else if self?.dismissOnPointerExit == true {
+                self?.closeIfPointerOutside()
             }
         }, queue: .mainQueue())
         
@@ -633,6 +643,30 @@ final class AppMenuController : NSObject  {
     
     private var foundItem: TableRowItem? = nil
     
+    /// Link-hover previews: close once the pointer leaves the menu, not only on a click.
+    /// While a menu is open its parent window swallows mouseMoved/Entered/Exited (see `initialize()`),
+    /// so the view under it never learns the pointer moved; the 0.05 s tick polls the pointer instead.
+    var dismissOnPointerExit = false
+    /// Pointer position when the menu appeared. The menu is placed from the event that started the hover,
+    /// which can lag behind the pointer (the peer resolve is async) or be shifted by `adjust`; the zone
+    /// between that point and the menu counts as inside, so the menu does not close the moment it appears.
+    private var pointerAnchor: NSPoint?
+
+    func closeIfPointerOutside() {
+        guard !isClosed, !windows.isEmpty else { return }
+        let mouse = NSEvent.mouseLocation
+        let inside = windows.values.contains(where: { window in
+            var zone = window.frame
+            if let anchor = pointerAnchor {
+                zone = zone.union(NSRect(x: anchor.x - 1, y: anchor.y - 1, width: 2, height: 2))
+            }
+            return zone.insetBy(dx: -6, dy: -6).contains(mouse)
+        })
+        if !inside {
+            close()
+        }
+    }
+
     private var isClosed = false
     func close() {
         
@@ -767,6 +801,13 @@ final class AppMenuController : NSObject  {
             }
             return .rejected
         }, with: self, for: .mouseMoved)
+
+        if self.dismissOnPointerExit {
+            panel.set(mouseHandler: { [weak self] _ in
+                self?.close()
+                return .invoked
+            }, with: self, for: .scrollWheel, priority: .supreme)
+        }
         
         view.center()
         
@@ -1017,6 +1058,7 @@ final class AppMenuController : NSObject  {
         self.weakHolder = nil
         self.initialize()
         self.activate(event: event, view: view, animated: true)
+        self.pointerAnchor = NSEvent.mouseLocation
         self.onShow()
         self.previousCopyHandler = self.parent?.masterCopyhandler
         var skippedFirst: Bool = false

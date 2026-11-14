@@ -77,6 +77,8 @@ public final class AppMenu {
     private let appearMode: AppearMode
     private var observation:NSKeyValueObservation?
     private var timerDisposable: Disposable?
+    /// Link-hover previews: close the menu once the pointer is outside every menu window, not only on a click.
+    public var dismissOnPointerExit: Bool = false
     public init(menu: ContextMenu, appearMode: AppearMode = .click) {
         self.menu = menu
         self.appearMode = appearMode
@@ -115,6 +117,7 @@ public final class AppMenu {
             let controller = AppMenuController(self.menu, presentation: menu.presentation, holder: self, betterInside: menu.betterInside, appearMode: self.appearMode, parentView: view)
             
             self.controller = controller
+            controller.dismissOnPointerExit = self.dismissOnPointerExit
             self.observation?.invalidate()
             self.observation = nil
             
@@ -159,6 +162,11 @@ public final class AppMenu {
         self.controller?.present(event: event, view: view)
     }
     
+    /// Closes the menu unless the pointer is over it (so a pill that appeared under the cursor stays clickable).
+    public func closeIfPointerOutside() {
+        controller?.closeIfPointerOutside()
+    }
+
     public static func closeAll() {
         AppMenuController.closeAll()
     }

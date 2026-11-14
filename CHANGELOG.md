@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Fix (upstream bug): the link-hover peer pill now hides when the pointer leaves it.** The one-item `AppMenu` that `longHoverOnLink` shows (avatar + "Title (@username)", InAppLinks.swift) was a `.click` menu, and nothing reacted to the pointer: it swallowed mouseMoved and mouseExited, so the link view never cancelled it. The new `AppMenu.dismissOnPointerExit` (TGUIKit) does three things. The 50 ms tick closes the pill once the pointer leaves the pill plus its opening point (6 px slack). Scrolling under or over it closes it, and the scroll still reaches the chat. The hover disposable closes it if the pointer is outside. Other menus are unchanged. Found by the owner; root cause and patch in workflow mac-link-hover-tooltip (Opus-verified).
+
 - **Build fix (Share extension link)**: `TelegramContextShare` gets `StorePurchasePolicy.swift` through a symlink, as its other shared files do, and the two app files import it under `#if SHARE`. TelegramShare compiles `AccountContext.swift`, and its link failed on `StorePurchasePolicy.blocks`.
 
 - **Build fix**: `AccountContext.swift` and `InAppLinks.swift` import `struct TelegramContext.StorePurchasePolicy` (a scoped import: the whole module clashes with the app's own `ChatLocation` and `AccountContextBindings`), which defines it (the store-build purchase switch); the first release build of that switch stopped on "cannot find 'StorePurchasePolicy' in scope".

@@ -262,7 +262,8 @@ var globalLinkExecutor:TextViewInteractions {
 
             switch link {
             case let .followResolvedName(_, username, _, _, _, _, _):
-                return (context.engine.peers.resolvePeerByName(name: username, referrer: nil) |> deliverOnMainQueue).start(next: { result in
+                let shownMenu = Atomic<AppMenu?>(value: nil)
+                let resolve = (context.engine.peers.resolvePeerByName(name: username, referrer: nil) |> deliverOnMainQueue).start(next: { result in
                     switch result {
                     case let .result(peer):
                         guard let peer = peer else { return }
@@ -286,14 +287,21 @@ var globalLinkExecutor:TextViewInteractions {
                         let localPoint = view.convert(mouseLocation, from: nil)
                         if !contextMenuOnScreen(), view.window?.isKeyWindow == true, view.bounds.contains(localPoint) {
                             let appMenu = AppMenu(menu: menu)
+                            appMenu.dismissOnPointerExit = true
+                            _ = shownMenu.swap(appMenu)
                             appMenu.show(event: event, view: view)
                         }
                     case .progress:
                         break
                     }
                 })
+                return ActionDisposable {
+                    resolve.dispose()
+                    shownMenu.with { $0 }?.closeIfPointerOutside()
+                }
             case let .joinchat(_, hash, _, _):
-                return (context.engine.peers.joinLinkInformation(hash) |> deliverOnMainQueue).start(next: { result in
+                let shownMenu = Atomic<AppMenu?>(value: nil)
+                let resolve = (context.engine.peers.joinLinkInformation(hash) |> deliverOnMainQueue).start(next: { result in
                     let menu = ContextMenu()
                     view.removeAllToolTips()
 
@@ -340,9 +348,15 @@ var globalLinkExecutor:TextViewInteractions {
                     let localPoint = view.convert(mouseLocation, from: nil)
                     if !contextMenuOnScreen(), view.window?.isKeyWindow == true, view.bounds.contains(localPoint) {
                         let appMenu = AppMenu(menu: menu)
+                        appMenu.dismissOnPointerExit = true
+                        _ = shownMenu.swap(appMenu)
                         appMenu.show(event: event, view: view)
                     }
                 })
+                return ActionDisposable {
+                    resolve.dispose()
+                    shownMenu.with { $0 }?.closeIfPointerOutside()
+                }
             default:
                 return nil
             }
