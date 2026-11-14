@@ -95,6 +95,9 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: `nanogram/NanogramAppIcons`, `tools/dev/lint/branding.py` (check).
 
 ### Upstream bug fixes
+- What: app-config keys read with the wrong type or key: `starref_start_param_prefixes` (server sends a list, default `_tgr_`; upstream read a string with fallback `_tgref_`, so affiliate links never matched), `hidden_members_group_size_min` (integer, default 100; upstream read a string, so always 1), `group_profile_bg_icon_level_min` (key had a trailing space), `channel_autotranslation_level_min` (fallback was the wear-gift level).
+- Where: `packages/TelegramContext/.../AppConfigurationValues.swift` (`AppConfigValueParsing`), `Telegram-Mac/utils/InAppLinks.swift`, `packages/PeerModerationUI/.../ChannelMembersViewController.swift`, `Telegram-Mac/account/AccountContext.swift`.
+- Upstream: yes (upstream Telegram for macOS bugs; could be sent as is).
 - What: protected images (channels with saving and copying turned off) keep their protection layer at the image view's size when the view is resized with `setFrameSize`; upstream left it 0×0, so those images showed grey.
 - Where: `packages/TGUIKit/Sources/TransformImageView.swift` (`setFrameSize`).
 - Upstream: no (upstream bug in 13.1.0; could be sent as is).

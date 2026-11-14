@@ -1338,12 +1338,7 @@ func execute(inapp:inAppLink, window: Window? = nil, isExternal: Bool = false, a
                 if let action {
                     switch action {
                     case let .start(parameter, _):
-                        let prefix = context.appConfiguration.getStringValue("starref_start_param_prefixes", orElse: "_tgref_")
-                        if parameter.hasPrefix(prefix) {
-                            referrer = String(parameter.suffix(parameter.length - prefix.length))
-                        } else {
-                            referrer = nil
-                        }
+                        referrer = context.appConfiguration.starRefReferrer(startParameter: parameter)
                     default:
                         referrer = nil
                     }

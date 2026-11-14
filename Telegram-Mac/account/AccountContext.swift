@@ -150,14 +150,14 @@ public struct PremiumConfiguration {
                 minChannelWallpaperLevel: get(data["channel_wallpaper_level_min"]) ?? defaultValue.minChannelWallpaperLevel,
                 minChannelCustomWallpaperLevel: get(data["channel_custom_wallpaper_level_min"]) ?? defaultValue.minChannelCustomWallpaperLevel,
                 minChannelRestrictAdsLevel: get(data["channel_restrict_sponsored_level_min"]) ?? defaultValue.minChannelRestrictAdsLevel,
-                minGroupProfileIconLevel: get(data["group_profile_bg_icon_level_min "]) ?? defaultValue.minGroupProfileIconLevel,
+                minGroupProfileIconLevel: get(data["group_profile_bg_icon_level_min"]) ?? defaultValue.minGroupProfileIconLevel,
                 minGroupEmojiStatusLevel: get(data["group_emoji_status_level_min"]) ?? defaultValue.minGroupEmojiStatusLevel,
                 minGroupWallpaperLevel: get(data["group_wallpaper_level_min"]) ?? defaultValue.minGroupWallpaperLevel,
                 minGroupCustomWallpaperLevel: get(data["group_custom_wallpaper_level_min"]) ?? defaultValue.minGroupCustomWallpaperLevel,
                 minGroupEmojiPackLevel: get(data["group_emoji_stickers_level_min"]) ?? defaultValue.minGroupEmojiPackLevel,
                 minGroupAudioTranscriptionLevel: get(data["group_transcribe_level_min"]) ?? defaultValue.minGroupAudioTranscriptionLevel,
                 minChannelWearGiftLevel: get(data["channel_emoji_status_level_min"]) ?? defaultValue.minChannelWearGiftLevel,
-                minChannelAutotranslationLevel: get(data["channel_autotranslation_level_min"]) ?? defaultValue.minChannelWearGiftLevel
+                minChannelAutotranslationLevel: get(data["channel_autotranslation_level_min"]) ?? defaultValue.minChannelAutotranslationLevel
             )
         } else {
             return defaultValue

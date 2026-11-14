@@ -20,11 +20,7 @@ struct ChannelMembersConfiguration {
     let hidden_members_group_size_min: Int32
     
     static func with(appConfiguration: AppConfiguration) -> ChannelMembersConfiguration {
-        if let data = appConfiguration.data, let rawType = data["hidden_members_group_size_min"] as? String, let value = Int32(rawType) {
-            return .init(hidden_members_group_size_min: value)
-        } else {
-            return .init(hidden_members_group_size_min: 1)
-        }
+        return .init(hidden_members_group_size_min: appConfiguration.getInt32Value("hidden_members_group_size_min") ?? 100)
     }
 }
 

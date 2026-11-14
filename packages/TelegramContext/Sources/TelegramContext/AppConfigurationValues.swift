@@ -44,3 +44,56 @@ public extension AppConfiguration {
         return getStringValue("rich_message_posting", orElse: "enabled") != "disabled"
     }
 }
+
+public enum AppConfigValueParsing {
+    public static func int32(_ value: Any?) -> Int32? {
+        switch value {
+        case let value as Double:
+            return value.isFinite && abs(value) < Double(Int32.max) ? Int32(value) : nil
+        case let value as Int:
+            return Int32(exactly: value)
+        case let value as Int32:
+            return value
+        case let value as String:
+            return Int32(value.trimmingCharacters(in: .whitespaces))
+        default:
+            return nil
+        }
+    }
+
+    public static func stringList(_ value: Any?) -> [String]? {
+        switch value {
+        case let value as [String]:
+            return value
+        case let value as [Any]:
+            return value.compactMap { $0 as? String }
+        case let value as String:
+            return [value]
+        default:
+            return nil
+        }
+    }
+
+    public static let defaultStarRefPrefixes = ["_tgr_"]
+
+    public static func starRefReferrer(startParameter: String, prefixes: [String]?) -> String? {
+        for prefix in prefixes ?? defaultStarRefPrefixes where !prefix.isEmpty && startParameter.hasPrefix(prefix) {
+            return String(startParameter.dropFirst(prefix.count))
+        }
+        return nil
+    }
+}
+
+public extension AppConfiguration {
+    func getInt32Value(_ key: String) -> Int32? {
+        return AppConfigValueParsing.int32(self.data?[key])
+    }
+
+    func getStringListValue(_ key: String) -> [String]? {
+        return AppConfigValueParsing.stringList(self.data?[key])
+    }
+
+    func starRefReferrer(startParameter: String) -> String? {
+        return AppConfigValueParsing.starRefReferrer(startParameter: startParameter, prefixes: getStringListValue("starref_start_param_prefixes"))
+    }
+}
