@@ -86,13 +86,14 @@ framework_ccache_state() {
 
 framework_extra_fingerprint() {
     case "$1" in
-        webrtc|tde2e|mozjpeg)
+        webrtc|tde2e|mozjpeg|libopus)
             framework_tool_version cmake --version
             framework_tool_version ninja --version
             framework_ccache_state
             ;;
         libwebp)
             framework_tool_version cmake --version
+            framework_tool_version ninja --version
             framework_ccache_state
             ;;
         dav1d)

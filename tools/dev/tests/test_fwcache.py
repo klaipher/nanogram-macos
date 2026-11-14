@@ -282,14 +282,13 @@ class StampTests(unittest.TestCase):
 
     def test_build_tool_versions_are_in_the_stamps_that_use_them(self):
         want = {"webrtc": ("cmake", "ninja"), "tde2e": ("cmake", "ninja"), "mozjpeg": ("cmake", "ninja"),
-                "dav1d": ("meson", "ninja"), "libwebp": ("cmake",)}
+                "dav1d": ("meson", "ninja"), "libwebp": ("cmake", "ninja"), "libopus": ("cmake", "ninja")}
         for unit, tools in want.items():
             for tool in tools:
                 self.assertRegex(self.stamps[unit], rf"(?m)^{tool}=\S", unit)
-        for unit in ("webrtc", "tde2e", "mozjpeg", "libwebp"):
+        for unit in ("webrtc", "tde2e", "mozjpeg", "libwebp", "libopus"):
             self.assertRegex(self.stamps[unit], r"(?m)^ccache=(on|off)$", unit)
-        self.assertNotRegex(self.stamps["libwebp"], r"(?m)^ninja=")
-        for unit in ("OpenSSL", "libopus", "ffmpeg", "tlottie"):
+        for unit in ("OpenSSL", "ffmpeg", "tlottie"):
             self.assertNotRegex(self.stamps[unit], r"(?m)^(cmake|ninja|meson|ccache)=", unit)
 
     def test_tool_version_changes_the_stamp(self):
