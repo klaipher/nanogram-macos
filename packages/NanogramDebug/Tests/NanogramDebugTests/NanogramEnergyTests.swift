@@ -40,6 +40,16 @@ final class NanogramEnergyTests: XCTestCase {
         XCTAssertFalse(text.contains("adapter power"), text)
     }
 
+    func testSummaryLineCoversTheWindowSinceTheChange() {
+        let clock = Box(sample(0, cpu: 0))
+        let ledger = NanogramEnergyLedger(sampler: { clock.value })
+        clock.value = sample(100, cpu: 10, billed: 0)
+        ledger.reset("exp.a")
+        clock.value = sample(220, cpu: 16, billed: 600_000_000)
+        XCTAssertEqual(ledger.summary(for: "exp.a"), "CPU 5.0%, 5 mW, over 2 min")
+        XCTAssertEqual(ledger.summary(for: "exp.b"), "CPU 7.3%, 3 mW, over 3 min")
+    }
+
     func testReportWithoutExperimentsAndOnAdapter() {
         let ledger = NanogramEnergyLedger(sampler: { self.sample(0, cpu: 0) })
         let none = ledger.report(experiments: [], power: NanogramPowerContext(batteryPercent: nil, isCharging: nil, onACPower: nil, minutesToEmpty: nil, thermalState: "fair", lowPowerMode: nil))

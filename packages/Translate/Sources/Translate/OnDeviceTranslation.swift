@@ -17,7 +17,7 @@ public protocol OnDeviceTranslationProvider: AnyObject {
 }
 
 public final class OnDeviceTranslation {
-    public static let legacyDebugOption = NanogramDebugOption.toggle(id: "translation.onDeviceBeforeMacOS26", section: "Translation", title: "On-device translation on macOS 15-25", detail: "Uses Apple's Translation models through a hidden SwiftUI view for installed language pairs. Off: Telegram's server translation. macOS 26 and later always translate on device.", defaultValue: false)
+    public static let debugOption = NanogramDebugOption.toggle(id: "translation.onDevice", section: "Translation", title: "On-device translation", detail: "Translates messages on this Mac with Apple's Translation models, so the text is not sent to Telegram for translation. Needs the language pair installed in System Settings > General > Language & Region > Translation Languages. Off: Telegram's server translation.", defaultValue: false)
 
     public static let shared = OnDeviceTranslation(resolveProvider: OnDeviceTranslation.systemProvider)
 
@@ -39,11 +39,14 @@ public final class OnDeviceTranslation {
         return self.provider != nil
     }
 
-    public static func selectProvider(osMajorVersion: Int, legacyEnabled: Bool, modern: () -> OnDeviceTranslationProvider?, legacy: () -> OnDeviceTranslationProvider?) -> OnDeviceTranslationProvider? {
+    public static func selectProvider(osMajorVersion: Int, enabled: Bool, modern: () -> OnDeviceTranslationProvider?, legacy: () -> OnDeviceTranslationProvider?) -> OnDeviceTranslationProvider? {
+        guard enabled else {
+            return nil
+        }
         if osMajorVersion >= 26 {
             return modern()
         }
-        if osMajorVersion >= 15, legacyEnabled {
+        if osMajorVersion >= 15 {
             return legacy()
         }
         return nil
@@ -66,7 +69,7 @@ public final class OnDeviceTranslation {
     }()
 
     private static func systemProvider() -> OnDeviceTranslationProvider? {
-        return OnDeviceTranslation.selectProvider(osMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion, legacyEnabled: NanogramDebugSettings.shared.bool(OnDeviceTranslation.legacyDebugOption.id), modern: { OnDeviceTranslation.systemProviders.modern }, legacy: { OnDeviceTranslation.systemProviders.legacy })
+        return OnDeviceTranslation.selectProvider(osMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion, enabled: NanogramDebugSettings.shared.bool(OnDeviceTranslation.debugOption.id), modern: { OnDeviceTranslation.systemProviders.modern }, legacy: { OnDeviceTranslation.systemProviders.legacy })
     }
 
     public static func systemLanguageCode(_ code: String) -> String {

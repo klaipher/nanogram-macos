@@ -32,26 +32,32 @@ extension SearchOperatorType {
 }
 
 struct ChatSearchSender {
-    let isResolved: Bool
+    let restoresFromToken: Bool
     let peerId: PeerId?
 }
 
-func chatSearchSender(_ sender: SearchOperatorSender?, fallback: PeerId?, engine: TelegramEngine) -> Signal<ChatSearchSender, NoError> {
-    switch sender {
-    case .none:
-        return .single(ChatSearchSender(isResolved: true, peerId: fallback))
-    case let .some(.userId(id)):
-        return .single(ChatSearchSender(isResolved: true, peerId: PeerId(namespace: Namespaces.Peer.CloudUser, id: ._internalFromInt64Value(id))))
-    case let .some(.username(name)):
-        return engine.peers.resolvePeerByName(name: name, referrer: nil)
-        |> mapToSignal { result -> Signal<ChatSearchSender, NoError> in
-            switch result {
-            case .progress:
-                return .complete()
-            case let .result(peer):
-                return .single(ChatSearchSender(isResolved: peer != nil, peerId: peer?.id))
-            }
-        }
-        |> take(1)
+// A name that does not resolve leaves the `from:` token in the text, so the search never gets wider than the words typed.
+func chatSearchSender(_ parsed: SearchOperatorQuery, fallback: PeerId?, accountPeerId: PeerId, engine: TelegramEngine) -> Signal<ChatSearchSender, NoError> {
+    guard parsed.fromName != nil else {
+        return .single(ChatSearchSender(restoresFromToken: false, peerId: fallback))
     }
+    if parsed.isMe {
+        return .single(ChatSearchSender(restoresFromToken: false, peerId: accountPeerId))
+    }
+    guard let name = parsed.resolvableUsername else {
+        return .single(ChatSearchSender(restoresFromToken: true, peerId: fallback))
+    }
+    return engine.peers.resolvePeerByName(name: name, referrer: nil)
+    |> mapToSignal { result -> Signal<ChatSearchSender, NoError> in
+        switch result {
+        case .progress:
+            return .complete()
+        case let .result(peer):
+            if let peer = peer {
+                return .single(ChatSearchSender(restoresFromToken: false, peerId: peer.id))
+            }
+            return .single(ChatSearchSender(restoresFromToken: true, peerId: fallback))
+        }
+    }
+    |> take(1)
 }

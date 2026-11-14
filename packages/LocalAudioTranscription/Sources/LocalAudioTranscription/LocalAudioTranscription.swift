@@ -11,7 +11,7 @@ public protocol LocalSpeechRecognizer: AnyObject, Sendable {
 
 
 public final class LocalAudioTranscription: @unchecked Sendable {
-    public static let debugOption = NanogramDebugOption.toggle(id: "voice.onDeviceTranscription", section: "Voice", title: "Transcribe voice messages on this Mac", detail: "Non-Premium accounts transcribe voice messages with Apple's on-device speech recognition; results stay on this Mac and are labelled on-device. Off: Telegram's server (Premium or trial).", defaultValue: true)
+    public static let debugOption = NanogramDebugOption.toggle(id: "voice.onDeviceTranscription", section: "Voice", title: "On-device voice transcription", detail: "Non-Premium accounts transcribe voice messages with Apple's speech recognition on this Mac; the audio is not sent to Telegram and results are labelled on-device. The language model downloads the first time it is needed. Off: Telegram's server transcription (Premium or trial).", defaultValue: false)
 
     public static let shared = LocalAudioTranscription(recognizer: LocalAudioTranscription.systemRecognizer())
 
@@ -32,7 +32,7 @@ public final class LocalAudioTranscription: @unchecked Sendable {
         if case let .toggle(defaultValue) = LocalAudioTranscription.debugOption.kind {
             return defaultValue
         }
-        return true
+        return false
     }
 
     public static func isOnDevice(transcriptionId: Int64, isPending: Bool) -> Bool {

@@ -31,12 +31,14 @@ public struct DeveloperOption {
     public let id: String
     public let title: String
     public let footnote: String?
+    public let stats: String?
     public let kind: Kind
 
-    public init(id: String, title: String, footnote: String?, kind: Kind) {
+    public init(id: String, title: String, footnote: String?, stats: String? = nil, kind: Kind) {
         self.id = id
         self.title = title
         self.footnote = footnote
+        self.stats = stats
         self.kind = kind
     }
 }

@@ -1,6 +1,59 @@
 import Foundation
 import NanogramDebug
 
+public struct TrackingParameterList: Sendable {
+    private struct Rule: Sendable {
+        let name: String
+        let isPrefix: Bool
+        let host: String?
+    }
+
+    private let rules: [Rule]
+
+    public init(fileContents: String) {
+        var rules: [Rule] = []
+        for rawLine in fileContents.split(whereSeparator: { $0.isNewline }) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty || line.hasPrefix("#") {
+                continue
+            }
+            var namePart = line
+            var host: String?
+            if let bar = line.firstIndex(of: "|") {
+                namePart = String(line[line.startIndex ..< bar])
+                host = String(line[line.index(after: bar)...]).lowercased()
+            }
+            let isPrefix = namePart.hasSuffix("*")
+            if isPrefix {
+                namePart.removeLast()
+            }
+            if namePart.isEmpty {
+                continue
+            }
+            rules.append(Rule(name: namePart.lowercased(), isPrefix: isPrefix, host: host))
+        }
+        self.rules = rules
+    }
+
+    public var ruleCount: Int {
+        return self.rules.count
+    }
+
+    public func isTracking(name: String, host: String) -> Bool {
+        let name = name.lowercased()
+        let host = host.lowercased()
+        for rule in self.rules {
+            if let ruleHost = rule.host, host != ruleHost && !host.hasSuffix("." + ruleHost) {
+                continue
+            }
+            if rule.isPrefix ? name.hasPrefix(rule.name) : name == rule.name {
+                return true
+            }
+        }
+        return false
+    }
+}
+
 public enum LinkHygiene {
     public static let stripOptionId = "links.stripTracking"
     public static let confirmOptionId = "links.confirmTelegramLinks"
@@ -29,28 +82,60 @@ public enum LinkHygiene {
         return LinkHygiene.stripsTracking ? LinkHygiene.strippingTracking(link) : link
     }
 
-    static let trackingPrefixes: [String] = ["utm_", "pk_", "mtm_", "hsa_"]
-
-    static let trackingParameters: Set<String> = [
-        "fbclid", "gclid", "gclsrc", "gbraid", "wbraid", "dclid", "gad_source", "gad_campaignid",
-        "msclkid", "yclid", "twclid", "ttclid", "li_fat_id", "epik", "rdt_cid",
-        "igshid", "igsh", "mc_eid", "mc_cid", "_hsenc", "_hsmi", "__hssc", "__hstc", "__hsfp", "hsctatracking",
-        "mkt_tok", "vero_id", "vero_conv", "oly_enc_id", "oly_anon_id", "rb_clickid", "s_cid", "wickedid",
-        "_openstat", "ref_src", "ref_url", "fb_action_ids", "fb_action_types", "fb_source", "fb_ref",
-        "ml_subscriber", "ml_subscriber_hash", "irclickid", "cjevent"
-    ]
-
-    static let hostSpecificParameters: [(hosts: [String], names: Set<String>)] = [
-        (["youtube.com", "youtu.be", "music.youtube.com", "spotify.com", "spotify.link", "open.spotify.com"], ["si", "feature", "pp"]),
-        (["twitter.com", "x.com", "mobile.twitter.com"], ["s", "t"]),
-        (["instagram.com", "threads.net", "threads.com"], ["igshid", "igsh", "xmt", "slof"]),
-        (["facebook.com", "m.facebook.com", "fb.com"], ["mibextid", "rdid", "share_url", "sfnsn"]),
-        (["tiktok.com", "vm.tiktok.com"], ["is_from_webapp", "sender_device", "sender_web_id", "web_id", "_r", "_t", "share_app_id", "share_link_id", "share_item_id", "source", "u_code", "tt_from", "enter_from", "social_sharing"]),
-        (["amazon.com", "amazon.de", "amazon.co.uk", "amazon.fr", "amazon.it", "amazon.es", "amazon.ca", "amazon.co.jp", "amzn.to"], ["tag", "linkcode", "linkid", "ascsubtag", "ref_", "pd_rd_r", "pd_rd_w", "pd_rd_wg", "pf_rd_p", "pf_rd_r"]),
-        (["linkedin.com"], ["trk", "trackingid", "refid", "lipi", "midtoken", "midsig", "trkemail", "eid", "otptoken"]),
-        (["reddit.com", "redd.it"], ["share_id", "ref", "ref_source"]),
-        (["medium.com"], ["source", "sk"]),
-    ]
+    // Mirrors docs/specs/link-tracking-params.txt, which the iOS repo owns; a test compares the two.
+    static let standardList = TrackingParameterList(fileContents: """
+    utm_*
+    fbclid
+    gclid
+    gclsrc
+    dclid
+    gbraid
+    wbraid
+    msclkid
+    twclid
+    ttclid
+    li_fat_id
+    igshid
+    igsh
+    mc_eid
+    mc_cid
+    _hsenc
+    _hsmi
+    __hssc
+    __hstc
+    __hsfp
+    hsctatracking
+    mkt_tok
+    oly_anon_id
+    oly_enc_id
+    vero_id
+    vero_conv
+    yclid
+    ysclid
+    _openstat
+    ref_src
+    ref_url
+    s_cid
+    spm
+    scm
+    si|youtube.com
+    si|youtu.be
+    si|open.spotify.com
+    si|music.youtube.com
+    feature|youtube.com
+    pp|youtube.com
+    ref|amazon.com
+    tag|amazon.com
+    pd_rd_*|amazon.com
+    pf_rd_*|amazon.com
+    share_id|tiktok.com
+    is_copy_url|tiktok.com
+    is_from_webapp|tiktok.com
+    sender_device|tiktok.com
+    refsrc|facebook.com
+    __tn__|facebook.com
+    __cft__*|facebook.com
+    """)
 
     static let telegramHosts: Set<String> = ["t.me", "telegram.me", "telegram.dog", "telesco.pe"]
 
@@ -65,7 +150,7 @@ public enum LinkHygiene {
         return telegramHosts.contains(host)
     }
 
-    public static func strippingTracking(_ link: String) -> String {
+    public static func strippingTracking(_ link: String, list: TrackingParameterList = LinkHygiene.standardList) -> String {
         guard let schemeEnd = link.range(of: "://") else {
             return link
         }
@@ -73,10 +158,7 @@ public enum LinkHygiene {
         guard scheme == "http" || scheme == "https" else {
             return link
         }
-        guard let host = hostOf(link), !telegramHosts.contains(host) else {
-            return link
-        }
-        guard let questionMark = link.firstIndex(of: "?") else {
+        guard let host = hostOf(link), let questionMark = link.firstIndex(of: "?") else {
             return link
         }
         let fragmentStart = link.firstIndex(of: "#")
@@ -85,15 +167,12 @@ public enum LinkHygiene {
         }
         let queryEnd = fragmentStart ?? link.endIndex
         let query = link[link.index(after: questionMark) ..< queryEnd]
-        let specific = hostSpecificParameters.filter { entry in
-            entry.hosts.contains(where: { host == $0 || host.hasSuffix("." + $0) })
-        }
         var kept: [Substring] = []
         var removed = false
         for item in query.split(separator: "&", omittingEmptySubsequences: false) {
             let rawName = item.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).first.map { String($0) } ?? ""
-            let name = (rawName.removingPercentEncoding ?? rawName).lowercased()
-            if isTracking(name, hostSpecific: specific) {
+            let name = rawName.removingPercentEncoding ?? rawName
+            if !name.isEmpty && list.isTracking(name: name, host: host) {
                 removed = true
             } else {
                 kept.append(item)
@@ -111,22 +190,6 @@ public enum LinkHygiene {
             result += String(link[fragmentStart...])
         }
         return result
-    }
-
-    private static func isTracking(_ name: String, hostSpecific: [(hosts: [String], names: Set<String>)]) -> Bool {
-        if name.isEmpty {
-            return false
-        }
-        if trackingParameters.contains(name) {
-            return true
-        }
-        for prefix in trackingPrefixes where name.hasPrefix(prefix) {
-            return true
-        }
-        for entry in hostSpecific where entry.names.contains(name) {
-            return true
-        }
-        return false
     }
 
     private static func hostOf(_ link: String) -> String? {

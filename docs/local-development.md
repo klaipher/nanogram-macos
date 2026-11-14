@@ -705,15 +705,15 @@ UserDefaults as `nanogram.debug.<id>`; an unset key means the default. Reset all
 | `display.maxFrameRate` | Display | off | caps the shared display link that drives app animations at 60 or 30 Hz |
 | `media.jpegWideGamut` | Media | off | Display P3 photos are sent with their ICC profile instead of being flattened to sRGB |
 | `media.systemPictureInPicture` | Media | off | gallery videos use macOS picture-in-picture instead of Telegram's floating player (web and HLS videos keep Telegram's) |
-| `translation.onDeviceBeforeMacOS26` | Translation | off | on macOS 15–25, translate on device with Apple's Translation models; off uses Telegram's server. macOS 26+ always translates on device |
-| `voice.onDeviceTranscription` | Voice | **on** | non-Premium accounts transcribe voice messages with Apple's on-device speech recognition, labelled on-device; off uses Telegram's server (Premium or trial) |
+| `translation.onDevice` | Translation | off | translate on device with Apple's Translation models (macOS 15+, installed language pairs); off uses Telegram's server |
+| `voice.onDeviceTranscription` | Voice | off | non-Premium accounts transcribe voice messages with Apple's on-device speech recognition, labelled on-device; off uses Telegram's server (Premium or trial) |
 
 User choices are switches marked `.userFacing()`: they show on **Settings > Nanogram Features** (not the Developer screen),
 keep the same `nanogram.debug.<id>` keys, and are reset by that screen's Reset to Defaults. Currently:
 `search.operators` (Search, **on**: `from:`, `before:`, `after:`, `date:`, `type:` in chat search, see
 `docs/specs/search-operators.md`), `links.stripTracking` and `links.confirmTelegramLinks` (Links, off, see
 `docs/specs/link-hygiene.md`), `media.jpegWideGamut`, `media.systemPictureInPicture`, `decoding.isolatedXPC`,
-`translation.onDeviceBeforeMacOS26`, `voice.onDeviceTranscription`. Everything else in the table stays an experiment on the
+`translation.onDevice`, `voice.onDeviceTranscription`. Everything else in the table stays an experiment on the
 Developer screen.
 
 Add a switch by declaring a `static let debugOption = NanogramDebugOption.toggle(…)` (or `.choice`) next to the

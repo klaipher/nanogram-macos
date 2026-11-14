@@ -421,7 +421,7 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
                 arguments.presentController(SettingsNavigationHooks.shared.makeInstalledStickerPacksController(arguments.context, nil), true)
             }, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .nanogramFeatures(_, viewType):
-            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: "Nanogram Features", icon: theme.icons.settingsGeneral, activeIcon: theme.icons.settingsGeneralActive, type: .next, viewType: viewType, action: { //TODOLANG
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: "Nanogram Features", icon: nanogramFeaturesIcon(like: theme.icons.settingsGeneral, color: theme.colors.grayIcon), activeIcon: nanogramFeaturesIcon(like: theme.icons.settingsGeneralActive, color: theme.colors.underSelectedColor), type: .next, viewType: viewType, action: { //TODOLANG
                 arguments.presentController(NanogramFeaturesViewController(context: arguments.context), true)
             }, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .notifications(_, viewType, status):
@@ -1449,3 +1449,22 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
 
 }
 
+
+private func nanogramFeaturesIcon(like reference: CGImage, color: NSColor) -> CGImage {
+    let width = reference.width
+    let height = reference.height
+    guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue), let symbol = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: CGFloat(height) * 0.62, weight: .regular)) else {
+        return reference
+    }
+    let rect = NSRect(x: 0, y: 0, width: width, height: height)
+    let graphics = NSGraphicsContext(cgContext: context, flipped: false)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = graphics
+    let size = symbol.size
+    let target = NSRect(x: (rect.width - size.width) / 2, y: (rect.height - size.height) / 2, width: size.width, height: size.height)
+    symbol.draw(in: target)
+    color.setFill()
+    target.fill(using: .sourceIn)
+    NSGraphicsContext.restoreGraphicsState()
+    return context.makeImage() ?? reference
+}

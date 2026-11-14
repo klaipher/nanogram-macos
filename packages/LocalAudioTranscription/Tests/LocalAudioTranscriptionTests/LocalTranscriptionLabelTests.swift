@@ -9,28 +9,29 @@ final class LocalTranscriptionLabelTests: XCTestCase {
         return (NanogramDebugSettings(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
     }
 
-    func testDebugSwitchIsOnByDefaultWithoutRegistration() {
+    func testSwitchIsOffByDefaultWithoutRegistration() {
         let (settings, cleanup) = self.settings()
         defer { cleanup() }
         XCTAssertEqual(LocalAudioTranscription.debugOption.section, "Voice")
         guard case let .toggle(defaultValue) = LocalAudioTranscription.debugOption.kind else {
             return XCTFail("toggle expected")
         }
-        XCTAssertTrue(defaultValue)
-        XCTAssertTrue(LocalAudioTranscription.isEnabled(in: settings))
+        XCTAssertFalse(defaultValue)
+        XCTAssertFalse(LocalAudioTranscription.isEnabled(in: settings))
         settings.register(LocalAudioTranscription.debugOption)
-        XCTAssertTrue(LocalAudioTranscription.isEnabled(in: settings))
+        XCTAssertFalse(LocalAudioTranscription.isEnabled(in: settings))
     }
 
-    func testDebugSwitchTurnsTheLocalEngineOff() {
+    func testSwitchTurnsTheLocalEngineOnAndOff() {
         let (settings, cleanup) = self.settings()
         defer { cleanup() }
         settings.register(LocalAudioTranscription.debugOption)
-        settings.set(LocalAudioTranscription.debugOption.id, bool: false)
-        XCTAssertFalse(LocalAudioTranscription.isEnabled(in: settings))
         XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled(in: settings), isPremium: false, isVoice: true, hasServerTranscription: false))
-        settings.reset(LocalAudioTranscription.debugOption.id)
+        settings.set(LocalAudioTranscription.debugOption.id, bool: true)
         XCTAssertTrue(LocalAudioTranscription.isEnabled(in: settings))
+        XCTAssertTrue(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled(in: settings), isPremium: false, isVoice: true, hasServerTranscription: false))
+        settings.reset(LocalAudioTranscription.debugOption.id)
+        XCTAssertFalse(LocalAudioTranscription.isEnabled(in: settings))
     }
 
     func testOnlyFinishedLocalResultsAreMarkedOnDevice() {

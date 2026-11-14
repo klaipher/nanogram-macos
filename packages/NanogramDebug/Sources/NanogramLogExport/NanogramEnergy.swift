@@ -2,6 +2,8 @@ import Darwin
 import Foundation
 import IOKit.ps
 
+// Kept next to, not on, iOS's shared EnergyNumbers module: the Mac's core pin predates that module, and moving needs a pin bump.
+
 /// Cumulative kernel counters of this process; two samples give the cost of the time between them.
 public struct NanogramEnergySample: Equatable, Sendable {
     public var date: Date
@@ -226,6 +228,18 @@ public final class NanogramEnergyLedger: @unchecked Sendable {
         self.lock.lock()
         defer { self.lock.unlock() }
         return self.baselines[id] ?? self.launch
+    }
+
+    /// One line for a settings row: CPU, average power and how long the window has run, since the switch last changed.
+    public func summary(for id: String) -> String {
+        let delta = self.sampler().since(self.baseline(id))
+        var parts = [String(format: "CPU %.1f%%", delta.cpuPercent)]
+        if let power = delta.averageMilliwatts {
+            parts.append(String(format: "%.0f mW", power))
+        }
+        let seconds = Int(delta.wallSeconds)
+        parts.append(seconds >= 3600 ? "over \(seconds / 3600) h \(seconds % 3600 / 60) min" : "over \(max(seconds / 60, 0)) min")
+        return parts.joined(separator: ", ")
     }
 
     public func report(experiments: [(id: String, title: String, value: String)], power: NanogramPowerContext) -> String {

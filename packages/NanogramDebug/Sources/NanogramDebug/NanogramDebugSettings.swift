@@ -20,22 +20,30 @@ public struct NanogramDebugOption: Equatable, Sendable {
     public let section: String
     public let title: String
     public let detail: String?
+    public let userDetail: String?
     public let requiresRelaunch: Bool
     public let isUserFacing: Bool
     public let kind: Kind
 
-    public init(id: String, section: String, title: String, detail: String? = nil, requiresRelaunch: Bool = false, isUserFacing: Bool = false, kind: Kind) {
+    public init(id: String, section: String, title: String, detail: String? = nil, requiresRelaunch: Bool = false, isUserFacing: Bool = false, userDetail: String? = nil, kind: Kind) {
         self.id = id
         self.section = section
         self.title = title
         self.detail = detail
+        self.userDetail = userDetail
         self.requiresRelaunch = requiresRelaunch
         self.isUserFacing = isUserFacing
         self.kind = kind
     }
 
-    public func userFacing() -> NanogramDebugOption {
-        return NanogramDebugOption(id: self.id, section: self.section, title: self.title, detail: self.detail, requiresRelaunch: self.requiresRelaunch, isUserFacing: true, kind: self.kind)
+    /// `userDetail` is the plain wording for Nanogram Features; the technical `detail` stays on the Developer screen.
+    public func userFacing(_ userDetail: String? = nil) -> NanogramDebugOption {
+        return NanogramDebugOption(id: self.id, section: self.section, title: self.title, detail: self.detail, requiresRelaunch: self.requiresRelaunch, isUserFacing: true, userDetail: userDetail, kind: self.kind)
+    }
+
+    public var userFootnote: String? {
+        let notes = [self.userDetail ?? self.detail, self.requiresRelaunch ? "Applies after relaunch." : nil].compactMap { $0 } //TODOLANG
+        return notes.isEmpty ? nil : notes.joined(separator: " ")
     }
 
     public var footnote: String? {

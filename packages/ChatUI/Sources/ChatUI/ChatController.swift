@@ -568,11 +568,13 @@ public class ChatControllerView : View, ChatInputDelegate {
             guard let chatInteraction = chatInteraction else {
                 return .never()
             }
-            let parsed = SearchOperators.isEnabled ? SearchOperators.parse(query) : SearchOperatorQuery(text: query)
-            return chatSearchSender(parsed.sender, fallback: fromId, engine: context.engine) |> mapToSignal { sender -> Signal<([Message], SearchMessagesState?, Int32), NoError> in
-                if !sender.isResolved || parsed.isEmptyRange {
+            let isSecretChat = chatInteraction.chatLocation.peerId.namespace == Namespaces.Peer.SecretChat
+            let parsed = SearchOperators.isEnabled && !isSecretChat ? SearchOperators.parse(query) : SearchOperatorQuery(text: query)
+            return chatSearchSender(parsed, fallback: fromId, accountPeerId: context.peerId, engine: context.engine) |> mapToSignal { sender -> Signal<([Message], SearchMessagesState?, Int32), NoError> in
+                if parsed.isEmptyRange {
                     return .single(([], nil, 0))
                 }
+                let searchText = sender.restoresFromToken ? parsed.textRestoringFrom() : parsed.text
                 let location: SearchMessagesLocation
                 switch chatInteraction.chatLocation {
                 case let .peer(peerId):
@@ -580,7 +582,7 @@ public class ChatControllerView : View, ChatInputDelegate {
                 case let .thread(data):
                     location = .peer(peerId: data.peerId, fromId: sender.peerId, tags: parsed.type?.messageTags, reactions: tags.map { $0.tag.reaction }, threadId: data.threadId, minDate: parsed.minDate, maxDate: parsed.maxDate)
                 }
-                return context.engine.messages.searchMessages(location: location, query: parsed.text, state: state) |> map {($0.0.messages.filter({ !($0.extendedMedia is TelegramMediaAction) }), $0.1, $0.0.totalCount)}
+                return context.engine.messages.searchMessages(location: location, query: searchText, state: state) |> map {($0.0.messages.filter({ !($0.extendedMedia is TelegramMediaAction) }), $0.1, $0.0.totalCount)}
             }
         })
         

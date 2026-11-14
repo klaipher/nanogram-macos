@@ -1439,10 +1439,10 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         nanogramDebugObservations.append(settings.observe(GlassChromeReuse.debugOptionId) { _ in
             applyGlassChromeReuse()
         })
-        settings.register(DecoderIsolation.debugOption.userFacing())
-        settings.register(OnDeviceTranslation.legacyDebugOption.userFacing())
-        settings.register(LocalAudioTranscription.debugOption.userFacing())
-        settings.register(SystemPictureInPicture.debugOption.userFacing())
+        settings.register(DecoderIsolation.debugOption.userFacing("Opens animated stickers in a separate locked-down helper, so a broken sticker cannot harm the app. Applies to stickers opened after the change."))
+        settings.register(OnDeviceTranslation.debugOption.userFacing("Translates messages on this Mac, so the text is not sent to Telegram. Language models are installed in System Settings > General > Language & Region > Translation Languages. Off: Telegram translates."))
+        settings.register(LocalAudioTranscription.debugOption.userFacing("Turns voice messages into text on this Mac, so the audio is not sent to Telegram. The language model downloads the first time it is needed. Off: Telegram transcribes (Premium or trial)."))
+        settings.register(SystemPictureInPicture.debugOption.userFacing("Pops videos out into the macOS picture-in-picture window, which works with Spaces and Stage Manager."))
         nanogramDebugObservations.append(contentsOf: installCallVideoDebugOptions(settings))
         NanogramExperimentEnergy.install()
         NanogramDebugMenu.install(openDeveloperScreen: { [weak self] in

@@ -83,13 +83,15 @@ final class TranslationRoutingTests: XCTestCase {
         let modern = StubProvider("modern")
         let legacy = StubProvider("legacy")
         func pick(_ major: Int, _ flag: Bool) -> String? {
-            return (OnDeviceTranslation.selectProvider(osMajorVersion: major, legacyEnabled: flag, modern: { modern }, legacy: { legacy }) as? StubProvider)?.name
+            return (OnDeviceTranslation.selectProvider(osMajorVersion: major, enabled: flag, modern: { modern }, legacy: { legacy }) as? StubProvider)?.name
         }
         XCTAssertNil(pick(15, false))
         XCTAssertNil(pick(25, false))
         XCTAssertEqual(pick(15, true), "legacy")
         XCTAssertEqual(pick(25, true), "legacy")
-        XCTAssertEqual(pick(26, false), "modern")
+        XCTAssertNil(pick(26, false))
+        XCTAssertNil(pick(27, false))
+        XCTAssertEqual(pick(26, true), "modern")
         XCTAssertEqual(pick(27, true), "modern")
         XCTAssertNil(pick(14, true))
     }
@@ -99,18 +101,18 @@ final class TranslationRoutingTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = NanogramDebugSettings(defaults: defaults)
-        settings.register(OnDeviceTranslation.legacyDebugOption)
-        guard case let .toggle(defaultValue) = OnDeviceTranslation.legacyDebugOption.kind else {
+        settings.register(OnDeviceTranslation.debugOption)
+        guard case let .toggle(defaultValue) = OnDeviceTranslation.debugOption.kind else {
             return XCTFail("toggle expected")
         }
         XCTAssertFalse(defaultValue)
 
         let legacy = StubProvider("legacy")
         let translation = OnDeviceTranslation(resolveProvider: {
-            return OnDeviceTranslation.selectProvider(osMajorVersion: 20, legacyEnabled: settings.bool(OnDeviceTranslation.legacyDebugOption.id), modern: { nil }, legacy: { legacy })
+            return OnDeviceTranslation.selectProvider(osMajorVersion: 20, enabled: settings.bool(OnDeviceTranslation.debugOption.id), modern: { nil }, legacy: { legacy })
         })
         XCTAssertFalse(translation.isAvailable)
-        settings.set(OnDeviceTranslation.legacyDebugOption.id, bool: true)
+        settings.set(OnDeviceTranslation.debugOption.id, bool: true)
         XCTAssertTrue(translation.isAvailable)
     }
 }

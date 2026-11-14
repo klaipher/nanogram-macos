@@ -49,7 +49,9 @@ func nanogramOptionEntries(sections: [DeveloperOptionSection], sectionId: inout 
             }
             index += 1
         }
-        let notes = section.options.compactMap { option in option.footnote.map { option.title + ": " + $0 } }
+        let notes = section.options.flatMap { option -> [String] in
+            return [option.footnote.map { option.title + ": " + $0 }, option.stats.map { option.title + ": " + $0 }].compactMap { $0 }
+        }
         if !notes.isEmpty {
             entries.append(.desc(sectionId: sectionId, index: index, text: .plain(notes.joined(separator: "\n")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
             index += 1
