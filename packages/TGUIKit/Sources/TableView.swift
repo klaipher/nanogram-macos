@@ -3037,13 +3037,17 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
     }
     
     public func remove(range:Range<Int>, redraw:Bool = true, animation:NSTableView.AnimationOptions = .none) -> Void {
+        let bounded = range.clamped(to: 0 ..< self.count)
+        guard !bounded.isEmpty else {
+            return
+        }
         
-        for i in range.lowerBound ..< range.upperBound {
+        for i in bounded.reversed() {
             remove(at: i, redraw: false)
         }
         
         if(redraw) {
-            self.tableView.removeRows(at: IndexSet(integersIn:range), withAnimation:  animation != .none ? .effectFade : .none)
+            self.tableView.removeRows(at: IndexSet(integersIn: bounded), withAnimation:  animation != .none ? .effectFade : .none)
         }
     }
     

@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- MACOS-LIST-2 (fixed): `TableView.remove(range:)` removed every second row and told NSTableView about the whole range; it now removes in reverse over the clamped range with one `removeRows`. No caller yet. Test: TGUIKit `TableRelayoutTests`.
+
 ## 13.2.0 (202611132157) — 2026-11-13
 
 Source: `nanogram/integration` @ 82fbeb79 · core `klaipher/nanogram` `main` @ 466d8350 (was 25edb39c at the last release; iOS TestFlight 202611132038 is 3c4e6399, plus 466d8350) · widget-sandbox and the core's untracked `submodules/rlottie` unchanged from the last release (BUILD-INFO says "dirty yes" because of them only).
