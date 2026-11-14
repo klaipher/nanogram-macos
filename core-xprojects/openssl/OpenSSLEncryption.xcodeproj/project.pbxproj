@@ -185,7 +185,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ ! -d \"$PROJECT_DIR/build\" ]; then\n  sh $PROJECT_DIR/OpenSSLEncryption/build.sh ../../submodules/telegram-ios/submodules/openssl\nfi\n";
+			shellScript = "if [ ! -d \"$PROJECT_DIR/build\" ]; then\n  sh $PROJECT_DIR/OpenSSLEncryption/build.sh\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

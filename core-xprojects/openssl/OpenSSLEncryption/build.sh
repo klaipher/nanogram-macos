@@ -3,7 +3,6 @@
 set -x
 set -e
 
-SRC_DIR="$1"
 BUILD_DIR=$(echo "$(cd "$(dirname "$3")"; pwd -P)/$(basename "$3")")
 
 
@@ -169,8 +168,6 @@ function build_for ()
   cd "$DIR"
 }
 
-# patch "$SOURCE_DIR/Configurations/10-main.conf" < "$PWD/OpenSSLEncryption/patch-conf.diff" || exit 1
-
 
 for ARCH in $ARCHS
 do
@@ -210,17 +207,3 @@ cat >> "${BUILD_DIR}build/openssl/include/openssl/configuration.h" <<'EOF_SUPPRE
 # define OPENSSL_SUPPRESS_DEPRECATED
 #endif
 EOF_SUPPRESS
-
-
-#cp -r "${TMP_DIR}/$ARCH/include" "${TMP_DIR}/"
-#if [ "$ARCH" == "arm64" ]; then
-#  patch -p3 "${TMP_DIR}/include/openssl/opensslconf.h" < "$SRC_DIR/patch-include.patch" || exit 1
-#fi
-#
-#DFT_DIST_DIR="$OUT_DIR/out"
-#rm -rf "$DFT_DIST_DIR"
-#mkdir -p "$DFT_DIST_DIR"
-#
-#DIST_DIR="${DIST_DIR:-$DFT_DIST_DIR}"
-#mkdir -p "${DIST_DIR}"
-#cp -r "${TMP_DIR}/include" "${TMP_DIR}/$ARCH/lib" "${DIST_DIR}"

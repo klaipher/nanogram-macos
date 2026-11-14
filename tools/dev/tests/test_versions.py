@@ -84,6 +84,9 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn("-b openssl-3.5.9 ", script)
         self.assertIn("45e844fa2a14ec92d146bd8f5778ac130b6625fb", script)
         self.assertNotIn("OpenSSL_1_1_1", script)
+        self.assertFalse((CORE / "openssl" / "OpenSSLEncryption" / "patch-conf.diff").exists())
+        project = read(CORE / "openssl" / "OpenSSLEncryption.xcodeproj" / "project.pbxproj")
+        self.assertNotIn("submodules/telegram-ios/submodules/openssl", project)
 
     def test_openssl_keeps_upstream_callers_free_of_3_0_deprecation_warnings(self):
         script = read(CORE / "openssl" / "OpenSSLEncryption" / "build.sh")
