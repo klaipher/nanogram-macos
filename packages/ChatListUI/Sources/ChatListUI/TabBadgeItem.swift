@@ -226,9 +226,30 @@ public class TabBadgeItem: TabAnimatedItem {
 }
 public class TabAllBadgeItem: TabAnimatedItem {
     private let context:any AccountContextProtocol
+    private let hasMultipleAccounts = Atomic<Bool?>(value: nil)
+    private let accountsDisposable = MetaDisposable()
     public init(_ context: any AccountContextProtocol, image: CGImage, selectedImage: CGImage, controller:ViewController, subNode:Node? = nil, longHoverHandler:((Control)->Void)? = nil) {
         self.context = context
         super.init(.tab_settings, image: image, selectedImage: selectedImage, controller: controller, subNode: subNode ?? ChatListUIHooks.shared.makeTabAllBadgeNode(context), longHoverHandler: longHoverHandler)
+        let hasMultipleAccounts = self.hasMultipleAccounts
+        self.accountsDisposable.set((context.sharedContext.activeAccounts |> map { $0.accounts.count > 1 }).start(next: { value in
+            _ = hasMultipleAccounts.swap(value)
+        }))
+    }
+
+    private func currentHasMultipleAccounts() -> Bool {
+        if let cached = hasMultipleAccounts.with({ $0 }) {
+            return cached
+        }
+        let semaphore = DispatchSemaphore(value: 0)
+        let hasMultipleAccounts = self.hasMultipleAccounts
+        let disposable = (context.sharedContext.activeAccounts |> take(1)).start(next: { accounts in
+            _ = hasMultipleAccounts.swap(accounts.accounts.count > 1)
+            semaphore.signal()
+        })
+        _ = semaphore.wait(timeout: .now() + 0.25)
+        disposable.dispose()
+        return hasMultipleAccounts.with { $0 } ?? true
     }
     
     public override func withUpdatedImages(_ image: CGImage, _ selectedImage: CGImage) -> TabItem {
@@ -239,17 +260,8 @@ public class TabAllBadgeItem: TabAnimatedItem {
     
     public override func makeView() -> NSView {
         let context = self.context
-        
-        let semaphore = DispatchSemaphore(value: 0)
-        var isMultiple = true
-        _ = (context.sharedContext.activeAccounts |> take(1)).start(next: { accounts in
-            isMultiple = accounts.accounts.count > 1
-            semaphore.signal()
-        })
 
-        semaphore.wait()
-        
-        if !isMultiple {
+        if !currentHasMultipleAccounts() {
             return super.makeView()
         }
         
