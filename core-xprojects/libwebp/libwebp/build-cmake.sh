@@ -72,8 +72,8 @@ fi
 
 echo "set(CMAKE_C_COMPILER $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang)" >> toolchain.cmake
 
-cmake -G"Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_OSX_SYSROOT=${MACOS_SYSROOT[0]} -DCMAKE_BUILD_TYPE=Release $COMMON_ARGS ../libwebp-1.6.0
-make
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_OSX_SYSROOT=${MACOS_SYSROOT[0]} -DCMAKE_BUILD_TYPE=Release $COMMON_ARGS ../libwebp-1.6.0
+ninja
 
 cd ..
 

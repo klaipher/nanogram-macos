@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **libopus and libwebp build with CMake + Ninja from the core's sources.** `core-xprojects/libopus/libopus/build.sh` builds `submodules/telegram-ios/third-party/opus/opus` (xiph/opus v1.6.1, 22244de5, the same commit iOS and Android pin; no download, no tarball, no sha256 check) with `cmake -G Ninja` (system cmake and ninja like `webrtc`; arm64 only, `MACOSX_DEPLOYMENT_TARGET`, `-O2 -DNDEBUG`) and the options iOS uses: shared off, programs and tests off, intrinsics on (NEON), DRED/OSCE off, PIC on. Behaviour change: the Mac opus is now floating point; it was `--enable-fixed-point`. Output `build/libopus/lib/libopus.a` and `build/libopus/include/opus` are unchanged, so the Xcode project is untouched. `core-xprojects/libwebp/libwebp/build-cmake.sh` uses Ninja instead of Unix Makefiles with the same options. Needs the core at the iOS commit that adds the opus submodule (core bump).
+
 - **`submodules/tgcalls` entry matches the iOS core's**: URL with `.git`, `shallow = true` (smaller recursive clone). check_shared normalises the URL, still 0 URL errors.
 - **webrtc build preflight checks crc32c**: `core-xprojects/webrtc/webrtc/build.sh` also requires `third_party/crc32c/src/include`, so an uninitialised crc32c fails with the init hint instead of inside CMake.
 - **Pre-push shared check follows the pushed commits**: `tglint pre-push` runs `check_shared --ref <pushed sha>` for every pushed commit (not HEAD) and stops when `submodules/telegram-ios` is not checked out at the commit that pushed sha pins (a stale core would read the wrong manifest). Tests: not built; pure Python compiled.
