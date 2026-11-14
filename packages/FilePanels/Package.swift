@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "FilePanels",
-    platforms: [.macOS(.v10_13)],
+    platforms: [.macOS(.v12)],
     products: [
         .library(name: "FilePanels", targets: ["FilePanels"]),
     ],
@@ -24,5 +24,9 @@ let package = Package(
                 .product(name: "AppAnalytics", package: "AppAnalytics", condition: nil),
             ],
             path: "Sources/FilePanels"),
+        .testTarget(
+            name: "FilePanelsTests",
+            dependencies: ["FilePanels"],
+            path: "Tests/FilePanelsTests"),
     ]
 )
