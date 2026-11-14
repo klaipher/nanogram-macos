@@ -177,7 +177,7 @@ private final class StoryMorphLabSession {
                 return parts.count > 3 ? parts[3...].joined(separator: " ").prefix(110).description : line
             }.joined(separator: " \n ")
         }
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         self.window.makeKeyAndOrderFront(nil)
         self.waitForCandidates(deadline: CACurrentMediaTime() + self.configuration.double("-PerfLabWait", 30))
     }

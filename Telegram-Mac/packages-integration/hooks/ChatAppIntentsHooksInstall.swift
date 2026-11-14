@@ -148,7 +148,7 @@ private final class AppChatIntentsDataSource: ChatIntentsDataSource {
                 return false
             }
             let peerId = PeerId(id.peerId)
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             if appDelegate?.activeContext(for: nil)?.account.id == context.account.id {
                 navigateToChat(navigation: context.bindings.rootNavigation(), context: context, chatLocation: .peer(peerId))
             } else {

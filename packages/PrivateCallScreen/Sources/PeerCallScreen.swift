@@ -520,7 +520,7 @@ public final class PeerCallScreen : ViewController {
     @MainActor
     private func acceptFromIncomingCard() {
         self.external.acceptcall()
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         self.screen.makeKeyAndOrderFront(nil)
     }
     

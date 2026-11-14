@@ -212,7 +212,7 @@ class SharedAccountContext {
             
             menu.addItem(ContextMenuItem(strings().statusBarActivate, handler: {
                 if !mainWindow.isKeyWindow  {
-                    NSApp.activate(ignoringOtherApps: true)
+                    NSApp.activate()
                     mainWindow.deminiaturize(nil)
                 } else {
                     NSApp.hide(nil)

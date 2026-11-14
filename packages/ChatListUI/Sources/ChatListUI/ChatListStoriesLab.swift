@@ -120,7 +120,7 @@ private final class ChatListStoriesLabSession {
             window.sendEvent(event)
             return nil
         })
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         self.target?.storyLabWindow?.makeKeyAndOrderFront(nil)
         self.waitForTarget(deadline: CACurrentMediaTime() + self.configuration.double("-PerfLabWait", 30))
     }

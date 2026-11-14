@@ -119,7 +119,7 @@ private final class EmojiPanelLabSession<Context: AccountContextProtocol> {
         controller.viewWillAppear(false)
         window.contentView?.addSubview(controller.view)
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         controller.viewDidAppear(false)
         self.window = window
         self.controller = controller
