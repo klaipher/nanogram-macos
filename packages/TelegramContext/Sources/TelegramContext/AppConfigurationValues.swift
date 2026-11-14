@@ -61,17 +61,21 @@ public enum AppConfigValueParsing {
         }
     }
 
+    // Same result as the shared core's StarRefStartParamPrefixes: empty or malformed lists mean "use the default".
     public static func stringList(_ value: Any?) -> [String]? {
+        let list: [String]
         switch value {
         case let value as [String]:
-            return value
+            list = value
         case let value as [Any]:
-            return value.compactMap { $0 as? String }
+            list = value.compactMap { $0 as? String }
         case let value as String:
-            return [value]
+            list = [value]
         default:
             return nil
         }
+        let nonEmpty = list.filter { !$0.isEmpty }
+        return nonEmpty.isEmpty ? nil : nonEmpty
     }
 
     public static let defaultStarRefPrefixes = ["_tgr_"]

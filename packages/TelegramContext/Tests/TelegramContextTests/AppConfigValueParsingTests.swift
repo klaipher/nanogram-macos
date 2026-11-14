@@ -7,6 +7,10 @@ final class AppConfigValueParsingTests: XCTestCase {
         XCTAssertEqual(AppConfigValueParsing.stringList("_tgr_"), ["_tgr_"])
         XCTAssertNil(AppConfigValueParsing.stringList(5.0))
         XCTAssertNil(AppConfigValueParsing.stringList(nil))
+        XCTAssertNil(AppConfigValueParsing.stringList([] as [Any]))
+        XCTAssertNil(AppConfigValueParsing.stringList([1.0, 2.0] as [Any]))
+        XCTAssertNil(AppConfigValueParsing.stringList([""] as [Any]))
+        XCTAssertEqual(AppConfigValueParsing.stringList(["", "_x_", 3.0] as [Any]), ["_x_"])
     }
 
     func testStarRefReferrer() {
@@ -15,6 +19,7 @@ final class AppConfigValueParsingTests: XCTestCase {
         XCTAssertEqual(AppConfigValueParsing.starRefReferrer(startParameter: "_x_abc", prefixes: ["_tgr_", "_x_"]), "abc")
         XCTAssertNil(AppConfigValueParsing.starRefReferrer(startParameter: "plain", prefixes: ["_tgr_"]))
         XCTAssertNil(AppConfigValueParsing.starRefReferrer(startParameter: "abc", prefixes: [""]))
+        XCTAssertEqual(AppConfigValueParsing.starRefReferrer(startParameter: "_tgr_abc", prefixes: AppConfigValueParsing.stringList([] as [Any])), "abc")
     }
 
     func testInt32AcceptsServerNumbers() {
