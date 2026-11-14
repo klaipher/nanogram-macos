@@ -68,8 +68,15 @@ class PinnedVersionsTests(unittest.TestCase):
 
     def test_openh264(self):
         script = read(CORE / "OpenH264" / "OpenH264" / "build.sh")
-        self.assertIn("-b v2.7.0 ", script)
-        self.assertIn("1bca62311e447fd9c39fc93de2c4b96cd5ce971c", script)
+        self.assertIn("submodules/telegram-ios", script)
+        self.assertIn("third-party/openh264/openh264", script)
+        self.assertNotIn("git clone", script)
+        self.assertNotIn("1bca62311e447fd9c39fc93de2c4b96cd5ce971c", script)
+        header = TG_IOS / "third-party" / "openh264" / "openh264" / "codec" / "api" / "wels" / "codec_ver.h"
+        if header.is_file():
+            text = read(header)
+            self.assertRegex(text, r"OPENH264_MAJOR \(2\)[\s\S]*OPENH264_MINOR \(7\)[\s\S]*OPENH264_REVISION \(0\)")
+        self.assertFalse((TG_IOS / "third-party" / "openh264" / "third_party").exists())
 
     def test_libwebp(self):
         script = read(CORE / "libwebp" / "libwebp" / "build-cmake.sh")
@@ -164,8 +171,9 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-shared\n', modules)
 
     def test_libprisma_and_boost_regex_come_from_the_core(self):
-        self.assertTrue((TG_IOS / "third-party" / "libprisma" / "Sources" / "SyntaxHighlighter.cpp").exists())
-        self.assertTrue((TG_IOS / "third-party" / "boost_regex" / "include" / "boost" / "regex.hpp").exists())
+        self.assertTrue((TG_IOS / "third-party" / "libprisma" / "libprisma" / "libprisma" / "SyntaxHighlighter.cpp").exists())
+        self.assertTrue((TG_IOS / "third-party" / "libprisma" / "libprisma" / "apple" / "Syntaxer.mm").exists())
+        self.assertTrue((TG_IOS / "third-party" / "boost_regex" / "regex" / "include" / "boost" / "regex.hpp").exists())
 
     def test_sparkle_2(self):
         self.assertEqual(gitlink(ROOT, "submodules/Sparkle"), "ab7d71291238df6e0492143b120c9b696a35f603")

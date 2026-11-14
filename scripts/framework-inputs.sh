@@ -17,6 +17,9 @@ framework_build_dir() {
 
 framework_source_roots() {
     case "$2" in
+        OpenH264)
+            echo "$1/submodules/telegram-ios/third-party/openh264/openh264"
+            ;;
         libwebp)
             echo "$1/submodules/telegram-ios/third-party/webp/libwebp"
             ;;
