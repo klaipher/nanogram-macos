@@ -25,7 +25,7 @@ not re-verified against the code; correct them on the next change in that area.
 - What: `submodules/telegram-ios` is klaipher/nanogram `main` (history-free), not Telegram-iOS; tgcalls and webrtc come
   from our forks (one branch each, the same commits as iOS and Android); parity gate with the iOS repository.
 - Where: `.gitmodules`, `docs/mac-core-paths.txt`, `tools/dev/parity/`, `tg core-bump`.
-- tgcalls: `nanogram-shared` carries Telegram 13.2's engine changes (SCTP timer overrides, reflector candidate-IP default, `removeOutgoingChannel` fix); the 14.0.0 engine is not part of the Mac build, so its 13.2 changes only reach the iOS app. Records: the fork's `NANOGRAM-CHANGES.md`.
+- tgcalls: `nanogram-shared` carries Telegram 13.2's engine changes (SCTP timer overrides, reflector candidate-IP default, `removeOutgoingChannel` fix); the 14.0.0 engine is not part of the Mac build, so its 13.2 changes only reach the iOS app. Records: the fork's `NANOGRAM-CHANGES.md`. Pin 73cc1f8d adds the `ios/` exclude to `Package.swift` (the iOS bridge lives in the same tree).
 - Sync: core moves only through `tg core-bump`; see docs/local-development.md "The shared Telegram core".
 
 ### One source per shared library (iOS, Mac, Android)
