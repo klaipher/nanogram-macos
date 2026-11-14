@@ -21,7 +21,35 @@ echo "Building for arm64..."
 mkdir -p "$BUILD_DIR/arm64"
 pushd "$BUILD_DIR/arm64"
 
-meson setup "$SOURCE_DIR" --cross-file="$PWD/../../dav1d-arm64.meson" $MESON_OPTIONS \
+# Cross file from the active toolchain and SDK (xcode-select / DEVELOPER_DIR), not a fixed Xcode path.
+# Resolved first: a failing xcrun inside the heredoc would not trip set -e.
+DAV1D_CC=$(xcrun -f clang)
+DAV1D_AR=$(xcrun -f ar)
+DAV1D_STRIP=$(xcrun -f strip)
+DAV1D_SDK=$(xcrun --sdk macosx --show-sdk-path)
+for v in "$DAV1D_CC" "$DAV1D_AR" "$DAV1D_STRIP" "$DAV1D_SDK"; do
+    case "$v" in
+        ""|*"'"*) echo "dav1d: unusable toolchain path '$v' (empty or contains a quote)" >&2; exit 1 ;;
+    esac
+done
+CROSS_FILE="$PWD/cross-arm64.meson"
+cat > "$CROSS_FILE" <<CROSS
+[binaries]
+c = ['$DAV1D_CC', '-arch', 'arm64', '-isysroot', '$DAV1D_SDK']
+ar = '$DAV1D_AR'
+strip = '$DAV1D_STRIP'
+
+[properties]
+needs_exe_wrapper = false
+
+[host_machine]
+system = 'darwin'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
+CROSS
+
+meson setup "$SOURCE_DIR" --cross-file="$CROSS_FILE" $MESON_OPTIONS \
     -Dc_args="-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET" -Dc_link_args="-mmacosx-version-min=$MACOSX_DEPLOYMENT_TARGET"
 ninja
 popd

@@ -15,6 +15,13 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: `nanogram/Nanogram.xcconfig`, `nanogram/editions/`, `tools/dev/tg`, `tools/dev/nanogram/buildcheck.py`.
 - Upstream: no. Sync: conflicts are rare because we leave their files alone; after a merge run `tg frameworks`, `tg warnings --update`, `tg check`.
 
+### Native library builds
+- What: the CMake libraries (tde2e, libjpeg-turbo) build with Ninja; dav1d's meson cross file is generated from `xcrun` (the checked-in `dav1d-arm64.meson` with a fixed Xcode path is deleted); framework stamps carry cmake/ninja/meson versions and `ccache=on|off`; `tg frameworks` routes CMake compiles through ccache (shared dir, `CCACHE_BASEDIR`); earlier tde2e hardening flags and the libjpeg-turbo swap live in the same scripts.
+- Why: faster incremental and repeat builds, rebuild on Homebrew tool upgrades, no fixed Xcode path.
+- Where: `core-xprojects/dav1d/dav1d/build.sh`, `core-xprojects/Mozjpeg/Mozjpeg/build.sh`, `core-xprojects/tde2e/tde2e/build.sh`, `scripts/framework-inputs.sh`, `tools/dev/nanogram/frameworks.py`.
+- Upstream: no; these are upstream-owned scripts we edited (dav1d-arm64.meson deleted).
+- Sync: conflicts are likely in those four scripts; keep the generated cross file, the Ninja generator and the stamp lines; tests `test_versions` (dav1d cross file), `test_fwcache` (stamp tests), `test_frameworks` (ccache env).
+
 ### Two editions, identity, distribution
 - What: `mas` (App Store/TestFlight) and `direct` (Developer ID, notarized dmg, Sparkle 2.10.1 from klaipher/nanogram-releases),
   both sandboxed; own bundle id and team; Telegram's update, crash-bot and store endpoints removed.
