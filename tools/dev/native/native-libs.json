@@ -4,7 +4,7 @@
  "policy": {
   "versions": "Library versions equal on both sides unless listed under known_differences.",
   "min_os": {
-   "ios": "13.0 (device and simulator libraries)",
+   "ios": "26.0 (device and simulator libraries; equals minimum_os_version in Telegram/BUILD, guarded by tools/dev/tests/test_min_os.py)",
    "mac": "14.0 for the native libraries (-mmacosx-version-min=14.0) while the app targets 15.0; 14.0 libraries link into a 15.0 app and changing it would break shared cache keys"
   },
   "platform_specific_by_design": {
