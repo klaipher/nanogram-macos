@@ -82,11 +82,12 @@ This takes a while, mostly because of WebRTC. The script:
 1. Generates TelegramApi's SwiftPM sources with SwiftTL, then the FlatSerialization
    sources for TelegramCore with flatc 25.12.19, which `scripts/prepare-flat-serialization.py` downloads (sha256-checked) and builds with CMake on first use into a per-user cache shared by all worktrees (`~/Library/Caches/nanogram/flatc/25.12.19`, base overridable with `NANOGRAM_CACHE_DIR`); the first run needs network and cmake.
 2. Builds, in order, `OpenH264`, `BoringSSL`, `libopus`, `libvpx`, `Mozjpeg`,
-   `libwebp`, `dav1d`, `ffmpeg`, `webrtc` (`submodules/webrtc`, klaipher/webrtc), `tde2e` and `WalletEngine` through
+   `libwebp`, `dav1d`, `ffmpeg`, `webrtc` (`submodules/webrtc`, klaipher/webrtc), `tde2e`, `WalletEngine`, `MTProtoEngine` and `NanogramRust` through
    their projects in `core-xprojects/<lib>/`. Outputs land in `core-xprojects/<lib>/build`,
    which is git-ignored. `WalletEngine` also regenerates
-   `packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift` (checked in) and
-   `packages/WalletEngine/wallet_engineFFI.xcframework` (ignored).
+   `packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift` (checked in). `NanogramRust` builds tlottie,
+   mtproto-engine and wallet-engine as one fat-LTO staticlib, `libnanogram_rust.a`, and packages it as
+   `packages/RustLibraries/NanogramRustFFI.xcframework` (ignored).
 3. Copies public headers into the `SharedHeaders` directories that `tgcalls`, the
    OpusBinding, FFMpegBinding, OpenSSLEncryptionProvider (its headers are BoringSSL's), libwebp and Mozjpeg packages
    expect.
@@ -106,10 +107,12 @@ the old `cmake_minimum_required` versions that mozjpeg and td still declare.
 On Xcode 27, run `scripts/xcode27.sh apply` before this step: the library projects target
 macOS 10.11–10.13, which Xcode 27 rejects. See [XCODE27.md](XCODE27.md).
 
-### Rebuilding only the wallet engine
+### Rebuilding only the Rust libraries
 
-After bumping the `telegram-ios` submodule, or when `wallet_engineFFI.xcframework` is
-missing:
+After bumping the `telegram-ios` submodule, or when
+`packages/RustLibraries/NanogramRustFFI.xcframework` is missing, rerun
+`scripts/configure_frameworks.sh`; it rebuilds `wallet-engine`, `mtproto-engine` and then
+`nanogram-rust` as needed. To run just the wallet engine step:
 
 ```
 sh core-xprojects/wallet-engine/wallet-engine/build.sh \
@@ -313,9 +316,8 @@ cd packages/TGUIKit && swift build
 - **Xcode reports a missing library or `SharedHeaders` directory**: a library was skipped
   because a stale `core-xprojects/<lib>/build` directory existed. Delete it and rerun
   `configure_frameworks.sh`.
-- **`wallet_engineFFI.xcframework` not found**: Rust was not available when the frameworks
-  were built. Install rustup, then rerun `configure_frameworks.sh` or the wallet engine
-  build script above.
+- **`NanogramRustFFI.xcframework` not found**: Rust was not available when the frameworks
+  were built. Install rustup, then rerun `configure_frameworks.sh`.
 - **`cargo` not found although Rust is installed**: the engine build script looks in
   `PATH` and `~/.cargo/bin`; export `CARGO=/path/to/cargo` if it lives elsewhere.
 - **`library 'nanogram_rust' not found` or `module 'wallet_engineFFI' not found`**:

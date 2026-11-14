@@ -51,10 +51,7 @@ do
         framework_reset_outputs "$ROOT_DIR" "$LIB"
     else
         echo "framework-stamp: $LIB outputs are missing or inconsistent, repairing"
-        case "$LIB" in
-            wallet-engine|mtproto-engine|nanogram-rust) framework_reset_outputs "$ROOT_DIR" "$LIB" ;;
-            *) rm -rf "$BUILD_DIR" ;;
-        esac
+        rm -rf "$BUILD_DIR"
     fi
     rm -f "$STAMP_FILE"
 

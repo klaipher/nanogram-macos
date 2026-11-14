@@ -162,36 +162,63 @@ class FrameworkTests(TemporaryTest):
         write(self.root / "core-xprojects/tlottie/build.sh", "exit 0\n")
         for lib, project in zip(self.libraries, self.projects):
             write(self.root / f"core-xprojects/{lib}/{project}.xcodeproj/project.pbxproj", "fixture")
+            if lib in ("wallet-engine", "mtproto-engine", "nanogram-rust"):
+                shutil.copy2(ROOT / f"core-xprojects/{lib}/{project}.xcodeproj/project.pbxproj", self.root / f"core-xprojects/{lib}/{project}.xcodeproj/project.pbxproj")
+                write(self.root / f"core-xprojects/{lib}/{lib}/build.sh", f'#!/bin/sh\nexec "$(cd "$(dirname "$0")/../../.." && pwd)/bin/produce" "$(cd "$(dirname "$0")/../../.." && pwd)" {lib}\n')
         for name in ["submodules/telegram-ios/third-party/rnnoise/rnnoise/include/api.h", "submodules/telegram-ios/submodules/EncryptionProvider/PublicHeaders/api.h", "submodules/telegram-ios/third-party/mozjpeg/mozjpeg/api.h"]:
             write(self.root / name, "header")
         write(self.root / ".gitignore", "build/\nSharedHeaders/\n*.xcframework/\nruns\nbin/\nWalletEngineFFI.swift\n")
         run(["git", "init", "-q", str(self.root)])
         run(["git", "-C", str(self.root), "add", "."])
         run(["git", "-C", str(self.root), "-c", "user.name=CI Test", "-c", "user.email=ci@example.invalid", "commit", "-qm", "fixture"])
+        produce = '''#!/bin/bash
+set -e
+ROOT="$1"
+LIB="$2"
+. "$ROOT/scripts/framework-inputs.sh"
+mkdir -p "$ROOT/core-xprojects/$LIB/build"
+framework_required_outputs "$ROOT" "$LIB" | while IFS= read -r output; do
+    mkdir -p "$(dirname "$output")"
+    printf 'artifact' > "$output"
+done
+if [ "$LIB" = "mozjpeg" ]; then
+    mkdir -p "$ROOT/core-xprojects/mozjpeg/build/libjpeg-turbo-3.2.1/src"
+    printf 'header' > "$ROOT/core-xprojects/mozjpeg/build/libjpeg-turbo-3.2.1/src/jpeglib.h"
+fi
+if [ "$LIB" = "wallet-engine" ]; then
+    mkdir -p "$ROOT/packages/WalletEngine/Sources/WalletEngineFFI"
+    cp "$ROOT/core-xprojects/$LIB/build/WalletEngineFFI.swift" "$ROOT/packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift"
+fi
+'''
         mock_build = '''#!/bin/bash
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 while [ "$1" != "-project" ]; do shift; done
 shift
 LIB=$(basename "$(dirname "$1")")
+PBXPROJ="$1/project.pbxproj"
 echo "$LIB" >> "$ROOT/runs"
-. "$ROOT/scripts/framework-inputs.sh"
-mkdir -p "$ROOT/core-xprojects/$LIB/build"
-if [ "$LIB" = "${FAIL_LIB:-}" ]; then exit 37; fi
-framework_required_outputs "$ROOT" "$LIB" | while IFS= read -r output; do
-    mkdir -p "$(dirname "$output")"
-    printf 'artifact' > "$output"
-done
-if [ "$LIB" = "wallet-engine" ]; then
-    mkdir -p "$ROOT/packages/WalletEngine/Sources/WalletEngineFFI"
-    cp "$ROOT/core-xprojects/$LIB/build/WalletEngineFFI.swift" "$ROOT/packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift"
-fi
+if [ "$LIB" = "${FAIL_LIB:-}" ]; then mkdir -p "$ROOT/core-xprojects/$LIB/build"; exit 37; fi
+case "$LIB" in
+    wallet-engine|mtproto-engine|nanogram-rust)
+        PROJECT_DIR="$ROOT/core-xprojects/$LIB" /bin/sh -c "$(python3 -I "$ROOT/bin/phase-script" "$PBXPROJ")"
+        ;;
+    *)
+        "$ROOT/bin/produce" "$ROOT" "$LIB"
+        ;;
+esac
 if [ "$LIB" = "${INCOMPLETE_LIB:-}" ]; then
+    . "$ROOT/scripts/framework-inputs.sh"
     output=$(framework_required_outputs "$ROOT" "$LIB" | head -1)
     rm "$output"
 fi
 '''
-        for name, contents in [("xcrun", mock_build), ("xcodebuild", "#!/bin/sh\nprintf 'Xcode fixture\\n'\n")]:
+        phase = '''import re, sys
+text = open(sys.argv[1]).read()
+script = re.search(r'shellScript = "(.*)";', text).group(1)
+print(script.replace('\\\\"', '"').replace('\\\\n', '\\n'))
+'''
+        for name, contents in [("phase-script", phase), ("produce", produce), ("xcrun", mock_build), ("xcodebuild", "#!/bin/sh\nprintf 'Xcode fixture\\n'\n")]:
             executable = write(self.root / "bin" / name, contents)
             executable.chmod(0o755)
         self.environment = dict(os.environ, PATH=str(self.root / "bin") + os.pathsep + os.environ["PATH"])

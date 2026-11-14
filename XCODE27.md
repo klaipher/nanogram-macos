@@ -24,7 +24,7 @@ Set **macOS Deployment Target** (`MACOSX_DEPLOYMENT_TARGET`) to **12.0** for eve
 - `submodules/CodeSyntax/CodeSyntax/CodeSyntax.xcodeproj`
 - `submodules/Sparkle/Sparkle.xcodeproj`
 - Before running `scripts/configure_frameworks.sh`, also the native library projects it builds:
-  `core-xprojects/{OpenH264,boringssl,libopus,libvpx,Mozjpeg,libwebp,dav1d,ffmpeg,webrtc,tde2e,wallet-engine}/*.xcodeproj`
+  `core-xprojects/{OpenH264,boringssl,libopus,libvpx,Mozjpeg,libwebp,dav1d,ffmpeg,webrtc,tde2e,wallet-engine,mtproto-engine,nanogram-rust}/*.xcodeproj`
 
 Swift packages need no change: Xcode 27 builds them for 12.0 anyway. As a result, a green build no longer catches a
 missing `@available(macOS 10.15, *)`.

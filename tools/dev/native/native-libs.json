@@ -9,7 +9,7 @@
   },
   "platform_specific_by_design": {
    "tls": "iOS, Mac and Android link one BoringSSL (klaipher/boringssl nanogram, shared/shared-libraries.json); the Mac builds it with CMake (core-xprojects/boringssl) from the core third-party/boringssl/src, and TDLib tde2e builds against its headers",
-   "rust_lto": "iOS builds Rust with fat LTO (Make.py); Mac Rust is fat LTO via --config in the core-xprojects scripts. Same compiler (rust version above). Details: docs/module-build-settings.md",
+   "rust_lto": "iOS builds Rust with fat LTO (Make.py); the Mac builds tlottie, mtproto-engine and wallet-engine as one fat-LTO staticlib (third-party/nanogram-rust, its crate profile). Same compiler (rust version above). Details: docs/module-build-settings.md",
    "mac_order_file": "Both apps link Release with order files (iOS: MtProtoKit, SwiftSignalKit, Postbox, TelegramCore, TelegramUI; Mac: tools/dev/orderfile.py); the files are separate",
    "webrtc": "one pin for iOS, Mac and Android (klaipher/webrtc nanogram, shared/shared-libraries.json); the Mac builds the same submodule (submodules/webrtc); no per-file parity gate"
   }
