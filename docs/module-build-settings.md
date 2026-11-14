@@ -21,7 +21,7 @@ Why the platform differences stay:
 
 ## Swift language mode per module
 
-iOS builds 822 Swift modules (41 in Swift 6 mode); the Mac builds 258 package targets (8 in Swift 6 mode). 43 modules are built by both apps; 6 of them differ in language mode.
+iOS builds 903 Swift modules (44 in Swift 6 mode); the Mac builds 258 package targets (8 in Swift 6 mode). 43 modules are built by both apps; 6 of them differ in language mode.
 
 | Module | iOS | Mac | Status |
 |---|---|---|---|
