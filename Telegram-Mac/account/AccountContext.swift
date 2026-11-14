@@ -16,6 +16,7 @@ import WalletContext
 import HTMLBubbles
 #endif
 import ApiCredentials
+import TelegramContext
 
 
 #if !SHARE

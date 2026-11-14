@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Build fix**: `AccountContext.swift` and `InAppLinks.swift` import `TelegramContext`, which defines `StorePurchasePolicy` (the store-build purchase switch); the first release build of that switch stopped on "cannot find 'StorePurchasePolicy' in scope".
+
 - **Core**: iOS commit with the `ProbeIncomingCall` build fix (the `timeout` parameter hid the SignalKit operator).
 
 - **Build fix**: `LinkHygiene.standardList` is public. It is the default argument of the public `strippingTracking(_:list:)`, which Swift requires to be public (first release build of link hygiene).
