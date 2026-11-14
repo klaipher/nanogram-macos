@@ -8,7 +8,7 @@
 [submodule "submodules/tgcalls"]
 	path = submodules/tgcalls
 	url = https://github.com/klaipher/tgcalls.git
-	branch = nanogram-shared
+	branch = nanogram
 	shallow = true
 [submodule "submodules/webrtc"]
 	path = submodules/webrtc
