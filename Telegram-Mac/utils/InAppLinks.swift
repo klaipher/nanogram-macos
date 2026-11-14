@@ -14,7 +14,11 @@ import InAppSettings
 import WalletContext
 import AppAnalytics
 import NanogramRuntime
+#if SHARE
+import struct TelegramContextShare.StorePurchasePolicy
+#else
 import struct TelegramContext.StorePurchasePolicy
+#endif
 
 
 
