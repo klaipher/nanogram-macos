@@ -1100,7 +1100,7 @@ public class ChatInteractiveContentView: ChatMediaContentView {
                 }
                 
                 if let parent = parent, parent.flags.contains(.Unsent) && !parent.flags.contains(.Failed) {
-                    updatedStatusSignal = combineLatest(chatMessagePhotoStatus(account: context.account, photo: image), context.account.pendingMessageManager.pendingMessageStatus(parent.id))
+                    updatedStatusSignal = combineLatest((chatMessagePhotoStatus(account: context.account, photo: image) |> coalescedStatusProgress()), context.account.pendingMessageManager.pendingMessageStatus(parent.id))
                         |> map { resourceStatus, pendingStatus in
                             if let pendingStatus = pendingStatus.0, parent.forwardInfo == nil || resourceStatus != .Local {
                                 let progress: Float
@@ -1111,7 +1111,7 @@ public class ChatInteractiveContentView: ChatMediaContentView {
                             }
                     } |> deliverOnMainQueue
                 } else {
-                    updatedStatusSignal = chatMessagePhotoStatus(account: context.account, photo: image, approximateSynchronousValue: approximateSynchronousValue) |> map {($0, $0)} |> deliverOnMainQueue
+                    updatedStatusSignal = (chatMessagePhotoStatus(account: context.account, photo: image, approximateSynchronousValue: approximateSynchronousValue) |> coalescedStatusProgress()) |> map {($0, $0)} |> deliverOnMainQueue
                 }
             
             } else if let file = media as? TelegramMediaFile {
@@ -1145,7 +1145,7 @@ public class ChatInteractiveContentView: ChatMediaContentView {
                 }
                 
                 if let parent = parent, parent.flags.contains(.Unsent) && !parent.flags.contains(.Failed) {
-                    updatedStatusSignal = combineLatest(chatMessageFileStatus(context: context, message: parent, file: file), context.account.pendingMessageManager.pendingMessageStatus(parent.id))
+                    updatedStatusSignal = combineLatest((chatMessageFileStatus(context: context, message: parent, file: file) |> coalescedStatusProgress()), context.account.pendingMessageManager.pendingMessageStatus(parent.id))
                         |> map { resourceStatus, pendingStatus in
                             if let pendingStatus = pendingStatus.0 {
                                 let progress: Float
@@ -1164,7 +1164,7 @@ public class ChatInteractiveContentView: ChatMediaContentView {
                     } else {
                         let signal: Signal<MediaResourceStatus, NoError>
                         if let parent = parent {
-                            signal = chatMessageFileStatus(context: context, message: parent, file: file, approximateSynchronousValue: approximateSynchronousValue)
+                            signal = (chatMessageFileStatus(context: context, message: parent, file: file, approximateSynchronousValue: approximateSynchronousValue) |> coalescedStatusProgress())
                         } else {
                             signal = context.account.postbox.mediaBox.resourceStatus(file.resource)
                         }

@@ -218,7 +218,7 @@ public class ChatFileContentView: ChatMediaContentView {
             archiveSignal = archiver.archive(.resource(resource)) |> map {Optional($0)}
         }
         if let parent = parent, parent.flags.contains(.Unsent) && !parent.flags.contains(.Failed) {
-            updatedStatusSignal = combineLatest(chatMessageFileStatus(context: context, message: parent, file: file), context.account.pendingMessageManager.pendingMessageStatus(parent.id), archiveSignal)
+            updatedStatusSignal = combineLatest((chatMessageFileStatus(context: context, message: parent, file: file) |> coalescedStatusProgress()), context.account.pendingMessageManager.pendingMessageStatus(parent.id), archiveSignal)
                 |> map { resourceStatus, pendingStatus, archiveStatus in
                     if let archiveStatus = archiveStatus {
                         switch archiveStatus {
@@ -237,7 +237,7 @@ public class ChatFileContentView: ChatMediaContentView {
         } else {
             let signal: Signal<MediaResourceStatus, NoError>
             if let parent = parent {
-                signal = chatMessageFileStatus(context: context, message: parent, file: file, approximateSynchronousValue: approximateSynchronousValue)
+                signal = (chatMessageFileStatus(context: context, message: parent, file: file, approximateSynchronousValue: approximateSynchronousValue) |> coalescedStatusProgress())
             } else {
                 signal = context.account.postbox.mediaBox.resourceStatus(file.resource)
             }
