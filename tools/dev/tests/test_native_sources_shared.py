@@ -48,6 +48,19 @@ class SharedNativeSourcesTests(unittest.TestCase):
         self.assertIn(f'libopus)', body)
         self.assertIn(f'"$1/{CORE}/opus/opus-1.6.1.tar.gz"', body)
 
+    def test_libwebp_builds_from_the_core_copy(self):
+        script = read(ROOT / "core-xprojects/libwebp/libwebp/build-cmake.sh")
+        self.assertIn(f"{CORE.removeprefix('submodules/telegram-ios/')}/webp/libwebp", script)
+        self.assertFalse(list((ROOT / "core-xprojects/libwebp").glob("libwebp-*.tar.gz")))
+        body = read(ROOT / "scripts/framework-inputs.sh").split("framework_source_roots()", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn(f'libwebp)\n            echo "$1/{CORE}/webp/libwebp"', body)
+        self.assertNotIn("submodules/openssl", body)
+
+    def test_flatc_is_built_from_the_pinned_release_not_committed(self):
+        text = read(ROOT / "scripts/prepare-flat-serialization.py")
+        self.assertIn("flatbuffers/archive/refs/tags/v25.12.19.zip", text)
+        self.assertIn("f5d4636bfc4d30c622c9ad238ce947848c2b90b10aecd387dc62cdee2584359b", text)
+
     def test_native_libs_probes_point_at_the_core(self):
         libs = json.loads(read(ROOT / "tools/dev/native/native-libs.json"))["libs"]
         mac_vpx = {p["file"] for p in libs["libvpx"]["probes"]["mac"]}

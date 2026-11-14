@@ -28,6 +28,13 @@ not re-verified against the code; correct them on the next change in that area.
 - tgcalls: `nanogram-shared` carries Telegram 13.2's engine changes (SCTP timer overrides, reflector candidate-IP default, `removeOutgoingChannel` fix); the 14.0.0 engine is not part of the Mac build, so its 13.2 changes only reach the iOS app. Records: the fork's `NANOGRAM-CHANGES.md`.
 - Sync: core moves only through `tg core-bump`; see docs/local-development.md "The shared Telegram core".
 
+### Native sources shared with the iOS core, animated stickers on tlottie only
+- What: libwebp is built from the core's `third-party/webp/libwebp` (no vendored tarball, no stale `build.sh`); libjpeg-turbo 3.2.1 is downloaded by URL and sha256 in `Mozjpeg/build.sh` (no vendored tarball); flatc 25.12.19 (the iOS pin) is built on first use by `scripts/prepare-flat-serialization.py` from the sha256-checked release archive (no committed binary); the dead OpenSSL `patch-conf.diff` and the stale `submodules/openssl` argument are gone. These files are upstream Telegram for macOS's own (`scripts/flatc` 24.12.23, `core-xprojects/libwebp/libwebp/build.sh`, `core-xprojects/openssl/OpenSSLEncryption/patch-conf.diff`, the libwebp and libjpeg-turbo tarballs), and we delete or replace them on purpose. flatc is cached per user in `~/Library/Caches/nanogram/flatc/25.12.19`; the first run needs network and cmake.
+- Animated stickers render with tlottie always (as Telegram for macOS 13.2). There is no rlottie fallback, force switch or kill switch: the `macos_killswitch_disable_tlottie` server flag is ignored. Behaviour is the tlottie path of every release since 13.2.
+- Where: `core-xprojects/{libwebp,Mozjpeg,openssl}`, `scripts/prepare-flat-serialization.py`, `scripts/framework-inputs.sh`, `tools/dev/native/native-libs.json`, docs/shared/w1-mac-native-sources.md.
+- Upstream: yes, they are upstream's files.
+- Sync: on upstream merges keep `scripts/flatc`, `libwebp/build.sh` and `patch-conf.diff` deleted (modify/delete conflicts resolve to delete), keep our `Mozjpeg/build.sh` and OpenSSL pbxproj shellScript edits, and compare any upstream flatc bump with `FLATBUFFERS_VERSION` in `prepare-flat-serialization.py`.
+
 ### Strictness and guardrails
 - What: `packages/Nanogram*` build in Swift 6 with warnings as errors; upstream code may only lower its warning count;
   `tg check` as pre-push gate (crash-risk lint on changed lines, warning baseline, package tests).
