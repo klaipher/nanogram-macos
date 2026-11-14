@@ -304,27 +304,10 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             self.videoDeviceInput = videoDeviceInput
         }
         session.commitConfiguration()
-        selectCaptureFormat(for: device)
         _configureFps()
         videoOutput.videoSettings = captureVideoSettings()
     }
 
-    private func selectCaptureFormat(for device: AVCaptureDevice) {
-        let fps = Double(RoundVideoEncodingPolicy.frameRate)
-        let formats = device.formats
-        let candidates = formats.map { format -> RoundVideoEncodingPolicy.CaptureFormatCandidate in
-            let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            let supportsFrameRate = format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= fps && $0.maxFrameRate >= fps })
-            return RoundVideoEncodingPolicy.CaptureFormatCandidate(shortSide: Int(min(dimensions.width, dimensions.height)), supportsFrameRate: supportsFrameRate)
-        }
-        guard let index = RoundVideoEncodingPolicy.bestCaptureFormat(candidates, side: self.outputSide), formats[index] != device.activeFormat else {
-            return
-        }
-        _reconfigureDevice(device, with: { device in
-            device.activeFormat = formats[index]
-        })
-    }
-    
     private func captureVideoSettings() -> [String: Any] {
         var settings: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
