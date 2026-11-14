@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- MACOS-LIST-1 (flagged, default off): `TableView.layoutItems` (end of live resize, split-view drag) can relayout in two phases: rows in the visible range plus 600 pt are measured and updated at once, one `noteHeightOfRows` covers the whole table, the other rows are measured in chunks of 20 on following main-queue turns, nearest first, with `saveScrollState` after each. Enable with `defaults write <bundle id> nanogram.experimental.deferredResizeRelayout -bool YES`. Plan in `TableRelayoutPlan`; tests in TGUIKit `TableRelayoutTests`. Off by default until the chat-at-bottom/anchor resize checks and Hangs numbers are in.
+
 - MACOS-LIST-2 (fixed): `TableView.remove(range:)` removed every second row and told NSTableView about the whole range; it now removes in reverse over the clamped range with one `removeRows`. No caller yet. Test: TGUIKit `TableRelayoutTests`.
 
 ## 13.2.0 (202611132157) — 2026-11-13
