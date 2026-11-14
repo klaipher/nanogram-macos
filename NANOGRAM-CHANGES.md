@@ -130,7 +130,7 @@ not re-verified against the code; correct them on the next change in that area.
 - Sync: conflicts possible in `TableView.swift` and `ChatMediaContentView.swift`.
 
 ### Round videos like iOS (480 px, 1.2 Mbps)
-- What: circles are recorded at `max(server diameter, 480)` px (even, at most 640), `max(server video_bitrate, 1200)` kbps and `max(server audio_bitrate, 64)` kbps, 30 fps, with the smallest camera format whose short side is at least 600 px. Upstream follows the server values (384 px, 1000 kbps).
-- Where: `packages/MediaRecorderUI` (`RoundVideoEncodingPolicy.swift`, `VideoRecorderPipeline.swift`).
+- What: circles are recorded at `max(server diameter, 480)` px (even, at most 640), `max(server video_bitrate, 1200)` kbps and `max(server audio_bitrate, 64)` kbps, 30 fps (fixed frame duration), on the session's existing preset chain. The size sent with the message is the real writer size. Upstream follows the server values (384 px, 1000 kbps).
+- Where: `packages/MediaRecorderUI` (`RoundVideoEncodingPolicy.swift`, `VideoRecorderPipeline.swift`, `ChatRecordingState.swift`) and the renderer's even output side in `TGVideoCameraMovie`.
 - Upstream: no; `VideoMessageConfig` and the server reading are untouched.
-- Sync: re-apply the policy calls in `VideoRecorderPipeline` (init, `setSelectedVideoDevice`, `configureRecorderTracks`) after a merge.
+- Sync: re-apply the policy calls in `VideoRecorderPipeline` (init, `_configureFps`, `configureRecorderTracks`, `writerSide`) after a merge.
