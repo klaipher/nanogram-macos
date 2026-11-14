@@ -7,8 +7,8 @@ Every repository we maintain keeps two files at its root. Identical text in both
 | klaipher/nanogram (iOS + shared core) | Telegram-iOS `release-*` tags | `main` (imports on `upstream`) | exists, private | new |
 | klaipher/nanogram-macos | telegram-macos (released code only) | `nanogram/integration` | exists, private | `NANOGRAM.md` stays the overview, new `NANOGRAM-CHANGES.md` has the detail |
 | klaipher/tgcalls | TelegramMessenger/tgcalls (`development`) | `nanogram-shared` (iOS + Mac) | new | new |
-| klaipher/webrtc | ali-fareed/webrtc `M123` (the WebRTC tree Telegram-iOS builds) | `nanogram-security-fixes` | new | new |
-| klaipher/tg_owt | macosswift/tg_owt `master`, with desktop-app/tg_owt `master` merged in | `nanogram-mac` | new | new |
+| klaipher/webrtc | ali-fareed/webrtc `M123` (the WebRTC tree Telegram-iOS builds) | `nanogram` (iOS, Mac and Android) | new | new |
+| klaipher/tg_owt | macosswift/tg_owt `master`, with desktop-app/tg_owt `master` merged in | archived: its content is in klaipher/webrtc `nanogram` since 2026-11-14 | kept for history | kept for history |
 | klaipher/rlottie | TelegramMessenger/rlottie | none: neither app builds it since 2026-11-11 (upstream 13.2 dropped it; the Watch app vendors its own copy) | kept for history | kept for history |
 | klaipher/nanogram-releases | none (downloads and Sparkle feed) | `main` | public notes only | not needed |
 

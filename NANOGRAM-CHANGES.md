@@ -22,8 +22,8 @@ not re-verified against the code; correct them on the next change in that area.
 - Upstream: no.
 
 ### Shared core from the iOS repository
-- What: `submodules/telegram-ios` is klaipher/nanogram `main` (history-free), not Telegram-iOS; tgcalls and tg_owt come
-  from our forks; parity gate with the iOS repository.
+- What: `submodules/telegram-ios` is klaipher/nanogram `main` (history-free), not Telegram-iOS; tgcalls and webrtc come
+  from our forks (one branch each, the same commits as iOS and Android); parity gate with the iOS repository.
 - Where: `.gitmodules`, `docs/mac-core-paths.txt`, `tools/dev/parity/`, `tg core-bump`.
 - tgcalls: `nanogram-shared` carries Telegram 13.2's engine changes (SCTP timer overrides, reflector candidate-IP default, `removeOutgoingChannel` fix); the 14.0.0 engine is not part of the Mac build, so its 13.2 changes only reach the iOS app. Records: the fork's `NANOGRAM-CHANGES.md`.
 - Sync: core moves only through `tg core-bump`; see docs/local-development.md "The shared Telegram core".
@@ -32,6 +32,7 @@ not re-verified against the code; correct them on the next change in that area.
 - What: every shared native library has one source and one commit, listed in `shared/shared-libraries.json` of klaipher/nanogram-deps (the core's `shared/` submodule, reached at `submodules/telegram-ios/shared/`). The Mac builds the core's copies (via-ios-core) and has no vendored copy of them. Parity, the manifest check, the cache policy, the feature-parity and development-pipeline documents are no longer copied into this repository: `tools/dev/parity/parity.py` and `tools/dev/native/check_shared.py` are wrappers, and the pre-push hook runs `check_shared.py --side mac`.
 - Where: `tools/dev/parity/`, `tools/dev/native/`, `tools/dev/cachegc/cachegc.py`, `docs/mac-core-paths.txt` (iOS file, byte for byte), `tools/dev/native/native-libs.json`.
 - Highlighter: `CodeSyntax` compiles the fork's C++ core and its one `apple/Syntaxer.{h,mm}` (the Mac keeps no copy); OpenH264 is built from the core's klaipher/openh264 `nanogram` submodule (v2.7.0 plus H.264 level 6.0-6.2 and the sprite mode, off by default); rnnoise is the SwiftPM package in the core.
+- Calls and WebRTC: `submodules/webrtc` = klaipher/webrtc `nanogram` (the tg_owt CMake build now lives at that tree's root; the Mac builds it from `build/src`, libyuv from the core, abseil with the fork's guarded lifetimebound workaround) and `submodules/tgcalls` is the commit iOS pins; the old klaipher/tg_owt is archived.
 - Widgets: `third-party/twidget` and `third-party/widget-sandbox` are klaipher/twidget and klaipher/widget-sandbox (`nanogram`), the same commits iOS and Android pin; QuickJS is klaipher/quickjs through the widget-sandbox fork (no local pin any more).
 - Where (libraries): `submodules/CodeSyntax/CodeSyntax/CodeSyntax.xcodeproj`, `core-xprojects/OpenH264/OpenH264/build.sh`, `scripts/configure_frameworks.sh`, `Telegram.xcodeproj` (grammars.dat path), `.gitmodules` (twidget, widget-sandbox), `tools/dev/nanogram/localfixes.py`.
 - Upstream: no.
@@ -95,7 +96,7 @@ not re-verified against the code; correct them on the next change in that area.
   must lie inside the file; bandwidth and level dimensions are clamped; playlist and range fetches stop after 5 retries;
   chat export decides copy protection from cached data when the refresh fails or times out (protected or unknown stays refused).
 - Why: a hostile playlist crashed the app, also during chat-scroll preload; unsatisfiable ranges refetched forever; export needed the network.
-- Where: `packages/HLSPlayback/Sources/HLSPlayback/{HLSMediaPlaylist,HLSLevel}.swift`, `packages/TelegramMedia/Sources/{HLSVideoContent,HLSVideoNativeContentView}.swift`, `HLSNative/HLSNativePlaylistLoader.swift`, `packages/ChatExportUI/Sources/ChatExportUI/ChatExportManager.swift`, key `ChatExport.Unverified`.
+- Where: `submodules/telegram-ios/submodules/HLSPlayback/Sources/{HLSMediaPlaylist,HLSLevel}.swift` (the Mac package symlinks it), `packages/TelegramMedia/Sources/{HLSVideoContent,HLSVideoNativeContentView}.swift`, `HLSNative/HLSNativePlaylistLoader.swift`, `packages/ChatExportUI/Sources/ChatExportUI/ChatExportManager.swift`, key `ChatExport.Unverified`.
 - Upstream: the HLS files are upstream's 13.2 code with small edits; export gate is ours.
 - Sync: keep the `rangesFit`, `addingReportingOverflow` and `hlsBoundedRetry` call sites when upstream's lines change; add the key to the generated `Localizable.swift` on the next `tg` localization run.
 

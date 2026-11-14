@@ -17,7 +17,7 @@
    "name": "Calls and WebRTC",
    "prefixes": [
     "submodules/tgcalls",
-    "submodules/tg_owt",
+    "submodules/webrtc",
     "packages/TelegramCallsCore/",
     "packages/CallsUI/",
     "Telegram-Mac/Calls"
@@ -70,11 +70,11 @@
    "fork_branch": "nanogram-shared"
   },
   {
-   "name": "tg_owt",
-   "path": "submodules/tg_owt",
-   "upstream_url": "https://github.com/macosswift/tg_owt.git",
-   "fork_url": "https://github.com/klaipher/tg_owt.git",
-   "fork_branch": "nanogram-mac"
+   "name": "webrtc",
+   "path": "submodules/webrtc",
+   "upstream_url": "https://github.com/ali-fareed/webrtc.git",
+   "fork_url": "https://github.com/klaipher/webrtc.git",
+   "fork_branch": "nanogram"
   },
   {
    "name": "Sparkle",

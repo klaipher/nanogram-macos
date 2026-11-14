@@ -9,10 +9,11 @@
 	path = submodules/tgcalls
 	url = https://github.com/klaipher/tgcalls
 	branch = nanogram-shared
-[submodule "submodules/tg_owt"]
-	path = submodules/tg_owt
-	url = https://github.com/klaipher/tg_owt
-	branch = nanogram-mac
+[submodule "submodules/webrtc"]
+	path = submodules/webrtc
+	url = https://github.com/klaipher/webrtc.git
+	branch = nanogram
+	shallow = true
 [submodule "submodules/tlottie"]
 	path = submodules/tlottie
 	url = https://github.com/dkaraush/tlottie

@@ -124,8 +124,10 @@ class PinnedVersionsTests(unittest.TestCase):
 
     def test_sqlcipher(self):
         sources = TG_IOS / "submodules" / "sqlcipher"
-        self.assertIn('#define SQLITE_VERSION        "3.54.1"', read(sources / "PublicHeaders" / "sqlcipher" / "sqlite3.h"))
-        self.assertIn("#define CIPHER_VERSION_NUMBER 4.20.0", read(sources / "Sources" / "sqlite3.c"))
+        amalgamation = sources / "amalgamation"
+        self.assertIn('#define SQLITE_VERSION        "3.54.1"', read(amalgamation / "headers" / "sqlcipher" / "sqlite3.h"))
+        self.assertIn("#define CIPHER_VERSION_NUMBER 4.20.0", read(amalgamation / "sqlite3.c"))
+        self.assertEqual(gitlink(TG_IOS, "submodules/sqlcipher/amalgamation"), "9948d5af4e4dc808e223917c228622f2952fcda5")
 
     def test_tde2e(self):
         self.assertEqual(gitlink(TG_IOS, "third-party/td/td"), "0e88653dcbf4e44c73cb655a05b58cd749a91169")
@@ -156,19 +158,36 @@ class PinnedVersionsTests(unittest.TestCase):
             self.assertIn("export RUSTUP_TOOLCHAIN", text, script)
             self.assertNotIn("third-party/mtproto-engine/rust-toolchain.toml", text, script)
 
-    def test_tg_owt_has_desktop_app_master(self):
-        owt = ROOT / "submodules" / "tg_owt"
-        pin = gitlink(ROOT, "submodules/tg_owt")
-        for commit in ("020feec5c040fdae2cf752c2c2be62ddde7c236d", "557e0e3d7d72f80278938f01e4d31bfd036278ba"):
-            self.assertTrue(is_ancestor(owt, commit, pin), f"tg_owt {pin} does not contain {commit}")
+    def test_webrtc_is_the_one_klaipher_fork_pin_shared_with_ios(self):
+        modules = read(ROOT / ".gitmodules")
+        self.assertIn('[submodule "submodules/webrtc"]\n\tpath = submodules/webrtc\n\turl = https://github.com/klaipher/webrtc.git\n\tbranch = nanogram\n', modules)
+        self.assertNotIn("tg_owt", modules)
+        self.assertEqual(gitlink(ROOT, "submodules/webrtc"), gitlink(TG_IOS, "third-party/webrtc/webrtc"))
+        with self.assertRaises(AssertionError):
+            gitlink(ROOT, "submodules/tg_owt")
 
-    def test_tgcalls_is_the_klaipher_fork(self):
-        tgcalls = ROOT / "submodules" / "tgcalls"
-        pin = gitlink(ROOT, "submodules/tgcalls")
-        for commit in ("bdda8eff9f62547b4621c09f6a8873a61aecd95c", "6926af015580a1377e1b1bcad191d076453192cb"):
-            self.assertTrue(is_ancestor(tgcalls, commit, pin), f"tgcalls {pin} does not contain {commit}")
+    def test_webrtc_build_takes_its_third_party_sources_from_the_single_sources(self):
+        script = read(CORE / "webrtc" / "webrtc" / "build.sh")
+        self.assertIn("-DTG_OWT_LIBYUV_DIR=$LIBYUV_DIR", script)
+        self.assertIn("apply_abseil_workaround.sh", script)
+        self.assertIn('"$SOURCE_DIR/CMakeLists.txt"', script)
+        project = read(CORE / "webrtc" / "webrtc.xcodeproj" / "project.pbxproj")
+        self.assertIn("submodules/webrtc/", project)
+        self.assertIn("submodules/telegram-ios/third-party/libyuv/third_party/libyuv", project)
+        self.assertNotIn("tg_owt", project)
+        self.assertNotIn("tg_owt", read(ROOT / "scripts" / "framework-inputs.sh"))
+        self.assertNotIn("attributes.h", read(ROOT / "scripts" / "setup_build_env.sh"))
+
+    def test_tgcalls_is_the_klaipher_fork_pin_shared_with_ios(self):
+        self.assertEqual(gitlink(ROOT, "submodules/tgcalls"), gitlink(TG_IOS, "submodules/TgVoipWebrtc/tgcalls"))
         modules = read(ROOT / ".gitmodules")
         self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-shared\n', modules)
+
+    def test_widget_stack_is_the_klaipher_forks_shared_with_ios(self):
+        modules = read(ROOT / ".gitmodules")
+        for name in ("twidget", "widget-sandbox"):
+            self.assertIn(f'[submodule "third-party/{name}"]\n\tpath = third-party/{name}\n\turl = https://github.com/klaipher/{name}.git\n\tbranch = nanogram\n', modules)
+            self.assertEqual(gitlink(ROOT, f"third-party/{name}"), gitlink(TG_IOS, f"third-party/{name}/{name}"))
 
     def test_libprisma_and_boost_regex_come_from_the_core(self):
         self.assertTrue((TG_IOS / "third-party" / "libprisma" / "libprisma" / "libprisma" / "SyntaxHighlighter.cpp").exists())

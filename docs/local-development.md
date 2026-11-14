@@ -408,7 +408,7 @@ What we changed in the build scripts:
   proc-macro crates fail to load ("can't find crate for `zeroize_derive`", Rust 1.91 and 1.96). The Rust objects
   then default to macOS 11.0, which links fine into a 15.0 app.
 - The framework stamp records `archs=` next to `deployment=`, so changing either rebuilds the libraries.
-- webrtc (tg_owt) is compiled for macOS 14.0: its desktop capturer calls `CGDisplayStream*` and
+- webrtc (`submodules/webrtc`, klaipher/webrtc) is compiled for macOS 14.0: its desktop capturer calls `CGDisplayStream*` and
   `CGWindowListCreateImage*`, which are obsoleted (a hard error) at a 15.0 deployment target. Its objects link
   into the 15.0 app and behave exactly as upstream's (which builds them for 10.13 against the same SDK). Moving
   it to ScreenCaptureKit belongs upstream.
@@ -637,8 +637,8 @@ contains that pin (`git tag --contains <pin>` in a Telegram-iOS clone, or the fi
 commit past the newest tag.
 
 Other forks we pin: `submodules/tgcalls` = `klaipher/tgcalls` branch `nanogram-shared` (one branch for iOS and the Mac;
-the parity check compares the `.gitmodules` branch names of both repos), `submodules/tg_owt` = `klaipher/tg_owt` branch
-`nanogram-mac` (rlottie is gone since 13.2, as upstream). Their records: `NANOGRAM-CHANGES.md` and
+the parity check compares the `.gitmodules` branch names of both repos), `submodules/webrtc` = `klaipher/webrtc` branch
+`nanogram` (one WebRTC source for iOS, Mac and Android; the old `klaipher/tg_owt` is archived; rlottie is gone since 13.2, as upstream). `submodules/telegram-ios/shared/shared-libraries.json` lists every shared library with its single source and commit; `check_shared.py --side mac` (pre-push) compares this repository with it. Their records: `NANOGRAM-CHANGES.md` and
 `CHANGELOG.md` in each fork. Run
 `git submodule sync --recursive` after `.gitmodules` URLs change; existing checkouts keep their old remotes until then.
 
@@ -650,17 +650,17 @@ the core's `shared/parity.py`, klaipher/nanogram-deps) enforces it; `tools/dev/t
 
 - History roots: every core commit must be rooted at the import `b46f1ec6`; a push that reaches Telegram's history is
   stopped (both repos' pre-push hooks).
-- Pins published: core, tgcalls and tg_owt pins must be on a `klaipher` remote (a network URL under
+- Pins published: core, tgcalls and webrtc pins must be on a `klaipher` remote (a network URL under
   `klaipher/`; a local-path remote such as `/Users/klaipher/...` does not count).
-- Equal SHAs: tgcalls and tlottie are the same commit on both sides (read from the core pin).
+- Equal SHAs: tgcalls, webrtc and tlottie are the same commit on both sides (read from the core pin); `check_shared.py` does the same for every library in the manifest.
 - Core pin: an ancestor of iOS `main` (or `mac/core-lts`), lag limit 20 commits / 7 days of shared-path commits
   (warning until `block-from`, then an error), and no shared file that differs through a commit that is neither a
   `cherry-pick -x` of `main` nor allow-listed. A cherry-pick explains a file only when it adds and removes exactly the
   lines its source does there (context may differ), so extra edits under a `cherry picked from` trailer count as
   drift; an adapted LTS backport needs an `allow core <path> until=DATE | reason` entry. A merge counts the files it
   resolves differently from every parent.
-- WebRTC: shared source files of `tg_owt/src` and the iOS webrtc tree must match unless allow-listed. Allow entries
-  can carry `until=DATE`, after which they stop applying.
+- WebRTC: there is no per-file comparison any more; both apps build the same `klaipher/webrtc` commit. Allow entries
+  for the core can carry `until=DATE`, after which they stop applying.
 - The paths file runs in `mode shared` (a `mode legacy` keeps ancestry, lag and file checks as warnings). `--release` makes a dirty core an error. `TG_PARITY=0` skips the hook once.
 
 `tg core-bump [REF|SHA] [--dry-run] [--no-fetch] [--no-test] [--build] [--commit]` is the only way to move the core

@@ -37,7 +37,8 @@ framework_source_roots() {
             echo "$1/submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg"
             ;;
         webrtc)
-            echo "$1/submodules/tg_owt"
+            echo "$1/submodules/webrtc"
+            echo "$1/submodules/telegram-ios/third-party/libyuv/third_party/libyuv"
             ;;
         tde2e)
             echo "$1/submodules/telegram-ios/third-party/td/td"
