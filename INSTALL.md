@@ -145,12 +145,8 @@ resolved from the local paths in the workspace; no network access is needed.
 
 ### Telegram-iOS compatibility
 
-The Telegram-iOS submodule points to the official upstream commit. The framework
-preparation applies `scripts/telegram-ios-macos.patch` to keep the Mac app's
-shared-core changes. If the frameworks are already built, run
-`sh scripts/prepare-telegram-ios.sh` before opening Xcode or resolving packages.
-Run `sh scripts/prepare-telegram-ios.sh --reverse` before checking out a different
-Telegram-iOS revision if the patch is applied.
+The Telegram-iOS submodule is the klaipher/nanogram core. It already carries the Mac's shared-core
+changes (the former `scripts/telegram-ios-macos.patch`), so the framework preparation applies no patch.
 
 ### Generated TelegramApi sources
 
