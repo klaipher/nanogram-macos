@@ -585,9 +585,8 @@ class DirectReleaseTests(unittest.TestCase):
             (top / "third-party/ws/README").write_text("changed\n")
             self.assertEqual(release.tracked_changes(top, {"third-party/ws/q": new}), ["third-party/ws"])
 
-    def test_the_widget_quickjs_fix_is_a_local_pin(self):
-        from nanogram import localfixes
-        self.assertEqual(release.LOCAL_PINS, {localfixes.WIDGET_QUICKJS_PATH: localfixes.WIDGET_QUICKJS_COMMIT})
+    def test_no_nested_checkout_is_moved_by_localfixes(self):
+        self.assertEqual(release.LOCAL_PINS, {})
 
     def test_make_dmg(self):
         import subprocess

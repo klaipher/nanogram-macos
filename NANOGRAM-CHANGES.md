@@ -29,11 +29,30 @@ not re-verified against the code; correct them on the next change in that area.
 - Upstream: no.
 
 ### Shared core from the iOS repository
-- What: `submodules/telegram-ios` is klaipher/nanogram `main` (history-free), not Telegram-iOS; tgcalls and tg_owt come
-  from our forks; parity gate with the iOS repository.
+- What: `submodules/telegram-ios` is klaipher/nanogram `main` (history-free), not Telegram-iOS; tgcalls and webrtc come
+  from our forks (one branch each, the same commits as iOS and Android); parity gate with the iOS repository.
 - Where: `.gitmodules`, `docs/mac-core-paths.txt`, `tools/dev/parity/`, `tg core-bump`.
-- tgcalls: `nanogram-shared` carries Telegram 13.2's engine changes (SCTP timer overrides, reflector candidate-IP default, `removeOutgoingChannel` fix); the 14.0.0 engine is not part of the Mac build, so its 13.2 changes only reach the iOS app. Records: the fork's `NANOGRAM-CHANGES.md`.
+- tgcalls: `nanogram-shared` carries Telegram 13.2's engine changes (SCTP timer overrides, reflector candidate-IP default, `removeOutgoingChannel` fix); the 14.0.0 engine is not part of the Mac build, so its 13.2 changes only reach the iOS app. Records: the fork's `NANOGRAM-CHANGES.md`. Pin 73cc1f8d adds the `ios/` exclude to `Package.swift` (the iOS bridge lives in the same tree).
 - Sync: core moves only through `tg core-bump`; see docs/local-development.md "The shared Telegram core".
+
+### One source per shared library (iOS, Mac, Android)
+- Checks: the pre-push hook checks every pushed commit with `check_shared --ref` and refuses a stale core checkout; `build.sh` of webrtc preflights crc32c; the tgcalls `.gitmodules` entry is shallow.
+- What: every shared native library has one source and one commit, listed in `shared/shared-libraries.json` of klaipher/nanogram-deps (the core's `shared/` submodule, reached at `submodules/telegram-ios/shared/`). The Mac builds the core's copies (via-ios-core) and has no vendored copy of them. Parity, the manifest check, the cache policy, the feature-parity and development-pipeline documents are no longer copied into this repository: `tools/dev/parity/parity.py` and `tools/dev/native/check_shared.py` are wrappers, and the pre-push hook runs `check_shared.py --side mac`.
+- Where: `tools/dev/parity/`, `tools/dev/native/`, `tools/dev/cachegc/cachegc.py`, `docs/mac-core-paths.txt` (iOS file, byte for byte), `tools/dev/native/native-libs.json`.
+- Highlighter: `CodeSyntax` compiles the fork's C++ core and its one `apple/Syntaxer.{h,mm}` (the Mac keeps no copy); OpenH264 is built from the core's klaipher/openh264 `nanogram` submodule (v2.7.0 plus H.264 level 6.0-6.2 and the sprite mode, off by default); rnnoise is the SwiftPM package in the core.
+- Calls and WebRTC: `submodules/webrtc` = klaipher/webrtc `nanogram` (the tg_owt CMake build now lives at that tree's root; the Mac builds it from `build/src`, libyuv from the core, abseil with the fork's guarded lifetimebound workaround) and `submodules/tgcalls` is the commit iOS pins; the old klaipher/tg_owt is archived.
+- Shared Swift/ObjC sources: the Mac packages HLSPlayback, SwiftMath, VP9Hardware, RingBuffer, EDSunriseSet, QrStudioUI (logic files), SceneEffects (diamond, shaders, release policy) and the card logic of Stripe are symlinks (behaviour change, as on iOS: expired Visa, MasterCard and Other cards pass client-side expiry validation, and `validationStateForCard:` marks both expiry fields valid when either is invalid; BIN ranges 8600/9860 become Other instead of Unknown; owner to approve) into `submodules/telegram-ios` (iOS-reconciled files); AppKit views, the sticker reader, `LiquidGlassShapesTypes` and Svg stay per app.
+- Widgets: `third-party/twidget` and `third-party/widget-sandbox` are klaipher/twidget and klaipher/widget-sandbox (`nanogram`), the same commits iOS and Android pin; QuickJS is klaipher/quickjs through the widget-sandbox fork (no local pin any more).
+- Where (libraries): `submodules/CodeSyntax/CodeSyntax/CodeSyntax.xcodeproj`, `core-xprojects/OpenH264/OpenH264/build.sh`, `scripts/configure_frameworks.sh`, `Telegram.xcodeproj` (grammars.dat path), `.gitmodules` (twidget, widget-sandbox), `tools/dev/nanogram/localfixes.py`.
+- Upstream: no.
+- Sync: after a core bump, `docs/mac-core-paths.txt` is re-copied from the core; `native-libs.json` stays identical to the iOS repository.
+
+### Native sources shared with the iOS core, animated stickers on tlottie only
+- What: libwebp is built from the core's `third-party/webp/libwebp` (no vendored tarball, no stale `build.sh`); libjpeg-turbo 3.2.1 is downloaded by URL and sha256 in `Mozjpeg/build.sh` (no vendored tarball); flatc 25.12.19 (the iOS pin) is built on first use by `scripts/prepare-flat-serialization.py` from the sha256-checked release archive (no committed binary); the dead OpenSSL `patch-conf.diff` and the stale `submodules/openssl` argument are gone. These files are upstream Telegram for macOS's own (`scripts/flatc` 24.12.23, `core-xprojects/libwebp/libwebp/build.sh`, `core-xprojects/openssl/OpenSSLEncryption/patch-conf.diff`, the libwebp and libjpeg-turbo tarballs), and we delete or replace them on purpose. flatc is cached per user in `~/Library/Caches/nanogram/flatc/25.12.19`; the first run needs network and cmake.
+- Animated stickers render with tlottie always (as Telegram for macOS 13.2). There is no rlottie fallback, force switch or kill switch: the `macos_killswitch_disable_tlottie` server flag is ignored. Behaviour is the tlottie path of every release since 13.2.
+- Where: `core-xprojects/{libwebp,Mozjpeg,openssl}`, `scripts/prepare-flat-serialization.py`, `scripts/framework-inputs.sh`, `tools/dev/native/native-libs.json`, docs/shared/w1-mac-native-sources.md.
+- Upstream: yes, they are upstream's files.
+- Sync: on upstream merges keep `scripts/flatc`, `libwebp/build.sh` and `patch-conf.diff` deleted (modify/delete conflicts resolve to delete), keep our `Mozjpeg/build.sh` and OpenSSL pbxproj shellScript edits, and compare any upstream flatc bump with `FLATBUFFERS_VERSION` in `prepare-flat-serialization.py`.
 
 ### Strictness and guardrails
 - What: `packages/Nanogram*` build in Swift 6 with warnings as errors; upstream code may only lower its warning count;
@@ -86,7 +105,7 @@ not re-verified against the code; correct them on the next change in that area.
   must lie inside the file; bandwidth and level dimensions are clamped; playlist and range fetches stop after 5 retries;
   chat export decides copy protection from cached data when the refresh fails or times out (protected or unknown stays refused).
 - Why: a hostile playlist crashed the app, also during chat-scroll preload; unsatisfiable ranges refetched forever; export needed the network.
-- Where: `packages/HLSPlayback/Sources/HLSPlayback/{HLSMediaPlaylist,HLSLevel}.swift`, `packages/TelegramMedia/Sources/{HLSVideoContent,HLSVideoNativeContentView}.swift`, `HLSNative/HLSNativePlaylistLoader.swift`, `packages/ChatExportUI/Sources/ChatExportUI/ChatExportManager.swift`, key `ChatExport.Unverified`.
+- Where: `submodules/telegram-ios/submodules/HLSPlayback/Sources/{HLSMediaPlaylist,HLSLevel}.swift` (the Mac package symlinks it), `packages/TelegramMedia/Sources/{HLSVideoContent,HLSVideoNativeContentView}.swift`, `HLSNative/HLSNativePlaylistLoader.swift`, `packages/ChatExportUI/Sources/ChatExportUI/ChatExportManager.swift`, key `ChatExport.Unverified`.
 - Upstream: the HLS files are upstream's 13.2 code with small edits; export gate is ours.
 - Sync: keep the `rangesFit`, `addingReportingOverflow` and `hlsBoundedRetry` call sites when upstream's lines change; add the key to the generated `Localizable.swift` on the next `tg` localization run.
 
@@ -134,3 +153,5 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: `packages/MediaRecorderUI` (`RoundVideoEncodingPolicy.swift`, `VideoRecorderPipeline.swift`, `ChatRecordingState.swift`) and the renderer's even output side in `TGVideoCameraMovie`.
 - Upstream: no; `VideoMessageConfig` and the server reading are untouched.
 - Sync: re-apply the policy calls in `VideoRecorderPipeline` (init, `_configureFps`, `configureRecorderTracks`, `writerSide`) after a merge.
+
+- libopus builds from the core's xiph/opus v1.6.1 submodule with CMake + Ninja and the shared option file `opus-cmake-args.sh` (NEON presumed), floating point (was fixed-point); libwebp builds with Ninja (2026-11-14). Where: `core-xprojects/libopus`, `core-xprojects/libwebp`. Upstream: no. Sync: keep ours.

@@ -17,15 +17,18 @@ framework_build_dir() {
 
 framework_source_roots() {
     case "$2" in
-        OpenSSL)
-            echo "$1/submodules/telegram-ios/submodules/openssl"
+        OpenH264)
+            echo "$1/submodules/telegram-ios/third-party/openh264/openh264"
+            ;;
+        libwebp)
+            echo "$1/submodules/telegram-ios/third-party/webp/libwebp"
             ;;
         libvpx)
             echo "$1/submodules/telegram-ios/third-party/libvpx/libvpx"
             ;;
         libopus)
-            # The tarball only: edits to the iOS Bazel opus script must not invalidate the Mac cache.
-            echo "$1/submodules/telegram-ios/third-party/opus/opus-1.6.1.tar.gz"
+            echo "$1/submodules/telegram-ios/third-party/opus/opus"
+            echo "$1/submodules/telegram-ios/third-party/opus/opus-cmake-args.sh"
             ;;
         dav1d)
             echo "$1/submodules/telegram-ios/third-party/dav1d/dav1d"
@@ -34,7 +37,8 @@ framework_source_roots() {
             echo "$1/submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg"
             ;;
         webrtc)
-            echo "$1/submodules/tg_owt"
+            echo "$1/submodules/webrtc"
+            echo "$1/submodules/telegram-ios/third-party/libyuv/third_party/libyuv"
             ;;
         tde2e)
             echo "$1/submodules/telegram-ios/third-party/td/td"

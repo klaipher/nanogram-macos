@@ -39,7 +39,7 @@ layout = '\n'.join(block(state, marker) for marker in [
     'private func twidgetChanged(',
 ]).replace('private ', '')
 sdk = (sandbox / 'WidgetSdk.swift').read_text()
-renderer = (root / 'third-party/twidget/Sources/TwidgetRenderer/LiteHTMLWidgetRenderer.swift').read_text()
+renderer = (root / 'third-party/twidget/apple/Sources/TwidgetRenderer/LiteHTMLWidgetRenderer.swift').read_text()
 navigation = (root / 'packages/ChatUI/Sources/ChatUI/ChatNavigationLab.swift').read_text()
 source = Path(__file__).with_name('Tests.swift').read_text()
 source = source.replace('__ANCHOR__', anchor).replace('__LAYOUT__', layout)
@@ -58,7 +58,7 @@ fixtures = {
     'limit': list(zlib.compress(b'x' * (4 * 1024 * 1024), 9)),
     'oversized': list(zlib.compress(b'x' * (4 * 1024 * 1024 + 1), 9)),
 }
-sources = [html / 'HTMLWidgetPayload.swift', root / 'third-party/twidget/Sources/TwidgetRenderer/WidgetResizeDiff.swift']
+sources = [html / 'HTMLWidgetPayload.swift', root / 'third-party/twidget/apple/Sources/TwidgetRenderer/WidgetResizeDiff.swift']
 
 
 def run(path, cached):

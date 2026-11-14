@@ -26,7 +26,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from nanogram import branding, buildcheck, config, editions, localfixes
+from nanogram import branding, buildcheck, config, editions
 from nanogram import enhanced_security as enhanced_security_module
 from nanogram import dmg as disk_image
 
@@ -671,7 +671,7 @@ SPARKLE_NS = "http://www.andymatuschak.org/xml-namespaces/sparkle"
 MIN_MACOS = buildcheck.MIN_OS
 
 
-LOCAL_PINS = {localfixes.WIDGET_QUICKJS_PATH: localfixes.WIDGET_QUICKJS_COMMIT}
+LOCAL_PINS: dict[str, str] = {}  # nested checkouts tg localfixes moves on purpose: none since the forks carry the fixes
 
 
 def _git_out(cwd: Path, *args: str) -> str:

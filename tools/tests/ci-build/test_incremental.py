@@ -35,7 +35,10 @@ class FlatSerializationTests(TemporaryTest):
     def setUp(self):
         super().setUp()
         (self.root / "scripts").mkdir()
-        (self.root / "scripts/flatc").symlink_to(ROOT / "scripts/flatc")
+        flatc = flat_generation.cached_flatc() or (ROOT / "scripts/flatc")
+        if not (flatc.is_file() and os.access(flatc, os.X_OK)):
+            self.skipTest("no flatc cached; run scripts/prepare-flat-serialization.py once (needs network and cmake)")
+        (self.root / "scripts/flatc").symlink_to(flatc)
         base = self.root / "submodules/telegram-ios/submodules/TelegramCore/FlatSerialization"
         self.model = write(base / "Models/Sample.fbs", "namespace Test;\ntable Sample { value:int (id: 0); }\n")
         self.output = base / "Sources/Sample_generated.swift"
@@ -160,7 +163,7 @@ class FrameworkTests(TemporaryTest):
         write(self.root / "core-xprojects/tlottie/build.sh", "exit 0\n")
         for lib, project in zip(self.libraries, self.projects):
             write(self.root / f"core-xprojects/{lib}/{project}.xcodeproj/project.pbxproj", "fixture")
-        for name in ["submodules/telegram-ios/third-party/rnnoise/PublicHeaders/api.h", "submodules/telegram-ios/submodules/EncryptionProvider/PublicHeaders/api.h", "submodules/telegram-ios/third-party/mozjpeg/mozjpeg/api.h", "submodules/telegram-ios/third-party/td/td/api.h"]:
+        for name in ["submodules/telegram-ios/third-party/rnnoise/rnnoise/include/api.h", "submodules/telegram-ios/submodules/EncryptionProvider/PublicHeaders/api.h", "submodules/telegram-ios/third-party/mozjpeg/mozjpeg/api.h"]:
             write(self.root / name, "header")
         write(self.root / ".gitignore", "build/\nSharedHeaders/\n*.xcframework/\nruns\nbin/\nWalletEngineFFI.swift\n")
         run(["git", "init", "-q", str(self.root)])

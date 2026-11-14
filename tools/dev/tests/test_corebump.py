@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nanogram import sync  # noqa: E402
-from test_parity import OWNER_URL, commit, config_text, init, run  # noqa: E402
+from gitfixtures import OWNER_URL, commit, config_text, init, run  # noqa: E402
 
 
 class CoreBump(unittest.TestCase):

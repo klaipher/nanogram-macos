@@ -14,9 +14,19 @@ MIN_FREE_GB = 40
 SUBMODULE_MARKERS = {
     "tlottie": "submodules/tlottie/Cargo.toml",
     "telegram-ios": "submodules/telegram-ios/submodules/TelegramCore/Package.swift",
-    # libvpx and libopus are built from the core's copies (nested submodule and tarball).
+    # libvpx and libopus are built from the core's copies (nested submodules).
     "libvpx source": "submodules/telegram-ios/third-party/libvpx/libvpx/configure",
-    "opus tarball": "submodules/telegram-ios/third-party/opus/opus-1.6.1.tar.gz",
+    "opus source": "submodules/telegram-ios/third-party/opus/opus/CMakeLists.txt",
+    # The shared single sources live in the core as submodules; an empty one makes a library script fail late.
+    "shared tooling": "submodules/telegram-ios/shared/shared-libraries.json",
+    "ffmpeg source": "submodules/telegram-ios/submodules/ffmpeg/Sources/FFMpeg/ffmpeg-9.0.2/configure",
+    "libwebp source": "submodules/telegram-ios/third-party/webp/libwebp/CMakeLists.txt",
+    "openh264 source": "submodules/telegram-ios/third-party/openh264/openh264/codec/api/wels/codec_ver.h",
+    "libprisma source": "submodules/telegram-ios/third-party/libprisma/libprisma/apple/Syntaxer.mm",
+    "boost regex source": "submodules/telegram-ios/third-party/boost_regex/regex/include/boost/regex.hpp",
+    "ogg source": "submodules/telegram-ios/third-party/ogg/ogg/include/ogg/ogg.h",
+    "opusfile source": "submodules/telegram-ios/third-party/opusfile/opusfile/include/opusfile.h",
+    "td source": "submodules/telegram-ios/third-party/td/td/CMakeLists.txt",
 }
 
 

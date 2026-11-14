@@ -113,7 +113,7 @@ private struct State : Equatable {
         }
               
         if card.date.length == 5 {
-            let yearState = STPCardValidator.validationState(forExpirationYear: String(card.date.suffix(2)), inMonth: card.date.prefix(2))
+            let yearState = STPCardValidator.validationState(forExpirationYear: String(card.date.suffix(2)), inMonth: card.date.prefix(2), cardBrand: brand)
             switch yearState {
             case .invalid:
                 return _id_card_date
@@ -602,7 +602,7 @@ public func PaymentsPaymentMethodController(context: (any AccountContextProtocol
             if current.card.date.length == 5 && cardError == nil {
                 let year = String(current.card.date.suffix(2))
                 let month = String(current.card.date.prefix(2))
-                var yearState = STPCardValidator.validationState(forExpirationYear: year, inMonth: month)
+                var yearState = STPCardValidator.validationState(forExpirationYear: year, inMonth: month, cardBrand: brand)
                 var monthState = STPCardValidator.validationState(forExpirationMonth: month)
                 if let year = Int32(year), let month = Int32(month) {
                     if year >= 22 && month >= 1 {

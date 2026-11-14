@@ -62,8 +62,8 @@ sh scripts/setup_build_env.sh
 
 The script is idempotent and does everything from the requirements list that can be
 automated: installs Homebrew and the packages, installs Rosetta 2 on Apple Silicon,
-checks that full Xcode is selected, initialises the submodules recursively, and patches
-`ABSL_ATTRIBUTE_LIFETIME_BOUND` in `tg_owt`'s abseil copy, which recent clang rejects.
+checks that full Xcode is selected, and initialises the submodules recursively. (The abseil `ABSL_ATTRIBUTE_LIFETIME_BOUND` workaround is applied by
+`core-xprojects/webrtc/webrtc/build.sh` to a copy of the abseil in `submodules/webrtc`; nothing is patched in place.)
 It does not install Rust; do that yourself (see above).
 
 Run it with `--build` to continue straight into step 3.
@@ -79,9 +79,9 @@ sh scripts/configure_frameworks.sh
 This takes a while, mostly because of WebRTC. The script:
 
 1. Generates TelegramApi's SwiftPM sources with SwiftTL, then the FlatSerialization
-   sources for TelegramCore with the bundled `scripts/flatc`.
+   sources for TelegramCore with flatc 25.12.19, which `scripts/prepare-flat-serialization.py` downloads (sha256-checked) and builds with CMake on first use into a per-user cache shared by all worktrees (`~/Library/Caches/nanogram/flatc/25.12.19`, base overridable with `NANOGRAM_CACHE_DIR`); the first run needs network and cmake.
 2. Builds, in order, `OpenH264`, `OpenSSLEncryption`, `libopus`, `libvpx`, `Mozjpeg`,
-   `libwebp`, `dav1d`, `ffmpeg`, `webrtc` (tg_owt), `tde2e` and `WalletEngine` through
+   `libwebp`, `dav1d`, `ffmpeg`, `webrtc` (`submodules/webrtc`, klaipher/webrtc), `tde2e` and `WalletEngine` through
    their projects in `core-xprojects/<lib>/`. Outputs land in `core-xprojects/<lib>/build`,
    which is git-ignored. `WalletEngine` also regenerates
    `packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift` (checked in) and
@@ -311,8 +311,9 @@ cd packages/TGUIKit && swift build
   Rosetta 2 (`softwareupdate --install-rosetta --agree-to-license`).
 - **CMake complains about `cmake_minimum_required`**: export
   `CMAKE_POLICY_VERSION_MINIMUM=3.5` before running `configure_frameworks.sh`.
-- **clang error about `lifetimebound` in abseil** while building webrtc: run
-  `scripts/setup_build_env.sh` again; it applies the patch.
+- **clang error about `lifetimebound` in abseil** while building webrtc: `core-xprojects/webrtc/webrtc/build.sh`
+  applies the fork's workaround unless `NANOGRAM_ABSEIL_WORKAROUND=0` is set; delete `core-xprojects/webrtc/build`
+  and rebuild without that variable.
 - **Xcode reports a missing library or `SharedHeaders` directory**: a library was skipped
   because a stale `core-xprojects/<lib>/build` directory existed. Delete it and rerun
   `configure_frameworks.sh`.

@@ -71,8 +71,6 @@
 			children = (
 				270D049A2AEA8ABB00EFF1E1 /* libprisma */,
 				270D04612AEA755700EFF1E1 /* CodeSyntax.h */,
-				270D04C22AEA8E9200EFF1E1 /* Syntaxer.mm */,
-				270D04962AEA7CA300EFF1E1 /* Syntaxer.h */,
 			);
 			path = CodeSyntax;
 			sourceTree = "<group>";
@@ -91,9 +89,10 @@
 			isa = PBXGroup;
 			children = (
 				270D049D2AEA8ABB00EFF1E1 /* libprisma */,
+				270D04C42AEA8E9200EFF1E1 /* apple */,
 			);
 			name = libprisma;
-			path = ../../../telegram-ios/third-party/libprisma;
+			path = ../../../telegram-ios/third-party/libprisma/libprisma;
 			sourceTree = "<group>";
 		};
 		270D049D2AEA8ABB00EFF1E1 /* libprisma */ = {
@@ -108,7 +107,16 @@
 				270D04A42AEA8ABB00EFF1E1 /* SyntaxHighlighter.h */,
 				270D04A52AEA8ABB00EFF1E1 /* Highlight.cpp */,
 			);
-			path = Sources;
+			path = libprisma;
+			sourceTree = "<group>";
+		};
+		270D04C42AEA8E9200EFF1E1 /* apple */ = {
+			isa = PBXGroup;
+			children = (
+				270D04C22AEA8E9200EFF1E1 /* Syntaxer.mm */,
+				270D04962AEA7CA300EFF1E1 /* Syntaxer.h */,
+			);
+			path = apple;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -346,7 +354,14 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = $PROJECT_DIR/../../telegram-ios/third-party/boost_regex/include/;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"BOOST_REGEX_MAX_BLOCKS=1536",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$PROJECT_DIR/../../telegram-ios/third-party/boost_regex/regex/include/",
+					"$PROJECT_DIR/../../telegram-ios/third-party/libprisma/libprisma/libprisma",
+				);
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -384,7 +399,14 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = $PROJECT_DIR/../../telegram-ios/third-party/boost_regex/include/;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"BOOST_REGEX_MAX_BLOCKS=1536",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$PROJECT_DIR/../../telegram-ios/third-party/boost_regex/regex/include/",
+					"$PROJECT_DIR/../../telegram-ios/third-party/libprisma/libprisma/libprisma",
+				);
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (

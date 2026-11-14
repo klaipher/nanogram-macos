@@ -1,6 +1,6 @@
 # Cache cleanup (iOS and Mac)
 
-One implementation, `tools/dev/cachegc/cachegc.py`, and one configuration, `tools/dev/cachegc/cache-policy.json`, identical in both repos (`tg cache-cleanup verify` fails when they differ, or when `.bazelrc` / `Nanogram.xcconfig` disagree with the policy). Stale build caches clean themselves up; nothing runs on a schedule (no launchd agent, no cron, no daily job).
+One implementation, `tools/dev/cachegc/cachegc.py`, and one configuration, `shared/cache-policy.json` (the klaipher/nanogram-deps submodule, one copy for iOS, Mac and Android; the Mac reads it through the core at `submodules/telegram-ios/shared/`). `tg cache-cleanup verify` fails when the implementation differs from the iOS copy, or when `.bazelrc` / `Nanogram.xcconfig` disagree with the policy). Stale build caches clean themselves up; nothing runs on a schedule (no launchd agent, no cron, no daily job).
 
 ## When it runs
 

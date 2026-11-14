@@ -164,7 +164,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nif [ ! -d \"$PROJECT_DIR/build\" ]; then\n  sh $PROJECT_DIR/Mozjpeg/build.sh $PROJECT_DIR/libjpeg-turbo-3.2.1.tar.gz\nfi\n";
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nif [ ! -d \"$PROJECT_DIR/build\" ]; then\n  sh $PROJECT_DIR/Mozjpeg/build.sh\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

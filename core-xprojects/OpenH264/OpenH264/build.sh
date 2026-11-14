@@ -14,11 +14,22 @@ BUILD_DIR="${BUILD_DIR}build"
 # Create the build directory if it does not exist
 mkdir -p ${BUILD_DIR}
 
-# Clone OpenH264 into the build directory if not already cloned
-if [ ! -d "${BUILD_DIR}/openh264" ]; then
-    git clone -b v2.7.0 --depth 1 https://github.com/cisco/openh264.git ${BUILD_DIR}/openh264
+# Build from the core's klaipher/openh264 submodule (nanogram branch: v2.7.0 plus H.264 level 6.0-6.2 and the subcodec
+# sprite mode, off by default): the one source iOS, Mac and Android pin. No clone, no download.
+CORE_DIR="${PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)}/../../submodules/telegram-ios"
+CORE_OPENH264_DIR="${CORE_DIR}/third-party/openh264/openh264"
+if [ ! -f "${CORE_OPENH264_DIR}/codec/api/wels/codec_ver.h" ]; then
+    echo "error: ${CORE_OPENH264_DIR} is empty; run 'git submodule update --init --recursive'" >&2
+    exit 1
 fi
-[ "$(git -C ${BUILD_DIR}/openh264 rev-parse HEAD)" = "1bca62311e447fd9c39fc93de2c4b96cd5ce971c" ]
+EXPECTED_SHA=$(git -C "${CORE_DIR}" ls-tree HEAD third-party/openh264/openh264 | awk '{print $3}')
+ACTUAL_SHA=$(git -C "${CORE_OPENH264_DIR}" rev-parse HEAD 2>/dev/null || true)
+if [ -n "${EXPECTED_SHA}" ] && [ -n "${ACTUAL_SHA}" ] && [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then
+    echo "error: openh264 checkout is ${ACTUAL_SHA}, the core pins ${EXPECTED_SHA}; run 'git submodule update --init --recursive'" >&2
+    exit 1
+fi
+mkdir -p ${BUILD_DIR}/openh264
+rsync -a --delete --exclude .git "${CORE_OPENH264_DIR}/" ${BUILD_DIR}/openh264/
 
 # Define the output prefix for the final universal binary
 USED_PREFIX=${BUILD_DIR}/output

@@ -13,12 +13,10 @@
 #   lts-ref <ref>           the history-free LTS branch used while iOS main is ahead of the Mac UI
 #   lag commits=N days=N block-from=DATE   limit for shared-path commits on the reference that the pin lacks;
 #                           warning until block-from, then an error
-#   pin <name> ios=<path in the iOS repo> mac=<path in the Mac repo> [external] [warn-until=DATE]
+#   pin <name> ios=<path in the iOS repo> mac=<path in the Mac repo> [android=<path in the Android repo>] [external] [warn-until=DATE]
+#   lib <name> [ios=<path>] [mac=<path>] [android=<path>]   a library whose single pin lives in shared/shared-libraries.json
 #   share <path>            a shared path inside the core
-#   webrtc-root mac=<dir> ios=<dir>   where the WebRTC sources start in the tg_owt and webrtc trees
-#   allow core|webrtc <path-prefix> [until=DATE] | reason   an intended difference, with its reason
-#   mirror ios=<file> mac=<file> [warn-until=DATE]   a file kept as an identical copy in both repos (blob ids are
-#                           compared on every check: an error on the Mac side, a warning on the iOS side)
+#   allow core <path-prefix> [until=DATE] | reason   an intended difference in the core, with its reason
 #
 # Process: a fix to anything listed under `share` is committed to iOS main first; the same day run
 # tools/dev/tg core-bump on the Mac (or cherry-pick -x into mac/core-lts). Mac-only code in shared
@@ -33,10 +31,31 @@ reference origin/main
 lts-ref origin/mac/core-lts
 lag commits=20 days=7 block-from=2026-11-18
 
-pin tgcalls ios=submodules/TgVoipWebrtc/tgcalls mac=submodules/tgcalls
-pin tlottie ios=submodules/tlottie/tlottie mac=submodules/tlottie external
-pin webrtc ios=third-party/webrtc/webrtc mac=submodules/tg_owt
-webrtc-root mac=src ios=
+pin tgcalls ios=submodules/TgVoipWebrtc/tgcalls mac=submodules/tgcalls android=TMessagesProj/jni/tgcalls warn-until=2026-12-31
+pin tlottie ios=submodules/tlottie/tlottie mac=submodules/tlottie external android=TMessagesProj/jni/tlottie
+pin webrtc ios=third-party/webrtc/webrtc mac=submodules/webrtc android=TMessagesProj/jni/voip/webrtc warn-until=2026-12-31
+
+# Libraries pinned by shared/shared-libraries.json (klaipher/nanogram-deps), one commit for iOS, Mac and Android.
+# `tools/dev/native/check_shared.py` (pre-push) verifies the pins; parity only checks that the names exist there.
+lib ffmpeg ios=submodules/ffmpeg/Sources/FFMpeg/ffmpeg-9.0.2 mac=submodules/ffmpeg/Sources/FFMpeg/ffmpeg-9.0.2 android=TMessagesProj/jni/third_party/ffmpeg
+lib boost-regex ios=third-party/boost_regex/regex mac=third-party/boost_regex/regex android=TMessagesProj/jni/third_party/boost-regex
+lib wamr ios=third-party/wamr/wamr android=TMessagesProj/jni/third_party/wamr
+lib ogg ios=third-party/ogg/ogg mac=third-party/ogg/ogg android=TMessagesProj/jni/third_party/xiph/ogg
+lib opus ios=third-party/opus/opus mac=third-party/opus/opus android=TMessagesProj/jni/third_party/xiph/opus
+lib opusfile ios=third-party/opusfile/opusfile mac=third-party/opusfile/opusfile android=TMessagesProj/jni/third_party/xiph/opusfile
+lib libwebp ios=third-party/webp/libwebp mac=third-party/webp/libwebp
+lib libvpx ios=third-party/libvpx/libvpx mac=third-party/libvpx/libvpx android=TMessagesProj/jni/third_party/libvpx
+lib dav1d ios=third-party/dav1d/dav1d mac=third-party/dav1d/dav1d android=TMessagesProj/jni/third_party/dav1d
+lib td ios=third-party/td/td mac=third-party/td/td android=TMessagesProj/jni/td
+lib mtproto-engine ios=third-party/mtproto-engine mac=third-party/mtproto-engine
+lib openh264 ios=third-party/openh264/openh264 mac=third-party/openh264/openh264 android=TMessagesProj/jni/third_party/openh264
+lib rnnoise ios=third-party/rnnoise/rnnoise mac=third-party/rnnoise/rnnoise android=TMessagesProj/jni/third_party/xiph/rnnoise
+lib libprisma ios=third-party/libprisma/libprisma mac=third-party/libprisma/libprisma android=TMessagesProj/jni/third_party/libprisma
+lib sqlcipher-amalgamation ios=submodules/sqlcipher/amalgamation mac=submodules/sqlcipher/amalgamation android=TMessagesProj/jni/third_party/sqlite
+lib libyuv ios=third-party/libyuv/third_party/libyuv mac=third-party/libyuv/third_party/libyuv android=TMessagesProj/jni/third_party/libyuv
+lib quickjs ios=third-party/quickjs-ng/quickjs mac=third-party/widget-sandbox/packages/ios/Sources/CQuickJS/quickjs android=TMessagesProj/jni/twidget/widget-sandbox/packages/ios/Sources/CQuickJS/quickjs
+lib widget-sandbox ios=third-party/widget-sandbox/widget-sandbox mac=third-party/widget-sandbox android=TMessagesProj/jni/twidget/widget-sandbox
+lib twidget ios=third-party/twidget/twidget mac=third-party/twidget android=TMessagesProj/jni/twidget/twidget
 
 share submodules/SSignalKit
 share submodules/Postbox
@@ -71,7 +90,6 @@ share submodules/FFMpegBinding
 share submodules/ffmpeg
 share submodules/libphonenumber
 share submodules/sqlcipher
-share submodules/openssl
 share submodules/tlottie
 share submodules/LottieBinding
 share third-party/rnnoise
@@ -81,75 +99,28 @@ share third-party/td
 share third-party/dav1d
 share third-party/mozjpeg
 share third-party/ogg
+share third-party/openh264
+share third-party/opus
+share third-party/opusfile
+share third-party/webp
 share third-party/libprisma
 share third-party/boost_regex
 share submodules/HardenedMedia
+share third-party/libyuv
+share third-party/SwiftMath
+share submodules/TelegramUI/Resources/Fonts/latinmodern-math.otf
+share submodules/TelegramUI/Resources/Fonts/latinmodern-math.plist
+share submodules/HLSPlayback
+share submodules/RingBuffer
+share submodules/Sunrise
+share submodules/AnimatedStickerNode/VP9Hardware
+share submodules/TelegramUI/Components/QrStudioLogic
+share submodules/TelegramUI/Components/LiquidGlassShapes/Metal/LiquidGlassShapes.metal
+share submodules/TelegramUI/Components/LiquidGlassShapes/Sources/LiquidGlassSurfaceReleasePolicy.swift
+share submodules/TelegramUI/Components/LiquidGlassShapes/Sources/LiquidGlassShapesTypes.swift
+share submodules/TelegramUI/Components/Premium/PremiumDiamondComponent/MetalResources/GramDiamond.metal
+share submodules/TelegramUI/Components/Premium/PremiumDiamondComponent/Sources/InteractiveDiamond/DiamondAnimation.swift
+share submodules/TelegramUI/Components/Premium/PremiumDiamondComponent/Sources/InteractiveDiamond/DiamondGeometry.swift
 
-# Files that exist as identical copies in both repos (the Mac has no Package.swift for the core module yet).
-# A change to one side must land on the other the same day.
-mirror ios=submodules/AnimatedStickerNode/VP9Hardware/Sources/VP9HardwareDecoder.swift mac=packages/VP9Hardware/Sources/VP9Hardware/VP9HardwareDecoder.swift
-mirror ios=submodules/AnimatedStickerNode/VP9Hardware/Sources/WebMStickerDemuxer.swift mac=packages/VP9Hardware/Sources/VP9Hardware/WebMStickerDemuxer.swift
-mirror ios=docs/feature-parity.md mac=docs/feature-parity.md
-
-# Intended WebRTC differences
-allow webrtc api/peer_connection_interface.cc | iOS TGCALLS seam (disable_payload_type_demuxing, external transport security, dtls factory)
-allow webrtc api/peer_connection_interface.h | iOS TGCALLS seam
-allow webrtc pc/external_hmac.cc | iOS TGCALLS seam (external transport security)
-allow webrtc pc/external_hmac.h | iOS TGCALLS seam (external transport security)
-allow webrtc pc/peer_connection.cc | iOS TGCALLS seam (payload-type demuxing, dtls factory)
-allow webrtc pc/peer_connection.h | iOS TGCALLS seam (payload-type demuxing, dtls factory)
-allow webrtc pc/peer_connection_internal.h | iOS TGCALLS seam (OnUnDemuxableRtpPacket)
-allow webrtc pc/sdp_offer_answer.cc | iOS TGCALLS seam (payload-type demuxing; the tg_owt d1cf250e fix is applied on both)
-allow webrtc pc/srtp_session.cc | iOS TGCALLS seam (external transport security)
-allow webrtc modules/desktop_capture | Windows, Linux and desktop screen capture code is not built on iOS
-allow webrtc modules/video_capture | Windows and Linux capture code is not built on iOS
-allow webrtc modules/audio_device | per-platform audio device code; iOS uses its own, the Mac uses CoreAudio
-allow webrtc OWNERS | repository metadata
-allow webrtc AUTHORS | repository metadata
-allow webrtc .gitignore | repository metadata
-
-# The tg_owt security and crash fixes (owner exception 2026-11-04) are on iOS in the klaipher/webrtc fork branch
-# nanogram-security-fixes: 328e6475, 09d55d6d, e2d0e88d, 76fa70ba, b857c260, d1cf250e, d45a5774, 07fb35bc, ec71c06a,
-# 49ceed39, 97d355ae, 020feec5 (tg_owt commit ids; 557e0e3d is an Abseil pointer the iOS tree does not use).
-# What still differs, file by file, is listed here and nowhere else.
-allow webrtc api/audio_codecs/audio_format.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc api/scoped_refptr.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc api/video/nv12_buffer.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc api/video_codecs/sdp_video_format.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc audio/utility/channel_mixer.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc common_video/h265/h265_pps_parser.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc media/engine/webrtc_video_engine.cc | iOS-only debug log lines; the Mac has none
-allow webrtc modules/audio_coding/codecs/opus/opus_inst.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc modules/audio_processing/aec3/alignment_mixer.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc modules/audio_processing/aec3/matched_filter_avx2.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc modules/congestion_controller/goog_cc/loss_based_bwe_v2.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc modules/rtp_rtcp/source/rtp_packetizer_av1_test_helper.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc modules/video_coding/codecs/h264/h264.cc | iOS Bazel include paths (third_party/ffmpeg, third_party/openh264) and FFmpeg 7 timestamp handling; the Mac builds these with CMake include paths
-allow webrtc modules/video_coding/codecs/h264/h264_color_space.h | iOS Bazel include paths (third_party/ffmpeg, third_party/openh264) and FFmpeg 7 timestamp handling; the Mac builds these with CMake include paths
-allow webrtc modules/video_coding/codecs/h264/h264_decoder_impl.cc | iOS Bazel include paths (third_party/ffmpeg, third_party/openh264) and FFmpeg 7 timestamp handling; the Mac builds these with CMake include paths
-allow webrtc modules/video_coding/codecs/h264/h264_decoder_impl.h | iOS Bazel include paths (third_party/ffmpeg, third_party/openh264) and FFmpeg 7 timestamp handling; the Mac builds these with CMake include paths
-allow webrtc modules/video_coding/codecs/h264/h264_encoder_impl.cc | iOS Bazel include paths (third_party/ffmpeg, third_party/openh264) and FFmpeg 7 timestamp handling; the Mac builds these with CMake include paths
-allow webrtc modules/video_coding/codecs/h264/h264_encoder_impl.h | iOS Bazel include paths (third_party/ffmpeg, third_party/openh264) and FFmpeg 7 timestamp handling; the Mac builds these with CMake include paths
-allow webrtc modules/video_coding/generic_decoder.cc | iOS-only debug log lines; the Mac has none
-allow webrtc modules/video_coding/utility/ivf_file_reader.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc net/dcsctp/packet/bounded_byte_writer.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc net/dcsctp/packet/crc32c.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc p2p/base/basic_ice_controller.cc | tg_owt orders the MorePingable arguments (comparator consistency); not in the approved fix set, owner decides whether iOS takes it
-allow webrtc p2p/base/ice_transport_internal.cc | iOS TGCALLS seam: reflector candidates may use low ports
-allow webrtc rtc_base/byte_order.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc rtc_base/ip_address.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc rtc_base/net_test_helpers.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc rtc_base/openssl_certificate.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc rtc_base/physical_socket_server.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc rtc_base/platform_thread_types.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc rtc_base/platform_thread_types.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc rtc_base/synchronization/sequence_checker_internal.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc rtc_base/system/arch.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc sdk/objc/components/network/RTCNetworkMonitor.mm | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc sdk/objc/components/renderer/metal/RTCMTLRenderer.mm | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc system_wrappers/source/cpu_info.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc system_wrappers/source/denormal_disabler.cc | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc video/rtp_video_stream_receiver2.cc | iOS TGCALLS seam: frame decryptor requirement
-allow webrtc video/rtp_video_stream_receiver2.h | iOS TGCALLS seam: frame decryptor requirement
-allow webrtc video/stats_counter.h | tg_owt build or platform compatibility edit (Windows, Linux, GCC, Xcode 27, Abseil); no behaviour change expected on iOS; revisit at the next WebRTC bump
-allow webrtc video/video_receive_stream2.cc | iOS-only debug log lines; the Mac has none
+# WebRTC is one pin (klaipher/webrtc nanogram) for iOS, Mac and Android: there is no per-file difference list and no
+# WebRTC parity gate any more (the Mac builds the same submodule, submodules/webrtc).

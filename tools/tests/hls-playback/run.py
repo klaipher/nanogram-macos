@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='hls-playback-') as temp:
     directory = Path(temp)
     cache = directory / 'module-cache'
     range_set = sorted((root / 'submodules/telegram-ios/submodules/Utils/RangeSet/Sources').glob('*.swift'))
-    playback = sorted((root / 'packages/HLSPlayback/Sources/HLSPlayback').glob('*.swift'))
+    playback = sorted((root / 'packages/HLSPlayback/Sources').glob('*.swift'))
     commands = [
         ['swiftc', '-module-cache-path', str(cache), '-emit-library', '-emit-module', '-module-name', 'RangeSet', *map(str, range_set), '-o', str(directory / 'libRangeSet.dylib'), '-emit-module-path', str(directory / 'RangeSet.swiftmodule')],
         ['swiftc', '-module-cache-path', str(cache), '-emit-library', '-emit-module', '-module-name', 'HLSPlayback', *map(str, playback), '-o', str(directory / 'libHLSPlayback.dylib'), '-emit-module-path', str(directory / 'HLSPlayback.swiftmodule')],

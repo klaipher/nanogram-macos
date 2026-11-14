@@ -6,7 +6,7 @@ touch an area. A finished plan is deleted; its design record stays only if it st
 | Topic | Document |
 |---|---|
 | Overview of the fork | [../NANOGRAM.md](../NANOGRAM.md), [../NANOGRAM-CHANGES.md](../NANOGRAM-CHANGES.md), [../CHANGELOG.md](../CHANGELOG.md) |
-| Development pipeline, shared-code rule, disk and worktree hygiene | [development-pipeline.md](development-pipeline.md) |
+| Development pipeline, shared-code rule, disk and worktree hygiene | [shared/development-pipeline.md](../submodules/telegram-ios/shared/development-pipeline.md) |
 | Change records in every repository and fork | [fork-records.md](fork-records.md) |
 | Everything about building, editions, signing, Sparkle, upstream sync, the shared core, parity | [local-development.md](local-development.md) |
 | Cache cleanup policy | [cache-cleanup.md](cache-cleanup.md) |

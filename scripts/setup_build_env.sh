@@ -54,8 +54,8 @@ fi
 #    INSTALL.md list. Apple Silicon only: no x86 assemblers (nasm, yasm).
 # ---------------------------------------------------------------------------
 BREW_PACKAGES=(
-  cmake        # libwebp / mozjpeg / tde2e / webrtc (tg_owt)
-  ninja        # webrtc (tg_owt), dav1d
+  cmake        # libwebp / mozjpeg / tde2e / webrtc
+  ninja        # webrtc, dav1d
   meson        # dav1d
   openssl@1.1  # used by several configure steps
   zlib
@@ -89,7 +89,7 @@ fi
 
 # ---------------------------------------------------------------------------
 # 5. Git submodules
-#    The framework projects build from submodule sources (tg_owt, telegram-ios
+#    The framework projects build from submodule sources (webrtc, telegram-ios
 #    third-party: td/dav1d/mozjpeg/ffmpeg, etc.). Requires SSH access to
 #    github.com/gitlab.com, or HTTPS rewrites configured for those hosts.
 # ---------------------------------------------------------------------------
@@ -102,25 +102,11 @@ if ! git -C "$REPO_DIR" submodule update --init --recursive; then
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Source patch for recent Xcode/clang (Xcode 16+ / 26.x)
-#    clang now hard-errors on [[clang::lifetimebound]] applied to a parameter
-#    of a void-returning function (tg_owt's abseil). Neutralise the macro; it is
-#    a static-analysis annotation only, with no runtime or ABI effect.
+# 6. (no source patch any more)
+#    The abseil lifetimebound workaround used to edit tg_owt's abseil in place here. WebRTC is now submodules/webrtc
+#    (klaipher/webrtc, never edited); core-xprojects/webrtc/webrtc/build.sh applies the fork's guarded workaround to a
+#    copy (set NANOGRAM_ABSEIL_WORKAROUND=0 to try the pristine abseil).
 # ---------------------------------------------------------------------------
-ABSL_ATTR="$REPO_DIR/submodules/tg_owt/src/third_party/abseil-cpp/absl/base/attributes.h"
-if [ -f "$ABSL_ATTR" ]; then
-  if grep -q '^#define ABSL_ATTRIBUTE_LIFETIME_BOUND \[\[clang::lifetimebound\]\]' "$ABSL_ATTR"; then
-    log "Patching ABSL_ATTRIBUTE_LIFETIME_BOUND (clang lifetimebound compatibility)"
-    /usr/bin/sed -i '' \
-      -e 's|^#define ABSL_ATTRIBUTE_LIFETIME_BOUND \[\[clang::lifetimebound\]\]|#define ABSL_ATTRIBUTE_LIFETIME_BOUND|' \
-      -e 's|^#define ABSL_ATTRIBUTE_LIFETIME_BOUND __attribute__((lifetimebound))|#define ABSL_ATTRIBUTE_LIFETIME_BOUND|' \
-      "$ABSL_ATTR"
-  else
-    log "abseil lifetimebound already neutralised (or not present) — skipping patch"
-  fi
-else
-  warn "tg_owt abseil attributes.h not found yet (submodules not initialised?) — skipping patch"
-fi
 
 # ---------------------------------------------------------------------------
 # Done / optional build

@@ -6,13 +6,13 @@ This file provides guidance to coding agents working with code in this repositor
 ## Hard rules
 
 - Marketing version follows upstream; only the build number changes. Never fetch upstream tags/branches into this repository by hand (`tg sync-upstream` only, released code only).
-- A fix in shared code (core, tgcalls, tg_owt, libprisma) lands on both apps in the same round: iOS `main` first, then `tools/dev/tg core-bump` here.
+- A fix in shared code (the core, tgcalls, webrtc and every library in `submodules/telegram-ios/shared/shared-libraries.json`) lands in the single source (an official pin or ONE klaipher fork branch), then all three pins (iOS, Mac, Android) move the same day: iOS `main` first, then `tools/dev/tg core-bump` here. No vendored copies, no per-platform branches; `tools/dev/native/check_shared.py` (a wrapper around the core's `shared/`) runs in the pre-push hook.
 - Never `--no-verify`. Never read `~/.config/telegram-ios`, keychains or signing material. No scheduled jobs.
 - Agents do not build or launch the app (`tg build/check/test/warnings`, `xcodebuild`, `swift build/test`); one combined build at the end of a round. Pure-Python tests are fine.
 - Work in your own worktree and branch under `~/Projects/wt/`, never in the main checkout.
 - Mac releases go to the GitHub release (`tg release-direct`); Mac TestFlight only on request.
 
-## Development pipeline (full text: [docs/development-pipeline.md](docs/development-pipeline.md))
+## Development pipeline (full text: [submodules/telegram-ios/shared/development-pipeline.md](submodules/telegram-ios/shared/development-pipeline.md))
 
 1. Research and review in parallel lenses, with evidence. 2. Adversarial verification of every finding.
 3. Fix confirmed findings on branches, tests first. 4. No builds by agents. 5. One combined build per platform at the end.
@@ -43,7 +43,7 @@ Read the matching document before starting the task.
 | Task | Document |
 |---|---|
 | Creating a new screen or controller | [docs/swift/TemplateController/README.md](docs/swift/TemplateController/README.md), template in [TemplateController.swift](docs/swift/TemplateController/TemplateController.swift) |
-| Checking whether a feature exists on iOS, on the Mac or in official Telegram | [docs/feature-parity.md](docs/feature-parity.md) (identical in both repos; update the row when a feature lands) |
+| Checking whether a feature exists on iOS, on the Mac or in official Telegram | [submodules/telegram-ios/shared/feature-parity.md](submodules/telegram-ios/shared/feature-parity.md) (one copy for iOS, Mac and Android in the core's `shared/` submodule, klaipher/nanogram-deps; update the row there when a feature lands) |
 | HLS (adaptive) video playback | [packages/HLSPlayback/README.md](packages/HLSPlayback/README.md) |
 
 

@@ -22,6 +22,7 @@ common = Path(__file__).with_name('Context.swift').read_text().replace('__FUNCTI
 builds = sorted(Path.home().glob('Library/Developer/Xcode/DerivedData/Telegram*/Build'), key=lambda p:p.stat().st_mtime, reverse=True)
 build = next(p for p in builds if (p/'Products/Debug/OpusBinding.o').exists())
 headers = root/'submodules/telegram-ios/submodules/OpusBinding/PublicHeaders'
+links = root/'submodules/telegram-ios/submodules/OpusBinding/SwiftPMLinks'  # symlinks into the single ogg (v1.3.6 plus overlay header) and opusfile (v0.12) sources
 with tempfile.TemporaryDirectory(prefix='audio-trim-store-') as directory:
     directory=Path(directory)
     module=directory/'Modules/OpusBinding'; module.mkdir(parents=True)
@@ -30,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='audio-trim-store-') as directory:
     encoder_source = Path('/tmp/opusenc-before-audio-trim-store.m') if args.baseline else root/'submodules/telegram-ios/submodules/OpusBinding/Sources/opusenc/opusenc.m'
     encoder_object = directory/'opusenc.o'
     sdk = subprocess.check_output(['xcrun', '--show-sdk-path', '--sdk', 'macosx'], text=True).strip()
-    subprocess.run(['xcrun', 'clang', '-c', '-fobjc-arc', '-target', 'arm64-apple-macos10.13', '-isysroot', sdk, '-I'+str(headers/'OpusBinding'), '-I'+str(root/'core-xprojects/libopus/build/libopus/include'), '-I'+str(root/'submodules/telegram-ios/third-party/ogg/include'), '-I'+str(root/'submodules/telegram-ios/submodules/OpusBinding/Sources/opusenc'), str(encoder_source), '-o', str(encoder_object)], check=True)
+    subprocess.run(['xcrun', 'clang', '-c', '-fobjc-arc', '-target', 'arm64-apple-macos10.13', '-isysroot', sdk, '-I'+str(headers/'OpusBinding'), '-I'+str(root/'core-xprojects/libopus/build/libopus/include'), '-I'+str(links/'ogg-include'), '-I'+str(links/'opusfile-include'), '-I'+str(root/'submodules/telegram-ios/submodules/OpusBinding/Sources/opusenc'), str(encoder_source), '-o', str(encoder_object)], check=True)
     item_source = Path('/tmp/TGDataItem.m-before-opus-continuity') if args.baseline else root/'submodules/telegram-ios/submodules/OpusBinding/Sources/TGDataItem.m'
     item_object = directory/'TGDataItem.o'
     subprocess.run(['xcrun', 'clang', '-x', 'objective-c', '-c', '-fobjc-arc', '-target', 'arm64-apple-macos10.13', '-isysroot', sdk, '-I'+str(headers/'OpusBinding'), str(item_source), '-o', str(item_object)], check=True)

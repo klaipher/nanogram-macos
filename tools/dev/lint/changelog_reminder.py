@@ -3,7 +3,7 @@
 The records are CHANGELOG.md (what changed, newest first) and NANOGRAM-CHANGES.md (how this repository
 differs from upstream). The check looks at the whole pushed range, not at single commits, so an
 integrator's changelog commit satisfies it for the branches it merges. It only warns; set
-TG_CHANGELOG_STRICT=1 to make it block. See docs/development-pipeline.md.
+TG_CHANGELOG_STRICT=1 to make it block. See shared/development-pipeline.md.
 
 Identical in nanogram-ios and nanogram-macos.
 """

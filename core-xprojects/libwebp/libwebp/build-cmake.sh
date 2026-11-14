@@ -30,14 +30,17 @@ CROSS_SDK_MAC="MacOSX.sdk"
 
 
 SOURCE_DIR="$OUT_DIR/libwebp-1.6.0"
-SOURCE_ARCHIVE="$SRC_DIR/libwebp-1.6.0.tar.gz"
-SOURCE_SHA256="e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564"
+CORE_WEBP_DIR="$PROJECT_DIR/../../submodules/telegram-ios/third-party/webp/libwebp"
 
-echo "$SOURCE_SHA256  $SOURCE_ARCHIVE" | shasum -a 256 -c -
+if [ ! -f "$CORE_WEBP_DIR/CMakeLists.txt" ]; then
+  echo "error: $CORE_WEBP_DIR is empty; run 'git submodule update --init --recursive'" >&2
+  exit 1
+fi
 
 rm -rf "$SOURCE_DIR"
+mkdir -p "$SOURCE_DIR"
+rsync -a --exclude .git "$CORE_WEBP_DIR/" "$SOURCE_DIR/"
 
-tar -xzf "$SOURCE_ARCHIVE" --directory "$OUT_DIR"
 COMMON_ARGS="-DWEBP_LINK_STATIC=1 -DWEBP_BUILD_CWEBP=0 -DWEBP_BUILD_DWEBP=0 -DWEBP_BUILD_IMG2WEBP=0 -DWEBP_BUILD_ANIM_UTILS=0 -DWEBP_BUILD_GIF2WEBP=0 -DWEBP_BUILD_VWEBP=0 -DWEBP_BUILD_WEBPINFO=0 -DWEBP_BUILD_LIBWEBPMUX=0 -DWEBP_BUILD_WEBPMUX=0 -DWEBP_BUILD_EXTRAS=0"
 
 
@@ -69,8 +72,8 @@ fi
 
 echo "set(CMAKE_C_COMPILER $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang)" >> toolchain.cmake
 
-cmake -G"Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_OSX_SYSROOT=${MACOS_SYSROOT[0]} -DCMAKE_BUILD_TYPE=Release $COMMON_ARGS ../libwebp-1.6.0
-make
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_OSX_SYSROOT=${MACOS_SYSROOT[0]} -DCMAKE_BUILD_TYPE=Release $COMMON_ARGS ../libwebp-1.6.0
+ninja
 
 cd ..
 

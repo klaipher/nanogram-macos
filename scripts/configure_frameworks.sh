@@ -82,7 +82,7 @@ DIRECTORY_PAIRS=(
     "${SCRIPT_DIR}/../core-xprojects/openssl/build/openssl/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/openssl/include"
     "${SCRIPT_DIR}/../core-xprojects/libopus/build/libopus/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/libopus/include"
     "${SCRIPT_DIR}/../core-xprojects/ffmpeg/build/ffmpeg/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/ffmpeg/include"
-    "${SCRIPT_DIR}/../submodules/telegram-ios/third-party/rnnoise/PublicHeaders,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/rnoise"
+    "${SCRIPT_DIR}/../submodules/telegram-ios/third-party/rnnoise/rnnoise/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/rnoise"
     "${SCRIPT_DIR}/../core-xprojects/libwebp/build/libwebp/include,${SCRIPT_DIR}/../submodules/libwebp/SharedHeaders/libwebp/include"
     "${SCRIPT_DIR}/../core-xprojects/openssl/build/openssl/include,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/OpenSSLEncryptionProvider/SharedHeaders/openssl/include"
     "${SCRIPT_DIR}/../submodules/telegram-ios/submodules/EncryptionProvider/PublicHeaders,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/OpenSSLEncryptionProvider/SharedHeaders/EncryptionProvider"
@@ -95,9 +95,5 @@ for pair in "${DIRECTORY_PAIRS[@]}"; do
     IFS=',' read -r SOURCE_DIR DEST_DIR <<< "$pair"
     sh "$SCRIPT_DIR/sync-headers.sh" "$SOURCE_DIR" "$DEST_DIR"
 done
-
-sh "$SCRIPT_DIR/sync-headers.sh" \
-    "$ROOT_DIR/submodules/telegram-ios/third-party/td/td" \
-    "$ROOT_DIR/submodules/telegram-ios/third-party/td/TdBinding/SharedHeaders/td"
 
 sh "$ROOT_DIR/scripts/time-step.sh" tlottie sh "$ROOT_DIR/core-xprojects/tlottie/build.sh"

@@ -131,6 +131,10 @@
             case STPCardBrandVisa:
             imageName = shouldUseTemplate ? @"stp_card_visa_template" : @"stp_card_visa";
             break;
+            case STPCardBrandOther:
+            shouldUseTemplate = YES;
+            imageName = @"stp_card_unknown";
+            break;
     }
     NSImage *image = [self safeImageNamed:imageName
                       templateIfAvailable:shouldUseTemplate];

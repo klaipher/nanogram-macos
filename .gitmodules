@@ -7,20 +7,22 @@
 	branch = main
 [submodule "submodules/tgcalls"]
 	path = submodules/tgcalls
-	url = https://github.com/klaipher/tgcalls
+	url = https://github.com/klaipher/tgcalls.git
 	branch = nanogram-shared
-[submodule "submodules/tg_owt"]
-	path = submodules/tg_owt
-	url = https://github.com/klaipher/tg_owt
-	branch = nanogram-mac
+	shallow = true
+[submodule "submodules/webrtc"]
+	path = submodules/webrtc
+	url = https://github.com/klaipher/webrtc.git
+	branch = nanogram
+	shallow = true
 [submodule "submodules/tlottie"]
 	path = submodules/tlottie
 	url = https://github.com/dkaraush/tlottie
 [submodule "third-party/twidget"]
 	path = third-party/twidget
-	url = https://github.com/TelegramMessenger/twidget
-	branch = main
+	url = https://github.com/klaipher/twidget.git
+	branch = nanogram
 [submodule "third-party/widget-sandbox"]
 	path = third-party/widget-sandbox
-	url = https://github.com/TelegramMessenger/widget-sandbox
-	branch = main
+	url = https://github.com/klaipher/widget-sandbox.git
+	branch = nanogram

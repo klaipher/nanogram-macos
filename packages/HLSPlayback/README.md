@@ -6,22 +6,13 @@ event-driven `HLSPlaybackController`). It replaced hls.js running in JavaScriptC
 
 ## Provenance
 
-`Sources/` and `Tests/` are copied unchanged from telegram-ios `submodules/HLSPlayback` at
-`15f89745bed6c3d8825d9be5e26ee3713c8006e8`. This includes resumed-open start gates, refreshed bandwidth seeds,
-and checked MP4 fragment timing with AAC-LC priming. The deviations from hls.js, failure policy and iOS measurements
-are in telegram-ios `docs/native-hls-player.md`.
+`Sources` and `Tests` are symlinks into the iOS core: `submodules/telegram-ios/submodules/HLSPlayback/{Sources,Tests}`.
+There is no copy here; a fix lands once in the iOS repository and reaches the Mac with the next core bump. This includes
+the forward buffer (`HLSForwardBuffer`, `setMaxBufferAhead`), resumed-open start gates, refreshed bandwidth seeds, and
+checked MP4 fragment timing with AAC-LC priming. The deviations from hls.js, failure policy and iOS measurements are in
+telegram-ios `docs/native-hls-player.md`.
 
-Do not edit these files here. To update, take the iOS revision and copy both directories again:
-
-```
-git -C submodules/telegram-ios fetch origin
-git -C submodules/telegram-ios archive <revision> submodules/HLSPlayback/Sources submodules/HLSPlayback/Tests | tar -x -C /tmp/hls
-cp /tmp/hls/submodules/HLSPlayback/Sources/*.swift packages/HLSPlayback/Sources/HLSPlayback/
-cp -R /tmp/hls/submodules/HLSPlayback/Tests/. packages/HLSPlayback/Tests/HLSPlaybackTests/
-python3 tools/tests/hls-playback/run.py
-```
-
-`Tests/HLSPlaybackTests/HLSJSGoldens.swift` is hls.js's own output. It is regenerated in telegram-ios
+`Tests/HLSJSGoldens.swift` is hls.js's own output. It is regenerated in telegram-ios
 (`submodules/HLSPlayback/Tools/hlsjs-goldens`), never by hand.
 
 ## Tests

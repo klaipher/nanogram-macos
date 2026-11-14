@@ -40,20 +40,24 @@ def is_ancestor(repo: Path, ancestor: str, commit: str = "HEAD") -> bool:
 class PinnedVersionsTests(unittest.TestCase):
     def test_opus(self):
         script = read(CORE / "libopus" / "libopus" / "build.sh")
-        self.assertIn("third-party/opus/opus-1.6.1.tar.gz", script)
+        self.assertIn("third-party/opus/opus", script)
+        self.assertNotIn("opus-1.6.1.tar.gz", script)
         self.assertFalse((CORE / "libopus" / "opus-1.6.1.tar.gz").exists())
-        tarball = TG_IOS / "third-party" / "opus" / "opus-1.6.1.tar.gz"
-        if tarball.is_file():
-            self.assertEqual(hashlib.sha256(tarball.read_bytes()).hexdigest(),
-                             "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1")
         self.assertFalse((CORE / "libopus" / "opus-1.3.1.tar.gz").exists())
-        self.assertIn("6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1", script)
+        cmake = TG_IOS / "third-party" / "opus" / "opus" / "CMakeLists.txt"
+        if cmake.is_file():
+            self.assertIn("1.6.1", read(TG_IOS / "third-party" / "opus" / "BUILD"))
 
-    def test_opus_built_for_speed_with_fixed_point(self):
+    def test_opus_options_come_from_the_core_and_keep_neon(self):
         script = read(CORE / "libopus" / "libopus" / "build.sh")
-        self.assertIn("--enable-fixed-point", script)
-        self.assertRegex(script, r"CFLAGS=\"[^\"]*-O2 -DNDEBUG")
+        self.assertRegex(script, r"CMAKE_C_FLAGS_RELEASE=\"-O2 -DNDEBUG")
         self.assertNotIn("-Os", script)
+        args = TG_IOS / "third-party" / "opus" / "opus-cmake-args.sh"
+        if args.is_file():
+            text = read(args)
+            self.assertIn("-DOPUS_PRESUME_NEON=ON", text)
+            self.assertIn("-DOPUS_DISABLE_INTRINSICS=OFF", text)
+            self.assertIn("-DOPUS_FIXED_POINT=OFF", text)
 
     def test_libvpx(self):
         self.assertFalse((CORE / "libvpx" / "source").exists())
@@ -68,14 +72,22 @@ class PinnedVersionsTests(unittest.TestCase):
 
     def test_openh264(self):
         script = read(CORE / "OpenH264" / "OpenH264" / "build.sh")
-        self.assertIn("-b v2.7.0 ", script)
-        self.assertIn("1bca62311e447fd9c39fc93de2c4b96cd5ce971c", script)
+        self.assertIn("submodules/telegram-ios", script)
+        self.assertIn("third-party/openh264/openh264", script)
+        self.assertNotIn("git clone", script)
+        self.assertNotIn("1bca62311e447fd9c39fc93de2c4b96cd5ce971c", script)
+        header = TG_IOS / "third-party" / "openh264" / "openh264" / "codec" / "api" / "wels" / "codec_ver.h"
+        if header.is_file():
+            text = read(header)
+            self.assertRegex(text, r"OPENH264_MAJOR \(2\)[\s\S]*OPENH264_MINOR \(7\)[\s\S]*OPENH264_REVISION \(0\)")
+        self.assertFalse((TG_IOS / "third-party" / "openh264" / "third_party").exists())
 
     def test_libwebp(self):
         script = read(CORE / "libwebp" / "libwebp" / "build-cmake.sh")
-        self.assertIn('SOURCE_ARCHIVE="$SRC_DIR/libwebp-1.6.0.tar.gz"', script)
-        self.assertIn("e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564", script)
-        self.assertTrue((CORE / "libwebp" / "libwebp-1.6.0.tar.gz").is_file())
+        self.assertIn("submodules/telegram-ios/third-party/webp/libwebp", script)
+        self.assertNotIn("SOURCE_ARCHIVE", script)
+        self.assertFalse(list((CORE / "libwebp").glob("libwebp-*.tar.gz")))
+        self.assertFalse((CORE / "libwebp" / "libwebp" / "build.sh").exists())
         self.assertFalse((CORE / "libwebp" / "libwebp-master.zip").exists())
 
     def test_openssl(self):
@@ -83,6 +95,9 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn("-b openssl-3.5.9 ", script)
         self.assertIn("45e844fa2a14ec92d146bd8f5778ac130b6625fb", script)
         self.assertNotIn("OpenSSL_1_1_1", script)
+        self.assertFalse((CORE / "openssl" / "OpenSSLEncryption" / "patch-conf.diff").exists())
+        project = read(CORE / "openssl" / "OpenSSLEncryption.xcodeproj" / "project.pbxproj")
+        self.assertNotIn("submodules/telegram-ios/submodules/openssl", project)
 
     def test_openssl_keeps_upstream_callers_free_of_3_0_deprecation_warnings(self):
         script = read(CORE / "openssl" / "OpenSSLEncryption" / "build.sh")
@@ -113,8 +128,10 @@ class PinnedVersionsTests(unittest.TestCase):
 
     def test_sqlcipher(self):
         sources = TG_IOS / "submodules" / "sqlcipher"
-        self.assertIn('#define SQLITE_VERSION        "3.54.1"', read(sources / "PublicHeaders" / "sqlcipher" / "sqlite3.h"))
-        self.assertIn("#define CIPHER_VERSION_NUMBER 4.20.0", read(sources / "Sources" / "sqlite3.c"))
+        amalgamation = sources / "amalgamation"
+        self.assertIn('#define SQLITE_VERSION        "3.54.1"', read(amalgamation / "headers" / "sqlcipher" / "sqlite3.h"))
+        self.assertIn("#define CIPHER_VERSION_NUMBER 4.20.0", read(amalgamation / "sqlite3.c"))
+        self.assertEqual(gitlink(TG_IOS, "submodules/sqlcipher/amalgamation"), "010c1b1174ac79856766b9ece9179c784645053b")
 
     def test_tde2e(self):
         self.assertEqual(gitlink(TG_IOS, "third-party/td/td"), "0e88653dcbf4e44c73cb655a05b58cd749a91169")
@@ -127,9 +144,10 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertIn('SOURCE_NAME="libjpeg-turbo-3.2.1"', script)
         self.assertIn("c27ad72a68da151177929aa969ae773a2da5ac2af9ce946079314fdac8cece7f", script)
         self.assertIn("-DWITH_JPEG8=1", script)
-        self.assertTrue((CORE / "Mozjpeg" / "libjpeg-turbo-3.2.1.tar.gz").is_file())
+        self.assertIn("https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.1/libjpeg-turbo-3.2.1.tar.gz", script)
+        self.assertFalse(list((CORE / "Mozjpeg").glob("libjpeg-turbo-*.tar.gz")))
         project = read(CORE / "Mozjpeg" / "Mozjpeg.xcodeproj" / "project.pbxproj")
-        self.assertIn("libjpeg-turbo-3.2.1.tar.gz", project)
+        self.assertNotIn(".tar.gz\\n", project)
         self.assertNotIn("third-party/mozjpeg", project)
         self.assertNotIn("third-party/mozjpeg", read(ROOT / "scripts" / "framework-inputs.sh"))
         self.assertNotIn("third-party/mozjpeg", read(ROOT / "scripts" / "configure_frameworks.sh"))
@@ -144,23 +162,41 @@ class PinnedVersionsTests(unittest.TestCase):
             self.assertIn("export RUSTUP_TOOLCHAIN", text, script)
             self.assertNotIn("third-party/mtproto-engine/rust-toolchain.toml", text, script)
 
-    def test_tg_owt_has_desktop_app_master(self):
-        owt = ROOT / "submodules" / "tg_owt"
-        pin = gitlink(ROOT, "submodules/tg_owt")
-        for commit in ("020feec5c040fdae2cf752c2c2be62ddde7c236d", "557e0e3d7d72f80278938f01e4d31bfd036278ba"):
-            self.assertTrue(is_ancestor(owt, commit, pin), f"tg_owt {pin} does not contain {commit}")
-
-    def test_tgcalls_is_the_klaipher_fork(self):
-        tgcalls = ROOT / "submodules" / "tgcalls"
-        pin = gitlink(ROOT, "submodules/tgcalls")
-        for commit in ("bdda8eff9f62547b4621c09f6a8873a61aecd95c", "6926af015580a1377e1b1bcad191d076453192cb"):
-            self.assertTrue(is_ancestor(tgcalls, commit, pin), f"tgcalls {pin} does not contain {commit}")
+    def test_webrtc_is_the_one_klaipher_fork_pin_shared_with_ios(self):
         modules = read(ROOT / ".gitmodules")
-        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls\n\tbranch = nanogram-shared\n', modules)
+        self.assertIn('[submodule "submodules/webrtc"]\n\tpath = submodules/webrtc\n\turl = https://github.com/klaipher/webrtc.git\n\tbranch = nanogram\n', modules)
+        self.assertNotIn("tg_owt", modules)
+        self.assertEqual(gitlink(ROOT, "submodules/webrtc"), gitlink(TG_IOS, "third-party/webrtc/webrtc"))
+        with self.assertRaises(AssertionError):
+            gitlink(ROOT, "submodules/tg_owt")
+
+    def test_webrtc_build_takes_its_third_party_sources_from_the_single_sources(self):
+        script = read(CORE / "webrtc" / "webrtc" / "build.sh")
+        self.assertIn("-DTG_OWT_LIBYUV_DIR=$LIBYUV_DIR", script)
+        self.assertIn("apply_abseil_workaround.sh", script)
+        self.assertIn('"$SOURCE_DIR/CMakeLists.txt"', script)
+        project = read(CORE / "webrtc" / "webrtc.xcodeproj" / "project.pbxproj")
+        self.assertIn("submodules/webrtc/", project)
+        self.assertIn("submodules/telegram-ios/third-party/libyuv/third_party/libyuv", project)
+        self.assertNotIn("tg_owt", project)
+        self.assertNotIn("tg_owt", read(ROOT / "scripts" / "framework-inputs.sh"))
+        self.assertNotIn("attributes.h", read(ROOT / "scripts" / "setup_build_env.sh"))
+
+    def test_tgcalls_is_the_klaipher_fork_pin_shared_with_ios(self):
+        self.assertEqual(gitlink(ROOT, "submodules/tgcalls"), gitlink(TG_IOS, "submodules/TgVoipWebrtc/tgcalls"))
+        modules = read(ROOT / ".gitmodules")
+        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls.git\n\tbranch = nanogram-shared\n\tshallow = true\n', modules)
+
+    def test_widget_stack_is_the_klaipher_forks_shared_with_ios(self):
+        modules = read(ROOT / ".gitmodules")
+        for name in ("twidget", "widget-sandbox"):
+            self.assertIn(f'[submodule "third-party/{name}"]\n\tpath = third-party/{name}\n\turl = https://github.com/klaipher/{name}.git\n\tbranch = nanogram\n', modules)
+            self.assertEqual(gitlink(ROOT, f"third-party/{name}"), gitlink(TG_IOS, f"third-party/{name}/{name}"))
 
     def test_libprisma_and_boost_regex_come_from_the_core(self):
-        self.assertTrue((TG_IOS / "third-party" / "libprisma" / "Sources" / "SyntaxHighlighter.cpp").exists())
-        self.assertTrue((TG_IOS / "third-party" / "boost_regex" / "include" / "boost" / "regex.hpp").exists())
+        self.assertTrue((TG_IOS / "third-party" / "libprisma" / "libprisma" / "libprisma" / "SyntaxHighlighter.cpp").exists())
+        self.assertTrue((TG_IOS / "third-party" / "libprisma" / "libprisma" / "apple" / "Syntaxer.mm").exists())
+        self.assertTrue((TG_IOS / "third-party" / "boost_regex" / "regex" / "include" / "boost" / "regex.hpp").exists())
 
     def test_sparkle_2(self):
         self.assertEqual(gitlink(ROOT, "submodules/Sparkle"), "ab7d71291238df6e0492143b120c9b696a35f603")

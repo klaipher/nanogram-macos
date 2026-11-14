@@ -21,7 +21,10 @@ let package = Package(
         .target(
             name: "RingBuffer",
             dependencies: [],
-            path: ".",
-            publicHeadersPath: "Sources/RingBuffer"),
+            // The one RingBuffer: the iOS core's submodules/RingBuffer (the symlink keeps the target inside this package).
+            path: "CoreSources",
+            exclude: ["BUILD"],
+            sources: ["Sources"],
+            publicHeadersPath: "PublicHeaders"),
     ]
 )
