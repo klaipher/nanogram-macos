@@ -441,9 +441,23 @@ def cmd_pre_push(args):
                                                         input=pushed, text=True).returncode != 0:
         return 1
     shared_script = os.path.join(ROOT, 'tools', 'dev', 'native', 'check_shared.py')
-    if os.path.exists(shared_script) and subprocess.run([sys.executable, shared_script, '--side', 'mac', '--quiet'], cwd=ROOT).returncode != 0:
-        print('tglint: shared library pins differ from shared/shared-libraries.json; push stopped (see the lines above)', file=sys.stderr)
-        return 1
+    if os.path.exists(shared_script):
+        # Check each pushed commit (not whatever HEAD is), against the manifest of the core commit that commit pins.
+        pushed_shas = []
+        for _local_ref, local_sha, _remote_ref, _remote_sha in refs:
+            if local_sha != ZERO_SHA and local_sha not in pushed_shas:
+                pushed_shas.append(local_sha)
+        for local_sha in pushed_shas or ['HEAD']:
+            pinned = git('rev-parse', '--verify', '--quiet', local_sha + ':submodules/telegram-ios', check=False).strip()
+            checked_out = subprocess.run(['git', '-C', os.path.join(ROOT, 'submodules', 'telegram-ios'), 'rev-parse', 'HEAD'],
+                                         capture_output=True, text=True).stdout.strip()
+            if pinned and checked_out and pinned != checked_out:
+                print(f'tglint: submodules/telegram-ios is checked out at {checked_out[:10]} but {local_sha[:10]} pins {pinned[:10]}; '
+                      'the manifest in shared/ would be the wrong one. Run `git submodule update --init` and push again', file=sys.stderr)
+                return 1
+            if subprocess.run([sys.executable, shared_script, '--side', 'mac', '--quiet', '--ref', local_sha], cwd=ROOT).returncode != 0:
+                print(f'tglint: shared library pins of {local_sha[:10]} differ from shared/shared-libraries.json; push stopped (see the lines above)', file=sys.stderr)
+                return 1
     head = git('rev-parse', 'HEAD', check=False).strip()
     check_base = None
     blocking = 0
