@@ -52,6 +52,12 @@ framework_source_roots() {
         mtproto-engine)
             echo "$1/submodules/telegram-ios/third-party/mtproto-engine"
             ;;
+        nanogram-rust)
+            echo "$1/submodules/telegram-ios/third-party/nanogram-rust"
+            echo "$1/submodules/telegram-ios/third-party/wallet-engine/wallet-engine"
+            echo "$1/submodules/telegram-ios/third-party/mtproto-engine"
+            echo "$1/submodules/telegram-ios/submodules/tlottie/tlottie"
+            ;;
         *)
             ;;
     esac
@@ -67,6 +73,7 @@ framework_dependencies() {
         ffmpeg) echo "libopus libvpx dav1d" ;;
         webrtc) echo "OpenH264 boringssl mozjpeg libopus libvpx ffmpeg" ;;
         tde2e) echo "boringssl" ;;
+        nanogram-rust) echo "wallet-engine mtproto-engine" ;;
         *) echo "" ;;
     esac
 }
@@ -103,7 +110,7 @@ framework_extra_fingerprint() {
             framework_tool_version meson --version
             framework_tool_version ninja --version
             ;;
-        wallet-engine|mtproto-engine)
+        wallet-engine|mtproto-engine|nanogram-rust)
             CARGO_BIN=""
             if [ -n "${CARGO:-}" ]; then
                 CARGO_BIN="$CARGO"
@@ -126,11 +133,8 @@ framework_extra_fingerprint() {
 
 framework_reset_outputs() {
     case "$2" in
-        wallet-engine)
-            rm -rf "$1/packages/WalletEngine/wallet_engineFFI.xcframework"
-            ;;
-        mtproto-engine)
-            rm -rf "$1/submodules/telegram-ios/submodules/MTProtoRustEngine/MTProtoEngineFFI.xcframework"
+        nanogram-rust)
+            rm -rf "$1/packages/RustLibraries/NanogramRustFFI.xcframework"
             ;;
         *)
             ;;
@@ -181,16 +185,16 @@ framework_required_outputs() {
             printf '%s\n' "$BUILD_DIR/tde2e/lib/"{libtde2e,libtdutils}.a
             ;;
         wallet-engine)
-            local XCFRAMEWORK="$1/packages/WalletEngine/wallet_engineFFI.xcframework"
-            printf '%s\n' "$BUILD_DIR/libwallet_engine.a" "$BUILD_DIR/WalletEngineFFI.swift" \
-                "$XCFRAMEWORK/Info.plist" "$XCFRAMEWORK/macos-arm64/libwallet_engine.a" \
-                "$XCFRAMEWORK/macos-arm64/Headers/"{wallet_engineFFI.h,module.modulemap}
+            printf '%s\n' "$BUILD_DIR/WalletEngineFFI.swift" "$BUILD_DIR/headers/wallet_engineFFI.h" "$BUILD_DIR/headers/module.modulemap"
             ;;
         mtproto-engine)
-            local XCFRAMEWORK="$1/submodules/telegram-ios/submodules/MTProtoRustEngine/MTProtoEngineFFI.xcframework"
-            printf '%s\n' "$BUILD_DIR/libmtproto_engine_ffi.a" "$XCFRAMEWORK/Info.plist" \
-                "$XCFRAMEWORK/macos-arm64/libmtproto_engine_ffi.a" \
-                "$XCFRAMEWORK/macos-arm64/Headers/MTProtoEngineFFI/"{mtproto_engine.h,module.modulemap}
+            printf '%s\n' "$BUILD_DIR/headers/mtproto_engine.h"
+            ;;
+        nanogram-rust)
+            local XCFRAMEWORK="$1/packages/RustLibraries/NanogramRustFFI.xcframework"
+            printf '%s\n' "$BUILD_DIR/libnanogram_rust.a" "$XCFRAMEWORK/Info.plist" \
+                "$XCFRAMEWORK/macos-arm64/libnanogram_rust.a" \
+                "$XCFRAMEWORK/macos-arm64/Headers/"{wallet_engineFFI.h,mtproto_engine.h,module.modulemap}
             ;;
         *) return 1 ;;
     esac

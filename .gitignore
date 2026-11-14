@@ -19,9 +19,9 @@ tmp/
 test-glass/
 temp/
 core-xprojects/wallet-engine/build
-packages/WalletEngine/wallet_engineFFI.xcframework
+packages/RustLibraries/NanogramRustFFI.xcframework
 core-xprojects/mtproto-engine/build
-core-xprojects/tlottie/build
+core-xprojects/nanogram-rust/build
 
 # SwiftPM build output and Xcode-generated package metadata
 .build/

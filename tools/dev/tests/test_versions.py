@@ -154,7 +154,7 @@ class PinnedVersionsTests(unittest.TestCase):
     def test_rust_toolchain(self):
         pin = read(CORE / "rust-toolchain.toml")
         self.assertIn('channel = "1.99.1"', pin)
-        for script in ("mtproto-engine/mtproto-engine/build.sh", "wallet-engine/wallet-engine/build.sh", "tlottie/build.sh"):
+        for script in ("mtproto-engine/mtproto-engine/build.sh", "wallet-engine/wallet-engine/build.sh", "nanogram-rust/nanogram-rust/build.sh"):
             text = read(CORE / script)
             self.assertIn("rust-toolchain.toml", text, script)
             self.assertIn("export RUSTUP_TOOLCHAIN", text, script)

@@ -2,8 +2,8 @@
 set -e
 
 
-declare -a libs=("OpenH264" "boringssl" "libopus" "libvpx" "mozjpeg" "libwebp" "dav1d" "ffmpeg" "webrtc" "tde2e" "wallet-engine" "mtproto-engine")
-declare -a libname=("OpenH264" "BoringSSL" "libopus" "libvpx" "Mozjpeg" "libwebp" "dav1d" "ffmpeg" "webrtc" "tde2e" "WalletEngine" "MTProtoEngine")
+declare -a libs=("OpenH264" "boringssl" "libopus" "libvpx" "mozjpeg" "libwebp" "dav1d" "ffmpeg" "webrtc" "tde2e" "wallet-engine" "mtproto-engine" "nanogram-rust")
+declare -a libname=("OpenH264" "BoringSSL" "libopus" "libvpx" "Mozjpeg" "libwebp" "dav1d" "ffmpeg" "webrtc" "tde2e" "WalletEngine" "MTProtoEngine" "NanogramRust")
 
 arraylength=${#libs[@]}
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
@@ -52,7 +52,7 @@ do
     else
         echo "framework-stamp: $LIB outputs are missing or inconsistent, repairing"
         case "$LIB" in
-            wallet-engine|mtproto-engine) framework_reset_outputs "$ROOT_DIR" "$LIB" ;;
+            wallet-engine|mtproto-engine|nanogram-rust) framework_reset_outputs "$ROOT_DIR" "$LIB" ;;
             *) rm -rf "$BUILD_DIR" ;;
         esac
     fi
@@ -95,4 +95,3 @@ for pair in "${DIRECTORY_PAIRS[@]}"; do
     sh "$SCRIPT_DIR/sync-headers.sh" "$SOURCE_DIR" "$DEST_DIR"
 done
 
-sh "$ROOT_DIR/scripts/time-step.sh" tlottie sh "$ROOT_DIR/core-xprojects/tlottie/build.sh"

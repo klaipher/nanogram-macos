@@ -8,7 +8,6 @@ let root = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()
     .deletingLastPathComponent()
 
-let library = root.appendingPathComponent("core-xprojects/tlottie/build").path
 let headers = root.appendingPathComponent("submodules/tlottie/include").path
 
 let package = Package(
@@ -17,9 +16,13 @@ let package = Package(
     products: [
         .library(name: "TLottie", targets: ["TLottie"]),
     ],
+    dependencies: [
+        .package(name: "RustLibraries", path: "../RustLibraries"),
+    ],
     targets: [
         .target(
             name: "TLottie",
+            dependencies: [.product(name: "NanogramRustFFI", package: "RustLibraries")],
             path: "Sources/TLottie",
             publicHeadersPath: "include",
             cSettings: [
@@ -29,8 +32,6 @@ let package = Package(
                 .unsafeFlags(["-I\(headers)"]),
             ],
             linkerSettings: [
-                .unsafeFlags(["-L\(library)"]),
-                .linkedLibrary("tlottie"),
                 .linkedFramework("AppKit"),
             ]),
     ],

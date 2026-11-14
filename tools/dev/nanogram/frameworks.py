@@ -1,6 +1,6 @@
 """`tg frameworks`: native libraries with our settings (arm64, macOS 15), through the shared cache.
 
-Each library (and tlottie) is current, restored from ~/.cache/nanogram-macos/frameworks (fwcache.py) or built.
+Each library is current, restored from ~/.cache/nanogram-macos/frameworks (fwcache.py) or built.
 Upstream's scripts/configure_frameworks.sh runs only when something must be built; it skips current and restored
 libraries by their stamps. Finally every required output must exist and hold an arm64 slice only.
 """
@@ -46,13 +46,12 @@ def libraries() -> list[str]:
 
 
 def required_outputs(root: Path | None = None) -> list[Path]:
-    """Every output upstream's framework_required_outputs lists for `root`, plus tlottie's library."""
+    """Every output upstream's framework_required_outputs lists for `root`."""
     root = Path(root or config.ROOT)
     script = (f'. "{SCRIPTS / "framework-inputs.sh"}"; '
               f'for lib in {" ".join(libraries())}; do framework_required_outputs "$1" "$lib" || exit 1; done')
     out = subprocess.run(["bash", "-c", script, "bash", str(root)], capture_output=True, text=True, check=True).stdout
     paths = [Path(line) for line in out.splitlines() if line.strip()]
-    paths.append(root / "core-xprojects" / "tlottie" / "build" / "libtlottie.a")
     return paths
 
 
@@ -134,7 +133,6 @@ class Runner(Protocol):
     def configure(self) -> None: ...
     def headers_synced(self) -> bool: ...
     def sync_headers(self) -> None: ...
-    def build_tlottie(self, stamp: str) -> None: ...
     def write_stamp(self, unit: str, stamp: str) -> None: ...
     def store(self, unit: str, key: str, stamp: str) -> None: ...
     def prune(self, keep: set[str]) -> None: ...
@@ -184,15 +182,12 @@ def run(root: Path, use_cache: bool, runner: Runner) -> Summary:
                 continue
             if not runner.is_current(unit, stamps[unit]):
                 statuses[unit] = "build"
-    configured = any(status == "build" for unit, status in statuses.items() if unit != "tlottie")
+    configured = any(status == "build" for status in statuses.values())
     if configured:
         runner.configure()
         stamps = runner.stamps()
-        runner.write_stamp("tlottie", stamps["tlottie"])
     elif any(status != "current" for status in statuses.values()) or not runner.headers_synced():
         runner.sync_headers()
-    if (statuses["tlottie"] == "build" and not configured) or not runner.is_current("tlottie", stamps["tlottie"]):
-        runner.build_tlottie(stamps["tlottie"])
     keys = {unit: cache_key(stamp, rust) for unit, stamp in stamps.items()}
     if use_cache:
         for unit in UNITS:
@@ -265,11 +260,6 @@ class RealRunner:
     def sync_headers(self) -> None:
         for source, dest in self.fwcache.header_pairs(self.root):
             self._run(["sh", str(self.root / "scripts" / "sync-headers.sh"), str(source), str(dest)], "header sync")
-
-    def build_tlottie(self, stamp: str) -> None:
-        self._run(["sh", str(self.root / "scripts" / "time-step.sh"), "tlottie", "sh",
-                   str(self.root / "core-xprojects" / "tlottie" / "build.sh")], "tlottie")
-        self.write_stamp("tlottie", stamp)
 
     def write_stamp(self, unit: str, stamp: str) -> None:
         if outputs_present(self.outputs[unit]):

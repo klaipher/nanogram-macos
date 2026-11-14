@@ -17,6 +17,10 @@ SUBMODULE_MARKERS = {
     # libvpx and libopus are built from the core's copies (nested submodules).
     "libvpx source": "submodules/telegram-ios/third-party/libvpx/libvpx/configure",
     "boringssl source": "submodules/telegram-ios/third-party/boringssl/src/CMakeLists.txt",
+    "nanogram-rust source": "submodules/telegram-ios/third-party/nanogram-rust/Cargo.toml",
+    "tlottie source (core)": "submodules/telegram-ios/submodules/tlottie/tlottie/Cargo.toml",
+    "mtproto-engine source": "submodules/telegram-ios/third-party/mtproto-engine/Cargo.toml",
+    "wallet-engine source": "submodules/telegram-ios/third-party/wallet-engine/wallet-engine/Cargo.toml",
     "opus source": "submodules/telegram-ios/third-party/opus/opus/CMakeLists.txt",
     # The shared single sources live in the core as submodules; an empty one makes a library script fail late.
     "shared tooling": "submodules/telegram-ios/shared/shared-libraries.json",

@@ -19,6 +19,6 @@ if cmp -s "$BUILT_BINDINGS" "$PACKAGE_BINDINGS"; then
 fi
 
 if [ "$REPORT" = "xcode" ]; then
-    echo "error: packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift does not match the wallet engine library in packages/WalletEngine/wallet_engineFFI.xcframework, so the app would abort at launch with a UniFFI checksum mismatch. Rebuild the library from the repository root: $REBUILD"
+    echo "error: packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift does not match the wallet engine library in packages/RustLibraries/NanogramRustFFI.xcframework, so the app would abort at launch with a UniFFI checksum mismatch. Rebuild the library from the repository root: $REBUILD"
 fi
 exit 1

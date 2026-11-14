@@ -25,8 +25,9 @@ package dependencies, so once the submodules are checked out the build is offlin
 - A Rust toolchain via rustup. The TON wallet engine (`wallet-engine`) and the tlottie
   sticker renderer are Rust libraries; their build scripts pick up `cargo` from `PATH` or
   `~/.cargo/bin` and rustup installs the toolchain pinned in the engine's
-  `rust-toolchain.toml` automatically. tlottie is built with the toolchain of
-  `mtproto-engine`, so all Rust libraries in the app share one standard library.
+  `rust-toolchain.toml` automatically. tlottie, mtproto-engine and wallet-engine are linked
+  as one static library (`core-xprojects/nanogram-rust`, crate `third-party/nanogram-rust` in the core), so the
+  app holds one standard library.
   ```
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
   ```
@@ -234,8 +235,7 @@ Parallels VM build path.
 Source synchronization preserves native outputs, generated TelegramApi and
 FlatSerialization sources, the SwiftTL build cache and generated shared headers.
 Generators still run their validation; unchanged Swift files and headers keep their
-timestamps, and removed generated files are deleted. tlottie still lets Cargo check
-its inputs, but does not replace an identical universal library.
+timestamps, and removed generated files are deleted.
 
 GitLab retains `.ci-build-logs/<job-id>/` for seven days, including failed jobs:
 
@@ -318,11 +318,9 @@ cd packages/TGUIKit && swift build
   build script above.
 - **`cargo` not found although Rust is installed**: the engine build script looks in
   `PATH` and `~/.cargo/bin`; export `CARGO=/path/to/cargo` if it lives elsewhere.
-- **`library 'tlottie' not found`**: `core-xprojects/tlottie/build/libtlottie.a` is missing.
-  Run `sh core-xprojects/tlottie/build.sh` or rerun `configure_frameworks.sh`.
-- **`duplicate symbol '_rust_eh_personality'`**: tlottie was built with a different Rust
-  toolchain than the engines. Delete `core-xprojects/tlottie/build` and rerun
-  `sh core-xprojects/tlottie/build.sh`.
+- **`library 'nanogram_rust' not found` or `module 'wallet_engineFFI' not found`**:
+  `packages/RustLibraries/NanogramRustFFI.xcframework` is missing. Rerun `configure_frameworks.sh`
+  (it builds `wallet-engine` and `mtproto-engine` first, then `nanogram-rust`).
 - **CodeSyntax or Sparkle not found**: you opened `Telegram.xcodeproj`. Open the
   workspace instead.
 - **"The macOS deployment target 'MACOSX_DEPLOYMENT_TARGET' is set to 10.13, but the range

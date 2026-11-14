@@ -167,3 +167,9 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: `core-xprojects/boringssl`, `Telegram.xcodeproj` (library paths), `scripts/{configure_frameworks,framework-inputs,xcode27,setup_build_env}.sh`, `tools/dev/nanogram/doctor.py`, packages' `coreLibraries`, `run-tests.sh` files, `tools/dev/native/native-libs.json`.
 - Upstream: no. Upstream uses OpenSSL on the Mac.
 - Sync: keep `core-xprojects/boringssl` and the `-lcrypto/-lssl` paths `core-xprojects/boringssl/build/boringssl/lib`; resolve upstream edits to `core-xprojects/openssl` as deleted. The test helper `LibCryptoEncryptionProvider.swift` in the core still dlopens Homebrew openssl@3 (tests only, not shipped).
+
+### Rust libraries: one combined static library
+- What: tlottie, mtproto-engine and wallet-engine are linked as one fat-LTO staticlib (`nanogram-rust`), so std exists once; no duplicate `rust_eh_personality`. The wallet-engine keeps `opt-level 3`.
+- Where: `core-xprojects/{nanogram-rust,wallet-engine,mtproto-engine}`, `packages/{RustLibraries,WalletEngine,TLottie}`, `scripts/{framework-inputs,configure_frameworks}.sh`, `tools/dev/nanogram/{fwcache,frameworks}.py`, the core's `third-party/nanogram-rust` and `submodules/MTProtoRustEngine/Package.swift`.
+- Upstream: no (the engines are separate libraries upstream).
+- Sync: keep the `tlottie` unit and `core-xprojects/tlottie` deleted; the core's `MTProtoRustEngine/Package.swift` points at `packages/RustLibraries` (a Mac-only path; iOS builds it with Bazel).

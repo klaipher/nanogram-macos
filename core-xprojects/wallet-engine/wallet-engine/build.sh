@@ -59,22 +59,11 @@ mkdir -p "$BUILD_DIR"
 
 cd "$SOURCE_DIR"
 
-for RUST_TARGET in aarch64-apple-darwin; do
-    if [ -x "$RUSTUP_BIN" ]; then
-        "$RUSTUP_BIN" target add "$RUST_TARGET" >/dev/null 2>&1 || true
-    fi
-    env -u MACOSX_DEPLOYMENT_TARGET CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" rustc \
-        --package wallet-engine \
-        --lib \
-        --crate-type staticlib \
-        --release \
-        --locked \
-        --target "$RUST_TARGET" \
-        --config 'profile.release.opt-level=3' \
-        --config 'profile.release.lto="fat"'
-done
-
-cp "$BUILD_DIR/lib/aarch64-apple-darwin/release/libwallet_engine.a" "$BUILD_DIR/libwallet_engine.a"
+# The staticlib is built by nanogram-rust together with tlottie and mtproto-engine; this unit only generates the
+# Swift bindings and the C header (the xtask is the one dev-profile cargo run).
+if [ -x "$RUSTUP_BIN" ]; then
+    "$RUSTUP_BIN" target add aarch64-apple-darwin >/dev/null 2>&1 || true
+fi
 
 env -u MACOSX_DEPLOYMENT_TARGET CARGO="$CARGO_BIN" CARGO_TARGET_DIR="$BUILD_DIR/xtask" "$CARGO_BIN" run \
     --manifest-path xtask/Cargo.toml \
@@ -95,12 +84,5 @@ mkdir -p "$HEADERS_DIR"
 cp "$SOURCE_DIR/bindings/swift/Sources/wallet_engineFFI/wallet_engineFFI.h" "$HEADERS_DIR/"
 cp "$SOURCE_DIR/bindings/swift/Sources/wallet_engineFFI/module.modulemap" "$HEADERS_DIR/"
 
-rm -rf "$PACKAGE_DIR/wallet_engineFFI.xcframework"
-xcodebuild -create-xcframework \
-    -library "$BUILD_DIR/libwallet_engine.a" \
-    -headers "$HEADERS_DIR" \
-    -output "$PACKAGE_DIR/wallet_engineFFI.xcframework"
-
-lipo -info "$BUILD_DIR/libwallet_engine.a"
 cp "$PACKAGE_DIR/Sources/WalletEngineFFI/WalletEngineFFI.swift" "$BUILD_DIR/WalletEngineFFI.swift"
-echo "wallet-engine artifacts updated in $PACKAGE_DIR"
+echo "wallet-engine bindings updated in $PACKAGE_DIR"

@@ -14,12 +14,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nanogram import config, frameworks, fwcache  # noqa: E402
 
 STAMP = """schema=1
-lib=wallet-engine
+lib=nanogram-rust
 xcode=Xcode 27.2 Build version 27B52
 deployment=15.0
 archs=arm64
 rust=cargo 1.91.1 (ea2d97820 2025-10-10)
-input:core-xprojects/wallet-engine=2c099c1e.e3b0c44298fc
+input:core-xprojects/nanogram-rust=2c099c1e.e3b0c44298fc
 """
 RUST = "rustc 1.96.1 (abc 2026-01-01)"
 
@@ -36,26 +36,25 @@ def files_below(root: Path) -> set[str]:
 
 
 WALLET_FILES = (
-    "core-xprojects/wallet-engine/build/libwallet_engine.a",
-    "core-xprojects/wallet-engine/build/WalletEngineFFI.swift",
-    "packages/WalletEngine/wallet_engineFFI.xcframework/Info.plist",
-    "packages/WalletEngine/wallet_engineFFI.xcframework/macos-arm64/libwallet_engine.a",
-    "packages/WalletEngine/wallet_engineFFI.xcframework/macos-arm64/Headers/wallet_engineFFI.h",
-    "packages/WalletEngine/wallet_engineFFI.xcframework/macos-arm64/Headers/module.modulemap",
+    "core-xprojects/nanogram-rust/build/libnanogram_rust.a",
+    "packages/RustLibraries/NanogramRustFFI.xcframework/Info.plist",
+    "packages/RustLibraries/NanogramRustFFI.xcframework/macos-arm64/libnanogram_rust.a",
+    "packages/RustLibraries/NanogramRustFFI.xcframework/macos-arm64/Headers/wallet_engineFFI.h",
+    "packages/RustLibraries/NanogramRustFFI.xcframework/macos-arm64/Headers/module.modulemap",
 )
 
 
 def wallet_root(root: Path) -> Path:
     for rel in WALLET_FILES:
         write(root, rel, f"content of {rel}")
-    write(root, "core-xprojects/wallet-engine/build/lib/x.rlib")
-    write(root, "core-xprojects/wallet-engine/build/xtask/y")
+    write(root, "core-xprojects/nanogram-rust/build/lib/x.rlib")
+    write(root, "core-xprojects/nanogram-rust/build/xtask/y")
     return root
 
 
 def _store_in_child(cache_dir, root, key, queue):
     config.CACHE_DIR = Path(cache_dir)
-    entry = fwcache.store(Path(root), "wallet-engine", key, STAMP)
+    entry = fwcache.store(Path(root), "nanogram-rust", key, STAMP)
     queue.put(str(entry.path))
 
 
@@ -64,7 +63,7 @@ def _restore_in_child(cache_dir, root, key, holding, released):
     with fwcache.cache_lock(fwcache.fcntl.LOCK_SH):
         holding.set()
         time.sleep(1.5)
-        fwcache.restore(Path(root), "wallet-engine", fwcache.lookup(key), STAMP)
+        fwcache.restore(Path(root), "nanogram-rust", fwcache.lookup(key), STAMP)
         released.set()
 
 
@@ -82,40 +81,40 @@ class StoreRestoreTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
 
     def stored(self, key="k1"):
-        return fwcache.store(self.a, "wallet-engine", key, STAMP)
+        return fwcache.store(self.a, "nanogram-rust", key, STAMP)
 
     def test_restore_layout_is_exact(self):
         entry = self.stored()
-        fwcache.restore(self.b, "wallet-engine", entry, STAMP)
-        restored = files_below(self.b) - {"core-xprojects/wallet-engine/build/.framework-stamp"}
+        fwcache.restore(self.b, "nanogram-rust", entry, STAMP)
+        restored = files_below(self.b) - {"core-xprojects/nanogram-rust/build/.framework-stamp"}
         self.assertEqual(restored, set(WALLET_FILES))
         for rel in WALLET_FILES:
             self.assertEqual((self.b / rel).read_text(), f"content of {rel}")
         self.assertEqual(sorted(os.listdir(self.b)), ["core-xprojects", "packages"])
-        self.assertEqual(os.listdir(self.b / "core-xprojects"), ["wallet-engine"])
-        self.assertEqual(os.listdir(self.b / "core-xprojects/wallet-engine"), ["build"])
-        self.assertEqual(os.listdir(self.b / "packages/WalletEngine"), ["wallet_engineFFI.xcframework"])
+        self.assertEqual(os.listdir(self.b / "core-xprojects"), ["nanogram-rust"])
+        self.assertEqual(os.listdir(self.b / "core-xprojects/nanogram-rust"), ["build"])
+        self.assertEqual(os.listdir(self.b / "packages/RustLibraries"), ["NanogramRustFFI.xcframework"])
 
     def test_restore_replaces_stale_outputs(self):
         entry = self.stored()
-        write(self.b, "core-xprojects/wallet-engine/build/old.a")
-        write(self.b, "packages/WalletEngine/wallet_engineFFI.xcframework/old/x.a")
-        write(self.b, "packages/WalletEngine/Package.swift", "keep")
-        fwcache.restore(self.b, "wallet-engine", entry, STAMP)
-        self.assertFalse((self.b / "core-xprojects/wallet-engine/build/old.a").exists())
-        self.assertFalse((self.b / "packages/WalletEngine/wallet_engineFFI.xcframework/old").exists())
-        self.assertEqual((self.b / "packages/WalletEngine/Package.swift").read_text(), "keep")
+        write(self.b, "core-xprojects/nanogram-rust/build/old.a")
+        write(self.b, "packages/RustLibraries/NanogramRustFFI.xcframework/old/x.a")
+        write(self.b, "packages/RustLibraries/Package.swift", "keep")
+        fwcache.restore(self.b, "nanogram-rust", entry, STAMP)
+        self.assertFalse((self.b / "core-xprojects/nanogram-rust/build/old.a").exists())
+        self.assertFalse((self.b / "packages/RustLibraries/NanogramRustFFI.xcframework/old").exists())
+        self.assertEqual((self.b / "packages/RustLibraries/Package.swift").read_text(), "keep")
 
     def test_restore_writes_local_stamp(self):
         entry = self.stored()
-        fwcache.restore(self.b, "wallet-engine", entry, "local stamp\n")
-        self.assertEqual((self.b / "core-xprojects/wallet-engine/build/.framework-stamp").read_text(), "local stamp\n")
+        fwcache.restore(self.b, "nanogram-rust", entry, "local stamp\n")
+        self.assertEqual((self.b / "core-xprojects/nanogram-rust/build/.framework-stamp").read_text(), "local stamp\n")
 
     def test_lookup(self):
         self.assertIsNone(fwcache.lookup("k1"))
         entry = self.stored()
         found = fwcache.lookup("k1")
-        self.assertEqual((found.key, found.unit, found.path), ("k1", "wallet-engine", entry.path))
+        self.assertEqual((found.key, found.unit, found.path), ("k1", "nanogram-rust", entry.path))
         self.assertGreater(found.size, 0)
 
     def test_store_existing_key_is_noop(self):
@@ -140,7 +139,7 @@ class StoreRestoreTests(unittest.TestCase):
         self.assertEqual(names, ["k1"])
 
     def _aged(self, key, age):
-        entry = fwcache.store(self.a, "wallet-engine", key, STAMP)
+        entry = fwcache.store(self.a, "nanogram-rust", key, STAMP)
         stamp = time.time() - age
         os.utime(entry.path / "meta.json", (stamp, stamp))
         return entry
@@ -240,7 +239,7 @@ class ToolchainTests(unittest.TestCase):
 
     def test_only_core_pin_change_changes_every_rust_key(self):
         rust_stamps = {"wallet-engine": STAMP, "mtproto-engine": STAMP.replace("lib=", "lib=m"),
-                       "tlottie": "lib=tlottie\nrust=x\n"}
+                       "nanogram-rust": STAMP.replace("lib=", "lib=n")}
         other = "lib=boringssl\nxcode=Xcode 27.2\n"
         with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:
             before, _ = self.rust_of(self.toolchain_root(one))
@@ -288,7 +287,7 @@ class StampTests(unittest.TestCase):
                 self.assertRegex(self.stamps[unit], rf"(?m)^{tool}=\S", unit)
         for unit in ("webrtc", "tde2e", "mozjpeg", "libwebp", "libopus", "boringssl"):
             self.assertRegex(self.stamps[unit], r"(?m)^ccache=(on|off)$", unit)
-        for unit in ("ffmpeg", "tlottie"):
+        for unit in ("ffmpeg",):
             self.assertNotRegex(self.stamps[unit], r"(?m)^(cmake|ninja|meson|ccache)=", unit)
 
     def test_tool_version_changes_the_stamp(self):
@@ -305,22 +304,25 @@ class StampTests(unittest.TestCase):
         self.assertNotEqual(outs[0], outs[1])
         self.assertIn("2.0", outs[1])
 
-    def test_tlottie_stamp_carries_the_toolchain_fingerprint(self):
+    def test_nanogram_rust_stamp_carries_the_toolchain_fingerprint(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(config, "CACHE_DIR", Path(tmp)):
             stamps = fwcache.local_stamps(config.ROOT, fwcache.stamp_environment())
         rust = fwcache.pinned_rust(config.ROOT)
-        self.assertIn(f"rust={rust}\n", stamps["tlottie"])
-        if rust != fwcache.MISSING_RUST:
-            self.assertIn(f"toolchain={fwcache.toolchain_fingerprint(config.ROOT)}", stamps["tlottie"])
+        self.assertRegex(stamps["nanogram-rust"], r"(?m)^rust=.*$")
+        self.assertNotEqual(fwcache.cache_key(stamps["nanogram-rust"], rust),
+                            fwcache.cache_key(stamps["nanogram-rust"], rust + " other"))
 
-    def test_tlottie_stamp_carries_pinned_rust_and_inputs(self):
-        tlottie = self.stamps["tlottie"]
-        self.assertIn(f"rust={RUST}\n", tlottie)
-        self.assertRegex(tlottie, r"(?m)^input:submodules/tlottie=\S+$")
-        self.assertRegex(tlottie, r"(?m)^input:core-xprojects/tlottie/build.sh=[0-9a-f]{64}$")
+    def test_nanogram_rust_stamp_covers_the_three_sources_the_script_and_its_inputs(self):
+        stamp = self.stamps["nanogram-rust"]
+        for source in ("third-party/nanogram-rust", "third-party/wallet-engine/wallet-engine",
+                       "third-party/mtproto-engine", "submodules/tlottie/tlottie"):
+            self.assertRegex(stamp, rf"(?m)^input:.*{re.escape(source)}=\S+$")
+        self.assertRegex(stamp, r"(?m)^dependency:wallet-engine=")
+        self.assertRegex(stamp, r"(?m)^dependency:mtproto-engine=")
 
-    def test_units_are_libraries_plus_tlottie(self):
-        self.assertEqual(fwcache.UNITS, tuple(frameworks.libraries()) + ("tlottie",))
+    def test_units_are_the_libraries(self):
+        self.assertEqual(fwcache.UNITS, tuple(frameworks.libraries()))
+        self.assertNotIn("tlottie", fwcache.UNITS)
 
 
 class CachedFilesTests(unittest.TestCase):
@@ -333,13 +335,13 @@ class CachedFilesTests(unittest.TestCase):
     def test_cached_files_skip_scratch(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = wallet_root(Path(tmp))
-            listed = {str(p) for p in fwcache.cached_files(root, "wallet-engine")}
+            listed = {str(p) for p in fwcache.cached_files(root, "nanogram-rust")}
         self.assertEqual(listed, set(WALLET_FILES))
 
     def test_cached_files_are_relative_and_sorted(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = wallet_root(Path(tmp))
-            listed = fwcache.cached_files(root, "wallet-engine")
+            listed = fwcache.cached_files(root, "nanogram-rust")
         self.assertEqual(listed, sorted(listed))
         self.assertTrue(all(not p.is_absolute() for p in listed))
 
@@ -375,13 +377,13 @@ class CachedFilesTests(unittest.TestCase):
         self.assertTrue(all(str(s).startswith(tmp) for s in sources))
         self.assertFalse(any("SCRIPT_DIR" in str(s) or ".." in s.parts for s in sources))
 
-    def test_tlottie_cached_files(self):
+    def test_nanogram_rust_cached_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            write(root, "core-xprojects/tlottie/build/libtlottie.a")
-            write(root, "core-xprojects/tlottie/build/lib/aarch64-apple-darwin/release/libtlottie.a")
-            listed = [str(p) for p in fwcache.cached_files(root, "tlottie")]
-        self.assertEqual(listed, ["core-xprojects/tlottie/build/libtlottie.a"])
+            write(root, "core-xprojects/nanogram-rust/build/libnanogram_rust.a")
+            write(root, "core-xprojects/nanogram-rust/build/lib/aarch64-apple-darwin/release/libnanogram_rust.a")
+            listed = [str(p) for p in fwcache.cached_files(root, "nanogram-rust")]
+        self.assertEqual(listed, ["core-xprojects/nanogram-rust/build/libnanogram_rust.a"])
 
 
 if __name__ == "__main__":

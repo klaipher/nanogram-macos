@@ -10,14 +10,13 @@ let package = Package(
             name: "WalletEngineFFI",
             targets: ["WalletEngineFFI"]),
     ],
+    dependencies: [
+        .package(name: "RustLibraries", path: "../RustLibraries"),
+    ],
     targets: [
-        .binaryTarget(
-            name: "wallet_engineFFI",
-            path: "wallet_engineFFI.xcframework"
-        ),
         .target(
             name: "WalletEngineFFI",
-            dependencies: ["wallet_engineFFI"],
+            dependencies: [.product(name: "NanogramRustFFI", package: "RustLibraries")],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ],
