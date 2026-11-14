@@ -573,6 +573,11 @@ public enum EditVideoExport {
     }
 
     public static func exportProgressively(_ spec: EditVideoRenderSpec, to url: URL, useStreamingWriter: Bool = true) -> Signal<PendingVideoRenderEvent, NoError> {
+        return exportProgressivelyUnscoped(spec, to: url, useStreamingWriter: useStreamingWriter)
+            .holdingUserInitiatedActivity(reason: "Preparing video")
+    }
+
+    private static func exportProgressivelyUnscoped(_ spec: EditVideoRenderSpec, to url: URL, useStreamingWriter: Bool) -> Signal<PendingVideoRenderEvent, NoError> {
         return Signal { subscriber in
             guard url.standardizedFileURL != spec.url.standardizedFileURL else {
                 subscriber.putNext(.completed(false))
@@ -719,7 +724,7 @@ public enum EditVideoExport {
                 return EmptyDisposable
             }
             writer.startSession(atSourceTime: .zero)
-            let queue = DispatchQueue(label: "org.telegram.editVideo.streaming")
+            let queue = DispatchQueue(label: "org.telegram.editVideo.streaming", qos: .userInitiated)
             let remaining = Atomic<Int>(value: audioOutput == nil ? 1 : 2)
             let finish: () -> Void = {
                 guard !stopped.with({ $0 }), reader.status != .failed, reader.status != .cancelled else {
@@ -879,7 +884,7 @@ public enum EditVideoExport {
                 }
             }
             for (output, input, label) in pairs {
-                let queue = DispatchQueue(label: "org.telegram.editVideo.\(label)")
+                let queue = DispatchQueue(label: "org.telegram.editVideo.\(label)", qos: .userInitiated)
                 input.requestMediaDataWhenReady(on: queue) {
                     while input.isReadyForMoreMediaData {
                         var done = false
