@@ -1409,6 +1409,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     private func installNanogramDebugMenu() {
         let settings = NanogramDebugSettings.shared
         settings.register(SearchOperators.debugOption)
+        settings.register(CenteredChatHeader.debugOption)
         settings.register(LinkHygiene.stripOption)
         settings.register(LinkHygiene.confirmOption)
         settings.register(.choice(id: "display.maxFrameRate", section: "Display", title: "Frame-rate cap", detail: "Caps the shared display link that drives app animations.", options: [NanogramDebugChoice(id: "off", title: "Off"), NanogramDebugChoice(id: "60", title: "60 Hz"), NanogramDebugChoice(id: "30", title: "30 Hz")], defaultValue: "off"))

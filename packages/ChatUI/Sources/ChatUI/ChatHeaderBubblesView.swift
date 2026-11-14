@@ -252,7 +252,25 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
 
     var leftSideInset: CGFloat = sideInset
 
+    var centeredHeader = false
+
+    var hasInlinePinnedMessage = false
+    var compactTitle = false
     var updateHeaderLayout: ((ContainedViewLayoutTransition) -> Void)?
+    private var previousInlinePinnedFrame: NSRect?
+
+    func inlinePinnedMessageFrame(for width: CGFloat) -> NSRect? {
+        guard !centeredHeader, hasInlinePinnedMessage else { return nil }
+        let left = leftSideInset + (hasBackButton ? Self.bubbleHeight + Self.interBubbleSpacing : 0)
+        let right = width - Self.sideInset - rightCluster.desiredWidth(buttonSize: Self.bubbleHeight) - Self.interBubbleSpacing
+        let availableWidth = right - left
+        let minPinnedWidth: CGFloat = 280
+        guard availableWidth >= 260 + Self.interBubbleSpacing + minPinnedWidth else { return nil }
+        let maxCenterWidth = availableWidth - Self.interBubbleSpacing - minPinnedWidth
+        let centerWidth = titleView.textLayout == nil ? maxCenterWidth : min(maxCenterWidth, centerContentWidth)
+        let pinnedWidth = availableWidth - Self.interBubbleSpacing - centerWidth
+        return NSRect(x: right - pinnedWidth, y: Self.topInset, width: pinnedWidth, height: Self.bubbleHeight)
+    }
 
     private static let centerContentPadding: CGFloat = 4
     private static let avatarTextSpacing: CGFloat = 8
@@ -352,6 +370,8 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
     }
 
     private var searchHidden: Bool = false
+    var displaysInlineHeader: Bool = false
+    private var previousInlineHeaderFrame: NSRect?
     private var callHidden: Bool = true
     private var showActivities: Bool = false
 
@@ -1035,7 +1055,7 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
     private var appliedStatusTextKey: StatusTextKey?
 
     private func relayoutAnimatedIfContentWidthChanged(from before: CGFloat) {
-        guard before != centerContentWidth, titleView.textLayout != nil, let updateHeaderLayout else {
+        guard centeredHeader, before != centerContentWidth, titleView.textLayout != nil, let updateHeaderLayout else {
             return
         }
         updateHeaderLayout(.animated(duration: 0.2, curve: .easeOut))
@@ -1128,6 +1148,26 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         glassWrapper.setGhostFrame(ghost, frame: frame, transition: transition)
     }
 
+    func inlineHeaderFrame(for width: CGFloat) -> NSRect? {
+        guard !centeredHeader else { return nil }
+        let inDoneMode = menuMode == .done
+        let count = (callHidden || inDoneMode ? 0 : 1)
+            + (!showsForumSidebarButton || inDoneMode ? 0 : 1)
+            + (searchHidden || inDoneMode ? 0 : 1)
+            + (chatInteraction.mode == .preview || hidesForumMenuButton ? 0 : 1)
+        let clusterWidth = RightActionsCluster.desiredWidth(buttonSize: Self.bubbleHeight, count: count)
+        let left = leftSideInset + (hasBackButton ? Self.bubbleHeight + Self.interBubbleSpacing : 0)
+        let right = width - Self.sideInset - clusterWidth - (count > 0 ? Self.interBubbleSpacing : 0)
+        var titleWidth: CGFloat = titleView.textLayout?.attributedString.size().width ?? 0
+        titleWidth += statusControl?.frame.width ?? 0
+        titleWidth += leftStatusControl?.frame.width ?? 0
+        titleWidth += titleImageView?.image?.backingSize.width ?? 0
+        let statusWidth = statusView.textLayout?.attributedString.size().width ?? 0
+        let preferredWidth = max(titleWidth, statusWidth) + max(32, avatarControl.frame.width) + 30
+        let available = NSMakeRect(left, Self.topInset, max(0, right - left), Self.bubbleHeight)
+        return ChatHeaderInlineLayout.accessoryFrame(in: available, preferredTitleWidth: preferredWidth, spacing: Self.interBubbleSpacing)
+    }
+
     override func layout() {
         super.layout()
         updateLayout(size: frame.size, transition: .immediate)
@@ -1137,6 +1177,11 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         let bubbleHeight = Self.bubbleHeight
         let bubbleY = Self.topInset
         let spacing = Self.interBubbleSpacing
+        let inlineFrame = inlineHeaderFrame(for: size.width)
+        if previousInlineHeaderFrame != inlineFrame {
+            previousInlineHeaderFrame = inlineFrame
+            superview?.needsLayout = true
+        }
 
         let totalHeight = size.height + extendedContentHeight
         let wrapperFrame = NSRect(x: 0, y: 0, width: size.width, height: totalHeight)
@@ -1173,10 +1218,28 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         syncGhost(rightGhost, frame: clusterFrame, hidden: clusterCount == 0, transition: transition)
         let rightX: CGFloat = clusterX - (clusterCount > 0 ? spacing : 0)
 
-        let chatArea = NSRect(x: 0, y: bubbleY, width: size.width, height: bubbleHeight)
-        let titleContentWidth = titleView.textLayout == nil ? CGFloat.greatestFiniteMagnitude : centerContentWidth
-        let centerRect = ChatHeaderLayout.titleCapsuleFrame(chatArea: chatArea, leftReserved: leftX, rightReserved: size.width - rightX, contentWidth: titleContentWidth)
-        let centerWidth = centerRect.width
+        var centerRect: NSRect
+        let centerWidth: CGFloat
+        if centeredHeader {
+            let chatArea = NSRect(x: 0, y: bubbleY, width: size.width, height: bubbleHeight)
+            let titleContentWidth = titleView.textLayout == nil ? CGFloat.greatestFiniteMagnitude : centerContentWidth
+            centerRect = ChatHeaderLayout.titleCapsuleFrame(chatArea: chatArea, leftReserved: leftX, rightReserved: size.width - rightX, contentWidth: titleContentWidth)
+            centerWidth = centerRect.width
+        } else {
+            let inlinePinnedFrame = inlinePinnedMessageFrame(for: size.width)
+            if previousInlinePinnedFrame != inlinePinnedFrame {
+                previousInlinePinnedFrame = inlinePinnedFrame
+                superview?.needsLayout = true
+            }
+            let centerAvailableMinX = leftX
+            let centerAvailableMaxX = inlinePinnedFrame.map { $0.minX - spacing } ?? rightX
+            let maxCenterWidth = max(0, centerAvailableMaxX - centerAvailableMinX)
+            centerWidth = compactTitle && inlinePinnedFrame == nil && titleView.textLayout != nil ? min(maxCenterWidth, centerContentWidth) : maxCenterWidth
+            centerRect = NSRect(x: centerAvailableMinX, y: bubbleY, width: centerWidth, height: bubbleHeight)
+            if displaysInlineHeader, let inlineFrame {
+                centerRect.size.width = inlineFrame.minX - spacing - centerRect.minX
+            }
+        }
 
         let avatarSize: CGFloat = centerAvatarSize
         let horizontalContentPadding: CGFloat = Self.centerContentPadding

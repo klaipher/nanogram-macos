@@ -541,6 +541,14 @@ public class ChatControllerView : View, ChatInputDelegate {
             guard let self else { return }
             self.updateFrame(self.frame, inset: self.currentHeaderInset, transition: transition)
         }
+        bubblesView.centeredHeader = centeredHeader
+        centeredHeaderObservation = CenteredChatHeader.observe { [weak self] in
+            DispatchQueue.main.async {
+                guard let self, self.centeredHeader != CenteredChatHeader.isEnabled else { return }
+                self.centeredHeader = CenteredChatHeader.isEnabled
+                self.updateFrame(self.frame, inset: self.currentHeaderInset, transition: .animated(duration: 0.2, curve: .easeOut))
+            }
+        }
         inputView.delegate = self
         self.autoresizesSubviews = false
         tableView.autoresizingMask = []
@@ -1052,15 +1060,34 @@ public class ChatControllerView : View, ChatInputDelegate {
         return tableRect
     }
 
-    /// Height of the header column under the title capsule (the centred header keeps pinned and translate bars there).
+    private var centeredHeader = CenteredChatHeader.isEnabled
+    private var centeredHeaderObservation: AnyObject?
+
+    private func currentHeaderHeight(for width: CGFloat) -> CGFloat {
+        guard !centeredHeader else {
+            return header.state.height
+        }
+        return inlineHeaderFrame(for: width) != nil ? 0 : header.state.height - (bubblesView.inlinePinnedMessageFrame(for: width) == nil ? 0 : header.state.inlinePinnedHeight)
+    }
+
     private var headerHeight: CGFloat {
-        return header.state.height
+        return currentHeaderHeight(for: frame.width)
+    }
+
+    private func inlineHeaderFrame(for width: CGFloat) -> NSRect? {
+        guard !centeredHeader, !header.state.canDisplayPinnedInline, header.state.canDisplayInline, let frame = bubblesView.inlineHeaderFrame(for: width) else {
+            return nil
+        }
+        if case .search = header.state.main, frame.width < ChatHeaderInlineLayout.minimumSearchAccessoryWidth {
+            return nil
+        }
+        return frame
     }
 
     private var previousHeaderInsets: (stick: CGFloat, content: CGFloat)?
 
     private func updateHeaderInsets(width: CGFloat, animated: Bool) {
-        let height = header.state.height
+        let height = currentHeaderHeight(for: width)
         let bubbleHeight = ChatHeaderBubblesView.totalHeight
         let stick = bubbleHeight + height - header.state.toleranceHeight + (height > 0 ? 10 : 0)
         let content = bubbleHeight + ((chatInteraction.presentation.historyCount ?? 0) > 0 ? height : 0)
@@ -1102,8 +1129,14 @@ public class ChatControllerView : View, ChatInputDelegate {
 
         let bubbleBarHeight: CGFloat = ChatHeaderBubblesView.totalHeight
 
-        let headerHeight = header.state.height
+        bubblesView.centeredHeader = centeredHeader
+        bubblesView.hasInlinePinnedMessage = !centeredHeader && header.state.canDisplayPinnedInline
+        let inlinePinnedFrame = bubblesView.inlinePinnedMessageFrame(for: frame.width)
+        let inlineFrame = inlineHeaderFrame(for: frame.width)
+        let headerHeight = centeredHeader ? header.state.height : (inlineFrame != nil ? 0 : header.state.height - (inlinePinnedFrame == nil ? 0 : header.state.inlinePinnedHeight))
+        bubblesView.displaysInlineHeader = inlineFrame != nil
         bubblesView.extendedContentHeight = headerHeight
+        bubblesView.compactTitle = !centeredHeader && headerHeight == 0
         let bubblesFrame = NSMakeRect(headerInset.x, navigationOverflow, frame.width - headerInset.x, bubbleBarHeight)
         transition.updateFrame(view: bubblesView, frame: bubblesFrame)
         bubblesView.updateLayout(size: bubblesFrame.size, transition: transition)
@@ -1133,13 +1166,18 @@ public class ChatControllerView : View, ChatInputDelegate {
                 inset += 12 + monoforum_VerticalView.frame.width
             }
             
-            let accessoryColumn = ChatHeaderLayout.accessoryFrame(chatArea: NSMakeRect(0, 0, frame.width, headerHeight), leftReserved: inset + headerEdge, rightReserved: headerEdge, centered: header.state.fitsCenteredCapsule)
-            let headerFrame = NSMakeRect(accessoryColumn.minX, bubblesView.frame.maxY, accessoryColumn.width, headerHeight)
+            let headerFrame: NSRect
+            if centeredHeader {
+                let accessoryColumn = ChatHeaderLayout.accessoryFrame(chatArea: NSMakeRect(0, 0, frame.width, headerHeight), leftReserved: inset + headerEdge, rightReserved: headerEdge, centered: header.state.fitsCenteredCapsule)
+                headerFrame = NSMakeRect(accessoryColumn.minX, bubblesView.frame.maxY, accessoryColumn.width, headerHeight)
+            } else {
+                headerFrame = inlineFrame?.offsetBy(dx: headerInset.x, dy: navigationOverflow) ?? NSMakeRect(inset + headerEdge, bubblesView.frame.maxY, frame.width - inset - headerEdge * 2, headerHeight)
+            }
             header.measure(headerFrame.width)
 
             let headerTransition: ContainedViewLayoutTransition = header.hasLayout ? transition : .immediate
             headerTransition.updateFrame(view: currentView, frame: headerFrame)
-            header.updateLayout(size: headerFrame.size, containerFrame: headerFrame, transition: headerTransition)
+            header.updateLayout(size: headerFrame.size, containerFrame: headerFrame, inlinePinnedFrame: inlinePinnedFrame.map { $0.offsetBy(dx: 0, dy: navigationOverflow) }, transition: headerTransition)
         }
         
         updateHeaderInsets(width: frame.width, animated: transition.isAnimated)
@@ -1431,8 +1469,9 @@ public class ChatControllerView : View, ChatInputDelegate {
         let monoforumInset: CGFloat = interfaceState.monoforumState == .vertical && !forumSidebarMode ? 92 : 0
         state.measure(frame.width - monoforumInset - 24)
 
-        header.updateState(state, animated: animated, for: self, inset: monoforumInset, relativeView: header.monoforumView)
+        header.updateState(state, animated: animated, for: self, inset: monoforumInset, relativeView: header.monoforumView, mergeGlassOnRemoval: bubblesView.displaysInlineHeader)
 
+        bubblesView.hasInlinePinnedMessage = !centeredHeader && state.canDisplayPinnedInline
         updateHeaderInsets(width: frame.width, animated: animated)
 
         if superview != nil {
