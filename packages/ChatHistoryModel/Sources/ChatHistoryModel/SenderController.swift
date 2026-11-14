@@ -525,10 +525,7 @@ public class Sender: NSObject {
                 attrs.append(.Sticker(displayText: "", packReference: nil, maskData: nil))
             }
         } else if mime.hasPrefix("image/webp") {
-            var size: NSSize = NSMakeSize(512, 512)
-            if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
-                size = convertFromWebP(data)?.size ?? size
-            }
+            let size: NSSize = PhotoSourceReading.pixelSize(at: path) ?? NSMakeSize(512, 512)
             
             attrs.append(TelegramMediaFileAttribute.ImageSize(size: size.pixel))
             attrs.append(TelegramMediaFileAttribute.FileName(fileName: path.nsstring.lastPathComponent))

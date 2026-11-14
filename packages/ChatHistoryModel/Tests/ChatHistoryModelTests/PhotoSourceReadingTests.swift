@@ -54,5 +54,19 @@ final class PhotoSourceReadingTests: XCTestCase {
 
     func testMissingFileHasNoSource() {
         XCTAssertNil(PhotoSourceReading.source(at: "/nonexistent/\(UUID().uuidString).jpg"))
+        XCTAssertNil(PhotoSourceReading.pixelSize(at: "/nonexistent/\(UUID().uuidString).webp"))
+    }
+
+    func testPixelSizeOfPNG() throws {
+        let url = try writeImage(width: 321, height: 123, type: .png)
+        XCTAssertEqual(PhotoSourceReading.pixelSize(at: url.path), CGSize(width: 321, height: 123))
+    }
+
+    func testPixelSizeOfWebP() throws {
+        let data = try XCTUnwrap(Data(base64Encoded: "UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA=="))
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("tiny-\(UUID().uuidString).webp")
+        try data.write(to: url)
+        created.append(url)
+        XCTAssertEqual(PhotoSourceReading.pixelSize(at: url.path), CGSize(width: 1, height: 1))
     }
 }
