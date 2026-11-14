@@ -4,16 +4,6 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
-- MACOS-DRAG-1 (flagged, default off): dragging media out of a chat can use `NSFilePromiseProvider` (`ChatMediaFilePromise`) instead of the temp copy plus the legacy `kFilenames` pasteboard type. The drag starts at once, also for media that is not downloaded yet: the promise fetches it, waits for the complete resource and copies (a clone on APFS) to the destination the receiver gives, off the main thread; nothing is left in the temp folder. Same drag image and threshold; the old path stays for flag off and when the promise cannot start. Enable with `defaults write <bundle id> nanogram.experimental.mediaFilePromiseDrag -bool YES`. Re-test drops on Finder, Mail, browsers and Photos. Test: ChatUITests `ChatMediaFilePromiseTests`.
-
-- MACOS-MEDIA-1 (flagged, default off): `Signal.coalescedProgress` in TelegramMediaUtils (`ProgressCoalescer`: pure, testable) rate-limits `.Fetching` / `.Remote` / upload progress to 30 Hz and 1% steps with a trailing flush; `.Local`, `.Paused`, active/inactive changes and 100% pass at once and drop pending progress. Applied at the sources, `chatMessageFileStatus`, `chatMessagePhotoStatus` and the `getUpdatingMediaProgress` combine in `ChatInteractiveContentView` and `ChatFileContentView`, before `deliverOnMainQueue`. Enable with `defaults write <bundle id> nanogram.experimental.coalescedMediaProgress -bool YES` (read at subscribe). Measure status `next()` per second first. Test: ChatUITests `CoalescedProgressTests`.
-
-- MACOS-IMG-1 (flagged, default off): decoded-photo cache limits can scale with physical memory (`PhotoCacheSizing`): photos `memory/256` clamped to 24...96 MB (under the 120 MB DrawingContext cap), thumbs `memory/1024` clamped to 6...24 MB, photos closed-chat grace 60 s instead of 15 s. Memory-pressure purge and idle sweeps unchanged. Enable with `defaults write <bundle id> nanogram.experimental.scaledImageCaches -bool YES` (read at launch). Decide the default from the cache hit/miss counters first. Test: TelegramTheme `PhotoCacheSizingTests`.
-
-- MACOS-LIST-1 (flagged, default off): `TableView.layoutItems` (end of live resize, split-view drag) can relayout in two phases: rows in the visible range plus 600 pt are measured and updated at once, one `noteHeightOfRows` covers the whole table, the other rows are measured in chunks of 20 on following main-queue turns, nearest first, with `saveScrollState` after each. Enable with `defaults write <bundle id> nanogram.experimental.deferredResizeRelayout -bool YES`. Plan in `TableRelayoutPlan`; tests in TGUIKit `TableRelayoutTests`. Off by default until the chat-at-bottom/anchor resize checks and Hangs numbers are in.
-
-- MACOS-LIST-2 (fixed): `TableView.remove(range:)` removed every second row and told NSTableView about the whole range; it now removes in reverse over the clamped range with one `removeRows`. No caller yet. Test: TGUIKit `TableRelayoutTests`.
-
 ## 13.2.0 (202611132157) — 2026-11-13
 
 Source: `nanogram/integration` @ 82fbeb79 · core `klaipher/nanogram` `main` @ 466d8350 (was 25edb39c at the last release; iOS TestFlight 202611132038 is 3c4e6399, plus 466d8350) · widget-sandbox and the core's untracked `submodules/rlottie` unchanged from the last release (BUILD-INFO says "dirty yes" because of them only).
