@@ -1,0 +1,1 @@
+../TelegramTheme/PhotoCacheSizing.swift
