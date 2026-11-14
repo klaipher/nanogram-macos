@@ -21,6 +21,7 @@ public final class NanogramDebugMenu: NSObject {
         let menu = NanogramDebugMenu(openDeveloperScreen: openDeveloperScreen)
         if let mainMenu = NSApp.mainMenu {
             menu.install(in: mainMenu)
+            NanogramReportMenu.install(in: mainMenu)
         }
         installed = menu
     }

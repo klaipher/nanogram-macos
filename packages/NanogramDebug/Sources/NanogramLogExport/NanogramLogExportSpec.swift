@@ -1,6 +1,7 @@
 import Foundation
 
 public enum NanogramLogExportKind: String, CaseIterable, Equatable, Sendable {
+    case fullReport
     case appLogs
     case callLogs
     case crashReports
@@ -51,8 +52,18 @@ public struct NanogramLogExportSpec: Equatable, Sendable {
         switch self.kind {
         case .crashReports:
             return "Crash reports aren't available in the App Store edition." //TODOLANG
-        case .appLogs, .callLogs, .metricKit:
+        case .appLogs, .callLogs, .metricKit, .fullReport:
             return "\(self.what) aren't available in this edition." //TODOLANG
+        }
+    }
+
+    /// One line shown before sending, for the report that bundles everything.
+    public var includedNote: String? {
+        switch self.kind {
+        case .fullReport:
+            return NanogramReport.includedNote
+        case .appLogs, .callLogs, .crashReports, .metricKit:
+            return nil
         }
     }
 
@@ -65,7 +76,7 @@ public struct NanogramLogExportSpec: Equatable, Sendable {
         switch self.kind {
         case .metricKit:
             return [logsDirectory.appendingPathComponent(NanogramLogExportSpec.diskWriteLedgerFileName)]
-        case .appLogs, .callLogs, .crashReports:
+        case .appLogs, .callLogs, .crashReports, .fullReport:
             return []
         }
     }
@@ -78,6 +89,11 @@ public struct NanogramLogExportSpec: Equatable, Sendable {
         let subjectWhat: String
         let tag: String
         switch kind {
+        case .fullReport:
+            self.what = "Report" //TODOLANG
+            subjectWhat = "report" //TODOLANG
+            tag = "report"
+            self.packaging = .archive
         case .appLogs:
             self.what = "App Logs" //TODOLANG
             subjectWhat = "logs" //TODOLANG

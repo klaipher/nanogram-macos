@@ -11,6 +11,7 @@ import ShareUI
 import CrashReports
 import ApiCredentials
 import NanogramLogExport
+import NanogramDebug
 
 let nanogramCrashReportStore = CrashReportStore(handledKey: "crashReports.handledUntil." + ApiEnvironment.prefix)
 
@@ -18,7 +19,7 @@ func nanogramLogExportKindIsAvailable(_ kind: NanogramLogExportKind) -> Bool {
     switch kind {
     case .crashReports:
         return nanogramCrashReportStore.isAvailable
-    case .appLogs, .callLogs, .metricKit:
+    case .appLogs, .callLogs, .metricKit, .fullReport:
         return true
     }
 }
@@ -147,6 +148,33 @@ private func currentLogExportContext() -> AccountContext? {
 @MainActor
 private func nanogramLogCollector(_ kind: NanogramLogExportKind) -> NanogramLogCollector {
     switch kind {
+    case .fullReport:
+        let logs = ApiEnvironment.containerURL?.appendingPathComponent("logs", isDirectory: true)
+        let callDirectories = currentLogExportContext().map { context in
+            return [callLogsPath(account: context.account), groupCallLogsPath(account: context.account)].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        } ?? []
+        let settings = NanogramDebugSettings.shared
+        let settingsLines = NanogramReport.settingsLines(settings.options.map { option in
+            switch option.kind {
+            case .toggle:
+                return (option.id, settings.bool(option.id) ? "on" : "off")
+            case .choice:
+                return (option.id, settings.choice(option.id) ?? "default")
+            }
+        })
+        return {
+            let sections = [
+                NanogramReportSection(folder: "logs", title: "App logs and critical logs", sources: logs.map { [$0] } ?? []),
+                NanogramReportSection(folder: "call-logs", title: "Call logs", sources: callDirectories),
+                NanogramReportSection(folder: "crash-reports", title: "Crash and hang reports", sources: nanogramCrashReportStore.allReports().map { $0.url }),
+                NanogramReportSection(folder: "metrickit", title: "MetricKit reports", sources: MetricReportStore.shared.reports().map { URL(fileURLWithPath: $0.path) }),
+            ]
+            let staging = NanogramLogExportFiles.stagingRoot(under: NanogramLogExportFiles.defaultRoot())
+            guard let staged = try? NanogramReport.stage(device: NanogramReportDevice.current(), sections: sections, settings: settingsLines, in: staging) else {
+                return []
+            }
+            return [staged]
+        }
     case .appLogs:
         let logs = ApiEnvironment.containerURL?.appendingPathComponent("logs", isDirectory: true)
         return {

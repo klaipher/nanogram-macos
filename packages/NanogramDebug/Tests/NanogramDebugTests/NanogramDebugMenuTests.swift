@@ -76,7 +76,7 @@ final class NanogramDebugMenuTests: XCTestCase {
     @MainActor
     func testWindowListsEveryLogExport() {
         let controller = NanogramDebugWindowController(settings: makeSettings().0)
-        XCTAssertEqual(NanogramLogExportKind.allCases.compactMap { controller.logButton(for: $0)?.title }, ["Send App Logs…", "Send Call Logs…", "Send Crash Reports…", "Send MetricKit Reports…"])
+        XCTAssertEqual(NanogramLogExportKind.allCases.compactMap { controller.logButton(for: $0)?.title }, ["Send Report…", "Send App Logs…", "Send Call Logs…", "Send Crash Reports…", "Send MetricKit Reports…"])
         let gate = NanogramLogExportGate.shared
         XCTAssertTrue(gate.begin())
         XCTAssertFalse(controller.logButton(for: .appLogs)?.isEnabled ?? true)

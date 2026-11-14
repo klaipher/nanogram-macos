@@ -206,7 +206,7 @@ final class NanogramLogExportDeliveryTests: XCTestCase {
     @MainActor
     func testAnUnavailableKindSaysWhy() {
         let recorder = DeliveryRecorder()
-        self.install(recorder, availableKinds: [.appLogs, .callLogs, .metricKit])
+        self.install(recorder, availableKinds: [.fullReport, .appLogs, .callLogs, .metricKit])
         NanogramLogExportFlow.present(kind: .crashReports, window: nil, anchor: nil, collect: nil, onDelivered: nil)
         XCTAssertEqual(recorder.messages, ["Crash reports aren't available in the App Store edition."])
         XCTAssertFalse(NanogramLogExportGate.shared.isRunning)
@@ -215,9 +215,9 @@ final class NanogramLogExportDeliveryTests: XCTestCase {
     @MainActor
     func testDebugWindowOffersOnlyAvailableExports() {
         let recorder = DeliveryRecorder()
-        self.install(recorder, availableKinds: [.appLogs, .callLogs, .metricKit])
+        self.install(recorder, availableKinds: [.fullReport, .appLogs, .callLogs, .metricKit])
         let controller = NanogramDebugWindowController()
-        XCTAssertEqual(NanogramLogExportKind.allCases.compactMap { controller.logButton(for: $0)?.title }, ["Send App Logs…", "Send Call Logs…", "Send MetricKit Reports…"])
+        XCTAssertEqual(NanogramLogExportKind.allCases.compactMap { controller.logButton(for: $0)?.title }, ["Send Report…", "Send App Logs…", "Send Call Logs…", "Send MetricKit Reports…"])
         XCTAssertEqual(controller.logNotes, ["Crash reports aren't available in the App Store edition."])
     }
 
@@ -225,7 +225,7 @@ final class NanogramLogExportDeliveryTests: XCTestCase {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         var paths = ["Telegram-Mac/packages-integration/hooks/NanogramLogExportHooksInstall.swift"]
         let exportDirectory = "packages/NanogramDebug/Sources/NanogramLogExport"
-        for name in try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(exportDirectory).path) where name.hasSuffix(".swift") {
+        for name in try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(exportDirectory).path) where name.hasSuffix(".swift") && name != "NanogramReportReadme.swift" {
             paths.append(exportDirectory + "/" + name)
         }
         let literal = try NSRegularExpression(pattern: "\"((?:[^\"\\\\]|\\\\.)*)\"")

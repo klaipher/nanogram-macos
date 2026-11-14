@@ -161,3 +161,10 @@ not re-verified against the code; correct them on the next change in that area.
 - Sync: re-apply the policy calls in `VideoRecorderPipeline` (init, `_configureFps`, `configureRecorderTracks`, `writerSide`) after a merge.
 
 - libopus builds from the core's xiph/opus v1.6.1 submodule with CMake + Ninja and the shared option file `opus-cmake-args.sh` (NEON presumed), floating point (was fixed-point); libwebp builds with Ninja (2026-11-14). Where: `core-xprojects/libopus`, `core-xprojects/libwebp`. Upstream: no. Sync: keep ours.
+
+## One Send Report button (macOS)
+- What: Help > Send Report… bundles app logs with critical logs, call logs, crash and hang reports, MetricKit reports and debug-switch values into one zip with a README (Mac model, chip, macOS, app build). A note before sending lists what is included; no messages, contacts or phone numbers. The crash card and the Developer screen use it too; the four fine-grained exports stay in the debug windows only.
+- Where: `packages/NanogramDebug` (`NanogramReport.swift`, `NanogramReportReadme.swift`, `NanogramReportMenu.swift`, the `fullReport` kind) and the hooks in `Telegram-Mac/packages-integration/hooks`.
+- Upstream: no, Nanogram-only.
+- Sync: none beyond keeping the hook installs.
+

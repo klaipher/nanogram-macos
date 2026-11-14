@@ -29,7 +29,7 @@ final class NanogramLogExportTests: XCTestCase {
         let logs = URL(fileURLWithPath: "/tmp/container/logs", isDirectory: true)
         let metricKit = NanogramLogExportSpec(kind: .metricKit, appVersion: self.version, buildNumber: self.build)
         XCTAssertEqual(metricKit.ledgerSources(logsDirectory: logs).map { $0.path }, ["/tmp/container/logs/disk-writes.json"])
-        for kind in [NanogramLogExportKind.appLogs, .callLogs, .crashReports] {
+        for kind in [NanogramLogExportKind.appLogs, .callLogs, .crashReports, .fullReport] {
             let spec = NanogramLogExportSpec(kind: kind, appVersion: self.version, buildNumber: self.build)
             XCTAssertEqual(spec.ledgerSources(logsDirectory: logs), [], "\(kind)")
         }
@@ -190,7 +190,8 @@ final class NanogramLogExportTests: XCTestCase {
                 }
             }
         }
-        XCTAssertTrue(sources["Telegram-Mac/packages-integration/hooks/ChatListUIHooksInstall.swift", default: ""].contains("NanogramLogExport.present(kind: .crashReports"))
+        XCTAssertTrue(sources["Telegram-Mac/packages-integration/hooks/ChatListUIHooksInstall.swift", default: ""].contains("NanogramLogExport.present(kind: .fullReport"))
+        XCTAssertTrue(sources["Telegram-Mac/packages-integration/hooks/DeveloperHooksInstall.swift", default: ""].contains("NanogramLogExport.present(kind: .fullReport"))
         XCTAssertTrue(sources["packages/SettingsUI/Sources/SettingsUI/GeneralSettingsViewController.swift", default: ""].contains("DeveloperHooks.shared.sendLogs"))
         XCTAssertTrue(sources["packages/SettingsUI/Sources/SettingsUI/DeveloperViewController.swift", default: ""].contains("DeveloperHooks.shared.logExports"))
     }

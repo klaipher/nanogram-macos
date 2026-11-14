@@ -20,7 +20,7 @@ func installDeveloperUIHooks() {
             })
         },
         sendLogs: { window in
-            NanogramLogExport.present(kind: .appLogs, window: window)
+            NanogramLogExport.present(kind: .fullReport, window: window)
         }
     ))
 }

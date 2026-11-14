@@ -98,6 +98,11 @@ enum NanogramLogExportFlow {
         let header = NSMenuItem(title: spec.menuTitle, action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
+        if let note = spec.includedNote {
+            let noteItem = NSMenuItem(title: note, action: nil, keyEquivalent: "")
+            noteItem.isEnabled = false
+            menu.addItem(noteItem)
+        }
         menu.addItem(.separator())
         for destination in nanogramLogExportDestinations(canSendInApp: hooks.canSendInApp()) {
             let handler = NanogramLogMenuHandler {
@@ -158,7 +163,11 @@ enum NanogramLogExportFlow {
             return .failed(error.localizedDescription)
         }
         do {
-            let files = try NanogramLogExportFiles.prepare(spec: spec, sources: collect(), in: directory)
+            let sources = collect()
+            defer {
+                NanogramLogExportFiles.removeStaged(sources, root: root)
+            }
+            let files = try NanogramLogExportFiles.prepare(spec: spec, sources: sources, in: directory)
             if files.isEmpty {
                 try? FileManager.default.removeItem(at: directory)
                 return .nothing

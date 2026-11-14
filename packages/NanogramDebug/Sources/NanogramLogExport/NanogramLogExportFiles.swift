@@ -53,6 +53,17 @@ public enum NanogramLogExportFiles {
         }
     }
 
+    public static func stagingRoot(under root: URL) -> URL {
+        return root.appendingPathComponent("staging", isDirectory: true)
+    }
+
+    public static func removeStaged(_ sources: [URL], root: URL) {
+        let prefix = stagingRoot(under: root).standardizedFileURL.path + "/"
+        for source in sources where source.standardizedFileURL.path.hasPrefix(prefix) {
+            try? FileManager.default.removeItem(at: source)
+        }
+    }
+
     static func regularFiles(in url: URL) -> [URL] {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
