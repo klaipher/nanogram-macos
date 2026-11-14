@@ -74,6 +74,37 @@ class BuildEnvironmentTests(unittest.TestCase):
         env = frameworks.build_environment(Path("/tmp/timing.tsv"), base={"MAKEFLAGS": "-j2"})
         self.assertEqual(env["MAKEFLAGS"], "-j2")
 
+    def ccache_env(self, base, found="/opt/homebrew/bin/ccache"):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(config, "CACHE_DIR", Path(tmp)), \
+                mock.patch.object(frameworks.shutil, "which", return_value=found):
+            return frameworks.build_environment(Path("/tmp/timing.tsv"), base=base), Path(tmp)
+
+    def test_cmake_builds_get_ccache_when_installed(self):
+        env, cache = self.ccache_env({})
+        for key in frameworks.CCACHE_LAUNCHERS:
+            self.assertEqual(env[key], "/opt/homebrew/bin/ccache")
+        self.assertEqual(env["CCACHE_DIR"], str(cache / "ccache"))
+        self.assertEqual(env["CCACHE_MAXSIZE"], "3G")
+        self.assertEqual(env["CCACHE_COMPRESS"], "1")
+        self.assertEqual(env["CCACHE_BASEDIR"], str(config.ROOT))
+
+    def test_no_ccache_variables_without_ccache(self):
+        env, _ = self.ccache_env({}, found=None)
+        for key in (*frameworks.CCACHE_LAUNCHERS, "CCACHE_DIR", "CCACHE_MAXSIZE"):
+            self.assertNotIn(key, env)
+
+    def test_callers_ccache_settings_win(self):
+        env, _ = self.ccache_env({"CCACHE_DIR": "/x", "CMAKE_C_COMPILER_LAUNCHER": "sccache"})
+        self.assertEqual(env["CCACHE_DIR"], "/x")
+        self.assertEqual(env["CMAKE_C_COMPILER_LAUNCHER"], "sccache")
+
+    def test_dev_profile_cargo_runs_carry_no_debuginfo_or_incremental_state(self):
+        env = frameworks.build_environment(Path("/tmp/timing.tsv"), base={})
+        self.assertEqual(env["CARGO_PROFILE_DEV_DEBUG"], "0")
+        self.assertEqual(env["CARGO_INCREMENTAL"], "0")
+        env = frameworks.build_environment(Path("/tmp/timing.tsv"), base={"CARGO_INCREMENTAL": "1"})
+        self.assertEqual(env["CARGO_INCREMENTAL"], "1")
+
     def test_conditional_settings_are_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:
             xcconfig = Path(tmp) / "a.xcconfig"

@@ -85,10 +85,34 @@ def build_environment(timing_log: Path, base: dict[str, str] | None = None) -> d
     env["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
     env.setdefault("MAKEFLAGS", f"-j{os.cpu_count()}")
     env["BUILD_TIMING_LOG"] = str(timing_log)
+    # wallet-engine's xtask (Swift binding generation) is the only dev-profile cargo run; the release
+    # staticlibs ignore these. Debuginfo and incremental state only cost disk there.
+    env.setdefault("CARGO_PROFILE_DEV_DEBUG", "0")
+    env.setdefault("CARGO_INCREMENTAL", "0")
+    add_ccache(env)
     env["PATH"] = f"{config.RUSTUP_BIN}:{env.get('PATH', '/usr/bin:/bin')}"
     env["TMPDIR"] = str(scratch_dir())
     Path(env["TMPDIR"]).mkdir(parents=True, exist_ok=True)
     return env
+
+
+CCACHE_LAUNCHERS = ("CMAKE_C_COMPILER_LAUNCHER", "CMAKE_CXX_COMPILER_LAUNCHER",
+                    "CMAKE_OBJC_COMPILER_LAUNCHER", "CMAKE_OBJCXX_COMPILER_LAUNCHER")
+
+
+def add_ccache(env: dict[str, str]) -> None:
+    """Compiler caching for the CMake-built libraries (tg_owt, tde2e, libjpeg-turbo): CMake 3.17+ seeds
+    CMAKE_<LANG>_COMPILER_LAUNCHER from these variables and every build here configures fresh. No-op without
+    ccache. Output is what a normal compile gives, so the framework stamps and cache keys stay valid."""
+    ccache = shutil.which("ccache", path=env.get("PATH"))
+    if not ccache:
+        return
+    for key in CCACHE_LAUNCHERS:
+        env.setdefault(key, ccache)
+    env.setdefault("CCACHE_DIR", str(Path(config.CACHE_DIR) / "ccache"))
+    env.setdefault("CCACHE_MAXSIZE", "3G")
+    env.setdefault("CCACHE_COMPRESS", "1")
+    env.setdefault("CCACHE_BASEDIR", str(config.ROOT))
 
 
 def scratch_dir() -> Path:
