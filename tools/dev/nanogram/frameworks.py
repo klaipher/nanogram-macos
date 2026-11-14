@@ -101,9 +101,11 @@ CCACHE_LAUNCHERS = ("CMAKE_C_COMPILER_LAUNCHER", "CMAKE_CXX_COMPILER_LAUNCHER",
 
 
 def add_ccache(env: dict[str, str]) -> None:
-    """Compiler caching for the CMake-built libraries (tg_owt, tde2e, libjpeg-turbo): CMake 3.17+ seeds
+    """Compiler caching for the CMake-built libraries (tg_owt, tde2e, libjpeg-turbo, libwebp): CMake 3.17+ seeds
     CMAKE_<LANG>_COMPILER_LAUNCHER from these variables and every build here configures fresh. No-op without
-    ccache. Output is what a normal compile gives, so the framework stamps and cache keys stay valid."""
+    ccache. CCACHE_BASEDIR makes ccache rewrite absolute paths under the checkout to relative ones, so __FILE__
+    (RTC_LOG, td LOG/CHECK) differs from a plain compile; functionally harmless, and it drops the home path from
+    the binary. The framework stamps therefore carry `ccache=on|off` (scripts/framework-inputs.sh)."""
     ccache = shutil.which("ccache", path=env.get("PATH"))
     if not ccache:
         return

@@ -74,11 +74,22 @@ framework_tool_version() {
     fi
 }
 
+# ccache rewrites absolute paths under CCACHE_BASEDIR to checkout-relative ones, so __FILE__ in the objects differs
+# from a plain compile. One cache key must not map to both byte variants: record which one built the library.
+framework_ccache_state() {
+    if command -v ccache >/dev/null 2>&1; then echo "ccache=on"; else echo "ccache=off"; fi
+}
+
 framework_extra_fingerprint() {
     case "$1" in
         webrtc|tde2e|mozjpeg)
             framework_tool_version cmake --version
             framework_tool_version ninja --version
+            framework_ccache_state
+            ;;
+        libwebp)
+            framework_tool_version cmake --version
+            framework_ccache_state
             ;;
         dav1d)
             framework_tool_version meson --version
