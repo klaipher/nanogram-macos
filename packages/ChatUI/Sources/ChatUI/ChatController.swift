@@ -1052,6 +1052,11 @@ public class ChatControllerView : View, ChatInputDelegate {
         return tableRect
     }
 
+    /// Height of the header column under the title capsule (the centred header keeps pinned and translate bars there).
+    private var headerHeight: CGFloat {
+        return header.state.height
+    }
+
     private var previousHeaderInsets: (stick: CGFloat, content: CGFloat)?
 
     private func updateHeaderInsets(width: CGFloat, animated: Bool) {

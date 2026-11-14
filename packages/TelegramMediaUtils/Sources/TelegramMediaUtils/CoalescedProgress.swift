@@ -183,3 +183,12 @@ public extension Signal where T == Float? {
         return coalescedProgress(classify: ProgressSample.of(updating:))
     }
 }
+
+/// Pipe forms for `signal |> coalescedStatusProgress()`, the style of the ChatUI call sites.
+public func coalescedStatusProgress<E>() -> (Signal<MediaResourceStatus, E>) -> Signal<MediaResourceStatus, E> {
+    return { signal in signal.coalescedStatusProgress() }
+}
+
+public func coalescedUpdatingProgress<E>() -> (Signal<Float?, E>) -> Signal<Float?, E> {
+    return { signal in signal.coalescedUpdatingProgress() }
+}
