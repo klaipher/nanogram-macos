@@ -335,7 +335,57 @@ public class ChatMediaContentView: Control, NSDraggingSource, NSPasteboardItemDa
     }
     
     
+    private var filePromise: ChatMediaFilePromise?
+
+    private func beginFilePromiseDrag(with event: NSEvent) -> Bool {
+        guard let context = context, let rawContents = contents, CFGetTypeID(rawContents as CFTypeRef) == CGImage.typeID else {
+            return false
+        }
+        let cgImage = unsafeBitCast(rawContents, to: CGImage.self)
+        var resource: MediaResource?
+        var fetch: Signal<Void, NoError>?
+        if let image = media as? TelegramMediaImage {
+            if let largest = largestImageRepresentation(image.representations), let parent = parent {
+                resource = largest.resource
+                let imageReference = ImageMediaReference.message(message: MessageReference(parent), media: image)
+                fetch = fetchedMediaResource(mediaBox: context.account.postbox.mediaBox, userLocation: imageReference.userLocation, userContentType: imageReference.userContentType, reference: imageReference.resourceReference(largest.resource), range: nil, statsCategory: .image)
+                |> `catch` { _ in return .complete() }
+                |> map { _ in }
+            }
+        } else {
+            resource = mediaResource(from: media)
+            if let parent = parent, self.fetchStatus != .Local, let file = media as? TelegramMediaFile {
+                fetch = chatMessageFileInteractiveFetched(account: context.account, fileReference: FileMediaReference.message(message: MessageReference(parent), media: file)) |> map { _ in }
+            }
+        }
+        guard let resource = resource else {
+            return false
+        }
+        let mimeType = mediaResourceMIMEType(from: media)
+        let name = ChatMediaPromiseNaming.fileName(preferred: (media as? TelegramMediaFile)?.fileName, mimeType: mimeType, fallbackStem: ChatMediaPromiseNaming.fallbackStem(isImage: media is TelegramMediaImage, date: Date()))
+
+        let promise = ChatMediaFilePromise(fileName: name, mediaBox: context.account.postbox.mediaBox, resource: resource, fetch: fetch)
+        filePromise = promise
+
+        let provider = NSFilePromiseProvider(fileType: ChatMediaPromiseNaming.fileType(mimeType: mimeType), delegate: promise)
+        let image = NSImage(cgImage: cgImage, size: contentFrame.size)
+        let item = NSDraggingItem(pasteboardWriter: provider)
+        item.setDraggingFrame(contentFrame, contents: image)
+        beginDraggingSession(with: [item], event: event, source: self)
+        inDragging = true
+        return true
+    }
+
     public override func mouseDragged(with event: NSEvent) {
+        if ModernizationFlag.mediaFilePromiseDrag.isEnabled, !inDragging, acceptDragging {
+            let current = convert(event.locationInWindow, from: nil)
+            guard abs(mouseDownPoint.x - current.x) > 10 || abs(mouseDownPoint.y - current.y) > 10 else {
+                return
+            }
+            if beginFilePromiseDrag(with: event) {
+                return
+            }
+        }
         if self.fetchStatus == .Local {
             if !inDragging && acceptDragging {
                 let current = convert(event.locationInWindow, from: nil)

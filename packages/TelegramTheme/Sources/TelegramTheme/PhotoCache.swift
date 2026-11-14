@@ -434,8 +434,9 @@ private let minute: TimeInterval = 60
 private let closedScreenGrace: TimeInterval = 15
 
 private let peerPhotoCache = ScopedImageCache(name: "peerPhotos", countLimit: 200, byteLimit: 8 * megabyte, idleTimeout: 10 * minute, closedScopeGrace: closedScreenGrace)
-private let photosCache = ScopedImageCache(name: "photos", countLimit: 200, byteLimit: 24 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
-private let photoThumbsCache = ScopedImageCache(name: "photoThumbs", countLimit: 200, byteLimit: 6 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
+private let photoCacheSizing = PhotoCacheSizing.current()
+private let photosCache = ScopedImageCache(name: "photos", countLimit: 200, byteLimit: photoCacheSizing.photosByteLimit, idleTimeout: 5 * minute, closedScopeGrace: photoCacheSizing.photosClosedScopeGrace)
+private let photoThumbsCache = ScopedImageCache(name: "photoThumbs", countLimit: 200, byteLimit: photoCacheSizing.photoThumbsByteLimit, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
 private let themeThums = ScopedImageCache(name: "themeThumbs", countLimit: 200, byteLimit: 3 * megabyte, idleTimeout: 5 * minute, closedScopeGrace: closedScreenGrace)
 private let wallpaperCache = WallpaperCache(20)
 

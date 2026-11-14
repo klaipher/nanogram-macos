@@ -2305,22 +2305,81 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
     
     private var needsLayouItemsOnNextTransition:Bool = false
    
+    private var relayoutGeneration: Int = 0
+    private static let relayoutChunkSize = 20
+    private static let relayoutMargin: CGFloat = 600
+
     public func layoutItems() {
 
         let visibleItems = self.visibleItems()
         
+        if ModernizationFlag.deferredResizeRelayout.isEnabled {
+            layoutItemsInPhases(visibleItems: visibleItems)
+        } else {
+            self.beginTableUpdates()
+            self.enumerateItems { item in
+                _ = item.makeSize(frame.width, oldWidth: item.width)
+                reloadData(row: item.index, animated: false)
+                return true
+            }
+            self.endTableUpdates()
+            
+            self.saveScrollState(visibleItems)
+        }
+        
+        self.needsLayouItemsOnNextTransition = false
+    }
+    
+    private func layoutItemsInPhases(visibleItems: [(TableRowItem,CGFloat,CGFloat)]) {
+        relayoutGeneration += 1
+        let generation = relayoutGeneration
+        let plan = TableRelayoutPlan(count: list.count, visible: visibleRows(TableView.relayoutMargin), chunkSize: TableView.relayoutChunkSize)
+        
         self.beginTableUpdates()
-        self.enumerateItems { item in
+        for index in plan.immediate {
+            let item = list[index]
             _ = item.makeSize(frame.width, oldWidth: item.width)
-            reloadData(row: item.index, animated: false)
-            return true
+            reloadData(row: index, animated: false, notesHeight: false)
+        }
+        if !list.isEmpty {
+            self.tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0 ..< list.count))
         }
         self.endTableUpdates()
         
-        
         self.saveScrollState(visibleItems)
         
-        self.needsLayouItemsOnNextTransition = false
+        let deferred = plan.deferredChunks.map { chunk in chunk.map { list[$0] } }
+        measureDeferredChunks(deferred, generation: generation)
+    }
+    
+    private func measureDeferredChunks(_ chunks: [[TableRowItem]], generation: Int) {
+        guard generation == relayoutGeneration, let chunk = chunks.first else {
+            return
+        }
+        let rest = Array(chunks.dropFirst())
+        let anchor = self.visibleItems()
+        
+        var indexes = IndexSet()
+        self.beginTableUpdates()
+        for item in chunk {
+            guard let index = item._index, index < list.count, list[index] === item else {
+                continue
+            }
+            _ = item.makeSize(frame.width, oldWidth: item.width)
+            reloadData(row: index, animated: false, notesHeight: false)
+            indexes.insert(index)
+        }
+        if !indexes.isEmpty {
+            self.tableView.noteHeightOfRows(withIndexesChanged: indexes)
+        }
+        self.endTableUpdates()
+        self.saveScrollState(anchor)
+        
+        if !rest.isEmpty {
+            DispatchQueue.main.async { [weak self] in
+                self?.measureDeferredChunks(rest, generation: generation)
+            }
+        }
     }
     
     public override var _mouseDownCanMoveWindow: Bool {
@@ -2900,7 +2959,7 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
     
     
     
-    public func reloadData(row:Int, animated:Bool = false, options: NSTableView.AnimationOptions = .effectFade, presentAsNew: Bool = false, animateIfAlreadyAnimating: Bool = true) -> Void {
+    public func reloadData(row:Int, animated:Bool = false, options: NSTableView.AnimationOptions = .effectFade, presentAsNew: Bool = false, animateIfAlreadyAnimating: Bool = true, notesHeight: Bool = true) -> Void {
         if let view = self.viewNecessary(at: row) {
             let item = self.item(at: row)
             
@@ -2922,10 +2981,15 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
                 transition.updateFrame(view: view, frame: rect)
                 NSAnimationContext.current.duration = animated ? duration : 0.0
                 NSAnimationContext.current.timingFunction = animated ? CAMediaTimingFunction(name: .easeOut) : nil
-                self.tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integer: row))
+                if notesHeight {
+                    self.tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integer: row))
+                }
                 
                 return
             }
+        }
+        guard notesHeight else {
+            return
         }
         if let item = self.optionalItem(at: row) {
             let animated = visibleRows().contains(row) && item.view != nil && animated
@@ -3037,13 +3101,17 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
     }
     
     public func remove(range:Range<Int>, redraw:Bool = true, animation:NSTableView.AnimationOptions = .none) -> Void {
+        let bounded = range.clamped(to: 0 ..< self.count)
+        guard !bounded.isEmpty else {
+            return
+        }
         
-        for i in range.lowerBound ..< range.upperBound {
+        for i in bounded.reversed() {
             remove(at: i, redraw: false)
         }
         
         if(redraw) {
-            self.tableView.removeRows(at: IndexSet(integersIn:range), withAnimation:  animation != .none ? .effectFade : .none)
+            self.tableView.removeRows(at: IndexSet(integersIn: bounded), withAnimation:  animation != .none ? .effectFade : .none)
         }
     }
     
