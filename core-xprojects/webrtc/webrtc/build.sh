@@ -17,7 +17,7 @@ LIBVPX_DIR="$6"
 OPENH264_DIR="$7"
 LIBYUV_DIR="$8"
 
-if [ ! -f "$SOURCE_DIR/CMakeLists.txt" ] || [ ! -f "$SOURCE_DIR/third_party/abseil-cpp/absl/base/attributes.h" ] || [ ! -f "$SOURCE_DIR/third_party/libsrtp/include/srtp.h" ]; then
+if [ ! -f "$SOURCE_DIR/CMakeLists.txt" ] || [ ! -f "$SOURCE_DIR/third_party/abseil-cpp/absl/base/attributes.h" ] || [ ! -f "$SOURCE_DIR/third_party/libsrtp/include/srtp.h" ] || [ ! -d "$SOURCE_DIR/third_party/crc32c/src/include" ]; then
     echo "error: $SOURCE_DIR is empty or has empty submodules; run 'git submodule update --init --recursive'" >&2
     exit 1
 fi
