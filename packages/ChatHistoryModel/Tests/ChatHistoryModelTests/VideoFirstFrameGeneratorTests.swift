@@ -4,6 +4,7 @@ import CoreVideo
 import SwiftSignalKit
 @testable import TelegramMediaUtils
 
+@available(macOS 14.0, *)
 final class VideoFirstFrameGeneratorTests: XCTestCase {
     private var created: [URL] = []
 
@@ -89,6 +90,33 @@ final class VideoFirstFrameGeneratorTests: XCTestCase {
         wait(for: [delivered, completed], timeout: 30)
         disposable.dispose()
         XCTAssertEqual(values, 1)
+    }
+
+    func testUnsupportedContainerGivesNil() async throws {
+        for mime in ["video/webm", "video/x-matroska"] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("junk-\(UUID().uuidString)")
+            try Data(repeating: 0x1A, count: 4096).write(to: url)
+            created.append(url)
+            let image = await VideoFirstFrameGenerator.firstFrame(path: url.path, maxSize: CGSize(width: 800, height: 800), mimeType: mime)
+            XCTAssertNil(image)
+        }
+    }
+
+    func testDisposeBeforeDeliveryDeliversNothing() throws {
+        let url = try writeClip(side: 1200, fileType: .mp4, pathExtension: nil)
+        var values = 0
+        var completions = 0
+        let disposable = VideoFirstFrameGenerator.signal(path: url.path, maxSize: CGSize(width: 800, height: 800), mimeType: "video/mp4").start(next: { _ in
+            values += 1
+        }, completed: {
+            completions += 1
+        })
+        disposable.dispose()
+        let settle = expectation(description: "settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { settle.fulfill() }
+        wait(for: [settle], timeout: 10)
+        XCTAssertEqual(values, 0)
+        XCTAssertEqual(completions, 0)
     }
 
     func testDisabledByDefault() {

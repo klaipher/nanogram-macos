@@ -338,7 +338,7 @@ private func writeFirstFrameJPEG(_ image: CGImage) -> String? {
     var randomId: Int64 = 0
     arc4random_buf(&randomId, 8)
     let path = NSTemporaryDirectory() + "\(randomId)"
-    guard let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, kUTTypeJPEG, 1, nil) else {
+    guard let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, "public.jpeg" as CFString, 1, nil) else {
         return nil
     }
     CGImageDestinationSetProperties(destination, [:] as CFDictionary)
@@ -349,14 +349,15 @@ private func writeFirstFrameJPEG(_ image: CGImage) -> String? {
 }
 
 private func fetchCachedVideoFirstFrameRepresentation(account: Account, resource: MediaResource, resourceData: MediaResourceData) -> Signal<CachedMediaResourceRepresentationResult, FetchVideoFirstFrameError> {
-    if VideoFirstFrameGenerator.isEnabled {
+    if #available(macOS 14.0, *), VideoFirstFrameGenerator.isEnabled {
         return VideoFirstFrameGenerator.signal(path: resourceData.path, maxSize: CGSize(width: 800.0, height: 800.0), mimeType: "video/mp4")
         |> castError(FetchVideoFirstFrameError.self)
+        |> deliverOn(cacheThreadPool)
         |> mapToSignal { image -> Signal<CachedMediaResourceRepresentationResult, FetchVideoFirstFrameError> in
             guard let image, let path = writeFirstFrameJPEG(image) else {
                 return .fail(.generic)
             }
-            return .single(.tempFile(TempBox.shared.tempFile(fileName: path.nsstring.lastPathComponent)))
+            return .single(.temporaryPath(path))
         }
     }
     return Signal { subscriber in
@@ -616,16 +617,7 @@ private func fetchCachedScaledImageRepresentation(account: Account, resource: Me
 private func fetchCachedVideoFirstFrameRepresentation(account: Account, resource: MediaResource, representation: CachedVideoFirstFrameRepresentation) -> Signal<CachedMediaResourceRepresentationResult, NoError> {
     return account.postbox.mediaBox.resourceRangesStatus(resource) |> mapToSignal { _ in
         return account.postbox.mediaBox.resourceData(resource) |> take(1)
-    } |> runOn(cacheThreadPool) |> mapToSignal { resourceData -> Signal<CachedMediaResourceRepresentationResult, NoError> in
-        if VideoFirstFrameGenerator.isEnabled {
-            return VideoFirstFrameGenerator.signal(path: resourceData.path, maxSize: CGSize(width: 800.0, height: 800.0), mimeType: "video/mp4")
-            |> mapToSignal { image -> Signal<CachedMediaResourceRepresentationResult, NoError> in
-                if let image, let path = writeFirstFrameJPEG(image) {
-                    return .single(.temporaryPath(path))
-                }
-                return .never()
-            }
-        }
+    } |> runOn(cacheThreadPool) |> mapToSignal { resourceData in
         let tempFilePath = NSTemporaryDirectory() + "\(resourceData.path.nsstring.lastPathComponent).mp4"
         let _ = try? FileManager.default.removeItem(atPath: tempFilePath)
         try? FileManager.default.createSymbolicLink(atPath: resourceData.path, withDestinationPath: tempFilePath)

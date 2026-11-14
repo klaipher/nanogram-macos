@@ -10,10 +10,12 @@ public enum VideoFirstFrameGenerator {
         return UserDefaults.standard.bool(forKey: "nanogram.debug." + debugOptionId)
     }
 
+    @available(macOS 14.0, *)
     static func makeAsset(path: String, mimeType: String) -> AVURLAsset {
         return AVURLAsset(url: URL(fileURLWithPath: path), options: [AVURLAssetOverrideMIMETypeKey: mimeType])
     }
 
+    @available(macOS 14.0, *)
     public static func firstFrame(path: String, maxSize: CGSize, mimeType: String) async -> CGImage? {
         let generator = AVAssetImageGenerator(asset: makeAsset(path: path, mimeType: mimeType))
         generator.maximumSize = maxSize
@@ -25,6 +27,7 @@ public enum VideoFirstFrameGenerator {
         }
     }
 
+    @available(macOS 14.0, *)
     public static func signal(path: String, maxSize: CGSize, mimeType: String) -> Signal<CGImage?, NoError> {
         return Signal { subscriber in
             let task = Task {
