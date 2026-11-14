@@ -2,30 +2,23 @@ import Foundation
 import CoreGraphics
 
 enum ChatHeaderLayout {
-    static let minimumComfortableTitleWidth: CGFloat = 200
+    static let minimumComfortableTitleWidth: CGFloat = 218
     static let minimumAccessoryWidth: CGFloat = 320
     static let maximumAccessoryWidth: CGFloat = 560
     static let accessoryWidthFraction: CGFloat = 0.62
 
     /// Centers the title capsule on the chat column. leftReserved and rightReserved are the distances from the
-    /// column edges to the nearest control, gaps included. When the symmetric room is too small the capsule
-    /// takes the whole gap between the controls and slides to the nearest non-overlapping position.
+    /// column edges to the nearest control, gaps included. The capsule never shrinks as the column grows:
+    /// it takes the larger of the symmetric room and the comfortable width (bounded by the gap), then slides clear of the controls.
     static func titleCapsuleFrame(chatArea: CGRect, leftReserved: CGFloat, rightReserved: CGFloat, contentWidth: CGFloat) -> CGRect {
         let left = max(0, leftReserved)
         let right = max(0, rightReserved)
         let content = max(0, contentWidth)
         let gap = max(0, chatArea.width - left - right)
         let symmetric = max(0, chatArea.width - 2 * max(left, right))
-        let width: CGFloat
-        let x: CGFloat
-        if symmetric >= minimumComfortableTitleWidth {
-            width = min(content, symmetric)
-            x = chatArea.minX + (chatArea.width - width) / 2
-        } else {
-            width = min(content, gap)
-            let centered = chatArea.minX + (chatArea.width - width) / 2
-            x = min(max(centered, chatArea.minX + left), chatArea.maxX - right - width)
-        }
+        let width = min(content, max(symmetric, min(gap, minimumComfortableTitleWidth)))
+        let centered = chatArea.minX + (chatArea.width - width) / 2
+        let x = min(max(centered, chatArea.minX + left), chatArea.maxX - right - width)
         return CGRect(x: x, y: chatArea.minY, width: width, height: chatArea.height)
     }
 

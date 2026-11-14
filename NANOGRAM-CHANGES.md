@@ -73,7 +73,7 @@ not re-verified against the code; correct them on the next change in that area.
 
 ### Centered chat header
 - What: the glass title capsule is centered on the chat column, and the pinned and translate bars are a bounded capsule centered under it. Upstream 13.2 anchors the title at the left and puts pinned, translate, search and Reopen Topic beside it (upstream #76, cfe7acc5). (check)
-- Where: `packages/ChatUI` (`ChatHeaderLayout`, `ChatHeaderBubblesView.updateLayout`, `ChatControllerView.updateFrame`, `ChatHeaderState.fitsCenteredCapsule`); `ChatHeaderInlineLayout` removed.
+- Where: `packages/ChatUI` (`ChatHeaderLayout`, `ChatHeaderBubblesView.updateLayout`, `ChatControllerView.updateFrame`, `ChatHeaderState.fitsCenteredCapsule`); `ChatHeaderInlineLayout` removed. Capsule width is continuous in the window width, and it relayouts animated when the text width changes.
 - Sync note: expect conflicts in `ChatHeaderBubblesView.swift`, `ChatController.swift` (`updateFrame`, `headerHeight`, `updateHeaderInsets`) and `ChatHeaderController.swift` at the next upstream merge; keep our side.
 
 ### Features and switches

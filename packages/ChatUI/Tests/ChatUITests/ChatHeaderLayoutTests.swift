@@ -68,6 +68,28 @@ final class ChatHeaderLayoutTests: XCTestCase {
         }
     }
 
+    func testCapsuleNeverShrinksWhenTheColumnGrows() {
+        for (left, right) in [(CGFloat(12), CGFloat(12)), (12, 70), (62, 70), (12, 150), (12, 190), (62, 190), (62, 150)] {
+            var previous: CGFloat = 0
+            for width in stride(from: CGFloat(0), through: 1800, by: 1) {
+                let frame = ChatHeaderLayout.titleCapsuleFrame(chatArea: area(width), leftReserved: left, rightReserved: right, contentWidth: 5000)
+                XCTAssertGreaterThanOrEqual(frame.width, previous - 0.001, "width \(width) left \(left) right \(right)")
+                previous = frame.width
+            }
+        }
+    }
+
+    func testCapsuleHasNoJumpAtTheSymmetricThreshold() {
+        let before = ChatHeaderLayout.titleCapsuleFrame(chatArea: area(579), leftReserved: 62, rightReserved: 190, contentWidth: 5000)
+        let after = ChatHeaderLayout.titleCapsuleFrame(chatArea: area(580), leftReserved: 62, rightReserved: 190, contentWidth: 5000)
+        XCTAssertLessThanOrEqual(abs(after.width - before.width), 1)
+    }
+
+    func testShortestTitleIsNotTruncatedAtTheThreshold() {
+        let frame = ChatHeaderLayout.titleCapsuleFrame(chatArea: area(580), leftReserved: 62, rightReserved: 190, contentWidth: 218)
+        XCTAssertEqual(frame.width, 218)
+    }
+
     func testCenteredAccessoryIsBoundedAndAlignedWithTheTitle() {
         let title = ChatHeaderLayout.titleCapsuleFrame(chatArea: area(1000), leftReserved: 12, rightReserved: 142, contentWidth: 240)
         let accessory = ChatHeaderLayout.accessoryFrame(chatArea: area(1000), leftReserved: 12, rightReserved: 12, centered: true)

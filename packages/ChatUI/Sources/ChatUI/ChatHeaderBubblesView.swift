@@ -688,7 +688,9 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
         updateStoryRing(story, animated: animated)
         updateLiveStream(story, animated: animated)
         updateStatusText(presentation: chatInteraction.presentation)
+        let extrasWidthBefore = centerContentWidth
         updatePeerExtras(presentation: chatInteraction.presentation, animated: animated)
+        relayoutAnimatedIfContentWidthChanged(from: extrasWidthBefore)
         applyCallButtonImage()
         needsLayout = true
     }
@@ -696,7 +698,9 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
     func updatePresentation(_ presentation: ChatPresentationInterfaceState, force: Bool = false) {
         forumSidebarButton.setAccessibilityLabel(presentation.chatLocation.peerId == chatInteraction.interactionContext.peerId || presentation.isMonoforum ? localizedString("Chat.Sidebar.ShowChats") : strings().chatListTopicsTag)
         updateStatusText(presentation: presentation, force: force)
+        let extrasWidthBefore = centerContentWidth
         updatePeerExtras(presentation: presentation, animated: false)
+        relayoutAnimatedIfContentWidthChanged(from: extrasWidthBefore)
         applyCallButtonImage()
         needsLayout = true
     }
@@ -1030,6 +1034,13 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
     }
     private var appliedStatusTextKey: StatusTextKey?
 
+    private func relayoutAnimatedIfContentWidthChanged(from before: CGFloat) {
+        guard before != centerContentWidth, titleView.textLayout != nil, let updateHeaderLayout else {
+            return
+        }
+        updateHeaderLayout(.animated(duration: 0.2, curve: .easeOut))
+    }
+
     private func updateStatusText(presentation: ChatPresentationInterfaceState, force: Bool = false) {
         guard let result = computeTitleStatus(presentation: presentation) else {
             appliedStatusTextKey = nil
@@ -1055,6 +1066,7 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
             appliedStatusTextKey = key
 
             let titleLayout = TextViewLayout(titleString, maximumNumberOfLines: 1, truncationType: .end, alignment: .left)
+            let widthBefore = centerContentWidth
             titleLayout.measure(width: .greatestFiniteMagnitude)
             titleNaturalWidth = titleLayout.layoutSize.width
             titleLayout.measure(width: textWidth)
@@ -1073,6 +1085,7 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
                 statusView.isHidden = true
             }
             needsLayout = true
+            relayoutAnimatedIfContentWidthChanged(from: widthBefore)
         }
 
         if let presence = result.presence {
