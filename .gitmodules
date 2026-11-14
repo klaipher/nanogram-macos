@@ -18,9 +18,9 @@
 	url = https://github.com/dkaraush/tlottie
 [submodule "third-party/twidget"]
 	path = third-party/twidget
-	url = https://github.com/TelegramMessenger/twidget
-	branch = main
+	url = https://github.com/klaipher/twidget.git
+	branch = nanogram
 [submodule "third-party/widget-sandbox"]
 	path = third-party/widget-sandbox
-	url = https://github.com/TelegramMessenger/widget-sandbox
-	branch = main
+	url = https://github.com/klaipher/widget-sandbox.git
+	branch = nanogram
