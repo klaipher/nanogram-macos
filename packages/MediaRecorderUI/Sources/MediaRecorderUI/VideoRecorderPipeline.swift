@@ -110,6 +110,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     
     public let config: VideoMessageConfig
     public let outputSide: Int
+    public private(set) var writerSide: Int
     
     private var status: VideoCameraRecordingStatus = .idle {
         didSet {
@@ -176,6 +177,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         self.liveUploading = liveUploading
         self.config = config
         self.outputSide = TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: RoundVideoEncodingPolicy.side(serverDiameter: config.diameter))
+        self.writerSide = self.outputSide
         super.init()
         
         recorder = TGVideoCameraMovieRecorder(url: url, delegate: self, callbackQueue: VideoRecorderPipeline.queue.queue)
@@ -451,6 +453,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             return Int(min(dimensions.width, dimensions.height))
         } ?? self.outputSide
         let writerSide = RoundVideoEncodingPolicy.effectiveSide(side: self.outputSide, sourceShortSide: producedSide)
+        self.writerSide = writerSide
         let size = CGSize(width: writerSide, height: writerSide)
         let videoSettings = TGMediaVideoConversionPresetSettings.videoSettings(for: TGMediaVideoConversionPresetVideoMessage, dimensions: size, bitrate: Int32(RoundVideoEncodingPolicy.videoBitrateKbps(server: config.videoBitrate)))
         recorder.addVideoTrack(withSourceFormatDescription: outputVideoFormatDescription, transform: CGAffineTransform.identity, settings: videoSettings)

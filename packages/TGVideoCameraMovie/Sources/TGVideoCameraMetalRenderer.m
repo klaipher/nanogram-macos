@@ -219,6 +219,8 @@ static id<MTLRenderPipelineState> TGVideoMessagePipeline(id<MTLDevice> device)
     if (minSide <= 0)
         return false;
     CGFloat outputSide = _outputSide > 0 ? MIN(minSide, (CGFloat)_outputSide) : minSide;
+    if (outputSide >= 2)
+        outputSide = floor(outputSide / 2.0) * 2.0;
 
     _aspectRatio = minSide / maxSide;
     [self updateTextureVertices];

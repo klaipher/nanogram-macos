@@ -330,8 +330,9 @@ public final class ChatRecordingVideoState : ChatRecordingState {
     public override var data: Signal<[MediaSenderContainer], NoError> {
         let isOneTime = self.isOneTime
         let trimRange = self.pendingTrimRange
-        let side = self.pipeline.outputSide
+        let pipeline = self.pipeline
         func container(path: String, duration: Int, id: Int64?) -> MediaSenderContainer {
+            let side = pipeline.writerSide
             return VideoMessageSenderContainer(path: path, duration: duration, size: CGSize(width: side, height: side), id: id, isOneTime: isOneTime)
         }
         return pipeline.statePromise.get() |> filter { state in
