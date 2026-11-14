@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import os
 
 public enum IsolatedImageOutcome: Equatable, Sendable {
     case decoded(DecodedBitmap)
@@ -7,11 +8,14 @@ public enum IsolatedImageOutcome: Equatable, Sendable {
     case unavailable
 }
 
-public final class DecoderQuarantine: @unchecked Sendable {
+public final class DecoderQuarantine: Sendable {
+    private struct State {
+        var members: Set<Data> = []
+        var order: [Data] = []
+    }
+
     private let capacity: Int
-    private let lock = NSLock()
-    private var members: Set<Data> = []
-    private var order: [Data] = []
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     public init(capacity: Int = 512) {
         self.capacity = max(1, capacity)
@@ -22,20 +26,19 @@ public final class DecoderQuarantine: @unchecked Sendable {
     }
 
     public func contains(_ digest: Data) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return members.contains(digest)
+        return state.withLock { $0.members.contains(digest) }
     }
 
     public func insert(_ digest: Data) {
-        lock.lock()
-        defer { lock.unlock() }
-        guard members.insert(digest).inserted else {
-            return
-        }
-        order.append(digest)
-        if order.count > capacity {
-            members.remove(order.removeFirst())
+        let capacity = self.capacity
+        state.withLock { state in
+            guard state.members.insert(digest).inserted else {
+                return
+            }
+            state.order.append(digest)
+            if state.order.count > capacity {
+                state.members.remove(state.order.removeFirst())
+            }
         }
     }
 }

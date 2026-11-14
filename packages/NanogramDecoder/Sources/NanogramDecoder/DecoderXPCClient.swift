@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public final class DecoderXPCClient: @unchecked Sendable {
     public struct Configuration: Sendable {
@@ -261,18 +262,18 @@ public final class DecoderXPCClient: @unchecked Sendable {
     }
 }
 
-private final class ReplyBox<T: Sendable>: @unchecked Sendable {
+private final class ReplyBox<T: Sendable>: Sendable {
     private let semaphore = DispatchSemaphore(value: 0)
-    private let lock = NSLock()
-    private var result: Result<T, DecoderError>?
+    private let result = OSAllocatedUnfairLock<Result<T, DecoderError>?>(initialState: nil)
 
     func complete(_ value: Result<T, DecoderError>) {
-        lock.lock()
-        let first = result == nil
-        if first {
-            result = value
+        let first = result.withLock { current -> Bool in
+            guard current == nil else {
+                return false
+            }
+            current = value
+            return true
         }
-        lock.unlock()
         if first {
             semaphore.signal()
         }
@@ -280,8 +281,6 @@ private final class ReplyBox<T: Sendable>: @unchecked Sendable {
 
     func wait(timeout: TimeInterval) -> Result<T, DecoderError>? {
         _ = semaphore.wait(timeout: .now() + timeout)
-        lock.lock()
-        defer { lock.unlock() }
-        return result
+        return result.withLock { $0 }
     }
 }
