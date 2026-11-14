@@ -284,7 +284,7 @@ public class ChatFileContentView: ChatMediaContentView {
         self.setNeedsDisplay()
         
         if let signal = updatedStatusSignal, let parent = parent, let parameters = parameters {
-            updatedStatusSignal = combineLatest(signal, parameters.getUpdatingMediaProgress(parent.id)) |> map { value, updating in
+            updatedStatusSignal = combineLatest(signal, parameters.getUpdatingMediaProgress(parent.id) |> coalescedUpdatingProgress()) |> map { value, updating in
                 if let progress = updating {
                     return (.Fetching(isActive: true, progress: progress), value.1)
                 } else {

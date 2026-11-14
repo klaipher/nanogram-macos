@@ -43,7 +43,7 @@ public func chatMessageFileStatus(context: any AccountContextProtocol, message: 
             }
         }
     }
-    return context.fetchManager.fetchStatus(category: .file, location: .chat(message.id.peerId), locationKey: .messageId(message.id), resource: file.resource)
+    return context.fetchManager.fetchStatus(category: .file, location: .chat(message.id.peerId), locationKey: .messageId(message.id), resource: file.resource) |> coalescedStatusProgress()
 }
 
 public func chatMessageFileInteractiveFetched(account: Account, fileReference: FileMediaReference) -> Signal<FetchResourceSourceType, NoError> {
@@ -1282,7 +1282,7 @@ public func chatMessagePhotoStatus(account: Account, photo: TelegramMediaImage, 
         if largest.resource is LocalFileReferenceMediaResource {
             return .single(.Local)
         } else {
-            return account.postbox.mediaBox.resourceStatus(largest.resource, approximateSynchronousValue: approximateSynchronousValue)
+            return account.postbox.mediaBox.resourceStatus(largest.resource, approximateSynchronousValue: approximateSynchronousValue) |> coalescedStatusProgress()
         }
     } else {
         return .never()
