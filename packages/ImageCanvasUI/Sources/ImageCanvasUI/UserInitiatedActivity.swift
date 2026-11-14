@@ -11,7 +11,7 @@ final class UserInitiatedActivity: @unchecked Sendable {
         begin: (ProcessInfo.ActivityOptions, String) -> any NSObjectProtocol = { ProcessInfo.processInfo.beginActivity(options: $0, reason: $1) },
         end: @escaping (any NSObjectProtocol) -> Void = { ProcessInfo.processInfo.endActivity($0) }
     ) {
-        self.token = begin([.userInitiated], reason)
+        self.token = begin([.userInitiatedAllowingIdleSystemSleep], reason)
         self.endActivity = end
     }
 

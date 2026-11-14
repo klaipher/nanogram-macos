@@ -61,4 +61,12 @@ final class UserInitiatedActivityTests: XCTestCase {
         _ = signal.start(next: { _ in }, error: { _ in })
         XCTAssertEqual(counter.counts.1, 1)
     }
+
+    func testOptionsAllowIdleSystemSleep() {
+        var options: ProcessInfo.ActivityOptions = []
+        let activity = UserInitiatedActivity(reason: "test", begin: { value, _ in options = value; return NSObject() }, end: { _ in })
+        activity.end()
+        XCTAssertFalse(options.contains(.idleSystemSleepDisabled))
+        XCTAssertTrue(options.contains(.userInitiatedAllowingIdleSystemSleep))
+    }
 }
