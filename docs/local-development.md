@@ -645,8 +645,8 @@ the parity check compares the `.gitmodules` branch names of both repos), `submod
 ## Parity gate and `tg core-bump`
 
 The iOS and macOS apps share one core, tgcalls, tlottie and WebRTC. `docs/mac-core-paths.txt` (identical in
-both repos) lists the shared paths and the intended differences. `tools/dev/parity/parity.py` (identical in both
-repos) enforces it; `tools/dev/tg parity` runs it here and `tg check` includes it, so the pre-push hook does too.
+both repos) lists the shared paths and the intended differences. `tools/dev/parity/parity.py` (a wrapper around
+the core's `shared/parity.py`, klaipher/nanogram-deps) enforces it; `tools/dev/tg parity` runs it here and `tg check` includes it, so the pre-push hook does too.
 
 - History roots: every core commit must be rooted at the import `b46f1ec6`; a push that reaches Telegram's history is
   stopped (both repos' pre-push hooks).

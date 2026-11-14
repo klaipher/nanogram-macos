@@ -2,7 +2,7 @@
 """Shared build-cache cleanup for the iOS and the Mac app (identical file in both repos).
 
 Selection is pure (plan_* functions take plain data and return Removal lists); gathering reads the disk and
-processes; execution deletes after a second safety check. Configuration: cache-policy.json next to this file.
+processes; execution deletes after a second safety check. Configuration: shared/cache-policy.json (klaipher/nanogram-deps, one copy for the iOS, Mac and Android apps; the Mac reads it through the core at submodules/telegram-ios/shared/).
 
   cachegc.py run [--dry-run] [--only A,B] [--repo PATH] [--force]
   cachegc.py auto          what tg runs after build/test commands: throttled, time-boxed, quiet, never fails
@@ -31,7 +31,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-POLICY_FILE = HERE / "cache-policy.json"
+_REPO_ROOT = HERE.parents[2]
+POLICY_FILE = next((path for path in (_REPO_ROOT / "shared" / "cache-policy.json",
+                                      _REPO_ROOT / "submodules" / "telegram-ios" / "shared" / "cache-policy.json")
+                    if path.is_file()), _REPO_ROOT / "shared" / "cache-policy.json")
 DAY = 86400
 CATEGORIES = ("bazel-output-base", "bazel-disk-cache", "derived-data", "module-cache", "compilation-cache", "spm-build",
               "spm-scratch", "cache-root", "instruments", "build-output", "simulator", "worktree", "tool-tmp")
@@ -96,6 +99,8 @@ class Policy:
 
 def load_policy(path: Path | None = None, home: Path | None = None) -> Policy:
     path = Path(os.environ.get("NANOGRAM_CACHEGC_POLICY", path or POLICY_FILE))
+    if not path.is_file():
+        raise SystemExit(f"cachegc: {path} is missing; run `git submodule update --init shared` (the shared/ submodule holds the one cache policy)")
     data = json.loads(path.read_text())
     return Policy(data, home or Path.home())
 
@@ -1286,7 +1291,7 @@ def verify(policy: Policy, repo: Path) -> int:
         other = sibling / "tools" / "dev" / "cachegc"
         if sibling.resolve() == repo.resolve() or not other.is_dir():
             continue
-        for name in ("cachegc.py", "cache-policy.json"):
+        for name in ("cachegc.py",):  # the policy is the shared/ submodule, one copy for every repo
             mine, theirs = HERE / name, other / name
             if not theirs.is_file() or mine.read_bytes() != theirs.read_bytes():
                 problems.append(f"{name} differs from {theirs}")

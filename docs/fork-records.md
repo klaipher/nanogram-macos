@@ -48,7 +48,7 @@ instead (which part got better, never how).
 
 ## Keeping them current
 
-1. The development pipeline (`docs/development-pipeline.md`) makes writing both files part of the fix, and the
+1. The development pipeline (`submodules/telegram-ios/shared/development-pipeline.md`) makes writing both files part of the fix, and the
    report of every round lists which entries were added.
 2. `tools/dev/lint/changelog_reminder.py`, run by the pre-push hook of both app repositories, warns when a push
    changes product code and touches neither file. Forks have no hook; their `AGENTS.md` carries the same rule.

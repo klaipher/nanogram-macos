@@ -27,7 +27,7 @@ config_value() { python3 -c "from nanogram import config; print(config.$1)"; }
 
 cmd_doctor() { py doctor; }
 
-# tg cache-cleanup [--dry-run] [--only A,B]: the shared cache cleanup (tools/dev/cachegc, policy in cache-policy.json).
+# tg cache-cleanup [--dry-run] [--only A,B]: the shared cache cleanup (tools/dev/cachegc, policy in submodules/telegram-ios/shared/cache-policy.json).
 # It also runs by itself, throttled and time-boxed, after build, test, check and release commands. There is no
 # scheduled job.
 cmd_cache_cleanup() {
@@ -58,7 +58,7 @@ after_build_command() {
 }
 
 # Runs before every build command (not throttled): enforces the hard caps and removes what deleted checkouts left behind,
-# and refuses to start a build below the hard free-space floor (cache-policy.json; TG_ALLOW_LOW_DISK=1 overrides).
+# and refuses to start a build below the hard free-space floor (shared/cache-policy.json in the core; TG_ALLOW_LOW_DISK=1 overrides).
 # A command that calls another tg command (check -> build) is guarded once; so is everything under buildlock.
 cache_guard() {
   [ -z "${NANOGRAM_TG_LOCKED:-}" ] || return 0
