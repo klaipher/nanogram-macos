@@ -27,8 +27,8 @@ framework_source_roots() {
             echo "$1/submodules/telegram-ios/third-party/libvpx/libvpx"
             ;;
         libopus)
-            # The tarball only: edits to the iOS Bazel opus script must not invalidate the Mac cache.
-            echo "$1/submodules/telegram-ios/third-party/opus/opus-1.6.1.tar.gz"
+            echo "$1/submodules/telegram-ios/third-party/opus/opus"
+            echo "$1/submodules/telegram-ios/third-party/opus/opus-cmake-args.sh"
             ;;
         dav1d)
             echo "$1/submodules/telegram-ios/third-party/dav1d/dav1d"

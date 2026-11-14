@@ -30,8 +30,9 @@ echo 'PACKAGE_VERSION="1.6.1"' > "$SOURCE_DIR/package_version"
 
 SDKROOT="$(xcode-select -p)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
-# The same options as third-party/opus/build-opus-bazel.sh in the core (checked by tools/dev/native/check_native_libs.py).
-COMMON_ARGS="-DOPUS_BUILD_SHARED_LIBRARY=OFF -DOPUS_BUILD_PROGRAMS=OFF -DOPUS_BUILD_TESTING=OFF -DBUILD_TESTING=OFF -DOPUS_DISABLE_INTRINSICS=OFF -DOPUS_FIXED_POINT=OFF -DOPUS_DRED=OFF -DOPUS_OSCE=OFF -DOPUS_INSTALL_PKG_CONFIG_MODULE=OFF -DOPUS_INSTALL_CMAKE_CONFIG_MODULE=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY"
+# The one option list iOS builds with (third-party/opus/opus-cmake-args.sh in the core), so the apps cannot drift.
+. "${SCRIPT_LOCATION}/../../../submodules/telegram-ios/third-party/opus/opus-cmake-args.sh"
+COMMON_ARGS="$OPUS_COMMON_ARGS"
 
 for ARCH in $ARCHS
 do

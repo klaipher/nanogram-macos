@@ -33,20 +33,21 @@ class SharedNativeSourcesTests(unittest.TestCase):
         self.assertNotIn('SOURCE_DIR="${BUILD_DIR}source"', text)
         self.assertIn("git submodule update --init --recursive", text)
 
-    def test_libopus_script_uses_core_tarball_and_keeps_the_hash_check(self):
+    def test_libopus_script_builds_the_core_submodule_with_the_shared_options(self):
         text = read(ROOT / "core-xprojects/libopus/libopus/build.sh")
-        self.assertIn(f"{CORE}/opus/opus-1.6.1.tar.gz", text)
-        self.assertNotIn('SOURCE_ARCHIVE="$SRC_DIR/', text)
-        self.assertIn("6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1", text)
-        self.assertIn("shasum -a 256 -c", text)
+        self.assertIn("submodules/telegram-ios/third-party/opus/opus", text)
+        self.assertIn("opus-cmake-args.sh", text)
+        self.assertIn('COMMON_ARGS="$OPUS_COMMON_ARGS"', text)
+        self.assertNotIn("opus-1.6.1.tar.gz", text)
+        self.assertNotIn("shasum -a 256 -c", text)
+        self.assertNotIn("curl", text)
 
     def test_framework_inputs_fingerprint_the_core_sources(self):
         text = read(ROOT / "scripts/framework-inputs.sh")
         body = text.split("framework_source_roots()", 1)[1].split("\n}\n", 1)[0]
         self.assertIn(f'libvpx)\n            echo "$1/{CORE}/libvpx/libvpx"', body)
-        # The tarball file only, so edits to the iOS Bazel script do not invalidate the Mac cache.
-        self.assertIn(f'libopus)', body)
-        self.assertIn(f'"$1/{CORE}/opus/opus-1.6.1.tar.gz"', body)
+        self.assertIn(f'libopus)\n            echo "$1/{CORE}/opus/opus"', body)
+        self.assertNotIn("opus-1.6.1.tar.gz", body)
 
     def test_libwebp_builds_from_the_core_copy(self):
         script = read(ROOT / "core-xprojects/libwebp/libwebp/build-cmake.sh")
@@ -66,7 +67,7 @@ class SharedNativeSourcesTests(unittest.TestCase):
         mac_vpx = {p["file"] for p in libs["libvpx"]["probes"]["mac"]}
         mac_opus = {p["file"] for p in libs["opus"]["probes"]["mac"]}
         self.assertIn(f"{CORE}/libvpx/libvpx/CHANGELOG", mac_vpx)
-        self.assertIn(f"{CORE}/opus/opus-*.tar.gz", mac_opus)
+        self.assertIn(f"{CORE}/opus/opus-cmake-args.sh", mac_opus)
         for probe in mac_vpx | mac_opus:
             self.assertNotIn("core-xprojects/libvpx/source", probe)
             self.assertNotIn("core-xprojects/libopus/opus-", probe)

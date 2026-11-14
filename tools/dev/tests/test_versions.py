@@ -40,20 +40,24 @@ def is_ancestor(repo: Path, ancestor: str, commit: str = "HEAD") -> bool:
 class PinnedVersionsTests(unittest.TestCase):
     def test_opus(self):
         script = read(CORE / "libopus" / "libopus" / "build.sh")
-        self.assertIn("third-party/opus/opus-1.6.1.tar.gz", script)
+        self.assertIn("third-party/opus/opus", script)
+        self.assertNotIn("opus-1.6.1.tar.gz", script)
         self.assertFalse((CORE / "libopus" / "opus-1.6.1.tar.gz").exists())
-        tarball = TG_IOS / "third-party" / "opus" / "opus-1.6.1.tar.gz"
-        if tarball.is_file():
-            self.assertEqual(hashlib.sha256(tarball.read_bytes()).hexdigest(),
-                             "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1")
         self.assertFalse((CORE / "libopus" / "opus-1.3.1.tar.gz").exists())
-        self.assertIn("6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1", script)
+        cmake = TG_IOS / "third-party" / "opus" / "opus" / "CMakeLists.txt"
+        if cmake.is_file():
+            self.assertIn("1.6.1", read(TG_IOS / "third-party" / "opus" / "BUILD"))
 
-    def test_opus_built_for_speed_with_fixed_point(self):
+    def test_opus_options_come_from_the_core_and_keep_neon(self):
         script = read(CORE / "libopus" / "libopus" / "build.sh")
-        self.assertIn("--enable-fixed-point", script)
-        self.assertRegex(script, r"CFLAGS=\"[^\"]*-O2 -DNDEBUG")
+        self.assertRegex(script, r"CMAKE_C_FLAGS_RELEASE=\"-O2 -DNDEBUG")
         self.assertNotIn("-Os", script)
+        args = TG_IOS / "third-party" / "opus" / "opus-cmake-args.sh"
+        if args.is_file():
+            text = read(args)
+            self.assertIn("-DOPUS_PRESUME_NEON=ON", text)
+            self.assertIn("-DOPUS_DISABLE_INTRINSICS=OFF", text)
+            self.assertIn("-DOPUS_FIXED_POINT=OFF", text)
 
     def test_libvpx(self):
         self.assertFalse((CORE / "libvpx" / "source").exists())

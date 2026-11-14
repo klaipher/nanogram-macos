@@ -166,66 +166,60 @@
    "probes": {
     "ios": [
      {
-      "id": "tarball",
+      "id": "BUILD",
       "what": "version",
-      "kind": "filename",
-      "file": "third-party/opus/opus-*.tar.gz",
-      "regex": "^opus-([\\d.]+)\\.tar\\.gz$"
+      "kind": "regex",
+      "file": "third-party/opus/BUILD",
+      "regex": "libopus v([\\d.]+) \\("
      },
      {
-      "id": "tarball",
-      "what": "sha256",
-      "kind": "sha256",
-      "file": "third-party/opus/opus-*.tar.gz"
-     },
-     {
-      "id": "configure",
+      "id": "cmake options",
       "what": "flags",
       "kind": "flags",
-      "file": "third-party/opus/build-opus-bazel.sh"
+      "file": "third-party/opus/opus-cmake-args.sh",
+      "region": [
+       "^OPUS_COMMON_ARGS=\"",
+       "\"\\s*$"
+      ]
      }
     ],
     "mac": [
      {
-      "id": "tarball",
+      "id": "BUILD",
       "what": "version",
-      "kind": "filename",
-      "file": "submodules/telegram-ios/third-party/opus/opus-*.tar.gz",
-      "regex": "^opus-([\\d.]+)\\.tar\\.gz$"
+      "kind": "regex",
+      "file": "submodules/telegram-ios/third-party/opus/BUILD",
+      "regex": "libopus v([\\d.]+) \\("
      },
      {
-      "id": "tarball",
-      "what": "sha256",
-      "kind": "sha256",
-      "file": "submodules/telegram-ios/third-party/opus/opus-*.tar.gz"
-     },
-     {
-      "id": "configure",
+      "id": "cmake options",
       "what": "flags",
       "kind": "flags",
-      "file": "core-xprojects/libopus/libopus/build.sh"
+      "file": "submodules/telegram-ios/third-party/opus/opus-cmake-args.sh",
+      "region": [
+       "^OPUS_COMMON_ARGS=\"",
+       "\"\\s*$"
+      ]
      }
     ]
    },
    "flags": {
-    "ios": [
-     "--disable-asm",
-     "--disable-doc",
-     "--disable-extra-programs",
-     "--disable-shared",
-     "--enable-intrinsics",
-     "--enable-static",
-     "--with-pic"
-    ],
-    "mac": [
-     "--disable-asm",
-     "--disable-doc",
-     "--disable-extra-programs",
-     "--enable-fixed-point"
+    "shared": [
+     "-DBUILD_TESTING=OFF",
+     "-DCMAKE_BUILD_TYPE=Release",
+     "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+     "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY",
+     "-DOPUS_BUILD_PROGRAMS=OFF",
+     "-DOPUS_BUILD_SHARED_LIBRARY=OFF",
+     "-DOPUS_BUILD_TESTING=OFF",
+     "-DOPUS_DISABLE_INTRINSICS=OFF",
+     "-DOPUS_DRED=OFF",
+     "-DOPUS_FIXED_POINT=OFF",
+     "-DOPUS_INSTALL_CMAKE_CONFIG_MODULE=OFF",
+     "-DOPUS_INSTALL_PKG_CONFIG_MODULE=OFF",
+     "-DOPUS_OSCE=OFF",
+     "-DOPUS_PRESUME_NEON=ON"
     ]
-   },
-   "sha256": {
-    "shared": "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1"
    },
    "version": {
     "shared": "1.6.1"
@@ -683,7 +677,6 @@
  },
  "known_differences": {
   "ffmpeg.flags": "The shared list is submodules/ffmpeg/Sources/FFMpeg/ffmpeg-common-flags.sh (decoders incl. vorbis and av1, demuxers, parsers, the disabled network and Apple-framework glue); both scripts source it. Left apart on purpose: iOS adds the mp4/matroska/ogg/mpegts muxers for recording, and its AudioToolbox decoders and encoders and the hwaccels come with the darwin configure call; Mac adds AudioToolbox, the native aac decoder, alac_at/gsm_ms_at and the VideoToolbox hwaccels in build.sh. tools/dev/tests/test_ffmpeg_flags_parity.py pins both deltas.",
-  "opus.flags": "iOS cross-compiles static PIC with intrinsics; the Mac build uses fixed-point and no PIC option. Both disable asm. Align when phase 2 shares one opus script.",
   "libvpx.flags": "iOS builds the realtime encoder only (no WebM IO, multi-res encoding, no postproc); the Mac builds the full VP8/VP9 decoder with WebM IO and runtime CPU detection. Different jobs: calls on iOS, playback of WebM on Mac."
  }
 }

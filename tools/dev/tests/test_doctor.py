@@ -66,7 +66,7 @@ class DoctorTests(unittest.TestCase):
             result = doctor.check_submodules(root)
             self.assertFalse(result.ok)
             self.assertIn("libvpx source", result.hint)
-            self.assertIn("opus tarball", result.hint)
+            self.assertIn("opus source", result.hint)
             for marker in doctor.SUBMODULE_MARKERS.values():
                 (root / marker).parent.mkdir(parents=True, exist_ok=True)
                 (root / marker).write_text("x")
