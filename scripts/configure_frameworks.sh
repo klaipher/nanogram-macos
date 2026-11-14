@@ -2,8 +2,8 @@
 set -e
 
 
-declare -a libs=("OpenH264" "OpenSSL" "libopus" "libvpx" "mozjpeg" "libwebp" "dav1d" "ffmpeg" "webrtc" "tde2e" "wallet-engine" "mtproto-engine")
-declare -a libname=("OpenH264" "OpenSSLEncryption" "libopus" "libvpx" "Mozjpeg" "libwebp" "dav1d" "ffmpeg" "webrtc" "tde2e" "WalletEngine" "MTProtoEngine")
+declare -a libs=("OpenH264" "boringssl" "libopus" "libvpx" "mozjpeg" "libwebp" "dav1d" "ffmpeg" "webrtc" "tde2e" "wallet-engine" "mtproto-engine" "nanogram-rust")
+declare -a libname=("OpenH264" "BoringSSL" "libopus" "libvpx" "Mozjpeg" "libwebp" "dav1d" "ffmpeg" "webrtc" "tde2e" "WalletEngine" "MTProtoEngine" "NanogramRust")
 
 arraylength=${#libs[@]}
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
@@ -51,10 +51,7 @@ do
         framework_reset_outputs "$ROOT_DIR" "$LIB"
     else
         echo "framework-stamp: $LIB outputs are missing or inconsistent, repairing"
-        case "$LIB" in
-            wallet-engine|mtproto-engine) framework_reset_outputs "$ROOT_DIR" "$LIB" ;;
-            *) rm -rf "$BUILD_DIR" ;;
-        esac
+        rm -rf "$BUILD_DIR"
     fi
     rm -f "$STAMP_FILE"
 
@@ -78,12 +75,12 @@ DIRECTORY_PAIRS=(
     "${SCRIPT_DIR}/../core-xprojects/libopus/build/libopus/include,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/OpusBinding/SharedHeaders/libopus/include"
     "${SCRIPT_DIR}/../core-xprojects/ffmpeg/build/ffmpeg/include,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/FFMpegBinding/SharedHeaders/ffmpeg/include"
     "${SCRIPT_DIR}/../core-xprojects/webrtc/build/src,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/webrtc"
-    "${SCRIPT_DIR}/../core-xprojects/openssl/build/openssl/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/openssl/include"
+    "${SCRIPT_DIR}/../core-xprojects/boringssl/build/boringssl/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/openssl/include"
     "${SCRIPT_DIR}/../core-xprojects/libopus/build/libopus/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/libopus/include"
     "${SCRIPT_DIR}/../core-xprojects/ffmpeg/build/ffmpeg/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/ffmpeg/include"
     "${SCRIPT_DIR}/../submodules/telegram-ios/third-party/rnnoise/rnnoise/include,${SCRIPT_DIR}/../submodules/tgcalls/SharedHeaders/rnoise"
     "${SCRIPT_DIR}/../core-xprojects/libwebp/build/libwebp/include,${SCRIPT_DIR}/../submodules/libwebp/SharedHeaders/libwebp/include"
-    "${SCRIPT_DIR}/../core-xprojects/openssl/build/openssl/include,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/OpenSSLEncryptionProvider/SharedHeaders/openssl/include"
+    "${SCRIPT_DIR}/../core-xprojects/boringssl/build/boringssl/include,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/OpenSSLEncryptionProvider/SharedHeaders/openssl/include"
     "${SCRIPT_DIR}/../submodules/telegram-ios/submodules/EncryptionProvider/PublicHeaders,${SCRIPT_DIR}/../submodules/telegram-ios/submodules/OpenSSLEncryptionProvider/SharedHeaders/EncryptionProvider"
     "${SCRIPT_DIR}/../core-xprojects/Mozjpeg/build,${SCRIPT_DIR}/../submodules/Mozjpeg/SharedHeaders/libmozjpeg"
     "${SCRIPT_DIR}/../core-xprojects/Mozjpeg/build/libjpeg-turbo-3.2.1/src,${SCRIPT_DIR}/../submodules/Mozjpeg/SharedHeaders/ios-mozjpeg"
@@ -95,4 +92,3 @@ for pair in "${DIRECTORY_PAIRS[@]}"; do
     sh "$SCRIPT_DIR/sync-headers.sh" "$SOURCE_DIR" "$DEST_DIR"
 done
 
-sh "$ROOT_DIR/scripts/time-step.sh" tlottie sh "$ROOT_DIR/core-xprojects/tlottie/build.sh"

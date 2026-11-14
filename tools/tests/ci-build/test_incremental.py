@@ -111,9 +111,8 @@ class SyncTests(TemporaryTest):
         write(target / "removed.swift", "old")
         preserved = [
             "core-xprojects/libopus/build/libopus.a",
-            "core-xprojects/tlottie/build/libtlottie.a",
-            "packages/WalletEngine/wallet_engineFFI.xcframework/Info.plist",
-            "submodules/telegram-ios/submodules/MTProtoRustEngine/MTProtoEngineFFI.xcframework/Info.plist",
+            "core-xprojects/nanogram-rust/build/libnanogram_rust.a",
+            "packages/RustLibraries/NanogramRustFFI.xcframework/Info.plist",
             "submodules/tgcalls/SharedHeaders/api.h",
             "submodules/telegram-ios/submodules/OpusBinding/SharedHeaders/api.h",
             ".build/telegram-api-generation/state.json",
@@ -148,8 +147,8 @@ class SyncTests(TemporaryTest):
 
 
 class FrameworkTests(TemporaryTest):
-    libraries = ["OpenH264", "OpenSSL", "libopus", "libvpx", "mozjpeg", "libwebp", "dav1d", "ffmpeg", "webrtc", "tde2e", "wallet-engine", "mtproto-engine"]
-    projects = ["OpenH264", "OpenSSLEncryption", "libopus", "libvpx", "Mozjpeg", "libwebp", "dav1d", "ffmpeg", "webrtc", "tde2e", "WalletEngine", "MTProtoEngine"]
+    libraries = ["OpenH264", "boringssl", "libopus", "libvpx", "mozjpeg", "libwebp", "dav1d", "ffmpeg", "webrtc", "tde2e", "wallet-engine", "mtproto-engine", "nanogram-rust"]
+    projects = ["OpenH264", "BoringSSL", "libopus", "libvpx", "Mozjpeg", "libwebp", "dav1d", "ffmpeg", "webrtc", "tde2e", "WalletEngine", "MTProtoEngine", "NanogramRust"]
 
     def setUp(self):
         super().setUp()
@@ -163,36 +162,63 @@ class FrameworkTests(TemporaryTest):
         write(self.root / "core-xprojects/tlottie/build.sh", "exit 0\n")
         for lib, project in zip(self.libraries, self.projects):
             write(self.root / f"core-xprojects/{lib}/{project}.xcodeproj/project.pbxproj", "fixture")
+            if lib in ("wallet-engine", "mtproto-engine", "nanogram-rust"):
+                shutil.copy2(ROOT / f"core-xprojects/{lib}/{project}.xcodeproj/project.pbxproj", self.root / f"core-xprojects/{lib}/{project}.xcodeproj/project.pbxproj")
+                write(self.root / f"core-xprojects/{lib}/{lib}/build.sh", f'#!/bin/sh\nexec "$(cd "$(dirname "$0")/../../.." && pwd)/bin/produce" "$(cd "$(dirname "$0")/../../.." && pwd)" {lib}\n')
         for name in ["submodules/telegram-ios/third-party/rnnoise/rnnoise/include/api.h", "submodules/telegram-ios/submodules/EncryptionProvider/PublicHeaders/api.h", "submodules/telegram-ios/third-party/mozjpeg/mozjpeg/api.h"]:
             write(self.root / name, "header")
         write(self.root / ".gitignore", "build/\nSharedHeaders/\n*.xcframework/\nruns\nbin/\nWalletEngineFFI.swift\n")
         run(["git", "init", "-q", str(self.root)])
         run(["git", "-C", str(self.root), "add", "."])
         run(["git", "-C", str(self.root), "-c", "user.name=CI Test", "-c", "user.email=ci@example.invalid", "commit", "-qm", "fixture"])
+        produce = '''#!/bin/bash
+set -e
+ROOT="$1"
+LIB="$2"
+. "$ROOT/scripts/framework-inputs.sh"
+mkdir -p "$ROOT/core-xprojects/$LIB/build"
+framework_required_outputs "$ROOT" "$LIB" | while IFS= read -r output; do
+    mkdir -p "$(dirname "$output")"
+    printf 'artifact' > "$output"
+done
+if [ "$LIB" = "mozjpeg" ]; then
+    mkdir -p "$ROOT/core-xprojects/mozjpeg/build/libjpeg-turbo-3.2.1/src"
+    printf 'header' > "$ROOT/core-xprojects/mozjpeg/build/libjpeg-turbo-3.2.1/src/jpeglib.h"
+fi
+if [ "$LIB" = "wallet-engine" ]; then
+    mkdir -p "$ROOT/packages/WalletEngine/Sources/WalletEngineFFI"
+    cp "$ROOT/core-xprojects/$LIB/build/WalletEngineFFI.swift" "$ROOT/packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift"
+fi
+'''
         mock_build = '''#!/bin/bash
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 while [ "$1" != "-project" ]; do shift; done
 shift
 LIB=$(basename "$(dirname "$1")")
+PBXPROJ="$1/project.pbxproj"
 echo "$LIB" >> "$ROOT/runs"
-. "$ROOT/scripts/framework-inputs.sh"
-mkdir -p "$ROOT/core-xprojects/$LIB/build"
-if [ "$LIB" = "${FAIL_LIB:-}" ]; then exit 37; fi
-framework_required_outputs "$ROOT" "$LIB" | while IFS= read -r output; do
-    mkdir -p "$(dirname "$output")"
-    printf 'artifact' > "$output"
-done
-if [ "$LIB" = "wallet-engine" ]; then
-    mkdir -p "$ROOT/packages/WalletEngine/Sources/WalletEngineFFI"
-    cp "$ROOT/core-xprojects/$LIB/build/WalletEngineFFI.swift" "$ROOT/packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift"
-fi
+if [ "$LIB" = "${FAIL_LIB:-}" ]; then mkdir -p "$ROOT/core-xprojects/$LIB/build"; exit 37; fi
+case "$LIB" in
+    wallet-engine|mtproto-engine|nanogram-rust)
+        PROJECT_DIR="$ROOT/core-xprojects/$LIB" /bin/sh -c "$(python3 -I "$ROOT/bin/phase-script" "$PBXPROJ")"
+        ;;
+    *)
+        "$ROOT/bin/produce" "$ROOT" "$LIB"
+        ;;
+esac
 if [ "$LIB" = "${INCOMPLETE_LIB:-}" ]; then
+    . "$ROOT/scripts/framework-inputs.sh"
     output=$(framework_required_outputs "$ROOT" "$LIB" | head -1)
     rm "$output"
 fi
 '''
-        for name, contents in [("xcrun", mock_build), ("xcodebuild", "#!/bin/sh\nprintf 'Xcode fixture\\n'\n")]:
+        phase = '''import re, sys
+text = open(sys.argv[1]).read()
+script = re.search(r'shellScript = "(.*)";', text).group(1)
+print(script.replace('\\\\"', '"').replace('\\\\n', '\\n'))
+'''
+        for name, contents in [("phase-script", phase), ("produce", produce), ("xcrun", mock_build), ("xcodebuild", "#!/bin/sh\nprintf 'Xcode fixture\\n'\n")]:
             executable = write(self.root / "bin" / name, contents)
             executable.chmod(0o755)
         self.environment = dict(os.environ, PATH=str(self.root / "bin") + os.pathsep + os.environ["PATH"])
@@ -213,23 +239,23 @@ fi
     def test_missing_native_output_and_xcframework_are_repaired(self):
         self.configure()
         (self.root / "core-xprojects/libopus/build/libopus/lib/libopus.a").unlink()
-        shutil.rmtree(self.root / "packages/WalletEngine/wallet_engineFFI.xcframework")
+        shutil.rmtree(self.root / "packages/RustLibraries/NanogramRustFFI.xcframework")
         self.configure()
-        self.assertEqual(self.runs()[12:], ["libopus", "wallet-engine"])
+        self.assertEqual(self.runs()[13:], ["libopus", "nanogram-rust"])
         self.configure()
-        self.assertEqual(len(self.runs()), 14)
+        self.assertEqual(len(self.runs()), 15)
 
     def test_changed_input_rebuilds_dependents_and_force_rebuilds_all(self):
         self.configure()
         write(self.root / "core-xprojects/libopus/libopus.xcodeproj/project.pbxproj", "changed")
         self.configure()
-        self.assertEqual(self.runs()[12:], ["libopus", "ffmpeg", "webrtc"])
+        self.assertEqual(self.runs()[13:], ["libopus", "ffmpeg", "webrtc"])
         write(self.root / "core-xprojects/libopus/libopus.xcodeproj/project.pbxproj", "changed again")
         self.configure()
-        self.assertEqual(self.runs()[15:], ["libopus", "ffmpeg", "webrtc"])
+        self.assertEqual(self.runs()[16:], ["libopus", "ffmpeg", "webrtc"])
         write(self.root / "scripts/rebuild", "yes")
         self.configure()
-        self.assertEqual(self.runs()[-12:], self.libraries)
+        self.assertEqual(self.runs()[-13:], self.libraries)
 
     def test_failed_or_incomplete_build_is_never_stamped(self):
         for variable in ["FAIL_LIB", "INCOMPLETE_LIB"]:
@@ -243,7 +269,7 @@ fi
         self.configure()
         write(self.root / "packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift", "wrong ABI")
         self.configure()
-        self.assertEqual(self.runs()[12:], ["wallet-engine"])
+        self.assertEqual(self.runs()[13:], ["wallet-engine"])
 
 
 class ArchiveTests(TemporaryTest):
@@ -321,42 +347,6 @@ print("Build Timing Summary\\nCompileSwift: fixture")
             self.build(ARCHIVE_RESULT="37")
         self.assertFalse((self.root / "builds/build-Beta/Telegram.app").exists())
         self.assertIn("deliberate archive failure", (self.logs / "xcodebuild.log").read_text())
-
-
-class TlottieTests(TemporaryTest):
-    def test_warm_build_preserves_library_and_does_not_reinstall_toolchain(self):
-        script = self.root / "core-xprojects/tlottie/build.sh"
-        script.parent.mkdir(parents=True)
-        shutil.copy2(ROOT / "core-xprojects/tlottie/build.sh", script)
-        write(self.root / "submodules/tlottie/Cargo.toml", "fixture")
-        write(self.root / "submodules/telegram-ios/third-party/mtproto-engine/rust-toolchain.toml", 'channel = "fixture"\n')
-        cargo = write(self.root / "bin/cargo", '''#!/bin/sh
-set -e
-while [ "$1" != "--target" ]; do shift; done
-shift
-mkdir -p "$CARGO_TARGET_DIR/$1/release"
-printf '%s' "${LIBRARY_CONTENT:-library}" > "$CARGO_TARGET_DIR/$1/release/libtlottie.a"
-''')
-        rustup = write(self.root / "bin/rustup", '''#!/bin/sh
-if [ "$1" = "run" ]; then exit 0; fi
-if [ "$1 $2" = "target list" ]; then printf 'aarch64-apple-darwin\\nx86_64-apple-darwin\\n'; exit 0; fi
-echo "unexpected rustup installation" >&2
-exit 37
-''')
-        lipo = write(self.root / "bin/lipo", '''#!/bin/sh
-if [ "$1" = "-info" ]; then exit 0; fi
-cat "$2" "$3" > "$5"
-''')
-        for executable in [cargo, rustup, lipo]:
-            executable.chmod(0o755)
-        environment = dict(os.environ, CARGO=str(cargo), PATH=str(cargo.parent) + os.pathsep + os.environ["PATH"])
-        run(["sh", str(script)], env=environment)
-        output = script.parent / "build/libtlottie.a"
-        before = output.stat().st_mtime_ns
-        run(["sh", str(script)], env=environment)
-        self.assertEqual(before, output.stat().st_mtime_ns)
-        run(["sh", str(script)], env=dict(environment, LIBRARY_CONTENT="changed"))
-        self.assertEqual(output.read_text(), "changedchanged")
 
 
 if __name__ == "__main__":

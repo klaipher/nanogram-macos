@@ -18,14 +18,6 @@ installLocalizationTransform(BrandingStrings.brand)
 #if NANOGRAM_MAS
 StorePurchasePolicy.current = .store
 #endif
-
-@_silgen_name("OPENSSL_init_crypto")
-private func OPENSSL_init_crypto(_ opts: UInt64, _ settings: OpaquePointer?) -> Int32
-
-private let OPENSSL_INIT_NO_ATEXIT: UInt64 = 0x00080000
-
-_ = OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nil)
-
 if let groupURL = ApiEnvironment.legacyContainerURL {
     armCrashMarker(folder: groupURL.appendingPathComponent(ApiEnvironment.prefix).path)
 }

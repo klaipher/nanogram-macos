@@ -90,19 +90,17 @@ class PinnedVersionsTests(unittest.TestCase):
         self.assertFalse((CORE / "libwebp" / "libwebp" / "build.sh").exists())
         self.assertFalse((CORE / "libwebp" / "libwebp-master.zip").exists())
 
-    def test_openssl(self):
-        script = read(CORE / "openssl" / "OpenSSLEncryption" / "build.sh")
-        self.assertIn("-b openssl-3.5.9 ", script)
-        self.assertIn("45e844fa2a14ec92d146bd8f5778ac130b6625fb", script)
-        self.assertNotIn("OpenSSL_1_1_1", script)
-        self.assertFalse((CORE / "openssl" / "OpenSSLEncryption" / "patch-conf.diff").exists())
-        project = read(CORE / "openssl" / "OpenSSLEncryption.xcodeproj" / "project.pbxproj")
-        self.assertNotIn("submodules/telegram-ios/submodules/openssl", project)
+    def test_boringssl_replaces_openssl(self):
+        script = read(CORE / "boringssl" / "BoringSSL" / "build.sh")
+        self.assertIn("third-party/boringssl/src", script)
+        self.assertNotIn("git clone", script)
+        self.assertFalse((CORE / "openssl").exists())
+        project = read(CORE / "boringssl" / "BoringSSL.xcodeproj" / "project.pbxproj")
+        self.assertNotIn("OpenSSL", project)
 
-    def test_openssl_keeps_upstream_callers_free_of_3_0_deprecation_warnings(self):
-        script = read(CORE / "openssl" / "OpenSSLEncryption" / "build.sh")
-        self.assertIn("define OPENSSL_SUPPRESS_DEPRECATED", script)
-        self.assertIn("openssl/configuration.h", script)
+    def test_no_openssl_deprecation_workaround_remains(self):
+        script = read(CORE / "boringssl" / "BoringSSL" / "build.sh")
+        self.assertNotIn("OPENSSL_SUPPRESS_DEPRECATED", script)
 
     def test_ffmpeg(self):
         sources = TG_IOS / "submodules" / "ffmpeg" / "Sources" / "FFMpeg"
@@ -156,7 +154,7 @@ class PinnedVersionsTests(unittest.TestCase):
     def test_rust_toolchain(self):
         pin = read(CORE / "rust-toolchain.toml")
         self.assertIn('channel = "1.99.1"', pin)
-        for script in ("mtproto-engine/mtproto-engine/build.sh", "wallet-engine/wallet-engine/build.sh", "tlottie/build.sh"):
+        for script in ("mtproto-engine/mtproto-engine/build.sh", "wallet-engine/wallet-engine/build.sh", "nanogram-rust/nanogram-rust/build.sh"):
             text = read(CORE / script)
             self.assertIn("rust-toolchain.toml", text, script)
             self.assertIn("export RUSTUP_TOOLCHAIN", text, script)

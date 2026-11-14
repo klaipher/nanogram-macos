@@ -57,40 +57,9 @@ mkdir -p "$BUILD_DIR"
 
 cd "$SOURCE_DIR"
 
-for RUST_TARGET in aarch64-apple-darwin; do
-    if [ -x "$RUSTUP_BIN" ]; then
-        "$RUSTUP_BIN" target add "$RUST_TARGET" >/dev/null 2>&1 || true
-    fi
-    # cargo rustc with --crate-type staticlib only: the crate also declares rlib, and Cargo never runs LTO for a
-    # crate whose types include rlib (it emits object plus bitcode and ignores profile.release.lto).
-    env -u MACOSX_DEPLOYMENT_TARGET CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" rustc \
-        --package mtproto-ffi \
-        --lib \
-        --crate-type staticlib \
-        --release \
-        --locked \
-        --target "$RUST_TARGET" \
-        --config 'profile.release.lto="fat"'
-done
-
-cp "$BUILD_DIR/lib/aarch64-apple-darwin/release/libmtproto_engine_ffi.a" "$BUILD_DIR/libmtproto_engine_ffi.a"
-
+# The staticlib is built by nanogram-rust together with tlottie and wallet-engine; this unit only stages the header.
 HEADERS_DIR="$BUILD_DIR/headers"
 rm -rf "$HEADERS_DIR"
-mkdir -p "$HEADERS_DIR/MTProtoEngineFFI"
-cp "$SOURCE_DIR/crates/mtproto-ffi/include/mtproto_engine.h" "$HEADERS_DIR/MTProtoEngineFFI/"
-cat > "$HEADERS_DIR/MTProtoEngineFFI/module.modulemap" <<EOF
-module MTProtoEngineFFI {
-    header "mtproto_engine.h"
-    export *
-}
-EOF
-
-rm -rf "$PACKAGE_DIR/MTProtoEngineFFI.xcframework"
-xcodebuild -create-xcframework \
-    -library "$BUILD_DIR/libmtproto_engine_ffi.a" \
-    -headers "$HEADERS_DIR" \
-    -output "$PACKAGE_DIR/MTProtoEngineFFI.xcframework"
-
-lipo -info "$BUILD_DIR/libmtproto_engine_ffi.a"
-echo "mtproto-engine artifacts updated in $PACKAGE_DIR"
+mkdir -p "$HEADERS_DIR"
+cp "$SOURCE_DIR/crates/mtproto-ffi/include/mtproto_engine.h" "$HEADERS_DIR/"
+echo "mtproto-engine header staged in $HEADERS_DIR"

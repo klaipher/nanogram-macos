@@ -8,8 +8,7 @@ mkdir -p "$DEST_DIR"
 rsync -a --delete \
     --exclude='/core-xprojects/*/build/' \
     --exclude='/Telegram-Mac/Release.xcconfig' \
-    --exclude='/packages/WalletEngine/wallet_engineFFI.xcframework/' \
-    --exclude='/submodules/telegram-ios/submodules/MTProtoRustEngine/MTProtoEngineFFI.xcframework/' \
+    --exclude='/packages/RustLibraries/NanogramRustFFI.xcframework/' \
     --exclude='/submodules/**/SharedHeaders/' \
     --exclude='/.build/telegram-api-generation/' \
     --exclude='/submodules/telegram-ios/build-system/SwiftTL/.build/' \

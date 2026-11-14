@@ -17,9 +17,9 @@ Deleted: `core-xprojects/Mozjpeg/libjpeg-turbo-3.2.1.tar.gz`. Its sha256 is c27a
 
 Deleted: `scripts/flatc` (sha256 4448902b456693cb1b5fc6158071b6499525518160314abf128e531bd8b44d3d). Its embedded build path names `flatbuffers-25.12.19`, the iOS pin (`MODULE.bazel` `flatbuffers_zip`, sha256 f5d4636bfc4d30c622c9ad238ce947848c2b90b10aecd387dc62cdee2584359b). `prepare-flat-serialization.py` downloads that archive, checks the sha256, builds `flatc` with the same CMake flags as iOS `third-party/flatc/BUILD`, and caches it in `.build/flatc/25.12.19/`. A `scripts/flatc` file, if someone puts one there, still takes precedence.
 
-## OpenSSL
+## BoringSSL (replaces OpenSSL 3.5.9)
 
-`patch-conf.diff` patched `Configurations/10-main.conf` for darwin64 no-asm targets of OpenSSL 1.1; the `patch` call was already commented out and OpenSSL 3.5.9 has native darwin64-arm64-cc and darwin64-x86_64-cc targets, so the hunk is intentionally dropped. The `../../submodules/telegram-ios/submodules/openssl` argument pointed to a directory that does not exist in the core and was never read.
+The Mac builds the one BoringSSL iOS and Android use (klaipher/boringssl `nanogram`, the core's `third-party/boringssl/src`) with CMake + Ninja in `core-xprojects/boringssl/BoringSSL/build.sh`: `-O2`, the `.bazelrc` hardening flags, assembly on, only the `crypto` and `ssl` targets. Output `build/boringssl/{lib/libcrypto.a,lib/libssl.a,include/openssl}`, the layout OpenSSL had. WebRTC (headers only, `TG_OWT_OPENSSL_INCLUDE_PATH`), tde2e and the app link all use this one copy. `core-xprojects/openssl` and its `OpenSSLEncryption` project are gone; the Swift module `OpenSSLEncryption` (the core's `OpenSSLEncryptionProvider` package) keeps its name and is built with `TELEGRAM_USE_BORINGSSL=1`.
 
 ## Pending until the iOS integrator lane lands: the core bump checklist
 

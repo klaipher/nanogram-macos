@@ -1605,8 +1605,8 @@
 		27D43DA72791771A006968A6 /* libwebpdecoder.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libwebpdecoder.a; path = "core-xprojects/libwebp/build/libwebp/lib/libwebpdecoder.a"; sourceTree = "<group>"; };
 		27D43DA92791771F006968A6 /* libwebpdemux.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libwebpdemux.a; path = "core-xprojects/libwebp/build/libwebp/lib/libwebpdemux.a"; sourceTree = "<group>"; };
 		27D43DAD27917735006968A6 /* libjpeg.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libjpeg.a; path = "core-xprojects/Mozjpeg/build/libjpeg.a"; sourceTree = "<group>"; };
-		27D43DAF27917747006968A6 /* libssl.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libssl.a; path = "core-xprojects/openssl/build/openssl/lib/libssl.a"; sourceTree = "<group>"; };
-		27D43DB12791774A006968A6 /* libcrypto.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcrypto.a; path = "core-xprojects/openssl/build/openssl/lib/libcrypto.a"; sourceTree = "<group>"; };
+		27D43DAF27917747006968A6 /* libssl.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libssl.a; path = "core-xprojects/boringssl/build/boringssl/lib/libssl.a"; sourceTree = "<group>"; };
+		27D43DB12791774A006968A6 /* libcrypto.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcrypto.a; path = "core-xprojects/boringssl/build/boringssl/lib/libcrypto.a"; sourceTree = "<group>"; };
 		27D43DB327917798006968A6 /* libmac_framework_objc_static.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmac_framework_objc_static.a; path = "core-xprojects/webrtc/build/webrtc/libmac_framework_objc_static.a"; sourceTree = "<group>"; };
 		27D43DB527918ABB006968A6 /* Mozjpeg */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Mozjpeg; path = submodules/Mozjpeg; sourceTree = "<group>"; };
 		27D43DBD27919152006968A6 /* OpenSSLEncryptionProvider */ = {isa = PBXFileReference; lastKnownFileType = folder; name = OpenSSLEncryptionProvider; path = "submodules/telegram-ios/submodules/OpenSSLEncryptionProvider"; sourceTree = "<group>"; };
@@ -5142,7 +5142,7 @@
 					"$(PROJECT_DIR)/core-xprojects/libopus/build/libopus/lib",
 					"$(PROJECT_DIR)/core-xprojects/libwebp/build/libwebp/lib",
 					"$(PROJECT_DIR)/core-xprojects/Mozjpeg/build",
-					"$(PROJECT_DIR)/core-xprojects/openssl/build/openssl/lib",
+					"$(PROJECT_DIR)/core-xprojects/boringssl/build/boringssl/lib",
 					"$(PROJECT_DIR)/core-xprojects/webrtc/build/webrtc",
 					"$(PROJECT_DIR)/core-xprojects/OpenH264/build/output/lib",
 					"$(PROJECT_DIR)/core-xprojects/dav1d/build/dav1d/lib",
@@ -5195,7 +5195,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/core-xprojects/ffmpeg/build/ffmpeg/lib",
 					"$(PROJECT_DIR)/core-xprojects/Mozjpeg/build",
-					"$(PROJECT_DIR)/core-xprojects/openssl/build/openssl/lib",
+					"$(PROJECT_DIR)/core-xprojects/boringssl/build/boringssl/lib",
 					"$(PROJECT_DIR)/core-xprojects/libopus/build/libopus/lib",
 					"$(PROJECT_DIR)/core-xprojects/libvpx/build/libvpx/lib",
 					"$(PROJECT_DIR)/core-xprojects/libwebp/build/libwebp/lib",
@@ -5247,7 +5247,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/core-xprojects/ffmpeg/build/ffmpeg/lib",
 					"$(PROJECT_DIR)/core-xprojects/Mozjpeg/build",
-					"$(PROJECT_DIR)/core-xprojects/openssl/build/openssl/lib",
+					"$(PROJECT_DIR)/core-xprojects/boringssl/build/boringssl/lib",
 					"$(PROJECT_DIR)/core-xprojects/libopus/build/libopus/lib",
 					"$(PROJECT_DIR)/core-xprojects/libvpx/build/libvpx/lib",
 					"$(PROJECT_DIR)/core-xprojects/libwebp/build/libwebp/lib",
@@ -5367,7 +5367,7 @@
 					"$(PROJECT_DIR)/core-xprojects/libopus/build/libopus/lib",
 					"$(PROJECT_DIR)/core-xprojects/libwebp/build/libwebp/lib",
 					"$(PROJECT_DIR)/core-xprojects/Mozjpeg/build",
-					"$(PROJECT_DIR)/core-xprojects/openssl/build/openssl/lib",
+					"$(PROJECT_DIR)/core-xprojects/boringssl/build/boringssl/lib",
 					"$(PROJECT_DIR)/core-xprojects/webrtc/build/webrtc",
 					"$(PROJECT_DIR)/core-xprojects/OpenH264/build/output/lib",
 					"$(PROJECT_DIR)/core-xprojects/dav1d/build/dav1d/lib",

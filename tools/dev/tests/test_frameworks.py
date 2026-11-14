@@ -23,8 +23,8 @@ class VerifyOutputsTests(unittest.TestCase):
     def test_required_outputs_cover_every_library(self):
         with tempfile.TemporaryDirectory() as tmp:
             names = {p.name for p in frameworks.required_outputs(Path(tmp))}
-        for name in ("libssl.a", "libopenh264.a", "libdav1d.a", "libtde2e.a", "libwallet_engine.a",
-                     "libmtproto_engine_ffi.a", "libmac_framework_objc_static.a", "libtlottie.a"):
+        for name in ("libssl.a", "libopenh264.a", "libdav1d.a", "libtde2e.a", "libnanogram_rust.a",
+                     "libcrypto.a", "libmac_framework_objc_static.a", "mtproto_engine.h", "WalletEngineFFI.swift"):
             self.assertIn(name, names)
 
     def test_xcframework_slices_are_arm64_only(self):
@@ -114,8 +114,7 @@ class BuildEnvironmentTests(unittest.TestCase):
 
 class RustScriptTests(unittest.TestCase):
     SCRIPTS = ("core-xprojects/wallet-engine/wallet-engine/build.sh",
-               "core-xprojects/mtproto-engine/mtproto-engine/build.sh",
-               "core-xprojects/tlottie/build.sh")
+               "core-xprojects/nanogram-rust/nanogram-rust/build.sh")
 
     def test_every_cargo_call_unsets_deployment_target(self):
         for script in self.SCRIPTS:
@@ -177,10 +176,6 @@ class FakeRunner:
     def sync_headers(self):
         self.calls.append(("sync_headers",))
 
-    def build_tlottie(self, stamp):
-        self.calls.append(("build_tlottie",))
-        self.current.add("tlottie")
-
     def write_stamp(self, unit, stamp):
         self.calls.append(("write_stamp", unit))
         self.current.add(unit)
@@ -206,7 +201,7 @@ class CacheRunTests(unittest.TestCase):
     def test_all_current_skips_configure(self):
         runner = FakeRunner(current=ALL, cached=ALL)
         summary = frameworks.run(Path("/root"), True, runner)
-        for name in ("configure", "sync_headers", "build_tlottie", "restore", "store"):
+        for name in ("configure", "sync_headers", "restore", "store"):
             self.assertNotIn(name, runner.names())
         self.assertEqual((summary.current, summary.restored, summary.built), (len(ALL), 0, 0))
 
@@ -216,7 +211,6 @@ class CacheRunTests(unittest.TestCase):
         self.assertEqual([c[1] for c in runner.calls if c[0] == "restore"], list(ALL))
         self.assertIn("sync_headers", runner.names())
         self.assertNotIn("configure", runner.names())
-        self.assertNotIn("build_tlottie", runner.names())
         self.assertEqual((summary.current, summary.restored, summary.built), (0, len(ALL), 0))
         self.assertLess(runner.names().index("restore"), runner.names().index("sync_headers"))
 
@@ -227,7 +221,6 @@ class CacheRunTests(unittest.TestCase):
         self.assertEqual(runner.names().count("configure"), 1)
         self.assertEqual([c[1] for c in runner.calls if c[0] == "store"], ["webrtc"])
         self.assertLess(runner.names().index("configure"), runner.names().index("store"))
-        self.assertNotIn("build_tlottie", runner.names())
         self.assertEqual(summary.built, 1)
 
     def test_restore_that_is_not_current_gets_built(self):
@@ -247,7 +240,7 @@ class CacheRunTests(unittest.TestCase):
 
     def test_failed_restore_gets_built(self):
         runner = FakeRunner(current=(), cached=ALL)
-        runner.failing = {"OpenSSL"}
+        runner.failing = {"boringssl"}
         summary = frameworks.run(Path("/root"), True, runner)
         self.assertEqual(runner.names().count("configure"), 1)
         self.assertEqual((summary.restored, summary.built), (len(ALL) - 1, 1))
@@ -265,22 +258,10 @@ class CacheRunTests(unittest.TestCase):
         self.assertFalse(stored & rust_units, stored)
         self.assertEqual(stored, set(ALL) - rust_units)
 
-    def test_configure_builds_tlottie_once(self):
-        runner = FakeRunner(current=(), cached=())
-        frameworks.run(Path("/root"), True, runner)
-        self.assertEqual(runner.names().count("configure"), 1)
-        self.assertNotIn("build_tlottie", runner.names())
-
-    def test_tlottie_miss_alone_builds_only_tlottie(self):
-        runner = FakeRunner(current=[u for u in ALL if u != "tlottie"], cached=())
-        frameworks.run(Path("/root"), True, runner)
-        self.assertIn("build_tlottie", runner.names())
-        self.assertNotIn("configure", runner.names())
-
     def test_current_units_seed_the_cache(self):
-        runner = FakeRunner(current=ALL, cached=[u for u in ALL if u != "OpenSSL"])
+        runner = FakeRunner(current=ALL, cached=[u for u in ALL if u != "boringssl"])
         frameworks.run(Path("/root"), True, runner)
-        self.assertEqual([c[1] for c in runner.calls if c[0] == "store"], ["OpenSSL"])
+        self.assertEqual([c[1] for c in runner.calls if c[0] == "store"], ["boringssl"])
 
     def test_no_cache_builds_even_with_hit(self):
         runner = FakeRunner(current=(), cached=ALL)
@@ -292,9 +273,9 @@ class CacheRunTests(unittest.TestCase):
         self.assertIn("configure", runner.names())
 
     def test_plan_statuses(self):
-        runner = FakeRunner(current=["OpenSSL"], cached=["libopus"])
+        runner = FakeRunner(current=["boringssl"], cached=["libopus"])
         statuses = frameworks.plan(runner.stamps(), runner.is_current, runner.find, "rustc 1", use_cache=True)
-        self.assertEqual(statuses["OpenSSL"], "current")
+        self.assertEqual(statuses["boringssl"], "current")
         self.assertEqual(statuses["libopus"], "restore")
         self.assertEqual(statuses["webrtc"], "build")
 
@@ -339,24 +320,37 @@ class NativeBuildFlagTests(unittest.TestCase):
         for flag in ("network", "securetransport", "bzlib", "iconv", "appkit", "avfoundation", "coreimage", "metal", "sdl2"):
             self.assertIn(f"--disable-{flag}", text)
 
-    def test_openssl_configure_drops_unused_algorithms(self):
-        text = self.script("core-xprojects/openssl/OpenSSLEncryption/build.sh")
-        configure = text[text.index("./Configure"):text.index("--prefix=", text.index("./Configure"))]
-        for option in ("no-quic", "no-engine", "no-legacy", "no-autoload-config", "no-sm4", "no-ml-dsa", "no-ssl3"):
-            self.assertIn(option, configure)
-        for kept in ("no-srtp", "no-dtls", "no-ec ", "no-chacha", "no-poly1305", "no-dh "):
-            self.assertNotIn(kept, configure)
+    def test_boringssl_cmake_builds_only_crypto_and_ssl_with_the_ios_options(self):
+        text = self.script("core-xprojects/boringssl/BoringSSL/build.sh")
+        for option in ("-DBUILD_SHARED_LIBS=OFF", "-DBUILD_TESTING=OFF", "-DCMAKE_BUILD_TYPE=Release"):
+            self.assertIn(option, text)
+        self.assertIn("crypto ssl", text)
+        self.assertNotIn("OPENSSL_NO_ASM", text)
 
     def test_webrtc_stays_below_the_macos_15_screen_capture_obsoletions(self):
         text = self.script("core-xprojects/webrtc/webrtc/build.sh")
         self.assertIn("-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0", text)
 
-    def test_tlottie_aborts_on_panic(self):
-        self.assertIn("--config 'profile.release.panic=\"abort\"'", self.script("core-xprojects/tlottie/build.sh"))
+    def test_one_staticlib_holds_the_three_rust_libraries_with_fat_lto(self):
+        script = self.script("core-xprojects/nanogram-rust/nanogram-rust/build.sh")
+        self.assertRegex(script, r'"\$CARGO_BIN" rustc \\\n\s+--lib \\\n\s+--crate-type staticlib')
+        self.assertIn("--locked", script)
+        self.assertIn("NanogramRustFFI.xcframework", script)
+        for engine in ("wallet-engine", "mtproto-engine"):
+            self.assertNotIn("--crate-type staticlib", self.script(f"core-xprojects/{engine}/{engine}/build.sh"))
+        crate = config.ROOT / "submodules/telegram-ios/third-party/nanogram-rust/Cargo.toml"
+        if crate.is_file():
+            text = crate.read_text()
+            for setting in ('lto = "fat"', 'panic = "abort"', "codegen-units = 1", "opt-level = 3"):
+                self.assertIn(setting, text)
+            for dependency in ("tlottie", "wallet-engine", "mtproto-ffi"):
+                self.assertIn(dependency, text)
 
-    def test_wallet_engine_builds_only_its_staticlib(self):
+    def test_rust_units_build_headers_and_bindings_only(self):
         text = self.script("core-xprojects/wallet-engine/wallet-engine/build.sh")
-        self.assertRegex(text, r'"\$CARGO_BIN" rustc \\\n\s+--package wallet-engine \\\n\s+--lib \\\n\s+--crate-type staticlib')
+        self.assertIn("-- bindings swift", text)
+        self.assertNotIn("xcodebuild -create-xcframework", text)
+
 
 
 if __name__ == "__main__":

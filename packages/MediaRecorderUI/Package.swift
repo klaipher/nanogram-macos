@@ -19,8 +19,8 @@ let deps: [(String, String)] = [
 
 let mediaRecorderTestLibraries: [(path: String, name: String)] = [
     ("webrtc/build/webrtc", "mac_framework_objc_static"),
-    ("openssl/build/openssl/lib", "ssl"),
-    ("openssl/build/openssl/lib", "crypto"),
+    ("boringssl/build/boringssl/lib", "ssl"),
+    ("boringssl/build/boringssl/lib", "crypto"),
     ("ffmpeg/build/ffmpeg/lib", "avformat"),
     ("ffmpeg/build/ffmpeg/lib", "avcodec"),
     ("ffmpeg/build/ffmpeg/lib", "swresample"),

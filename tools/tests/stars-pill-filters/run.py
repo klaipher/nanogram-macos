@@ -42,7 +42,7 @@ if not objects or any(not Path(path).is_file() for path in objects):
 libraries = ['-lbz2', '-liconv', '-lc++', '-lz']
 if args.rnoise:
     libraries.append(str(args.rnoise.resolve()))
-for relative in ['libvpx/build/libvpx/lib', 'ffmpeg/build/ffmpeg/lib', 'libopus/build/libopus/lib', 'libwebp/build/libwebp/lib', 'Mozjpeg/build', 'openssl/build/openssl/lib', 'webrtc/build/webrtc', 'OpenH264/build/output/lib', 'dav1d/build/dav1d/lib', 'tde2e/build/tde2e/lib']:
+for relative in ['libvpx/build/libvpx/lib', 'ffmpeg/build/ffmpeg/lib', 'libopus/build/libopus/lib', 'libwebp/build/libwebp/lib', 'Mozjpeg/build', 'boringssl/build/boringssl/lib', 'webrtc/build/webrtc', 'OpenH264/build/output/lib', 'dav1d/build/dav1d/lib', 'tde2e/build/tde2e/lib']:
     libraries.extend(str(path) for path in sorted((repo / 'core-xprojects' / relative).glob('*.a')))
 developer = subprocess.check_output(['xcode-select', '-p'], text=True).strip()
 frameworks = developer + '/Platforms/MacOSX.platform/Developer/Library/Frameworks'

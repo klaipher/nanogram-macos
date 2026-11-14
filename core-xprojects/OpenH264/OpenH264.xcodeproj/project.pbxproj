@@ -14,7 +14,6 @@
 		D0983BFB2566C86800467703 /* OpenH264.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = OpenH264.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0983BFE2566C86800467703 /* OpenH264.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OpenH264.h; sourceTree = "<group>"; };
 		D0983BFF2566C86800467703 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		D0983C122566CCD900467703 /* OpenSSLEncryption.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = OpenSSLEncryption.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0983C41256815B200467703 /* libmac_framework_objc_static.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmac_framework_objc_static.a; path = build/webrtc/libmac_framework_objc_static.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -59,7 +58,6 @@
 			isa = PBXGroup;
 			children = (
 				D0983C41256815B200467703 /* libmac_framework_objc_static.a */,
-				D0983C122566CCD900467703 /* OpenSSLEncryption.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";

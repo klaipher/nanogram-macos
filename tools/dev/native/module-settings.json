@@ -86,7 +86,7 @@
   "rust_lto": {
    "label": "Rust LTO, Release",
    "ios": "fat",
-   "mac": "fat (--config in core-xprojects scripts)",
+   "mac": "fat (one nanogram-rust staticlib, crate profile)",
    "equal": "yes",
    "probes": {
     "ios": [
@@ -98,19 +98,9 @@
     ],
     "mac": [
      {
-      "id": "wallet-engine build.sh",
-      "file": "core-xprojects/wallet-engine/wallet-engine/build.sh",
-      "regex": "(?s)--crate-type staticlib.*profile\\.release\\.lto=\"(fat)\""
-     },
-     {
-      "id": "mtproto-engine build.sh",
-      "file": "core-xprojects/mtproto-engine/mtproto-engine/build.sh",
-      "regex": "(?s)CARGO_BIN\" rustc.*--crate-type staticlib.*profile\\.release\\.lto=\"(fat)\""
-     },
-     {
-      "id": "tlottie build.sh (no lto override)",
-      "file": "core-xprojects/tlottie/build.sh",
-      "regex": "\\A(?![\\s\\S]*profile\\.release\\.lto=false)[\\s\\S]*(--crate-type staticlib)"
+      "id": "nanogram-rust Cargo.toml",
+      "file": "submodules/telegram-ios/third-party/nanogram-rust/Cargo.toml",
+      "regex": "(?s)crate-type = \\[\"staticlib\"\\].*lto = \"(fat)\""
      }
     ]
    }

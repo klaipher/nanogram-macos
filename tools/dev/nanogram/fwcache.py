@@ -23,16 +23,13 @@ from pathlib import Path
 
 from . import config, frameworks
 
-UNITS: tuple[str, ...] = tuple(frameworks.libraries()) + ("tlottie",)
+UNITS: tuple[str, ...] = tuple(frameworks.libraries())
 EXTRA_OUTPUTS: dict[str, str] = {
-    "wallet-engine": "packages/WalletEngine/wallet_engineFFI.xcframework",
-    "mtproto-engine": "submodules/telegram-ios/submodules/MTProtoRustEngine/MTProtoEngineFFI.xcframework",
+    "nanogram-rust": "packages/RustLibraries/NanogramRustFFI.xcframework",
 }
 TOOLCHAIN_FILE = "core-xprojects/rust-toolchain.toml"
-RUST_UNITS: tuple[str, ...] = ("wallet-engine", "mtproto-engine", "tlottie")
+RUST_UNITS: tuple[str, ...] = ("wallet-engine", "mtproto-engine", "nanogram-rust")
 MISSING_RUST = "missing"
-TLOTTIE_BUILD = "core-xprojects/tlottie/build"
-TLOTTIE_LIBRARY = f"{TLOTTIE_BUILD}/libtlottie.a"
 KEY_SCHEMA = "nanogram-fwcache=1\n"
 RUST_LINE = re.compile(r"(?m)^rust=.*$")
 META_SCHEMA = 1
@@ -52,16 +49,6 @@ for UNIT in "$@"; do
     framework_stamp "$ROOT_ARG" "$UNIT" "$OUT" > "$OUT/$UNIT.tmp"
     mv "$OUT/$UNIT.tmp" "$OUT/$UNIT"
 done
-{
-    echo "schema=$FRAMEWORK_STAMP_SCHEMA"
-    echo "lib=tlottie"
-    echo "xcode=$FRAMEWORK_XCODE_VERSION"
-    echo "deployment=${MACOSX_DEPLOYMENT_TARGET:-default}"
-    echo "archs=${ARCHS:-default}"
-    echo "rust=$NANOGRAM_PINNED_RUST"
-    echo "input:submodules/tlottie=$(framework_path_fingerprint "$ROOT_ARG/submodules/tlottie")"
-    echo "input:core-xprojects/tlottie/build.sh=$(framework_path_fingerprint "$ROOT_ARG/core-xprojects/tlottie/build.sh")"
-} > "$OUT/tlottie"
 """
 
 OUTPUTS_SCRIPT = r"""
@@ -130,7 +117,7 @@ def local_stamps(root: Path, env: Mapping[str, str], rust: str | None = None) ->
     with tempfile.TemporaryDirectory(prefix="nanogram-stamps-") as out:
         subprocess.run(["bash", "-c", STAMPS_SCRIPT, "bash", str(frameworks.SCRIPTS), str(root), out, *libraries],
                        env=run_env, check=True, capture_output=True, text=True)
-        return {unit: (Path(out) / unit).read_text() for unit in (*libraries, "tlottie")}
+        return {unit: (Path(out) / unit).read_text() for unit in libraries}
 
 
 def cache_key(stamp: str, rust: str) -> str:
@@ -139,15 +126,11 @@ def cache_key(stamp: str, rust: str) -> str:
 
 
 def stamp_file(root: Path, unit: str) -> Path:
-    if unit == "tlottie":
-        return Path(root) / TLOTTIE_BUILD / ".nanogram-stamp"
     return build_dir(root, unit) / ".framework-stamp"
 
 
 def build_dir(root: Path, unit: str) -> Path:
     root = Path(root)
-    if unit == "tlottie":
-        return root / TLOTTIE_BUILD
     projects = root / "core-xprojects"
     if projects.is_dir():
         for name in sorted(os.listdir(projects)):
@@ -182,7 +165,6 @@ def required_outputs_by_unit(root: Path) -> dict[str, list[Path]]:
         unit, _, path = line.partition("\t")
         if path:
             outputs[unit].append(Path(path))
-    outputs["tlottie"] = [root / TLOTTIE_LIBRARY]
     return outputs
 
 
