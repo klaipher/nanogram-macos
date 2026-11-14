@@ -160,6 +160,9 @@ def archive_command(edition: str, build: str, archive_path: Path, key: AscKey,
                *release_settings(),
                "COMPILER_INDEX_STORE_ENABLE=NO"]
     command += ["-allowProvisioningUpdates", *key.auth_flags(), "-showBuildTimingSummary"]
+    # TG_KEEP_GOING=1: keep compiling other targets after an error, so one failed archive lists every compile error.
+    if os.environ.get("TG_KEEP_GOING") == "1":
+        command.append("-IDEBuildingContinueBuildingAfterErrors=YES")
     return command
 
 
