@@ -5,9 +5,9 @@ set -x
 
 
 
-SOURCE_ARCHIVE="$1"
 SOURCE_SHA256="c27ad72a68da151177929aa969ae773a2da5ac2af9ce946079314fdac8cece7f"
 SOURCE_NAME="libjpeg-turbo-3.2.1"
+SOURCE_URL="https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.1/libjpeg-turbo-3.2.1.tar.gz"
 BUILD_DIR=$(echo "$(cd "$(dirname "$3")"; pwd -P)/$(basename "$3")")
 OUTPUTNAME="libjpeg.a"
 
@@ -15,6 +15,10 @@ MACOS_PLATFORMDIR="$PLATFORM_DIR"
 MACOS_SYSROOT=($SDK_DIR)
 DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
 
+DOWNLOAD_DIR="$(mktemp -d)"
+trap 'rm -rf "$DOWNLOAD_DIR"' EXIT
+SOURCE_ARCHIVE="$DOWNLOAD_DIR/$SOURCE_NAME.tar.gz"
+curl -fsSL --retry 3 -o "$SOURCE_ARCHIVE" "$SOURCE_URL"
 echo "$SOURCE_SHA256  $SOURCE_ARCHIVE" | shasum -a 256 -c -
 
 cd "$BUILD_DIR"

@@ -447,12 +447,6 @@
       "kind": "regex",
       "file": "core-xprojects/Mozjpeg/Mozjpeg/build.sh",
       "regex": "^SOURCE_SHA256=\"([0-9a-f]{64})\""
-     },
-     {
-      "id": "tarball",
-      "what": "sha256",
-      "kind": "sha256",
-      "file": "core-xprojects/Mozjpeg/libjpeg-turbo-*.tar.gz"
      }
     ]
    },
