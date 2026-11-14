@@ -237,6 +237,18 @@ struct ChatHeaderState : Identifiable, Equatable {
         return pinnedBesideSearch
     }
 
+    var fitsCenteredCapsule: Bool {
+        guard voiceChat == nil, botManager == nil, botAd == nil, monoforumHorizontal == nil else {
+            return false
+        }
+        switch main {
+        case .none, .pinned:
+            return true
+        default:
+            return false
+        }
+    }
+
     var displaysMainInline: Bool {
         switch main {
         case .pinned, .shareInfo:

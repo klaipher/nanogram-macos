@@ -71,6 +71,11 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: docs/superpowers/specs/2026-11-02-macos-runtime-efficiency-specs.md, 2026-11-03-macos-round2-specs.md, docs/perflab/, `packages/PerfLab`.
 - Also (round 3): closed chats are released (the history pipeline no longer holds `ChatController`; a live-controller counter and `chatControllerCreated`/`chatControllerDeinit` signposts prove it), `coalesceOnMain` at the chat header and the main window status, the first history transition prepared off main, the disk-write ledger rate-limited, and the shared signpost names emitted from the Mac call sites. Upstream has none of these. Where: `packages/ChatUI` (`ChatController`, `ChatControllerLifetime`, `ChatHistoryPreparePolicy`), `packages/TGUIKit` (`PerformanceSignposts`, `Window`, `Modal`, `TableView`), `packages/NanogramRuntime/DiskWriteReports.swift`. Round 3b adds: VP9 hardware sessions given back 2 s after the app is hidden and resumed with a replay, the 60 Hz player update on the display link, an LRU of Lottie cache maps with the map saved off the releasing thread, presence timers suspended for chats off the stack, and live tracking-area/observer counters (off in release unless `nanogram.liveObjectCounters` is set).
 
+### Centered chat header
+- What: the glass title capsule is centered on the chat column, and the pinned and translate bars are a bounded capsule centered under it. Upstream 13.2 anchors the title at the left and puts pinned, translate, search and Reopen Topic beside it (upstream #76, cfe7acc5). (check)
+- Where: `packages/ChatUI` (`ChatHeaderLayout`, `ChatHeaderBubblesView.updateLayout`, `ChatControllerView.updateFrame`, `ChatHeaderState.fitsCenteredCapsule`); `ChatHeaderInlineLayout` removed.
+- Sync note: expect conflicts in `ChatHeaderBubblesView.swift`, `ChatController.swift` (`updateFrame`, `headerHeight`, `updateHeaderInsets`) and `ChatHeaderController.swift` at the next upstream merge; keep our side.
+
 ### Features and switches
 - What: Nanogram Debug Settings window (experiments off by default except on-device voice transcription), HTML
   message widgets, iOS-style first display, accessibility work. (check)
