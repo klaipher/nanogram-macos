@@ -180,6 +180,7 @@ public class ChatMediaContentView: Control, NSDraggingSource, NSPasteboardItemDa
     deinit {
         self.clean()
         dragDisposable.dispose()
+        filePromise?.cancel()
     }
      
      public func update(size: NSSize) {
@@ -335,7 +336,42 @@ public class ChatMediaContentView: Control, NSDraggingSource, NSPasteboardItemDa
     }
     
     
+    private var filePromise: ChatMediaFilePromise?
+
+    private func beginFilePromiseDrag(with event: NSEvent) -> Bool {
+        guard let context = context, let resource = mediaResource(from: media), let rawContents = contents, let cgImage = rawContents as? CGImage else {
+            return false
+        }
+        let mimeType = mediaResourceMIMEType(from: media)
+        let stem = mediaResourceName(from: media, ext: nil)
+        let name = ChatMediaPromiseNaming.fileName(preferred: (media as? TelegramMediaFile)?.fileName, mimeType: mimeType, fallbackStem: (stem as NSString).deletingPathExtension)
+
+        var fetch: Signal<Void, NoError>?
+        if let parent = parent, self.fetchStatus != .Local {
+            if let file = media as? TelegramMediaFile {
+                fetch = chatMessageFileInteractiveFetched(account: context.account, fileReference: FileMediaReference.message(message: MessageReference(parent), media: file)) |> map { _ in }
+            } else if let image = media as? TelegramMediaImage {
+                fetch = chatMessagePhotoInteractiveFetched(account: context.account, imageReference: ImageMediaReference.message(message: MessageReference(parent), media: image))
+            }
+        }
+
+        let promise = ChatMediaFilePromise(fileName: name, mediaBox: context.account.postbox.mediaBox, resource: resource, fetch: fetch)
+        filePromise?.cancel()
+        filePromise = promise
+
+        let provider = NSFilePromiseProvider(fileType: ChatMediaPromiseNaming.fileType(mimeType: mimeType), delegate: promise)
+        let image = NSImage(cgImage: cgImage, size: contentFrame.size)
+        let item = NSDraggingItem(pasteboardWriter: provider)
+        item.setDraggingFrame(contentFrame, contents: image)
+        beginDraggingSession(with: [item], event: event, source: self)
+        inDragging = true
+        return true
+    }
+
     public override func mouseDragged(with event: NSEvent) {
+        if ModernizationFlag.mediaFilePromiseDrag.isEnabled, !inDragging, acceptDragging, beginFilePromiseDrag(with: event) {
+            return
+        }
         if self.fetchStatus == .Local {
             if !inDragging && acceptDragging {
                 let current = convert(event.locationInWindow, from: nil)
