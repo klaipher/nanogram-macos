@@ -180,7 +180,6 @@ public class ChatMediaContentView: Control, NSDraggingSource, NSPasteboardItemDa
     deinit {
         self.clean()
         dragDisposable.dispose()
-        filePromise?.cancel()
     }
      
      public func update(size: NSSize) {
@@ -339,24 +338,33 @@ public class ChatMediaContentView: Control, NSDraggingSource, NSPasteboardItemDa
     private var filePromise: ChatMediaFilePromise?
 
     private func beginFilePromiseDrag(with event: NSEvent) -> Bool {
-        guard let context = context, let resource = mediaResource(from: media), let rawContents = contents, let cgImage = rawContents as? CGImage else {
+        guard let context = context, let rawContents = contents, CFGetTypeID(rawContents as CFTypeRef) == CGImage.typeID else {
+            return false
+        }
+        let cgImage = unsafeBitCast(rawContents, to: CGImage.self)
+        var resource: MediaResource?
+        var fetch: Signal<Void, NoError>?
+        if let image = media as? TelegramMediaImage {
+            if let largest = largestImageRepresentation(image.representations), let parent = parent {
+                resource = largest.resource
+                let imageReference = ImageMediaReference.message(message: MessageReference(parent), media: image)
+                fetch = fetchedMediaResource(mediaBox: context.account.postbox.mediaBox, userLocation: imageReference.userLocation, userContentType: imageReference.userContentType, reference: imageReference.resourceReference(largest.resource), range: nil, statsCategory: .image)
+                |> `catch` { _ in return .complete() }
+                |> map { _ in }
+            }
+        } else {
+            resource = mediaResource(from: media)
+            if let parent = parent, self.fetchStatus != .Local, let file = media as? TelegramMediaFile {
+                fetch = chatMessageFileInteractiveFetched(account: context.account, fileReference: FileMediaReference.message(message: MessageReference(parent), media: file)) |> map { _ in }
+            }
+        }
+        guard let resource = resource else {
             return false
         }
         let mimeType = mediaResourceMIMEType(from: media)
-        let stem = mediaResourceName(from: media, ext: nil)
-        let name = ChatMediaPromiseNaming.fileName(preferred: (media as? TelegramMediaFile)?.fileName, mimeType: mimeType, fallbackStem: (stem as NSString).deletingPathExtension)
-
-        var fetch: Signal<Void, NoError>?
-        if let parent = parent, self.fetchStatus != .Local {
-            if let file = media as? TelegramMediaFile {
-                fetch = chatMessageFileInteractiveFetched(account: context.account, fileReference: FileMediaReference.message(message: MessageReference(parent), media: file)) |> map { _ in }
-            } else if let image = media as? TelegramMediaImage {
-                fetch = chatMessagePhotoInteractiveFetched(account: context.account, imageReference: ImageMediaReference.message(message: MessageReference(parent), media: image))
-            }
-        }
+        let name = ChatMediaPromiseNaming.fileName(preferred: (media as? TelegramMediaFile)?.fileName, mimeType: mimeType, fallbackStem: ChatMediaPromiseNaming.fallbackStem(isImage: media is TelegramMediaImage, date: Date()))
 
         let promise = ChatMediaFilePromise(fileName: name, mediaBox: context.account.postbox.mediaBox, resource: resource, fetch: fetch)
-        filePromise?.cancel()
         filePromise = promise
 
         let provider = NSFilePromiseProvider(fileType: ChatMediaPromiseNaming.fileType(mimeType: mimeType), delegate: promise)
@@ -369,8 +377,14 @@ public class ChatMediaContentView: Control, NSDraggingSource, NSPasteboardItemDa
     }
 
     public override func mouseDragged(with event: NSEvent) {
-        if ModernizationFlag.mediaFilePromiseDrag.isEnabled, !inDragging, acceptDragging, beginFilePromiseDrag(with: event) {
-            return
+        if ModernizationFlag.mediaFilePromiseDrag.isEnabled, !inDragging, acceptDragging {
+            let current = convert(event.locationInWindow, from: nil)
+            guard abs(mouseDownPoint.x - current.x) > 10 || abs(mouseDownPoint.y - current.y) > 10 else {
+                return
+            }
+            if beginFilePromiseDrag(with: event) {
+                return
+            }
         }
         if self.fetchStatus == .Local {
             if !inDragging && acceptDragging {

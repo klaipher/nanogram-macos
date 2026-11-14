@@ -34,6 +34,13 @@ enum ChatMediaPromiseNaming {
         return stem + "." + ext
     }
 
+    static func fallbackStem(isImage: Bool, date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        return (isImage ? "IMAGE " : "FILE ") + formatter.string(from: date)
+    }
+
     static func sanitized(_ name: String) -> String {
         let forbidden = CharacterSet(charactersIn: "/:\0").union(.controlCharacters)
         let parts = name.components(separatedBy: forbidden)
@@ -47,22 +54,32 @@ enum ChatMediaPromiseError: Error {
 }
 
 final class ChatMediaFilePromise: NSObject, NSFilePromiseProviderDelegate {
+    static let defaultTimeout: Double = 30 * 60
+
     private let fileName: String
-    private let mediaBox: MediaBox
-    private let resource: MediaResource
+    private let data: Signal<MediaResourceData, NoError>
     private let fetch: Signal<Void, NoError>?
+    private let timeoutInterval: Double
     private let queue: OperationQueue
     private let disposable = MetaDisposable()
+    private let lock = NSLock()
+    private var activeCompletion: PromiseCompletion?
+    private var retainedWhileWriting: ChatMediaFilePromise?
 
-    init(fileName: String, mediaBox: MediaBox, resource: MediaResource, fetch: Signal<Void, NoError>?) {
+    init(fileName: String, data: Signal<MediaResourceData, NoError>, fetch: Signal<Void, NoError>?, timeout: Double = ChatMediaFilePromise.defaultTimeout) {
         self.fileName = fileName
-        self.mediaBox = mediaBox
-        self.resource = resource
+        self.data = data
         self.fetch = fetch
+        self.timeoutInterval = timeout
         self.queue = OperationQueue()
         self.queue.name = "nanogram.chatMediaFilePromise"
         self.queue.qualityOfService = .userInitiated
         super.init()
+    }
+
+    convenience init(fileName: String, mediaBox: MediaBox, resource: MediaResource, fetch: Signal<Void, NoError>?) {
+        let data = mediaBox.resourceData(resource, option: .complete(waitUntilFetchStatus: true))
+        self.init(fileName: fileName, data: data, fetch: fetch)
     }
 
     deinit {
@@ -70,7 +87,19 @@ final class ChatMediaFilePromise: NSObject, NSFilePromiseProviderDelegate {
     }
 
     func cancel() {
+        finish(CocoaError(.userCancelled))
+    }
+
+    private func finish(_ error: Error?) {
+        lock.lock()
+        let completion = activeCompletion
+        activeCompletion = nil
+        let retained = retainedWhileWriting
+        retainedWhileWriting = nil
+        lock.unlock()
         disposable.set(nil)
+        completion?.complete(error)
+        withExtendedLifetime(retained) {}
     }
 
     func filePromiseProvider(_ filePromiseProvider: NSFilePromiseProvider, fileNameForType fileType: String) -> String {
@@ -82,29 +111,44 @@ final class ChatMediaFilePromise: NSObject, NSFilePromiseProviderDelegate {
     }
 
     func filePromiseProvider(_ filePromiseProvider: NSFilePromiseProvider, writePromiseTo url: URL, completionHandler: @escaping (Error?) -> Void) {
-        let once = PromiseCompletion(completionHandler)
+        let completion = PromiseCompletion(completionHandler)
+        lock.lock()
+        activeCompletion = completion
+        retainedWhileWriting = self
+        lock.unlock()
 
-        let data = mediaBox.resourceData(resource, option: .complete(waitUntilFetchStatus: true))
+        let source = data
         |> filter { $0.complete }
         |> take(1)
+        |> timeout(timeoutInterval, queue: Queue.concurrentDefaultQueue(), alternate: .complete())
 
         let disposables = DisposableSet()
         if let fetch = fetch {
             disposables.add(fetch.start())
         }
-        disposables.add(data.start(next: { data in
-            do {
-                let manager = FileManager.default
-                if manager.fileExists(atPath: url.path) {
-                    try manager.removeItem(at: url)
-                }
-                try manager.copyItem(atPath: data.path, toPath: url.path)
-                once.complete(nil)
-            } catch {
-                once.complete(error)
+        let received = Atomic<Bool>(value: false)
+        disposables.add(source.start(next: { [weak self] data in
+            guard let self = self else {
+                return
             }
-        }, completed: {
-            once.complete(ChatMediaPromiseError.unavailable)
+            _ = received.swap(true)
+            let path = data.path
+            self.queue.addOperation {
+                do {
+                    let manager = FileManager.default
+                    if manager.fileExists(atPath: url.path) {
+                        try manager.removeItem(at: url)
+                    }
+                    try manager.copyItem(atPath: path, toPath: url.path)
+                    self.finish(nil)
+                } catch {
+                    self.finish(error)
+                }
+            }
+        }, completed: { [weak self] in
+            if !received.with({ $0 }) {
+                self?.finish(ChatMediaPromiseError.unavailable)
+            }
         }))
         disposable.set(disposables)
     }
