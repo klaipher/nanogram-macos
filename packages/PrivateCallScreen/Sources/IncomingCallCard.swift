@@ -64,34 +64,37 @@ final class IncomingCallCard {
         background.layer?.masksToBounds = true
         panel.contentView = background
 
-        let iconView = NSImageView(frame: NSMakeRect(16, (size.height - 56) / 2, 56, 56))
+        let layout = IncomingCallPanelConfiguration.layout
+
+        let iconView = NSImageView(frame: layout.icon)
         iconView.image = NSApp.applicationIconImage
         iconView.imageScaling = .scaleProportionallyUpOrDown
         background.addSubview(iconView)
 
         let titleLabel = NSTextField(labelWithString: "")
-        titleLabel.font = NSFont.systemFont(ofSize: 15, weight: .semibold)
+        titleLabel.font = IncomingCallPanelConfiguration.titleFont
         titleLabel.textColor = .white
         titleLabel.lineBreakMode = .byTruncatingTail
-        titleLabel.frame = NSMakeRect(84, size.height - 40, size.width - 84 - 16, 20)
+        titleLabel.maximumNumberOfLines = 1
+        titleLabel.frame = layout.title
         background.addSubview(titleLabel)
 
         let subtitleLabel = NSTextField(labelWithString: "")
-        subtitleLabel.font = NSFont.systemFont(ofSize: 12)
+        subtitleLabel.font = IncomingCallPanelConfiguration.subtitleFont
         subtitleLabel.textColor = NSColor.white.withAlphaComponent(0.7)
         subtitleLabel.lineBreakMode = .byTruncatingTail
-        subtitleLabel.frame = NSMakeRect(84, size.height - 60, size.width - 84 - 16, 16)
+        subtitleLabel.maximumNumberOfLines = 1
+        subtitleLabel.frame = layout.subtitle
         background.addSubview(subtitleLabel)
 
         let acceptAction = IncomingCallCardAction(accept)
         let declineAction = IncomingCallCardAction(decline)
 
-        let buttonWidth: CGFloat = (size.width - 84 - 16 - 8) / 2
         let declineButton = IncomingCallCard.makeButton(title: L10n.callDecline, color: .systemRed, action: declineAction)
-        declineButton.frame = NSMakeRect(84, 12, buttonWidth, 28)
+        declineButton.frame = layout.decline
         background.addSubview(declineButton)
         let acceptButton = IncomingCallCard.makeButton(title: L10n.callAccept, color: .systemGreen, action: acceptAction)
-        acceptButton.frame = NSMakeRect(84 + buttonWidth + 8, 12, buttonWidth, 28)
+        acceptButton.frame = layout.accept
         background.addSubview(acceptButton)
 
         self.panel = panel
@@ -108,7 +111,7 @@ final class IncomingCallCard {
         button.wantsLayer = true
         button.layer?.backgroundColor = color.cgColor
         button.layer?.cornerRadius = 8
-        button.attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: NSColor.white, .font: NSFont.systemFont(ofSize: 13, weight: .semibold)])
+        button.attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: NSColor.white, .font: IncomingCallPanelConfiguration.buttonFont])
         return button
     }
 

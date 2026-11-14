@@ -48,6 +48,28 @@ final class PeerCallWindowPolicyTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(IncomingCallPanelConfiguration.level.rawValue, NSWindow.Level.floating.rawValue)
     }
 
+    func testCardTextNeverOverlapsTheButtons() {
+        let layout = IncomingCallPanelConfiguration.layout
+        let bounds = NSRect(origin: .zero, size: IncomingCallPanelConfiguration.size)
+        let frames = [layout.icon, layout.title, layout.subtitle, layout.decline, layout.accept]
+        for frame in frames {
+            XCTAssertTrue(bounds.contains(frame), "\(frame) outside \(bounds)")
+        }
+        XCTAssertFalse(layout.title.intersects(layout.subtitle))
+        XCTAssertFalse(layout.subtitle.intersects(layout.decline))
+        XCTAssertFalse(layout.subtitle.intersects(layout.accept))
+        XCTAssertFalse(layout.decline.intersects(layout.accept))
+        XCTAssertGreaterThan(layout.subtitle.minY, layout.decline.maxY)
+        XCTAssertGreaterThan(layout.title.minY, layout.subtitle.minY)
+    }
+
+    func testCardLabelsAreTallEnoughForTheirFonts() {
+        let layout = IncomingCallPanelConfiguration.layout
+        let lineHeight = { (font: NSFont) in ceil(font.ascender - font.descender + font.leading) }
+        XCTAssertGreaterThanOrEqual(layout.title.height, lineHeight(IncomingCallPanelConfiguration.titleFont))
+        XCTAssertGreaterThanOrEqual(layout.subtitle.height, lineHeight(IncomingCallPanelConfiguration.subtitleFont))
+    }
+
     func testPanelSitsInTheTopRightCorner() {
         let frame = NSMakeRect(0, 0, 1440, 900)
         let origin = IncomingCallPanelConfiguration.origin(in: frame)
