@@ -24,8 +24,8 @@ options="$options -DCMAKE_BUILD_TYPE=Release"
 GEN_DIR="$BUILD_DIR/native-gen"
 mkdir -p "$GEN_DIR"
 pushd "$GEN_DIR"
-cmake -DTD_GENERATE_SOURCE_FILES=ON "$SOURCE_DIR"
-cmake --build . -- -j$(sysctl -n hw.ncpu)
+cmake -G Ninja -DTD_GENERATE_SOURCE_FILES=ON "$SOURCE_DIR"
+cmake --build . --parallel
 popd
 
 # Step 2: Build for arm64
@@ -40,13 +40,13 @@ pushd "$ARM64_DIR"
 # TL source generators above run on the build machine and stay plain.
 HARDENING_FLAGS="-ftrivial-auto-var-init=zero -fstack-protector-strong -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST"
 
-cmake "$SOURCE_DIR" \
+cmake -G Ninja "$SOURCE_DIR" \
     -DCMAKE_OSX_ARCHITECTURES=arm64 \
     -DCMAKE_C_FLAGS="$HARDENING_FLAGS" \
     -DCMAKE_CXX_FLAGS="$HARDENING_FLAGS" \
     $options
 
-cmake --build . --target tde2e -j$(sysctl -n hw.ncpu)
+cmake --build . --target tde2e --parallel
 popd
 
 OUTPUT_DIR="$BUILD_DIR/tde2e"

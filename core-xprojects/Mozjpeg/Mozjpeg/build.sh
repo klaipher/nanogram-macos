@@ -41,10 +41,10 @@ fi
 echo "set(CMAKE_C_COMPILER $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang)" >> toolchain.cmake
 
 # WITH_JPEG8 keeps the libjpeg v8 API (jpeg_mem_dest etc.) the binding and tg_owt were built against with mozjpeg.
-cmake -G"Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_OSX_SYSROOT=${MACOS_SYSROOT[0]} \
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_OSX_SYSROOT=${MACOS_SYSROOT[0]} \
     -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=FALSE -DWITH_JPEG8=1 -DWITH_TOOLS=FALSE -DWITH_TESTS=FALSE \
     -DBUILD=10000 "$SOURCE_DIR"
-make -j"$(sysctl -n hw.logicalcpu)" jpeg-static
+cmake --build . --target jpeg-static --parallel
 
 cd ..
 
