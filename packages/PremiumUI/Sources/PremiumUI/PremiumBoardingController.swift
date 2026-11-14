@@ -709,7 +709,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     }
     
     
-    if !state.periods.isEmpty, !state.isPremium {
+    if !state.periods.isEmpty, !state.isPremium, state.canMakePayment {
         let period = state.period ?? state.periods[0]
                 
         entries.append(.custom(sectionId: sectionId, index: index, value: .none, identifier: .init("_id_periods"), equatable: InputDataEquatable(state), comparable: nil, item: { initialSize, stableId in
@@ -1366,7 +1366,9 @@ public final class PremiumBoardingController : ModalViewController {
         #if APP_STORE || DEBUG
         canMakePayment = inAppPurchaseManager.canMakePayments
         #endif
-        
+        if StorePurchasePolicy.blocks(.premiumSubscription) {
+            canMakePayment = false
+        }
         
         
         let business = context.premiumOrder.premiumValues.filter { $0.isBusiness }.uniqueElements
@@ -1695,6 +1697,9 @@ public final class PremiumBoardingController : ModalViewController {
                 }
                 
             } else {
+                if StorePurchasePolicy.blocks(.premiumSubscription) {
+                    return
+                }
                 context.engine.accountData.addAppLogEvent(type: PremiumLogEvents.promo_screen_accept.value)
                 
                 #if APP_STORE

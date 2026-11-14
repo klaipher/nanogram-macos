@@ -47,7 +47,7 @@ final class Fragment_BalanceRowItem : GeneralRowItem {
         self.context = context
         self.balance = balance
         self.transfer = transfer
-        self.buyAds = buyAds
+        self.buyAds = StorePurchasePolicy.allows(.adsTopUp) ? buyAds : nil
         var canWithdraw = canWithdraw
         if let nextWithdrawalTimestamp, nextWithdrawalTimestamp - context.timestamp >= 0 {
             canWithdraw = false

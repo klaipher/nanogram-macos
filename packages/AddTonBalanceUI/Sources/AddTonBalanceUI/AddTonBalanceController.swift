@@ -41,7 +41,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
         let formattedAmount = formatCurrencyAmount(state.tonAmount, currency: TON).prettyCurrencyNumberUsd
         attr.append(string: strings().fragmentTonAddFundsHeaderAmount(formattedAmount), color: theme.colors.text, font: .medium(18))
         attr.append(string: "\n\n")
-        attr.append(string: strings().fragmentTonAddFundsHeaderInfo, color: theme.colors.text, font: .normal(.text))
+        attr.append(string: StorePurchasePolicy.blocks(.tonTopUp) ? StorePurchasePolicy.unavailableText : strings().fragmentTonAddFundsHeaderInfo, color: theme.colors.text, font: .normal(.text))
         return AddTonBalanceHooks.shared.makeStickerHeaderItem(initialSize, stableId, arguments.context, LocalAnimatedSticker.diamond, attr, NSMakeSize(120, 120), theme.colors.listBackground, nil)
     }))
   
@@ -93,11 +93,14 @@ public func AddTonBalanceController(context: any AccountContextProtocol, tonAmou
     
     controller.validateData = { _ in
         close?()
+        if StorePurchasePolicy.blocks(.tonTopUp) {
+            return .none
+        }
         LinkHooks.shared.openExternalLink(strings().fragmentTonAddFundsLink, false)
         return .none
     }
 
-    let modalInteractions = ModalInteractions(
+    let modalInteractions: ModalInteractions? = StorePurchasePolicy.blocks(.tonTopUp) ? nil : ModalInteractions(
         acceptTitle: strings().fragmentTonAddFundsAction,
         accept: { [weak controller] in
             _ = controller?.returnKeyAction()

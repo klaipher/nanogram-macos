@@ -876,9 +876,11 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
             entries.append(.sectionId(sectionId, type: .customModern(10)))
             sectionId += 1
             
-            entries.append(.desc(sectionId: sectionId, index: index, text: .markdown(strings().boostGetBoosts, linkHandler: { _ in
-                arguments.openGiveaway()
-            }), data: .init(color: arguments.presentation.colors.text, viewType: .textBottomItem, fontSize: 13, centerViewAlignment: true, alignment: .center, linkColor: arguments.presentation.colors.link)))
+            if StorePurchasePolicy.allows(.premiumGiveaway) {
+                entries.append(.desc(sectionId: sectionId, index: index, text: .markdown(strings().boostGetBoosts, linkHandler: { _ in
+                    arguments.openGiveaway()
+                }), data: .init(color: arguments.presentation.colors.text, viewType: .textBottomItem, fontSize: 13, centerViewAlignment: true, alignment: .center, linkColor: arguments.presentation.colors.link)))
+            }
             
             
         } else {
@@ -1134,6 +1136,9 @@ public func BoostChannelModalController(context: any AccountContextProtocol, pee
         showModalText(for: window, text: strings().shareLinkCopied)
         copyToClipboard(link)
     }, openGiveaway: {
+        if StorePurchasePolicy.blocks(.premiumGiveaway) {
+            return
+        }
         showModal(with: GiveawayModalController(context: context, peerId: peer.id, prepaid: nil, isGroup: stateValue.with { $0.isGroup }), for: window)
     })
     

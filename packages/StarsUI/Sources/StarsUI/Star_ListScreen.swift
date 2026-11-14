@@ -271,12 +271,12 @@ private final class BalanceItem : GeneralRowItem {
         
         
         switch currency {
-        case .stars:
+        case .stars where StorePurchasePolicy.allows(.starsGiftToFriends):
             let giftAttr = NSMutableAttributedString()
             giftAttr.append(string: strings().starsGiftToFriends(clown_space), color: theme.colors.accent, font: .normal(.title))
             giftAttr.insertEmbedded(.embedded(name: "Icon_Gift_Stars", color: theme.colors.accent, resize: false), for: clown)
             self.giftPremiumLayout = TextViewLayout(giftAttr)
-        case .ton:
+        case .stars, .ton:
             self.giftPremiumLayout = nil
         }
         
@@ -333,6 +333,9 @@ private final class BalanceItem : GeneralRowItem {
     }
     
     public var actionIsHidden: Bool {
+        if StorePurchasePolicy.blocks(currency == .ton ? .tonTopUp : .starsTopUp) {
+            return true
+        }
         switch currency {
         case .ton:
             #if DEBUG || STABLE || BETA
@@ -1024,7 +1027,10 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
             let alwaysShow: [Int64] = [15, 75, 250, 500, 1000, 2500]
 
 
-            if var options = state.options {
+            if StorePurchasePolicy.blocks(.starsTopUp) {
+                entries.append(.desc(sectionId: sectionId, index: index, text: .plain(StorePurchasePolicy.unavailableText), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem, centerViewAlignment: true, alignment: .center)))
+                index += 1
+            } else if var options = state.options {
                 
                 switch arguments.source {
                 case let .purchase(_, amount):
@@ -1285,6 +1291,10 @@ public func starsSpendTopupInvoiceDisabled(context: (any AccountContextProtocol)
 }
 
 public func showStarsTopup(context: (any AccountContextProtocol), currency: CurrencyAmount.Currency = .stars, source: Star_ListScreenSource, for window: Window) {
+    if StorePurchasePolicy.blocks(currency == .ton ? .tonTopUp : .starsTopUp) {
+        alert(for: window, info: StorePurchasePolicy.unavailableText)
+        return
+    }
     #if !APP_STORE
     if starsSpendTopupInvoiceDisabled(context: context, source: source) {
         alert(for: window, info: strings().starListSpendTopupUnavailable)

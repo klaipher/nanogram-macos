@@ -3,6 +3,7 @@ import ApiCredentials
 import CrashRecoveryUI
 import Localization
 import NanogramKit
+import TelegramContext
 
 guard SingleInstance.ensure() else { exit(0) }
 
@@ -13,6 +14,10 @@ if let home = LegacyPreferences.userHomeDirectory() {
 #endif
 
 installLocalizationTransform(BrandingStrings.brand)
+
+#if NANOGRAM_MAS
+StorePurchasePolicy.current = .store
+#endif
 
 @_silgen_name("OPENSSL_init_crypto")
 private func OPENSSL_init_crypto(_ opts: UInt64, _ settings: OpaquePointer?) -> Int32

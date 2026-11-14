@@ -2199,6 +2199,11 @@ func execute(inapp:inAppLink, window: Window? = nil, isExternal: Bool = false, a
         })
         afterComplete(true)
     case let .multigift(_, context):
+        if StorePurchasePolicy.blocks(.premiumGift) {
+            showModalText(for: getWindow(context), text: StorePurchasePolicy.unavailableText)
+            afterComplete(true)
+            return
+        }
         let behaviour = SelectContactsBehavior.init(settings: [.contacts, .remote, .excludeBots], excludePeerIds: [], limit: 10)
         
         _ = selectModalPeers(window: getWindow(context), context: context, title: strings().premiumGiftTitle, behavior: behaviour).start(next: { peerIds in

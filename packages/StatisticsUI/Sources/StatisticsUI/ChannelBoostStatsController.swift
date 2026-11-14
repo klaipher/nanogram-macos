@@ -36,9 +36,11 @@ private func actionItems(state: State, width: CGFloat, arguments: Arguments, the
             arguments.boost(false)
         }))
         
-        items.append(.init(text: strings().statsBoostsActionGiveaway, color: theme.colors.accent, image: theme.icons.stats_boost_giveaway, animation: .menu_gift, action: {
-            arguments.giveaway(nil)
-        }))
+        if StorePurchasePolicy.allows(.premiumGiveaway) {
+            items.append(.init(text: strings().statsBoostsActionGiveaway, color: theme.colors.accent, image: theme.icons.stats_boost_giveaway, animation: .menu_gift, action: {
+                arguments.giveaway(nil)
+            }))
+        }
         
         items.append(.init(text: strings().statsBoostsActionInfo, color: theme.colors.accent, image: theme.icons.stats_boost_info, animation: .menu_show_info, action: {
             arguments.boost(true)
@@ -824,7 +826,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
         // entries
         
                
-        let boosts_available = arguments.context.appConfiguration.getBoolValue("giveaway_gifts_purchase_available", orElse: false)
+        let boosts_available = arguments.context.appConfiguration.getBoolValue("giveaway_gifts_purchase_available", orElse: false) && StorePurchasePolicy.allows(.premiumGiveaway)
 
         if boosts_available {
             entries.append(.sectionId(sectionId, type: .normal))
@@ -909,6 +911,9 @@ public func ChannelBoostStatsController(context: any AccountContextProtocol, pee
     }, showMore: { [weak boostersContext] in
         boostersContext?.loadMore()
     }, giveaway: { prepaid in
+        if prepaid == nil, StorePurchasePolicy.blocks(.premiumGiveaway) {
+            return
+        }
         showModal(with: GiveawayModalController(context: context, peerId: peerId, prepaid: prepaid, isGroup: isGroup), for: context.window)
     }, openSlug: { slug in
         StatisticsHooks.shared.openGiftSlug(context, slug)

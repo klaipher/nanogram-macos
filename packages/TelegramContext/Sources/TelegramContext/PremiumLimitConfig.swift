@@ -116,8 +116,8 @@ public final class PremiumLimitConfig {
             self.about_length_limit_default = Int(data["about_length_limit_default"] as? Double ?? 70)
             self.about_length_limit_premium = Int(data["about_length_limit_premium"] as? Double ?? 140)
             
-            self.premium_purchase_blocked = data["premium_purchase_blocked"] as? Bool ?? true
-            self.show_premium_gift_in_attach_menu = data["premium_gift_attach_menu_icon"] as? Bool ?? false
+            self.premium_purchase_blocked = (data["premium_purchase_blocked"] as? Bool ?? true) || StorePurchasePolicy.blocks(.premiumSubscription)
+            self.show_premium_gift_in_attach_menu = (data["premium_gift_attach_menu_icon"] as? Bool ?? false) && !StorePurchasePolicy.blocks(.premiumGift)
             
             self.community_invites_limit_default = Int(data["community_invites_limit_default"] as? Double ?? 3)
             self.community_invites_limit_premium = Int(data["community_invites_limit_premium"] as? Double ?? 100)

@@ -26,6 +26,16 @@ public func multigift(context: any AccountContextProtocol, type: MultigiftType =
         type = .premium
     }
     
+    if StorePurchasePolicy.blocks(.premiumGift) {
+        switch type {
+        case .premium, .stars:
+            showModalText(for: context.window, text: StorePurchasePolicy.unavailableText)
+            return
+        case .both:
+            break
+        }
+    }
+    
     let birthdays: Signal<[UIChatListBirthday], NoError> = context.account.stateManager.contactBirthdays |> map {
         return $0.filter {
             $0.value.isEligble

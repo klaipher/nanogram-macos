@@ -572,7 +572,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
             return HeaderRowItem(initialSize, stableId: stableId, peers: [peer], context: arguments.context)
         }))
         
-        if arguments.context.peerId != peer.id, peer._asPeer().isUser, !state.disallowedGifts.contains(.premium) {
+        if arguments.context.peerId != peer.id, peer._asPeer().isUser, !state.disallowedGifts.contains(.premium), StorePurchasePolicy.allows(.premiumGift) {
             
             entries.append(.sectionId(sectionId, type: .normal))
             sectionId += 1

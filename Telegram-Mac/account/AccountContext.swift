@@ -135,10 +135,10 @@ public struct PremiumConfiguration {
                 return (value as? Double).flatMap(Int32.init)
             }
             return PremiumConfiguration(
-                isPremiumDisabled: data["premium_purchase_blocked"] as? Bool ?? defaultValue.isPremiumDisabled,
-                showPremiumGiftInAttachMenu: data["premium_gift_attach_menu_icon"] as? Bool ?? defaultValue.showPremiumGiftInAttachMenu,
-                showPremiumGiftInTextField: data["premium_gift_text_field_icon"] as? Bool ?? defaultValue.showPremiumGiftInTextField,
-                giveawayGiftsPurchaseAvailable: data["giveaway_gifts_purchase_available"] as? Bool ?? defaultValue.giveawayGiftsPurchaseAvailable,
+                isPremiumDisabled: (data["premium_purchase_blocked"] as? Bool ?? defaultValue.isPremiumDisabled) || StorePurchasePolicy.blocks(.premiumSubscription),
+                showPremiumGiftInAttachMenu: (data["premium_gift_attach_menu_icon"] as? Bool ?? defaultValue.showPremiumGiftInAttachMenu) && !StorePurchasePolicy.blocks(.premiumGift),
+                showPremiumGiftInTextField: (data["premium_gift_text_field_icon"] as? Bool ?? defaultValue.showPremiumGiftInTextField) && !StorePurchasePolicy.blocks(.premiumGift),
+                giveawayGiftsPurchaseAvailable: (data["giveaway_gifts_purchase_available"] as? Bool ?? defaultValue.giveawayGiftsPurchaseAvailable) && !StorePurchasePolicy.blocks(.premiumGiveaway),
                 boostsPerGiftCount: get(data["boosts_per_sent_gift"]) ?? defaultValue.boostsPerGiftCount,
                 audioTransciptionTrialMaxDuration: get(data["transcribe_audio_trial_duration_max"]) ?? defaultValue.audioTransciptionTrialMaxDuration,
                 audioTransciptionTrialCount: get(data["transcribe_audio_trial_weekly_number"]) ?? defaultValue.audioTransciptionTrialCount,
@@ -347,7 +347,7 @@ final class AccountContext {
     }
     #if !SHARE
     var premiumIsBlocked: Bool {
-        return self.premiumLimits.premium_purchase_blocked
+        return self.premiumLimits.premium_purchase_blocked || StorePurchasePolicy.blocks(.premiumSubscription)
     }
     #endif
     
