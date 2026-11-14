@@ -105,7 +105,7 @@ not re-verified against the code; correct them on the next change in that area.
 - Sync: re-apply the ring pipeline in `SharedWakeupManager.updateRindingsStatuses` and the `closeInterceptor` in `PeerCallScreen.init`; tests `IncomingCallPolicyTests`, `PeerCallWindowPolicyTests`.
 
 ### Concurrency cleanups (modernization review)
-- What: `activate()` instead of `activate(ignoringOtherApps:)` (28 sites); `FilePanels` uses `allowedContentTypes`; the share extension no longer blocks main on two semaphores (`continueLaunch`); `TabAllBadgeItem` caches the account count; the four export wait helpers are one `ExportBlocking`; `DecoderQuarantine`/`ReplyBox` are checked `Sendable`; four leaf packages build with `StrictConcurrency` warnings.
+- What: `activate()` instead of `activate(ignoringOtherApps:)` (28 sites); `FilePanels` uses `allowedContentTypes`; the share extension no longer blocks main on two semaphores (`continueLaunch`); `TabAllBadgeItem` caches the account count; the four export wait helpers are one `ExportBlocking`; `DecoderQuarantine`/`ReplyBox` are checked `Sendable`; the four packages named by the spec build with `StrictConcurrency` warnings.
 - Why: deprecations, latent main-thread hangs and unchecked concurrency.
 - Where: `TelegramShare/ShareViewController.swift`, `packages/ChatListUI/.../TabBadgeItem.swift`, `packages/ChatExportUI/.../ExportBlocking.swift`, `packages/FilePanels`, `packages/NanogramDecoder`, leaf `Package.swift` files.
 - Upstream: the activate sites, `ShareViewController`, `TabBadgeItem` and `ChatExportManager` are upstream lines we changed.

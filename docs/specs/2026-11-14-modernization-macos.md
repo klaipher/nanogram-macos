@@ -82,7 +82,7 @@ Shared iOS core changes reach the Mac only through `tg core-bump <iOS main SHA>`
 - **Risk:** low.
 - **Measurement:** accept a call from a notification with another app frontmost; 28 fewer warnings.
 - **Effort:** small
-- **Status:** implemented on `mod/mac-conc`: all 28 `activate(ignoringOtherApps: true)` calls are `activate()`; no handoff we control needed `yieldActivation`; not built or run
+- **Status:** implemented on `mod/mac-conc`: all 28 `activate(ignoringOtherApps: true)` calls are `activate()` (13 sites in 10.13-floor packages are `#available(macOS 14.0, *)`-guarded); no handoff we control needed `yieldActivation`; not built or run
 
 ### MACOS-PANEL-1: FilePanels uses deprecated allowedFileTypes
 - **Severity:** low
@@ -91,7 +91,7 @@ Shared iOS core changes reach the Mac only through `tg core-bump <iOS main SHA>`
 - **Risk:** low (test .tgs, .json, .strings pickers).
 - **Measurement:** every picker that passes `exts` selects the same files.
 - **Effort:** small
-- **Status:** implemented on `mod/mac-conc`: `allowedContentTypes` via `filePanelContentTypes(for:)` (FilePanels platform raised to macOS 12 for `UTType`); tests added, not run
+- **Status:** implemented on `mod/mac-conc`: `allowedContentTypes` via `filePanelContentTypes(for:)` (FilePanels stays at macOS 10.13; `@available(macOS 11, *)` helper with an `allowedFileTypes` fallback); tests added, not run
 
 ### MACOS-MAINSEM-1: Main-thread view creation waits on a semaphore
 - **Severity:** low
@@ -100,12 +100,12 @@ Shared iOS core changes reach the Mac only through `tg core-bump <iOS main SHA>`
 - **Risk:** low to medium (first-frame layout).
 - **Measurement:** Hangs template during account switches; no `semaphore_wait_trap` on main.
 - **Effort:** small
-- **Status:** partly implemented on `mod/mac-conc`: `TabAllBadgeItem.makeView` reads a cached value kept by a held subscription (bounded 0.25 s wait only if never emitted); `GlobalBadgeNode` and `ChatInterfaceInteraction` waits deferred (upstream files, intentional sync flush); not built or run
+- **Status:** partly implemented on `mod/mac-conc`: `TabAllBadgeItem.makeView` reads a cached value kept by a held subscription (no wait; defaults to multi-account if never emitted; view not rebuilt on emission); subscription disposed in deinit; `GlobalBadgeNode` and `ChatInterfaceInteraction` waits deferred (upstream files, intentional sync flush); not built or run
 
 ### MAC-DESIGN-1: 163 packages and the app target build in Swift 5 mode
 - **Severity:** low
 - **Evidence:** 163 packages at tools 5.5, 1 at 5.9, 1 at 6.0, 8 at 6.2; 9 use `swiftLanguageModes [.v6]`; 8 `SWIFT_VERSION = 5.0` in the pbxproj.
-- **Change:** phase 1: leaf packages (AppAnalytics, AudioPlayerCore, CrashReports, LocalAudioTranscription, ChatAppIntents, CallVideoLayer first) raise tools-version to 6.x and enable complete strict-concurrency checking as warnings; record a baseline in docs. Phase 2 per package at zero warnings. Never on packages with `treatAllWarnings(as: .error)` as errors. Postbox/SSignalKit-dependent packages wait.
+- **Change:** phase 1: the packages named by the spec (AppAnalytics, AudioPlayerCore, CrashReports, LocalAudioTranscription, ChatAppIntents, CallVideoLayer first) raise tools-version to 6.x and enable complete strict-concurrency checking as warnings; record a baseline in docs. Phase 2 per package at zero warnings. Never on packages with `treatAllWarnings(as: .error)` as errors. Postbox/SSignalKit-dependent packages wait.
 - **Docs:** https://www.swift.org/migration/documentation/migrationguide/
 - **Risk:** low for phase 1.
 - **Measurement:** warning count per package; packages in v6 mode.
