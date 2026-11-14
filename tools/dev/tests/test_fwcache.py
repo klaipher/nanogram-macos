@@ -1,6 +1,7 @@
 import multiprocessing
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -278,6 +279,29 @@ class StampTests(unittest.TestCase):
             self.assertNotIn(str(Path.home()), stamp, unit)
             self.assertIn("archs=arm64\n", stamp)
             self.assertIn("deployment=15.0\n", stamp)
+
+    def test_build_tool_versions_are_in_the_stamps_that_use_them(self):
+        want = {"webrtc": ("cmake", "ninja"), "tde2e": ("cmake", "ninja"), "mozjpeg": ("cmake", "ninja"),
+                "dav1d": ("meson", "ninja")}
+        for unit, tools in want.items():
+            for tool in tools:
+                self.assertRegex(self.stamps[unit], rf"(?m)^{tool}=\S", unit)
+        for unit in ("OpenSSL", "libopus", "ffmpeg", "tlottie"):
+            self.assertNotRegex(self.stamps[unit], r"(?m)^(cmake|ninja|meson)=", unit)
+
+    def test_tool_version_changes_the_stamp(self):
+        script = (f'. "{config.ROOT}/scripts/framework-inputs.sh"; framework_tool_version "$1" --version')
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "cmake"
+            outs = []
+            for version in ("1.0", "2.0"):
+                fake.write_text(f"#!/bin/sh\necho 'cmake version {version}'\n")
+                fake.chmod(0o755)
+                env = {"PATH": f"{tmp}:/usr/bin:/bin"}
+                outs.append(subprocess.run(["bash", "-c", script, "bash", "cmake"], env=env,
+                                           capture_output=True, text=True, check=True).stdout)
+        self.assertNotEqual(outs[0], outs[1])
+        self.assertIn("2.0", outs[1])
 
     def test_tlottie_stamp_carries_the_toolchain_fingerprint(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(config, "CACHE_DIR", Path(tmp)):

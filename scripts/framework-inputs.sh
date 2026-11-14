@@ -64,8 +64,26 @@ framework_dependencies() {
     esac
 }
 
+# `<tool>=<first line of its version output>`, or `<tool>=missing`. These are Homebrew tools: an upgrade can
+# change archive bytes, so the versions of the build tools a library uses are part of its stamp.
+framework_tool_version() {
+    if command -v "$1" >/dev/null 2>&1; then
+        echo "$1=$("$1" "$2" 2>/dev/null | head -1)"
+    else
+        echo "$1=missing"
+    fi
+}
+
 framework_extra_fingerprint() {
     case "$1" in
+        webrtc|tde2e|mozjpeg)
+            framework_tool_version cmake --version
+            framework_tool_version ninja --version
+            ;;
+        dav1d)
+            framework_tool_version meson --version
+            framework_tool_version ninja --version
+            ;;
         wallet-engine|mtproto-engine)
             CARGO_BIN=""
             if [ -n "${CARGO:-}" ]; then
