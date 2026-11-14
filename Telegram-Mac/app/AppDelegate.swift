@@ -28,6 +28,7 @@ import WebKit
 import CodeSyntax
 import MetalEngine
 import TelegramMedia
+import TelegramMediaUtils
 import TLottie
 import KeyboardKey
 import PasscodeCore
@@ -1415,6 +1416,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         nanogramDebugObservations.append(settings.observe("display.maxFrameRate") { _ in
             applyFrameRateCap()
         })
+        settings.register(.toggle(id: VideoFirstFrameGenerator.debugOptionId, section: "Media", title: "Async video thumbnails", detail: "Experiment: first-frame video thumbnails use the asynchronous AVFoundation generator and no temporary symlink, so cache threads are not blocked. Default: off. Applies to thumbnails made after the change.", defaultValue: false))
         settings.register(.toggle(id: "media.jpegWideGamut", section: "Media", title: "Keep wide-gamut colour in sent photos", detail: "Display P3 photos are sent with their ICC profile instead of being flattened to sRGB.", defaultValue: false))
         let applyJPEGWideGamut = {
             setJPEGPreservesWideGamut(settings.bool("media.jpegWideGamut"))
