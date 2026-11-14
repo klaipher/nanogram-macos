@@ -103,3 +103,10 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: `packages/PrivateCallScreen/Sources/{IncomingCallCard,PeerCallWindowPolicy,PeerCallScreen}.swift`, `packages/NanogramRuntime/Sources/NanogramRuntime/{IncomingCallPolicy,IncomingCallNotification}.swift`, `Telegram-Mac/account/{IncomingCallPresenter,SharedWakeupManager,SharedAccountContext}.swift`, `Telegram-Mac/utils/UNUserNotifications.swift`, `packages/TelegramCallsCore/.../PCallSession.swift`, `packages/CallsUI/.../{CallScreenController,PCallLaunch}.swift`, `packages/CallVideoLayer/Sources/CallWindowTransition.swift`, `SharedAccountContextProtocol.dropCrossCall(ownedBy:)`; commits 4d62949a, 1911058b.
 - Upstream: no (Nanogram-specific); the `.missed` busy drop and the `isUpdating` gate in `SharedWakeupManager` are upstream lines we changed.
 - Sync: re-apply the ring pipeline in `SharedWakeupManager.updateRindingsStatuses` and the `closeInterceptor` in `PeerCallScreen.init`; tests `IncomingCallPolicyTests`, `PeerCallWindowPolicyTests`.
+
+### Concurrency cleanups (modernization review)
+- What: `activate()` instead of `activate(ignoringOtherApps:)` (28 sites); `FilePanels` uses `allowedContentTypes`; the share extension no longer blocks main on two semaphores (`continueLaunch`); `TabAllBadgeItem` caches the account count; the four export wait helpers are one `ExportBlocking`; `DecoderQuarantine`/`ReplyBox` are checked `Sendable`; four leaf packages build with `StrictConcurrency` warnings.
+- Why: deprecations, latent main-thread hangs and unchecked concurrency.
+- Where: `TelegramShare/ShareViewController.swift`, `packages/ChatListUI/.../TabBadgeItem.swift`, `packages/ChatExportUI/.../ExportBlocking.swift`, `packages/FilePanels`, `packages/NanogramDecoder`, leaf `Package.swift` files.
+- Upstream: the activate sites, `ShareViewController`, `TabBadgeItem` and `ChatExportManager` are upstream lines we changed.
+- Sync: re-apply the semaphore removals in `ShareViewController` and `TabAllBadgeItem.makeView` after a merge; any new `activate(ignoringOtherApps:)` from upstream becomes `activate()`.

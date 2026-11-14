@@ -4,6 +4,16 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Mac concurrency and app-lifecycle cleanups (modernization review, stream mac-conc; branch `mod/mac-conc`, not built or run)**.
+  - MACOS-ACTIVATE-1 (fbc6ff7f): all 28 `NSApp.activate(ignoringOtherApps: true)` calls are `NSApp.activate()` (the flag has had no effect since macOS 14); no hand-off we control needed `yieldActivation`.
+  - MACOS-PANEL-1 (b13229d3): `FilePanels` sets `allowedContentTypes` from `UTType(filenameExtension:)` (`filePanelContentTypes(for:)`); the post-filter by extension stays, `nil` stays any file. Package platform raised to macOS 12 for `UTType`. Tests: FilePanelsTests.
+  - MAC-DESIGN-2 (9e1d51da): `ExportBlocking` (result in `Atomic`, dispose before return, same 0.2 s poll) replaces `waitForComplete`, both `waitForResource` and both `blockingFirst` in `ChatExportManager`. Tests: ExportBlockingTests.
+  - MAC-DESIGN-3 (e31b7cd7): `ShareViewController` reads theme and localization with one `combineLatest |> take(1) |> deliverOnMainQueue` and continues in `continueLaunch`; no semaphores on main. Needs a manual share-sheet test.
+  - MACOS-MAINSEM-1 (737fe4d4): `TabAllBadgeItem.makeView` uses an account-count flag kept by a held subscription; a 0.25 s bounded wait only if it never emitted. `GlobalBadgeNode` and `ChatInterfaceInteraction` waits left as they are.
+  - MAC-DESIGN-7 (a5f2543c): `DecoderQuarantine` and `ReplyBox` use `OSAllocatedUnfairLock` and are checked `Sendable` (`@unchecked Sendable` 41 to 39). Tests: DecoderQuarantineTests.
+  - MAC-DESIGN-1 phase 1 (8830d904): AppAnalytics, AudioPlayerCore, CrashReports and CallVideoLayer are tools 5.9 with `.enableUpcomingFeature("StrictConcurrency")` (warnings only, language mode 5). LocalAudioTranscription and ChatAppIntents were already Swift 6. Baseline table in `docs/strict-concurrency-baseline.md` (to be measured).
+  - Status of each spec: `docs/specs/2026-11-14-modernization-macos.md`.
+
 ## 13.2.0 (202611132157) — 2026-11-13
 
 Source: `nanogram/integration` @ 82fbeb79 · core `klaipher/nanogram` `main` @ 466d8350 (was 25edb39c at the last release; iOS TestFlight 202611132038 is 3c4e6399, plus 466d8350) · widget-sandbox and the core's untracked `submodules/rlottie` unchanged from the last release (BUILD-INFO says "dirty yes" because of them only).
