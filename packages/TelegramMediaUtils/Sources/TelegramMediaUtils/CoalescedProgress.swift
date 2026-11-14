@@ -49,8 +49,11 @@ public struct ProgressCoalescer<Value> {
         return .hold(after: max(minInterval - elapsed, 0))
     }
 
-    public mutating func flush(now: Double) -> Value? {
+    public mutating func flush(now: Double, force: Bool = true) -> Value? {
         guard let value = pending else {
+            return nil
+        }
+        if !force, let sample = classify(value), let last = lastEmitted, last.kind == sample.kind, abs(sample.progress - last.progress) < minDelta {
             return nil
         }
         pending = nil
@@ -70,41 +73,35 @@ public struct ProgressCoalescer<Value> {
 }
 
 private final class CoalescerState<T> {
-    private let lock = NSLock()
     private var coalescer: ProgressCoalescer<T>
     private var generation = 0
+    private var finished = false
 
     init(_ coalescer: ProgressCoalescer<T>) {
         self.coalescer = coalescer
     }
 
     func accept(_ value: T, now: Double) -> (ProgressCoalescer<T>.Decision, Int) {
-        lock.lock()
-        defer { lock.unlock() }
         generation += 1
         return (coalescer.accept(value, now: now), generation)
     }
 
     func flush(ifGeneration expected: Int, now: Double) -> T? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard generation == expected else {
+        guard !finished, generation == expected else {
             return nil
         }
-        return coalescer.flush(now: now)
+        return coalescer.flush(now: now, force: false)
     }
 
     func finish(now: Double) -> T? {
-        lock.lock()
-        defer { lock.unlock() }
         generation += 1
+        finished = true
         return coalescer.flush(now: now)
     }
 
     func cancel() {
-        lock.lock()
         generation += 1
-        lock.unlock()
+        finished = true
     }
 }
 
@@ -112,31 +109,40 @@ public extension Signal {
     func coalescedProgress(minDelta: Float = 0.01, minInterval: Double = 1.0 / 30.0, classify: @escaping (T) -> ProgressSample?) -> Signal<T, E> {
         return Signal<T, E> { subscriber in
             let state = CoalescerState(ProgressCoalescer<T>(minDelta: minDelta, minInterval: minInterval, classify: classify))
+            let queue = Queue(name: "nanogram.coalescedProgress")
 
             let source = self.start(next: { value in
-                let (decision, generation) = state.accept(value, now: CFAbsoluteTimeGetCurrent())
-                switch decision {
-                case let .emit(value):
-                    subscriber.putNext(value)
-                case let .hold(delay):
-                    Queue.concurrentDefaultQueue().after(delay + 0.002, {
-                        if let flushed = state.flush(ifGeneration: generation, now: CFAbsoluteTimeGetCurrent()) {
-                            subscriber.putNext(flushed)
-                        }
-                    })
+                queue.async {
+                    let (decision, generation) = state.accept(value, now: CFAbsoluteTimeGetCurrent())
+                    switch decision {
+                    case let .emit(value):
+                        subscriber.putNext(value)
+                    case let .hold(delay):
+                        queue.after(delay + 0.002, {
+                            if let flushed = state.flush(ifGeneration: generation, now: CFAbsoluteTimeGetCurrent()) {
+                                subscriber.putNext(flushed)
+                            }
+                        })
+                    }
                 }
             }, error: { error in
-                state.cancel()
-                subscriber.putError(error)
-            }, completed: {
-                if let flushed = state.finish(now: CFAbsoluteTimeGetCurrent()) {
-                    subscriber.putNext(flushed)
+                queue.async {
+                    state.cancel()
+                    subscriber.putError(error)
                 }
-                subscriber.putCompletion()
+            }, completed: {
+                queue.async {
+                    if let flushed = state.finish(now: CFAbsoluteTimeGetCurrent()) {
+                        subscriber.putNext(flushed)
+                    }
+                    subscriber.putCompletion()
+                }
             })
 
             return ActionDisposable {
-                state.cancel()
+                queue.async {
+                    state.cancel()
+                }
                 source.dispose()
             }
         }

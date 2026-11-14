@@ -109,4 +109,46 @@ final class CoalescedProgressTests: XCTestCase {
         disposable.dispose()
         XCTAssertEqual(values.with { $0 }, [0.1, 0.5])
     }
+
+    func testStatusChangeAfterHeldProgressIsNeverReordered() {
+        for _ in 0 ..< 20 {
+            let values = Atomic<[MediaResourceStatus]>(value: [])
+            let done = expectation(description: "local delivered")
+            let signal = Signal<MediaResourceStatus, NoError> { subscriber in
+                subscriber.putNext(.Fetching(isActive: true, progress: 0.1))
+                subscriber.putNext(.Fetching(isActive: true, progress: 0.9))
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.052) {
+                    subscriber.putNext(.Local)
+                }
+                return EmptyDisposable
+            }
+            let disposable = signal.coalescedProgress(minInterval: 0.05, classify: ProgressSample.of(_:)).start(next: { value in
+                let current = values.modify { $0 + [value] }
+                if current.last == .Local {
+                    done.fulfill()
+                }
+            })
+            wait(for: [done], timeout: 2)
+            Thread.sleep(forTimeInterval: 0.02)
+            disposable.dispose()
+            XCTAssertEqual(values.with { $0 }.last, .Local)
+        }
+    }
+
+    func testTimerDoesNotFlushATinyDelta() {
+        let values = Atomic<[Float]>(value: [])
+        let signal = Signal<Float?, NoError> { subscriber in
+            subscriber.putNext(0.100)
+            subscriber.putNext(0.103)
+            return EmptyDisposable
+        }
+        let disposable = signal.coalescedProgress(minInterval: 0.02, classify: ProgressSample.of(updating:)).start(next: { value in
+            if let value = value {
+                _ = values.modify { $0 + [value] }
+            }
+        })
+        Thread.sleep(forTimeInterval: 0.3)
+        disposable.dispose()
+        XCTAssertEqual(values.with { $0 }, [0.1])
+    }
 }
