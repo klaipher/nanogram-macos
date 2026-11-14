@@ -247,7 +247,7 @@ class CacheRunTests(unittest.TestCase):
 
     def test_failed_restore_gets_built(self):
         runner = FakeRunner(current=(), cached=ALL)
-        runner.failing = {"OpenSSL"}
+        runner.failing = {"boringssl"}
         summary = frameworks.run(Path("/root"), True, runner)
         self.assertEqual(runner.names().count("configure"), 1)
         self.assertEqual((summary.restored, summary.built), (len(ALL) - 1, 1))
@@ -278,9 +278,9 @@ class CacheRunTests(unittest.TestCase):
         self.assertNotIn("configure", runner.names())
 
     def test_current_units_seed_the_cache(self):
-        runner = FakeRunner(current=ALL, cached=[u for u in ALL if u != "OpenSSL"])
+        runner = FakeRunner(current=ALL, cached=[u for u in ALL if u != "boringssl"])
         frameworks.run(Path("/root"), True, runner)
-        self.assertEqual([c[1] for c in runner.calls if c[0] == "store"], ["OpenSSL"])
+        self.assertEqual([c[1] for c in runner.calls if c[0] == "store"], ["boringssl"])
 
     def test_no_cache_builds_even_with_hit(self):
         runner = FakeRunner(current=(), cached=ALL)
@@ -292,9 +292,9 @@ class CacheRunTests(unittest.TestCase):
         self.assertIn("configure", runner.names())
 
     def test_plan_statuses(self):
-        runner = FakeRunner(current=["OpenSSL"], cached=["libopus"])
+        runner = FakeRunner(current=["boringssl"], cached=["libopus"])
         statuses = frameworks.plan(runner.stamps(), runner.is_current, runner.find, "rustc 1", use_cache=True)
-        self.assertEqual(statuses["OpenSSL"], "current")
+        self.assertEqual(statuses["boringssl"], "current")
         self.assertEqual(statuses["libopus"], "restore")
         self.assertEqual(statuses["webrtc"], "build")
 
@@ -339,13 +339,12 @@ class NativeBuildFlagTests(unittest.TestCase):
         for flag in ("network", "securetransport", "bzlib", "iconv", "appkit", "avfoundation", "coreimage", "metal", "sdl2"):
             self.assertIn(f"--disable-{flag}", text)
 
-    def test_openssl_configure_drops_unused_algorithms(self):
-        text = self.script("core-xprojects/openssl/OpenSSLEncryption/build.sh")
-        configure = text[text.index("./Configure"):text.index("--prefix=", text.index("./Configure"))]
-        for option in ("no-quic", "no-engine", "no-legacy", "no-autoload-config", "no-sm4", "no-ml-dsa", "no-ssl3"):
-            self.assertIn(option, configure)
-        for kept in ("no-srtp", "no-dtls", "no-ec ", "no-chacha", "no-poly1305", "no-dh "):
-            self.assertNotIn(kept, configure)
+    def test_boringssl_cmake_builds_only_crypto_and_ssl_with_the_ios_options(self):
+        text = self.script("core-xprojects/boringssl/BoringSSL/build.sh")
+        for option in ("-DBUILD_SHARED_LIBS=OFF", "-DBUILD_TESTING=OFF", "-DCMAKE_BUILD_TYPE=Release"):
+            self.assertIn(option, text)
+        self.assertIn("crypto ssl", text)
+        self.assertNotIn("OPENSSL_NO_ASM", text)
 
     def test_webrtc_stays_below_the_macos_15_screen_capture_obsoletions(self):
         text = self.script("core-xprojects/webrtc/webrtc/build.sh")

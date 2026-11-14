@@ -17,7 +17,6 @@
 		D0983BFB2566C86800467703 /* webrtc.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = webrtc.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0983BFE2566C86800467703 /* webrtc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = webrtc.h; sourceTree = "<group>"; };
 		D0983BFF2566C86800467703 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		D0983C122566CCD900467703 /* OpenSSLEncryption.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = OpenSSLEncryption.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0983C41256815B200467703 /* libmac_framework_objc_static.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmac_framework_objc_static.a; path = build/webrtc/libmac_framework_objc_static.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -64,7 +63,6 @@
 			isa = PBXGroup;
 			children = (
 				D0983C41256815B200467703 /* libmac_framework_objc_static.a */,
-				D0983C122566CCD900467703 /* OpenSSLEncryption.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -160,7 +158,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "#!/bin/sh\n\n# Check if the build directory exists; if not, execute the build script\nif [ ! -d \"$PROJECT_DIR/build\" ]; then\n    sh $PROJECT_DIR/webrtc/build.sh \\\n    $PROJECT_DIR/../../submodules/webrtc/ \\\n    $PROJECT_DIR/../openssl/build/openssl/include \\\n    $PROJECT_DIR/../Mozjpeg/build \\\n    $PROJECT_DIR/../libopus/build/libopus/include/opus \\\n    $PROJECT_DIR/../ffmpeg/build/ffmpeg/include \\\n    $PROJECT_DIR/../libvpx/build/libvpx/include \\\n    $PROJECT_DIR/../OpenH264/build/output/include/include \\\n    $PROJECT_DIR/../../submodules/telegram-ios/third-party/libyuv/third_party/libyuv\nfi\n";
+			shellScript = "#!/bin/sh\n\n# Check if the build directory exists; if not, execute the build script\nif [ ! -d \"$PROJECT_DIR/build\" ]; then\n    sh $PROJECT_DIR/webrtc/build.sh \\\n    $PROJECT_DIR/../../submodules/webrtc/ \\\n    $PROJECT_DIR/../boringssl/build/boringssl/include \\\n    $PROJECT_DIR/../Mozjpeg/build \\\n    $PROJECT_DIR/../libopus/build/libopus/include/opus \\\n    $PROJECT_DIR/../ffmpeg/build/ffmpeg/include \\\n    $PROJECT_DIR/../libvpx/build/libvpx/include \\\n    $PROJECT_DIR/../OpenH264/build/output/include/include \\\n    $PROJECT_DIR/../../submodules/telegram-ios/third-party/libyuv/third_party/libyuv\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

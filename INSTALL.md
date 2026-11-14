@@ -20,7 +20,7 @@ package dependencies, so once the submodules are checked out the build is offlin
   ```
 - Homebrew and these packages:
   ```
-  brew install cmake ninja meson nasm yasm openssl@1.1 zlib autoconf libtool automake pkg-config
+  brew install cmake ninja meson nasm yasm zlib autoconf libtool automake pkg-config
   ```
 - A Rust toolchain via rustup. The TON wallet engine (`wallet-engine`) and the tlottie
   sticker renderer are Rust libraries; their build scripts pick up `cargo` from `PATH` or
@@ -80,14 +80,14 @@ This takes a while, mostly because of WebRTC. The script:
 
 1. Generates TelegramApi's SwiftPM sources with SwiftTL, then the FlatSerialization
    sources for TelegramCore with flatc 25.12.19, which `scripts/prepare-flat-serialization.py` downloads (sha256-checked) and builds with CMake on first use into a per-user cache shared by all worktrees (`~/Library/Caches/nanogram/flatc/25.12.19`, base overridable with `NANOGRAM_CACHE_DIR`); the first run needs network and cmake.
-2. Builds, in order, `OpenH264`, `OpenSSLEncryption`, `libopus`, `libvpx`, `Mozjpeg`,
+2. Builds, in order, `OpenH264`, `BoringSSL`, `libopus`, `libvpx`, `Mozjpeg`,
    `libwebp`, `dav1d`, `ffmpeg`, `webrtc` (`submodules/webrtc`, klaipher/webrtc), `tde2e` and `WalletEngine` through
    their projects in `core-xprojects/<lib>/`. Outputs land in `core-xprojects/<lib>/build`,
    which is git-ignored. `WalletEngine` also regenerates
    `packages/WalletEngine/Sources/WalletEngineFFI/WalletEngineFFI.swift` (checked in) and
    `packages/WalletEngine/wallet_engineFFI.xcframework` (ignored).
 3. Copies public headers into the `SharedHeaders` directories that `tgcalls`, the
-   OpusBinding, FFMpegBinding, OpenSSLEncryptionProvider, libwebp and Mozjpeg packages
+   OpusBinding, FFMpegBinding, OpenSSLEncryptionProvider (its headers are BoringSSL's), libwebp and Mozjpeg packages
    expect.
 4. Runs the `td` macOS cleanup for `TdBinding`.
 

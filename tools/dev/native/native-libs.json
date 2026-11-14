@@ -8,7 +8,7 @@
    "mac": "14.0 for the native libraries (-mmacosx-version-min=14.0) while the app targets 15.0; 14.0 libraries link into a 15.0 app and changing it would break shared cache keys"
   },
   "platform_specific_by_design": {
-   "tls": "iOS links BoringSSL; the Mac builds OpenSSL 3.5.9 (core-xprojects/openssl) and TDLib's tde2e against it",
+   "tls": "iOS, Mac and Android link one BoringSSL (klaipher/boringssl nanogram, shared/shared-libraries.json); the Mac builds it with CMake (core-xprojects/boringssl) from the core third-party/boringssl/src, and TDLib tde2e builds against its headers",
    "rust_lto": "iOS builds Rust with fat LTO (Make.py); Mac Rust is fat LTO via --config in the core-xprojects scripts. Same compiler (rust version above). Details: docs/module-build-settings.md",
    "mac_order_file": "Both apps link Release with order files (iOS: MtProtoKit, SwiftSignalKit, Postbox, TelegramCore, TelegramUI; Mac: tools/dev/orderfile.py); the files are separate",
    "webrtc": "one pin for iOS, Mac and Android (klaipher/webrtc nanogram, shared/shared-libraries.json); the Mac builds the same submodule (submodules/webrtc); no per-file parity gate"

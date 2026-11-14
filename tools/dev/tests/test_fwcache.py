@@ -241,7 +241,7 @@ class ToolchainTests(unittest.TestCase):
     def test_only_core_pin_change_changes_every_rust_key(self):
         rust_stamps = {"wallet-engine": STAMP, "mtproto-engine": STAMP.replace("lib=", "lib=m"),
                        "tlottie": "lib=tlottie\nrust=x\n"}
-        other = "lib=OpenSSL\nxcode=Xcode 27.2\n"
+        other = "lib=boringssl\nxcode=Xcode 27.2\n"
         with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:
             before, _ = self.rust_of(self.toolchain_root(one))
             after, _ = self.rust_of(self.toolchain_root(two, 'components = ["rustfmt"]\n'))
@@ -282,13 +282,13 @@ class StampTests(unittest.TestCase):
 
     def test_build_tool_versions_are_in_the_stamps_that_use_them(self):
         want = {"webrtc": ("cmake", "ninja"), "tde2e": ("cmake", "ninja"), "mozjpeg": ("cmake", "ninja"),
-                "dav1d": ("meson", "ninja"), "libwebp": ("cmake", "ninja"), "libopus": ("cmake", "ninja")}
+                "dav1d": ("meson", "ninja"), "libwebp": ("cmake", "ninja"), "libopus": ("cmake", "ninja"), "boringssl": ("cmake", "ninja")}
         for unit, tools in want.items():
             for tool in tools:
                 self.assertRegex(self.stamps[unit], rf"(?m)^{tool}=\S", unit)
-        for unit in ("webrtc", "tde2e", "mozjpeg", "libwebp", "libopus"):
+        for unit in ("webrtc", "tde2e", "mozjpeg", "libwebp", "libopus", "boringssl"):
             self.assertRegex(self.stamps[unit], r"(?m)^ccache=(on|off)$", unit)
-        for unit in ("OpenSSL", "ffmpeg", "tlottie"):
+        for unit in ("ffmpeg", "tlottie"):
             self.assertNotRegex(self.stamps[unit], r"(?m)^(cmake|ninja|meson|ccache)=", unit)
 
     def test_tool_version_changes_the_stamp(self):

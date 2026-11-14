@@ -16,6 +16,7 @@ SUBMODULE_MARKERS = {
     "telegram-ios": "submodules/telegram-ios/submodules/TelegramCore/Package.swift",
     # libvpx and libopus are built from the core's copies (nested submodules).
     "libvpx source": "submodules/telegram-ios/third-party/libvpx/libvpx/configure",
+    "boringssl source": "submodules/telegram-ios/third-party/boringssl/src/CMakeLists.txt",
     "opus source": "submodules/telegram-ios/third-party/opus/opus/CMakeLists.txt",
     # The shared single sources live in the core as submodules; an empty one makes a library script fail late.
     "shared tooling": "submodules/telegram-ios/shared/shared-libraries.json",

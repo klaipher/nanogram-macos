@@ -5,19 +5,19 @@ set -x
 
 SOURCE_DIR="$1"
 BUILD_DIR="$2"
-OPENSSL_DIR="$3"
+BORINGSSL_DIR="$3"
 
-if [ -z "$SOURCE_DIR" ] || [ -z "$BUILD_DIR" ] || [ -z "$OPENSSL_DIR" ]; then
-    echo "Usage: $0 SOURCE_DIR BUILD_DIR OPENSSL_DIR"
-    echo "Example: $0 /path/to/td /path/to/build /path/to/openssl"
+if [ -z "$SOURCE_DIR" ] || [ -z "$BUILD_DIR" ] || [ -z "$BORINGSSL_DIR" ]; then
+    echo "Usage: $0 SOURCE_DIR BUILD_DIR BORINGSSL_DIR"
+    echo "Example: $0 /path/to/td /path/to/build /path/to/boringssl"
     exit 1
 fi
 
-openssl_crypto_library="${OPENSSL_DIR}/lib/libcrypto.a"
+boringssl_crypto_library="${BORINGSSL_DIR}/lib/libcrypto.a"
 options=""
 options="$options -DOPENSSL_FOUND=1"
-#options="$options -DOPENSSL_CRYPTO_LIBRARY=${openssl_crypto_library}"
-options="$options -DOPENSSL_INCLUDE_DIR=${OPENSSL_DIR}/include"
+#options="$options -DOPENSSL_CRYPTO_LIBRARY=${boringssl_crypto_library}"
+options="$options -DOPENSSL_INCLUDE_DIR=${BORINGSSL_DIR}/include"
 options="$options -DCMAKE_BUILD_TYPE=Release"
 
 # Step 1: Generate TDLib source files once

@@ -7,7 +7,7 @@ PROJECTS=(
     submodules/CodeSyntax/CodeSyntax/CodeSyntax.xcodeproj/project.pbxproj
     submodules/Sparkle/Sparkle.xcodeproj/project.pbxproj
     core-xprojects/OpenH264/OpenH264.xcodeproj/project.pbxproj
-    core-xprojects/openssl/OpenSSLEncryption.xcodeproj/project.pbxproj
+    core-xprojects/boringssl/BoringSSL.xcodeproj/project.pbxproj
     core-xprojects/libopus/libopus.xcodeproj/project.pbxproj
     core-xprojects/libvpx/libvpx.xcodeproj/project.pbxproj
     core-xprojects/Mozjpeg/Mozjpeg.xcodeproj/project.pbxproj

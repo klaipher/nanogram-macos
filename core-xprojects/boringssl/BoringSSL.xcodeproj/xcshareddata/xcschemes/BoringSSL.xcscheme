@@ -14,10 +14,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A790A2CB236AFCEF000451B5"
-               BuildableName = "OpenSSLEncryption.framework"
-               BlueprintName = "OpenSSLEncryption"
-               ReferencedContainer = "container:OpenSSLEncryption.xcodeproj">
+               BlueprintIdentifier = "D0983B8325668FAA00467703"
+               BuildableName = "BoringSSL.framework"
+               BlueprintName = "BoringSSL"
+               ReferencedContainer = "container:BoringSSL.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -50,10 +50,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A790A2CB236AFCEF000451B5"
-            BuildableName = "OpenSSLEncryption.framework"
-            BlueprintName = "OpenSSLEncryption"
-            ReferencedContainer = "container:OpenSSLEncryption.xcodeproj">
+            BlueprintIdentifier = "D0983B8325668FAA00467703"
+            BuildableName = "BoringSSL.framework"
+            BlueprintName = "BoringSSL"
+            ReferencedContainer = "container:BoringSSL.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </ProfileAction>

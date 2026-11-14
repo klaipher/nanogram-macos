@@ -57,7 +57,6 @@ BREW_PACKAGES=(
   cmake        # libwebp / mozjpeg / tde2e / webrtc
   ninja        # webrtc, dav1d
   meson        # dav1d
-  openssl@1.1  # used by several configure steps
   zlib
   autoconf
   libtool

@@ -15,7 +15,7 @@ Both artifacts are produced by the `WalletEngine` core-xproject, so the normal
 ./scripts/configure_frameworks.sh
 ```
 
-builds them alongside OpenSSL, ffmpeg, webrtc, tde2e and the rest. The build is
+builds them alongside BoringSSL, ffmpeg, webrtc, tde2e and the rest. The build is
 skipped when the artifacts are already present, and re-runs when
 `core-xprojects/wallet-engine/build` or the xcframework is missing (so the
 `scripts/rebuild` flag forces a rebuild the same way it does for the others).

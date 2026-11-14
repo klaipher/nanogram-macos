@@ -50,9 +50,9 @@ not re-verified against the code; correct them on the next change in that area.
 ### Native sources shared with the iOS core, animated stickers on tlottie only
 - What: libwebp is built from the core's `third-party/webp/libwebp` (no vendored tarball, no stale `build.sh`); libjpeg-turbo 3.2.1 is downloaded by URL and sha256 in `Mozjpeg/build.sh` (no vendored tarball); flatc 25.12.19 (the iOS pin) is built on first use by `scripts/prepare-flat-serialization.py` from the sha256-checked release archive (no committed binary); the dead OpenSSL `patch-conf.diff` and the stale `submodules/openssl` argument are gone. These files are upstream Telegram for macOS's own (`scripts/flatc` 24.12.23, `core-xprojects/libwebp/libwebp/build.sh`, `core-xprojects/openssl/OpenSSLEncryption/patch-conf.diff`, the libwebp and libjpeg-turbo tarballs), and we delete or replace them on purpose. flatc is cached per user in `~/Library/Caches/nanogram/flatc/25.12.19`; the first run needs network and cmake.
 - Animated stickers render with tlottie always (as Telegram for macOS 13.2). There is no rlottie fallback, force switch or kill switch: the `macos_killswitch_disable_tlottie` server flag is ignored. Behaviour is the tlottie path of every release since 13.2.
-- Where: `core-xprojects/{libwebp,Mozjpeg,openssl}`, `scripts/prepare-flat-serialization.py`, `scripts/framework-inputs.sh`, `tools/dev/native/native-libs.json`, docs/shared/w1-mac-native-sources.md.
+- Where: `core-xprojects/{libwebp,Mozjpeg,boringssl}`, `scripts/prepare-flat-serialization.py`, `scripts/framework-inputs.sh`, `tools/dev/native/native-libs.json`, docs/shared/w1-mac-native-sources.md.
 - Upstream: yes, they are upstream's files.
-- Sync: on upstream merges keep `scripts/flatc`, `libwebp/build.sh` and `patch-conf.diff` deleted (modify/delete conflicts resolve to delete), keep our `Mozjpeg/build.sh` and OpenSSL pbxproj shellScript edits, and compare any upstream flatc bump with `FLATBUFFERS_VERSION` in `prepare-flat-serialization.py`.
+- Sync: on upstream merges keep `scripts/flatc`, `libwebp/build.sh` and `patch-conf.diff` deleted (modify/delete conflicts resolve to delete), keep our `Mozjpeg/build.sh` and BoringSSL pbxproj shellScript edits, and compare any upstream flatc bump with `FLATBUFFERS_VERSION` in `prepare-flat-serialization.py`.
 
 ### Strictness and guardrails
 - What: `packages/Nanogram*` build in Swift 6 with warnings as errors; upstream code may only lower its warning count;
@@ -161,3 +161,9 @@ not re-verified against the code; correct them on the next change in that area.
 - Sync: re-apply the policy calls in `VideoRecorderPipeline` (init, `_configureFps`, `configureRecorderTracks`, `writerSide`) after a merge.
 
 - libopus builds from the core's xiph/opus v1.6.1 submodule with CMake + Ninja and the shared option file `opus-cmake-args.sh` (NEON presumed), floating point (was fixed-point); libwebp builds with Ninja (2026-11-14). Where: `core-xprojects/libopus`, `core-xprojects/libwebp`. Upstream: no. Sync: keep ours.
+
+### Mac TLS and crypto: OpenSSL 3.5.9 replaced by the shared BoringSSL
+- What: the Mac links one BoringSSL (klaipher/boringssl `nanogram` 1c764cec, official 0.20261105.0) built from the core's `third-party/boringssl/src` with CMake, like iOS and Android. WebRTC (klaipher/webrtc now builds `boringssl_certificate.cc` and `boringssl_identity.cc` on the Mac), libsrtp, tde2e, tgcalls and the MTProto RSA/BN code all use it. `core-xprojects/openssl` and `webrtc/build-gn.sh` are deleted; `Telegram-Mac/app/main.swift` no longer calls `OPENSSL_init_crypto` (a no-op in BoringSSL).
+- Where: `core-xprojects/boringssl`, `Telegram.xcodeproj` (library paths), `scripts/{configure_frameworks,framework-inputs,xcode27,setup_build_env}.sh`, `tools/dev/nanogram/doctor.py`, packages' `coreLibraries`, `run-tests.sh` files, `tools/dev/native/native-libs.json`.
+- Upstream: no. Upstream uses OpenSSL on the Mac.
+- Sync: keep `core-xprojects/boringssl` and the `-lcrypto/-lssl` paths `core-xprojects/boringssl/build/boringssl/lib`; resolve upstream edits to `core-xprojects/openssl` as deleted. The test helper `LibCryptoEncryptionProvider.swift` in the core still dlopens Homebrew openssl@3 (tests only, not shipped).

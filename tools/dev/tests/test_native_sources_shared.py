@@ -48,6 +48,7 @@ class SharedNativeSourcesTests(unittest.TestCase):
         self.assertIn(f'libvpx)\n            echo "$1/{CORE}/libvpx/libvpx"', body)
         self.assertIn(f'libopus)\n            echo "$1/{CORE}/opus/opus"', body)
         self.assertNotIn("opus-1.6.1.tar.gz", body)
+        self.assertIn(f'boringssl)\n            echo "$1/{CORE}/boringssl/src"', body)
 
     def test_libwebp_builds_from_the_core_copy(self):
         script = read(ROOT / "core-xprojects/libwebp/libwebp/build-cmake.sh")

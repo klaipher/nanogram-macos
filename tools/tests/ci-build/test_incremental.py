@@ -148,8 +148,8 @@ class SyncTests(TemporaryTest):
 
 
 class FrameworkTests(TemporaryTest):
-    libraries = ["OpenH264", "OpenSSL", "libopus", "libvpx", "mozjpeg", "libwebp", "dav1d", "ffmpeg", "webrtc", "tde2e", "wallet-engine", "mtproto-engine"]
-    projects = ["OpenH264", "OpenSSLEncryption", "libopus", "libvpx", "Mozjpeg", "libwebp", "dav1d", "ffmpeg", "webrtc", "tde2e", "WalletEngine", "MTProtoEngine"]
+    libraries = ["OpenH264", "boringssl", "libopus", "libvpx", "mozjpeg", "libwebp", "dav1d", "ffmpeg", "webrtc", "tde2e", "wallet-engine", "mtproto-engine"]
+    projects = ["OpenH264", "BoringSSL", "libopus", "libvpx", "Mozjpeg", "libwebp", "dav1d", "ffmpeg", "webrtc", "tde2e", "WalletEngine", "MTProtoEngine"]
 
     def setUp(self):
         super().setUp()

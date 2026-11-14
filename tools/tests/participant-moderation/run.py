@@ -6,7 +6,7 @@ root = Path(__file__).resolve().parents[3]
 flags = ['-lbz2', '-liconv']
 for directory in [
     'libvpx/build/libvpx/lib', 'ffmpeg/build/ffmpeg/lib', 'libopus/build/libopus/lib',
-    'libwebp/build/libwebp/lib', 'Mozjpeg/build', 'openssl/build/openssl/lib',
+    'libwebp/build/libwebp/lib', 'Mozjpeg/build', 'boringssl/build/boringssl/lib',
     'webrtc/build/webrtc', 'OpenH264/build/output/lib', 'dav1d/build/dav1d/lib',
     'tde2e/build/tde2e/lib',
 ]:

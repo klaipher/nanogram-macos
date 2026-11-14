@@ -26,6 +26,9 @@ framework_source_roots() {
         libvpx)
             echo "$1/submodules/telegram-ios/third-party/libvpx/libvpx"
             ;;
+        boringssl)
+            echo "$1/submodules/telegram-ios/third-party/boringssl/src"
+            ;;
         libopus)
             echo "$1/submodules/telegram-ios/third-party/opus/opus"
             echo "$1/submodules/telegram-ios/third-party/opus/opus-cmake-args.sh"
@@ -62,8 +65,8 @@ framework_inputs() {
 framework_dependencies() {
     case "$1" in
         ffmpeg) echo "libopus libvpx dav1d" ;;
-        webrtc) echo "OpenH264 OpenSSL mozjpeg libopus libvpx ffmpeg" ;;
-        tde2e) echo "OpenSSL" ;;
+        webrtc) echo "OpenH264 boringssl mozjpeg libopus libvpx ffmpeg" ;;
+        tde2e) echo "boringssl" ;;
         *) echo "" ;;
     esac
 }
@@ -86,7 +89,7 @@ framework_ccache_state() {
 
 framework_extra_fingerprint() {
     case "$1" in
-        webrtc|tde2e|mozjpeg|libopus)
+        webrtc|tde2e|mozjpeg|libopus|boringssl)
             framework_tool_version cmake --version
             framework_tool_version ninja --version
             framework_ccache_state
@@ -150,8 +153,8 @@ framework_required_outputs() {
         OpenH264)
             printf '%s\n' "$BUILD_DIR/output/lib/libopenh264.a" "$BUILD_DIR/output/include/include/wels/codec_api.h"
             ;;
-        OpenSSL)
-            printf '%s\n' "$BUILD_DIR/openssl/lib/libcrypto.a" "$BUILD_DIR/openssl/lib/libssl.a" "$BUILD_DIR/openssl/include/openssl/ssl.h"
+        boringssl)
+            printf '%s\n' "$BUILD_DIR/boringssl/lib/libcrypto.a" "$BUILD_DIR/boringssl/lib/libssl.a" "$BUILD_DIR/boringssl/include/openssl/ssl.h"
             ;;
         libopus)
             printf '%s\n' "$BUILD_DIR/libopus/lib/libopus.a" "$BUILD_DIR/libopus/include/opus/opus.h"
