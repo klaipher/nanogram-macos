@@ -4,6 +4,7 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **`submodules/tgcalls` entry matches the iOS core's**: URL with `.git`, `shallow = true` (smaller recursive clone). check_shared normalises the URL, still 0 URL errors.
 - **webrtc build preflight checks crc32c**: `core-xprojects/webrtc/webrtc/build.sh` also requires `third_party/crc32c/src/include`, so an uninitialised crc32c fails with the init hint instead of inside CMake.
 - **Pre-push shared check follows the pushed commits**: `tglint pre-push` runs `check_shared --ref <pushed sha>` for every pushed commit (not HEAD) and stops when `submodules/telegram-ios` is not checked out at the commit that pushed sha pins (a stale core would read the wrong manifest). Tests: not built; pure Python compiled.
 - **tgcalls submodule -> 73cc1f8d** (fork `nanogram-shared`, same commit as the core's `TgVoipWebrtc/tgcalls` pin): `Package.swift` excludes `ios/`, fixing the link failure from compiling 23 duplicate bridge classes and an XCTest file into the Mac target. Fork host tests default to submodules/webrtc.
