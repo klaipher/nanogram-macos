@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Build fix**: twidget 4913fd0e adds the `litehtml/no-public-headers` folder. Xcode 27's SwiftPM refused to resolve packages because the `TwidgetLitehtml` publicHeadersPath was missing ("public headers directory path ... is invalid"). The core moves to iOS ff1ac29b (same twidget and nanogram-deps 484b22e9 pins).
+
 - **Build fix**: the WebRTC CMake configure passes `-DCMAKE_CXX_STANDARD=20` (`core-xprojects/webrtc/webrtc/build.sh`). Abseil LTS 20260817 refuses to configure when the compiler default is below C++17 and nothing sets the standard; every WebRTC target already uses C++20. The regenerated `WalletEngineFFI.swift` (UniFFI bindings from the shared wallet-engine pin: encrypt/decrypt envelope) is committed with the binary it matches.
 
 - **Build fix pin**: twidget 58053871 restores litehtml's style::add_length_property (lost in the Apple-layer merge; the Android link failed); nanogram-deps e7783ff2.
