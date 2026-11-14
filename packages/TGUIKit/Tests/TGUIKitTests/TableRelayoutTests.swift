@@ -17,7 +17,22 @@ private final class FixedItem: TableRowItem {
 
     override func makeSize(_ width: CGFloat = CGFloat.greatestFiniteMagnitude, oldWidth: CGFloat = 0) -> Bool {
         makeSizeCalls += 1
+        if let id = stableId.base as? Int {
+            NoteHeightSpy.measureOrder.append(id)
+        }
         return super.makeSize(width, oldWidth: oldWidth)
+    }
+}
+
+private enum NoteHeightSpy {
+    static var calls: [IndexSet] = []
+    static var measureOrder: [Int] = []
+}
+
+private final class SpyTableView: TGFlipableTableView {
+    override func noteHeightOfRows(withIndexesChanged indexSet: IndexSet) {
+        NoteHeightSpy.calls.append(indexSet)
+        super.noteHeightOfRows(withIndexesChanged: indexSet)
     }
 }
 
@@ -104,5 +119,46 @@ final class TableRelayoutTests: XCTestCase {
         table.layoutItems()
         let measured = zip(items, before).filter { $0.makeSizeCalls > $1 }.count
         XCTAssertLessThan(measured, 200)
+    }
+
+    func testFlagOnNotesHeightOnceWithFullIndexSetAndMeasuresVisibleRowsFirst() {
+        UserDefaults.standard.set(true, forKey: ModernizationFlag.deferredResizeRelayout.rawValue)
+        let (table, window, _) = makeTable(count: 200)
+        defer { window.close() }
+        object_setClass(table.tableView, SpyTableView.self)
+        NoteHeightSpy.calls = []
+        NoteHeightSpy.measureOrder = []
+        let visible = table.visibleRows(600)
+
+        table.layoutItems()
+
+        XCTAssertEqual(NoteHeightSpy.calls.first, IndexSet(integersIn: 0 ..< 200))
+        XCTAssertEqual(NoteHeightSpy.calls.filter { $0.count == 200 }.count, 1)
+        let leading = Set(NoteHeightSpy.measureOrder.prefix(visible.length))
+        XCTAssertEqual(leading, Set(visible.location ..< visible.location + visible.length))
+    }
+
+    func testFlagOnKeepsScrollPositionChosenBetweenChunks() {
+        UserDefaults.standard.set(true, forKey: ModernizationFlag.deferredResizeRelayout.rawValue)
+        let (table, window, items) = makeTable(count: 200)
+        defer { window.close() }
+        let before = items.map { $0.makeSizeCalls }
+
+        table.layoutItems()
+        table.clipView.scroll(to: NSPoint(x: 0, y: 6000))
+        let scrolledTo = table.documentOffset.y
+
+        let drained = expectation(description: "chunks drained")
+        func poll() {
+            if zip(items, before).allSatisfy({ $0.makeSizeCalls > $1 }) {
+                drained.fulfill()
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01, execute: poll)
+            }
+        }
+        poll()
+        wait(for: [drained], timeout: 5)
+
+        XCTAssertEqual(table.documentOffset.y, scrolledTo, accuracy: 120)
     }
 }

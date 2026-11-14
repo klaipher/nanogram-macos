@@ -2349,14 +2349,15 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
         self.saveScrollState(visibleItems)
         
         let deferred = plan.deferredChunks.map { chunk in chunk.map { list[$0] } }
-        measureDeferredChunks(deferred, generation: generation, visibleItems: visibleItems)
+        measureDeferredChunks(deferred, generation: generation)
     }
     
-    private func measureDeferredChunks(_ chunks: [[TableRowItem]], generation: Int, visibleItems: [(TableRowItem,CGFloat,CGFloat)]) {
+    private func measureDeferredChunks(_ chunks: [[TableRowItem]], generation: Int) {
         guard generation == relayoutGeneration, let chunk = chunks.first else {
             return
         }
         let rest = Array(chunks.dropFirst())
+        let anchor = self.visibleItems()
         
         var indexes = IndexSet()
         self.beginTableUpdates()
@@ -2372,11 +2373,11 @@ open class TableView: ScrollView, NSTableViewDelegate,NSTableViewDataSource,Sele
             self.tableView.noteHeightOfRows(withIndexesChanged: indexes)
         }
         self.endTableUpdates()
-        self.saveScrollState(visibleItems)
+        self.saveScrollState(anchor)
         
         if !rest.isEmpty {
             DispatchQueue.main.async { [weak self] in
-                self?.measureDeferredChunks(rest, generation: generation, visibleItems: visibleItems)
+                self?.measureDeferredChunks(rest, generation: generation)
             }
         }
     }
