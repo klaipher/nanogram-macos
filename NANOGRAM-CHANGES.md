@@ -110,3 +110,8 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: `packages/PrivateCallScreen/Sources/{IncomingCallCard,PeerCallWindowPolicy,PeerCallScreen}.swift`, `packages/NanogramRuntime/Sources/NanogramRuntime/{IncomingCallPolicy,IncomingCallNotification}.swift`, `Telegram-Mac/account/{IncomingCallPresenter,SharedWakeupManager,SharedAccountContext}.swift`, `Telegram-Mac/utils/UNUserNotifications.swift`, `packages/TelegramCallsCore/.../PCallSession.swift`, `packages/CallsUI/.../{CallScreenController,PCallLaunch}.swift`, `packages/CallVideoLayer/Sources/CallWindowTransition.swift`, `SharedAccountContextProtocol.dropCrossCall(ownedBy:)`; commits 4d62949a, 1911058b.
 - Upstream: no (Nanogram-specific); the `.missed` busy drop and the `isUpdating` gate in `SharedWakeupManager` are upstream lines we changed.
 - Sync: re-apply the ring pipeline in `SharedWakeupManager.updateRindingsStatuses` and the `closeInterceptor` in `PeerCallScreen.init`; tests `IncomingCallPolicyTests`, `PeerCallWindowPolicyTests`.
+
+### Media and power efficiency (MAC-POWER-1, MAC-IMAGE-1/2, MAC-VISION-1, MAC-MEDIA-1)
+- What: video export holds a user-initiated activity and QoS (no App Nap throttling of a send in progress); photo send and WebP size reads stream through ImageIO instead of loading and decoding whole files; subject lift shares one CIContext; async video first-frame thumbnails behind a Debug Settings switch (off).
+- Where: `packages/ImageCanvasUI` (`UserInitiatedActivity`), `packages/ChatHistoryModel` (`PhotoSourceReading`), `packages/TextRecognizing/SubjectLifting.swift`, `packages/TelegramMediaUtils` (`VideoFirstFrameGenerator`).
+- Upstream: no.

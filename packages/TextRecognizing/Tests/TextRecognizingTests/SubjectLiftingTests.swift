@@ -122,4 +122,48 @@ final class SubjectLiftingTests: XCTestCase {
         XCTAssertEqual(alpha(decoded, x: 2, y: 2), 0)
         XCTAssertEqual(alpha(decoded, x: 128, y: 256), 255)
     }
+
+    private func alphaBuffer(width: Int, height: Int, opaque: CGRect) -> CVPixelBuffer? {
+        var buffer: CVPixelBuffer?
+        CVPixelBufferCreate(nil, width, height, kCVPixelFormatType_32BGRA, [kCVPixelBufferCGImageCompatibilityKey: true] as CFDictionary, &buffer)
+        guard let buffer else { return nil }
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        guard let base = CVPixelBufferGetBaseAddress(buffer) else { return nil }
+        let rowBytes = CVPixelBufferGetBytesPerRow(buffer)
+        memset(base, 0, rowBytes * height)
+        for y in Int(opaque.minY) ..< Int(opaque.maxY) {
+            for x in Int(opaque.minX) ..< Int(opaque.maxX) {
+                let pixel = base.advanced(by: y * rowBytes + x * 4).assumingMemoryBound(to: UInt8.self)
+                pixel[0] = 255
+                pixel[1] = 255
+                pixel[2] = 255
+                pixel[3] = 255
+            }
+        }
+        return buffer
+    }
+
+    func testMakeSubjectReusesOneContext() {
+        XCTAssertTrue(TextRecognizing.sharedBufferContext === TextRecognizing.sharedBufferContext)
+    }
+
+    func testMakeSubjectKeepsNormalizedRectWithYFlip() throws {
+        let buffer = try XCTUnwrap(alphaBuffer(width: 100, height: 50, opaque: CGRect(x: 20, y: 10, width: 40, height: 20)))
+        let first = try XCTUnwrap(TextRecognizing.makeSubject(buffer))
+        let second = try XCTUnwrap(TextRecognizing.makeSubject(buffer))
+        for subject in [first, second] {
+            XCTAssertEqual(subject.image.width, 40)
+            XCTAssertEqual(subject.image.height, 20)
+            XCTAssertEqual(subject.rect.minX, 0.2, accuracy: 0.001)
+            XCTAssertEqual(subject.rect.width, 0.4, accuracy: 0.001)
+            XCTAssertEqual(subject.rect.height, 0.4, accuracy: 0.001)
+            XCTAssertEqual(subject.rect.minY, 1 - 30.0 / 50.0, accuracy: 0.001)
+        }
+    }
+
+    func testMakeSubjectOfEmptyMaskIsNil() throws {
+        let buffer = try XCTUnwrap(alphaBuffer(width: 16, height: 16, opaque: .zero))
+        XCTAssertNil(TextRecognizing.makeSubject(buffer))
+    }
 }

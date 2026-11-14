@@ -346,7 +346,7 @@ public class Sender: NSObject {
                     let memoryWaveform:Data? = container.data.waveform
                     
                     let resource: TelegramMediaResource
-                    if let id = container.id, let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                    if let id = container.id, let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe) {
                         resource = LocalFileMediaResource(fileId: id, size: fileSize(path), isSecretRelated: isSecretRelated)
                         account.postbox.mediaBox.storeResourceData(resource.id, data: data)
                     } else {
@@ -359,7 +359,7 @@ public class Sender: NSObject {
                     var attrs:[TelegramMediaFileAttribute] = []
                     
                     let resource: TelegramMediaResource
-                    if let id = container.id, let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                    if let id = container.id, let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe) {
                         resource = LocalFileMediaResource(fileId: id, size: fileSize(path), isSecretRelated: isSecretRelated)
                         account.postbox.mediaBox.storeResourceData(resource.id, data: data)
                     } else {
@@ -374,19 +374,13 @@ public class Sender: NSObject {
                     let resource = LocalFileReferenceMediaResource(localFilePath:path, randomId: randomId, isUniquelyReferencedTemporaryFile: false, size: fileSize(path))
                     
                     media = TelegramMediaFile(fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: randomId), partialReference: nil, resource: resource, previewRepresentations: previewForFile(path, isSecretRelated: isSecretRelated, account: account), videoThumbnails: [], immediateThumbnailData: nil, mimeType: mimeType, size: nil, attributes: fileAttributes(for: mimeType, path: path, isMedia: true), alternativeRepresentations: [])
-                } else if mimeType.hasPrefix("image/") && !mimeType.hasSuffix("gif"), let imageData = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                } else if mimeType.hasPrefix("image/") && !mimeType.hasSuffix("gif") {
                     
                     let dimension: CGFloat = FastSettings.photoDimension
-                   
-                    let options = NSMutableDictionary()
-                    options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailWithTransform as String)
-                    options.setValue(dimension as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
-                    options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailFromImageAlways as String)
-
                     
-                    if let imageSource = CGImageSourceCreateWithData(imageData as CFData, nil) {
+                    if let imageSource = PhotoSourceReading.source(at: path) {
                         
-                        let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options)
+                        let image = PhotoSourceReading.thumbnail(of: imageSource, maxPixelSize: dimension)
                         
                         if let image = image {
                            
@@ -519,7 +513,7 @@ public class Sender: NSObject {
             }
             attrs.append(TelegramMediaFileAttribute.FileName(fileName: path.nsstring.lastPathComponent.nsstring.deletingPathExtension.appending(".mp4")))
 
-        } else if mime.hasPrefix("image"), let image = NSImage(contentsOf: URL(fileURLWithPath: path)), !mime.hasPrefix("image/webp") {
+        } else if mime.hasPrefix("image"), !mime.hasPrefix("image/webp"), let image = NSImage(contentsOf: URL(fileURLWithPath: path)) {
             var size = image.size
             if size.width == .infinity || size.height == .infinity {
                 size = image.cgImage(forProposedRect: nil, context: nil, hints: nil)!.size
@@ -531,10 +525,7 @@ public class Sender: NSObject {
                 attrs.append(.Sticker(displayText: "", packReference: nil, maskData: nil))
             }
         } else if mime.hasPrefix("image/webp") {
-            var size: NSSize = NSMakeSize(512, 512)
-            if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
-                size = convertFromWebP(data)?.size ?? size
-            }
+            let size: NSSize = PhotoSourceReading.pixelSize(at: path) ?? NSMakeSize(512, 512)
             
             attrs.append(TelegramMediaFileAttribute.ImageSize(size: size.pixel))
             attrs.append(TelegramMediaFileAttribute.FileName(fileName: path.nsstring.lastPathComponent))

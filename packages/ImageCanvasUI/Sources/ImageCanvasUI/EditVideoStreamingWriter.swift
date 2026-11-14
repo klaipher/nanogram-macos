@@ -101,8 +101,8 @@ final class EditVideoStreamingWriter: EditVideoExportWriter {
     private var headerEnd: Int64 = 0
 
     private let lock = NSLock()
-    private let muxQueue = DispatchQueue(label: "EditVideoStreamingWriter.mux")
-    private let audioQueue = DispatchQueue(label: "EditVideoStreamingWriter.audio")
+    private let muxQueue = DispatchQueue(label: "EditVideoStreamingWriter.mux", qos: .userInitiated)
+    private let audioQueue = DispatchQueue(label: "EditVideoStreamingWriter.audio", qos: .userInitiated)
 
     private var outputPath = ""
     private var isHEVC = true

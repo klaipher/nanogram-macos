@@ -334,7 +334,32 @@ private func videoFirstFrameData(account: Account, resource: MediaResource, chun
 
 
 
+private func writeFirstFrameJPEG(_ image: CGImage) -> String? {
+    var randomId: Int64 = 0
+    arc4random_buf(&randomId, 8)
+    let path = NSTemporaryDirectory() + "\(randomId)"
+    guard let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, "public.jpeg" as CFString, 1, nil) else {
+        return nil
+    }
+    CGImageDestinationSetProperties(destination, [:] as CFDictionary)
+    let options = NSMutableDictionary()
+    options.setObject(Float(0.6) as NSNumber, forKey: kCGImageDestinationLossyCompressionQuality as NSString)
+    CGImageDestinationAddImage(destination, image, options as CFDictionary)
+    return CGImageDestinationFinalize(destination) ? path : nil
+}
+
 private func fetchCachedVideoFirstFrameRepresentation(account: Account, resource: MediaResource, resourceData: MediaResourceData) -> Signal<CachedMediaResourceRepresentationResult, FetchVideoFirstFrameError> {
+    if #available(macOS 14.0, *), VideoFirstFrameGenerator.isEnabled {
+        return VideoFirstFrameGenerator.signal(path: resourceData.path, maxSize: CGSize(width: 800.0, height: 800.0), mimeType: "video/mp4")
+        |> castError(FetchVideoFirstFrameError.self)
+        |> deliverOn(cacheThreadPool)
+        |> mapToSignal { image -> Signal<CachedMediaResourceRepresentationResult, FetchVideoFirstFrameError> in
+            guard let image, let path = writeFirstFrameJPEG(image) else {
+                return .fail(.generic)
+            }
+            return .single(.temporaryPath(path))
+        }
+    }
     return Signal { subscriber in
         let tempFilePath = NSTemporaryDirectory() + "\(arc4random()).mov"
         do {
