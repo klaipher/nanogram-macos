@@ -378,17 +378,11 @@
     ],
     "mac": [
      {
-      "id": "tarball",
+      "id": "configure.ac",
       "what": "version",
-      "kind": "filename",
-      "file": "core-xprojects/libwebp/libwebp-*.tar.gz",
-      "regex": "^libwebp-([\\d.]+)\\.tar\\.gz$"
-     },
-     {
-      "id": "tarball",
-      "what": "sha256",
-      "kind": "sha256",
-      "file": "core-xprojects/libwebp/libwebp-*.tar.gz"
+      "kind": "regex",
+      "file": "submodules/telegram-ios/third-party/webp/libwebp/configure.ac",
+      "regex": "AC_INIT\\(\\[libwebp\\],\\s*\\[([\\d.]+)\\]"
      },
      {
       "id": "cmake options",
@@ -416,9 +410,6 @@
      "-DWEBP_BUILD_WEBPMUX=0",
      "-DWEBP_LINK_STATIC=1"
     ]
-   },
-   "sha256": {
-    "mac": "e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564"
    },
    "version": {
     "shared": "1.6.0"

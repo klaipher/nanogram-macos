@@ -73,9 +73,10 @@ class PinnedVersionsTests(unittest.TestCase):
 
     def test_libwebp(self):
         script = read(CORE / "libwebp" / "libwebp" / "build-cmake.sh")
-        self.assertIn('SOURCE_ARCHIVE="$SRC_DIR/libwebp-1.6.0.tar.gz"', script)
-        self.assertIn("e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564", script)
-        self.assertTrue((CORE / "libwebp" / "libwebp-1.6.0.tar.gz").is_file())
+        self.assertIn("submodules/telegram-ios/third-party/webp/libwebp", script)
+        self.assertNotIn("SOURCE_ARCHIVE", script)
+        self.assertFalse(list((CORE / "libwebp").glob("libwebp-*.tar.gz")))
+        self.assertFalse((CORE / "libwebp" / "libwebp" / "build.sh").exists())
         self.assertFalse((CORE / "libwebp" / "libwebp-master.zip").exists())
 
     def test_openssl(self):

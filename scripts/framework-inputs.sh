@@ -17,8 +17,8 @@ framework_build_dir() {
 
 framework_source_roots() {
     case "$2" in
-        OpenSSL)
-            echo "$1/submodules/telegram-ios/submodules/openssl"
+        libwebp)
+            echo "$1/submodules/telegram-ios/third-party/webp/libwebp"
             ;;
         libvpx)
             echo "$1/submodules/telegram-ios/third-party/libvpx/libvpx"
