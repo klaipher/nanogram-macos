@@ -4,6 +4,15 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Build system modernization, native libraries (build/modernize)**. Not run yet (no builds in this round); the first `tg frameworks` rebuilds dav1d, ffmpeg, webrtc, tde2e and libjpeg-turbo once (new stamp lines, new meson cross file, generator swap). Measure as in docs/local-development.md.
+  - MAC-P1: `tg frameworks` sets `CMAKE_<C,CXX,OBJC,OBJCXX>_COMPILER_LAUNCHER` to ccache (when installed) plus `CCACHE_DIR=~/.cache/nanogram-macos/ccache`, `CCACHE_MAXSIZE=3G`, `CCACHE_COMPRESS=1`, `CCACHE_BASEDIR=<checkout>`; callers' values win. FFmpeg (xcrun clang wrapper hides the compiler) left for later.
+  - MAC-P2: dav1d's meson cross file is written by `build.sh` from `xcrun -f clang/ar/strip` and `xcrun --sdk macosx --show-sdk-path`; `dav1d-arm64.meson` (hard-coded /Applications/Xcode.app SDK) is deleted.
+  - MAC-P3: stamps of webrtc, tde2e, mozjpeg carry `cmake=` and `ninja=`, dav1d's `meson=` and `ninja=` versions (`framework_tool_version`, `missing` when absent).
+  - MAC-P4: tde2e (both configures) and libjpeg-turbo use `-G Ninja` and `cmake --build --parallel` (jpeg-static target kept).
+  - MAC-P5: `CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_INCREMENTAL=0` for the wallet-engine xtask dev run.
+  - MAC-P6: `VALID_ARCHS` removed from Nanogram.xcconfig (ARCHS and ONLY_ACTIVE_ARCH pin arm64).
+  - Tests: tools/dev/tests test_frameworks (ccache, cargo env), test_fwcache (tool versions in stamps), test_versions (dav1d cross file now checked in build.sh). The 7 PinnedVersionsTests failures in a fresh worktree are the missing submodules and fail identically before the change.
+
 ## 13.2.0 (202611132157) — 2026-11-13
 
 Source: `nanogram/integration` @ 82fbeb79 · core `klaipher/nanogram` `main` @ 466d8350 (was 25edb39c at the last release; iOS TestFlight 202611132038 is 3c4e6399, plus 466d8350) · widget-sandbox and the core's untracked `submodules/rlottie` unchanged from the last release (BUILD-INFO says "dirty yes" because of them only).

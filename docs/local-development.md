@@ -96,6 +96,16 @@ ThinLTO and dead-code stripping):
 
 `buildcheck` fails a Debug build whose log has a `VerifyModule`, `GenerateDSYMFile` or `ExtractAppIntentsMetadata` task.
 
+**Native library builds** (`tg frameworks`): the CMake libraries (tg_owt, tde2e, libjpeg-turbo) build with Ninja and, when
+`ccache` is installed, through it (`CMAKE_{C,CXX,OBJC,OBJCXX}_COMPILER_LAUNCHER` from the environment; `CCACHE_DIR`
+`~/.cache/nanogram-macos/ccache`, `CCACHE_MAXSIZE=3G`, `CCACHE_COMPRESS=1`, `CCACHE_BASEDIR` the checkout, so worktrees share
+entries). ccache output equals a normal compile, so framework stamps and cache keys are unchanged. Autotools libraries
+(FFmpeg) are not behind ccache yet. The stamps of webrtc, tde2e, libjpeg-turbo (cmake, ninja) and dav1d (meson, ninja)
+carry the tool versions, so a Homebrew upgrade rebuilds them. dav1d's meson cross file is generated from `xcrun`
+(active Xcode and SDK). The wallet-engine bindgen run uses `CARGO_PROFILE_DEV_DEBUG=0` and `CARGO_INCREMENTAL=0`. To
+measure: `ccache -z`, rebuild webrtc (`tg frameworks --no-cache` after removing its `.framework-stamp`), repeat, then
+`ccache -s`, and compare the `BUILD_TIMING_LOG` seconds.
+
 **Compilation caching** (Debug only): `COMPILATION_CACHE_ENABLE_CACHING = YES` with one CAS for every checkout,
 `~/.cache/nanogram-macos/CompilationCache`, limited to 6 GB (`COMPILATION_CACHE_LIMIT_SIZE` in bytes: half of the 12 GB footprint cap, because the LLVM store keeps two generations and reached 15 GB against a 10 GB limit; the shared cleanup enforces the 12 GB, see [cache-cleanup.md](cache-cleanup.md)). Adopted on
 the numbers below (`build-output/stage2/task10/`, 2026-11-03, the three settings on the command line, otherwise the
@@ -462,6 +472,7 @@ use and what `tg prune` would do; `tg doctor` warns when the root is over its ca
 | `tmp/frameworks-<pid>/` | upstream's `configure_frameworks.sh` (per-library DerivedData, deleted when the script exits normally) | — | `tg prune` after 6 hours |
 | `spm-*/`, `swiftpm/` | `swift build --scratch-path` runs outside the checkout | whole root | `tg prune` (unused 7 days, or over the cap) |
 | `CompilationCache/` | Debug compilation caching, if enabled | whole root | `tg prune`, only when over the cap, last |
+| `ccache/` | `tg frameworks` when `ccache` is installed: compiler cache of the CMake-built libraries (tg_owt, tde2e, libjpeg-turbo) | 3 GB, prunes itself | not touched by `tg prune`; counts toward the whole root |
 | everything else (`bin/`, `build-*.lock`, `sparkle-ed25519/` (the signing helper binary), `launch-home`, tools, logs) | tools and workflows | — | never removed; `tg prune` refuses `sparkle-ed25519`, `sparkle_ed25519` and `launch-home` by name |
 
 `tg prune` keeps the whole root under 40 GB (`NANOGRAM_CACHE_MAX_GB`, or `--max-gb N`): first it removes DerivedData
