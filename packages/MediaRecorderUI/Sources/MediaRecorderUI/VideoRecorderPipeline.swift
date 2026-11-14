@@ -110,6 +110,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     
     public let config: VideoMessageConfig
     public let outputSide: Int
+    public private(set) var writerSide: Int
     
     private var status: VideoCameraRecordingStatus = .idle {
         didSet {
@@ -175,7 +176,8 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         self.currentURL = url
         self.liveUploading = liveUploading
         self.config = config
-        self.outputSide = TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: config.diameter)
+        self.outputSide = TGMediaVideoConversionPresetSettings.videoMessageSide(forDiameter: RoundVideoEncodingPolicy.side(serverDiameter: config.diameter))
+        self.writerSide = self.outputSide
         super.init()
         
         recorder = TGVideoCameraMovieRecorder(url: url, delegate: self, callbackQueue: VideoRecorderPipeline.queue.queue)
@@ -249,16 +251,25 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
         
         if let videoDevice = videoDevice {
             _reconfigureDevice(videoDevice, with: { device in
-               // device.activeVideoMaxFrameDuration = frameDuration
-               // device.activeVideoMinFrameDuration = frameDuration
+                let fps = Double(RoundVideoEncodingPolicy.frameRate)
+                guard device.activeFormat.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= fps && $0.maxFrameRate >= fps }) else {
+                    return
+                }
+                let frameDuration = CMTime(value: 1, timescale: CMTimeScale(RoundVideoEncodingPolicy.frameRate))
+                device.activeVideoMinFrameDuration = frameDuration
+                device.activeVideoMaxFrameDuration = frameDuration
             })
         }
     }
     
     private func _reconfigureDevice(_ device: AVCaptureDevice, with block: (AVCaptureDevice)-> Void) {
-        try? device.lockForConfiguration()
+        do {
+            try device.lockForConfiguration()
+        } catch {
+            return
+        }
+        defer { device.unlockForConfiguration() }
         block(device)
-        device.unlockForConfiguration()
     }
     
 
@@ -295,9 +306,10 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             self.videoDeviceInput = videoDeviceInput
         }
         session.commitConfiguration()
+        _configureFps()
         videoOutput.videoSettings = captureVideoSettings()
     }
-    
+
     private func captureVideoSettings() -> [String: Any] {
         var settings: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -434,10 +446,16 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     
     private func configureRecorderTracks() {
         let sourceSampleRate = self.outputAudioFormatDescription.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mSampleRate } ?? 48000.0
-        let audioSettings = TGMediaVideoConversionPresetSettings.audioSettings(for: TGMediaVideoConversionPresetVideoMessage, bitrate: Int32(config.audioBitrate), sourceSampleRate: sourceSampleRate)
+        let audioSettings = TGMediaVideoConversionPresetSettings.audioSettings(for: TGMediaVideoConversionPresetVideoMessage, bitrate: Int32(RoundVideoEncodingPolicy.audioBitrateKbps(server: config.audioBitrate)), sourceSampleRate: sourceSampleRate)
         recorder.addAudioTrack(withSourceFormatDescription: outputAudioFormatDescription, settings: audioSettings)
-        let size = CGSize(width: self.outputSide, height: self.outputSide)
-        let videoSettings = TGMediaVideoConversionPresetSettings.videoSettings(for: TGMediaVideoConversionPresetVideoMessage, dimensions: size, bitrate: Int32(config.videoBitrate))
+        let producedSide = self.outputVideoFormatDescription.map { description -> Int in
+            let dimensions = CMVideoFormatDescriptionGetDimensions(description)
+            return Int(min(dimensions.width, dimensions.height))
+        } ?? self.outputSide
+        let writerSide = RoundVideoEncodingPolicy.effectiveSide(side: self.outputSide, sourceShortSide: producedSide)
+        self.writerSide = writerSide
+        let size = CGSize(width: writerSide, height: writerSide)
+        let videoSettings = TGMediaVideoConversionPresetSettings.videoSettings(for: TGMediaVideoConversionPresetVideoMessage, dimensions: size, bitrate: Int32(RoundVideoEncodingPolicy.videoBitrateKbps(server: config.videoBitrate)))
         recorder.addVideoTrack(withSourceFormatDescription: outputVideoFormatDescription, transform: CGAffineTransform.identity, settings: videoSettings)
         
         recorder.prepareToRecord()
