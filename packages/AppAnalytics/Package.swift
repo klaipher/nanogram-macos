@@ -1,6 +1,10 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.9
 
 import PackageDescription
+
+let strictConcurrencySettings: [SwiftSetting] = [
+    .enableUpcomingFeature("StrictConcurrency"),
+]
 
 let package = Package(
     name: "AppAnalytics",
@@ -23,7 +27,8 @@ let package = Package(
                 .product(name: "Postbox", package: "Postbox", condition: nil),
                 .product(name: "TGUIKit", package: "TGUIKit", condition: nil),
             ],
-            path: "Sources/AppAnalytics"),
+            path: "Sources/AppAnalytics",
+            swiftSettings: strictConcurrencySettings),
         .testTarget(
             name: "AppAnalyticsTests",
             dependencies: [

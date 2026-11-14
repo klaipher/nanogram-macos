@@ -1,6 +1,10 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.9
 
 import PackageDescription
+
+let strictConcurrencySettings: [SwiftSetting] = [
+    .enableUpcomingFeature("StrictConcurrency"),
+]
 
 let package = Package(
     name: "CrashReports",
@@ -17,7 +21,8 @@ let package = Package(
             dependencies: [
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
             ],
-            path: "Sources/CrashReports"),
+            path: "Sources/CrashReports",
+            swiftSettings: strictConcurrencySettings),
         .testTarget(
             name: "CrashReportsTests",
             dependencies: ["CrashReports"],

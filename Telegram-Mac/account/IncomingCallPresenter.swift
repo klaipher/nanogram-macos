@@ -80,7 +80,7 @@ final class IncomingCallPresenter: @unchecked Sendable {
             case .open:
                 let window = sharedContext.peerCall?.window
                 MainActor.assumeIsolated {
-                    NSApp.activate(ignoringOtherApps: true)
+                    NSApp.activate()
                     window?.makeKeyAndOrderFront(nil)
                 }
             case .accept:
@@ -88,7 +88,7 @@ final class IncomingCallPresenter: @unchecked Sendable {
                 session.acceptCallSession()
                 let window = sharedContext.peerCall?.window
                 MainActor.assumeIsolated {
-                    NSApp.activate(ignoringOtherApps: true)
+                    NSApp.activate()
                     window?.makeKeyAndOrderFront(nil)
                 }
             case .decline:

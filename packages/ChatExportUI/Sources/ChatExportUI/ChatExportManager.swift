@@ -666,24 +666,11 @@ private final class ChatExportRun {
     }
 
     private func waitForComplete(mediaBox: MediaBox, resource: MediaResource, showProgress: Bool, name: String, progressValue: Atomic<Float>, timeout: Double) -> MediaResourceData? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: MediaResourceData?
-        let disposable = (mediaBox.resourceData(resource) |> filter { $0.complete } |> take(1)).start(next: { data in
-            result = data
-            semaphore.signal()
-        })
-        let deadline = Date().addingTimeInterval(timeout)
-        while semaphore.wait(timeout: .now() + 0.2) == .timedOut {
-            if isCancelled || Date() > deadline {
-                disposable.dispose()
-                return nil
-            }
+        return ExportBlocking.completeResource(mediaBox: mediaBox, resource: resource, timeout: timeout, isCancelled: { self.isCancelled }, onTick: {
             if showProgress {
-                setMediaProgress(name: name, progress: progressValue.with { $0 })
+                self.setMediaProgress(name: name, progress: progressValue.with { $0 })
             }
-        }
-        disposable.dispose()
-        return result
+        })
     }
 
     // MARK: - Media helpers
@@ -806,21 +793,7 @@ private final class ChatExportRun {
     }
 
     private func waitForResource(mediaBox: MediaBox, resource: MediaResource, timeout: Double) -> MediaResourceData? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: MediaResourceData?
-        let disposable = (mediaBox.resourceData(resource) |> filter { $0.complete } |> take(1)).start(next: { data in
-            result = data
-            semaphore.signal()
-        })
-        let deadline = Date().addingTimeInterval(timeout)
-        while semaphore.wait(timeout: .now() + 0.2) == .timedOut {
-            if isCancelled || Date() > deadline {
-                disposable.dispose()
-                return nil
-            }
-        }
-        disposable.dispose()
-        return result
+        return ExportBlocking.completeResource(mediaBox: mediaBox, resource: resource, timeout: timeout, isCancelled: { self.isCancelled })
     }
 
     private func chatHeaderSubtitle(peer: Peer, cachedData: CachedPeerData?) -> String? {
@@ -988,23 +961,7 @@ private final class ChatExportRun {
     // MARK: - Blocking signal helper
 
     private func blockingFirst<T>(_ signal: Signal<T, NoError>, timeout: Double) -> T? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: T?
-        let disposable = signal.start(next: { value in
-            result = value
-            semaphore.signal()
-        }, completed: {
-            semaphore.signal()
-        })
-        let deadline = timeout > 0 ? Date().addingTimeInterval(timeout) : Date.distantFuture
-        while semaphore.wait(timeout: .now() + 0.2) == .timedOut {
-            if isCancelled || Date() > deadline {
-                disposable.dispose()
-                return nil
-            }
-        }
-        disposable.dispose()
-        return result
+        return ExportBlocking.first(signal, timeout: timeout, isCancelled: { self.isCancelled })
     }
 }
 
@@ -1931,21 +1888,7 @@ private final class FullExportRun {
     }
 
     private func waitForResource(mediaBox: MediaBox, resource: MediaResource, timeout: Double) -> MediaResourceData? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: MediaResourceData?
-        let disposable = (mediaBox.resourceData(resource) |> filter { $0.complete } |> take(1)).start(next: { data in
-            result = data
-            semaphore.signal()
-        })
-        let deadline = Date().addingTimeInterval(timeout)
-        while semaphore.wait(timeout: .now() + 0.2) == .timedOut {
-            if isCancelled || Date() > deadline {
-                disposable.dispose()
-                return nil
-            }
-        }
-        disposable.dispose()
-        return result
+        return ExportBlocking.completeResource(mediaBox: mediaBox, resource: resource, timeout: timeout, isCancelled: { self.isCancelled })
     }
 
     private func formatDate(_ timestamp: Int32) -> String {
@@ -1964,22 +1907,6 @@ private final class FullExportRun {
     }
 
     private func blockingFirst<T>(_ signal: Signal<T, NoError>, timeout: Double) -> T? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: T?
-        let disposable = signal.start(next: { value in
-            result = value
-            semaphore.signal()
-        }, completed: {
-            semaphore.signal()
-        })
-        let deadline = timeout > 0 ? Date().addingTimeInterval(timeout) : Date.distantFuture
-        while semaphore.wait(timeout: .now() + 0.2) == .timedOut {
-            if isCancelled || Date() > deadline {
-                disposable.dispose()
-                return nil
-            }
-        }
-        disposable.dispose()
-        return result
+        return ExportBlocking.first(signal, timeout: timeout, isCancelled: { self.isCancelled })
     }
 }

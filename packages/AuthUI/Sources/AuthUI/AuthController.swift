@@ -1390,7 +1390,7 @@ public class AuthController : GenericViewController<AuthView> {
     
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        NSApp.activate(ignoringOtherApps: true)
+        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
 
     }
 

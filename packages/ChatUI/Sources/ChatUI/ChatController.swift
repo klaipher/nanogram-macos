@@ -13195,7 +13195,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                               self.chatInteraction.presentation.interfaceState.editState?.message.id == messageId,
                               dropAction.takeIfCurrent() else { return }
                         let replacement = self.chatInteraction.beginMediaReplacement(entry: .dropTarget, mode: .media, context: analyticsContext)
-                        NSApp.activate(ignoringOtherApps: true)
+                        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
                         self.editCurrentMessagePhotoDisposable.set(nil)
                         self.updateMediaDisposable.set(analyticsContext.preservingPresentation(Sender.generateMedia(for: MediaSenderContainer(path: list[0], isFile: false), account: self.chatInteraction.interactionContext.account, isSecretRelated: peerId.namespace == Namespaces.Peer.SecretChat) |> deliverOnMainQueue).start(next: { [weak self] media, _ in
                             guard let self, self.editingSessionId == editingSessionId,
@@ -13210,7 +13210,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     
                     let asMediaItem = DragItem(title: strings().chatDropTitle, desc: strings().chatDropQuickDesc, handler:{ [weak self] in
                         guard let self, dropAction.takeIfCurrent() else { return }
-                        NSApp.activate(ignoringOtherApps: true)
+                        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
                         let journey = self.chatInteraction.makeMediaAnalyticsJourney(context: analyticsContext, entry: .dropTarget, mode: .media, via: .dragDrop, source: self.analyticsScreen)
                         if let selectionBlocker { journey?.blocked(selectionBlocker) }
                         self.chatInteraction.showPreviewSender(list.map { URL(fileURLWithPath: $0) }, true, nil, analyticsContext: analyticsContext, journey: journey)
@@ -13227,7 +13227,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     }
                     let asFileItem = DragItem(title: fileTitle, desc: fileDesc, handler: { [weak self] in
                         guard let self, dropAction.takeIfCurrent() else { return }
-                        NSApp.activate(ignoringOtherApps: true)
+                        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
                         let shift = NSApp.currentEvent?.modifierFlags.contains(.shift) ?? false
                         if shift {
                             let journey = self.chatInteraction.makeMediaAnalyticsJourney(context: analyticsContext, entry: .dropTarget, mode: .file, via: .dragDrop, source: self.analyticsScreen)
@@ -13273,7 +13273,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                               self.chatInteraction.presentation.interfaceState.editState?.message.id == messageId,
                               dropAction.takeIfCurrent() else { return }
                         let replacement = self.chatInteraction.beginMediaReplacement(entry: .dropTarget, mode: .media, context: analyticsContext)
-                        NSApp.activate(ignoringOtherApps: true)
+                        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
                         self.editCurrentMessagePhotoDisposable.set(nil)
                         let account = self.chatInteraction.interactionContext.account
                         self.updateMediaDisposable.set(analyticsContext.preservingPresentation(putToTemp(image: image) |> mapToSignal {
@@ -13290,7 +13290,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
                 let asMediaItem = DragItem(title: strings().chatDropTitle, desc: strings().chatDropQuickDesc, handler:{ [weak self] in
                     guard let self, dropAction.takeIfCurrent() else { return }
-                    NSApp.activate(ignoringOtherApps: true)
+                    if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
                     let journey = self.chatInteraction.makeMediaAnalyticsJourney(context: analyticsContext, entry: .dropTarget, mode: .media, via: .dragDrop, source: self.analyticsScreen)
                     journey?.preparing()
                     let preparedAction = self.chatInteraction.captureDeferredSendAction()
@@ -13307,7 +13307,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 
                 let asFileItem = DragItem(title: strings().chatDropTitle, desc: strings().chatDropAsFilesDesc, handler:{ [weak self] in
                     guard let self, dropAction.takeIfCurrent() else { return }
-                    NSApp.activate(ignoringOtherApps: true)
+                    if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
                     let journey = self.chatInteraction.makeMediaAnalyticsJourney(context: analyticsContext, entry: .dropTarget, mode: .file, via: .dragDrop, source: self.analyticsScreen)
                     journey?.preparing()
                     let preparedAction = self.chatInteraction.captureDeferredSendAction()

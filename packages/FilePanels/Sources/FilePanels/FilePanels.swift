@@ -2,6 +2,7 @@ import Cocoa
 import TGUIKit
 import TelegramTheme
 import AppAnalytics
+import UniformTypeIdentifiers
 
 public let mediaExts:[String] = ["png","jpg","jpeg","tiff", "heic","mp4","mov","avi", "gif", "m4v"]
 public let photoExts:[String] = ["png","jpg","jpeg","tiff", "heic"]
@@ -20,6 +21,16 @@ public func filePanel(with exts:[String]? = nil, allowMultiple:Bool = true, canC
     presentFilePanel(with: exts, allowMultiple: allowMultiple, canChooseDirectories: canChooseDirectories, for: window, appearance: appearance, analyticsContext: analyticsContext, cancelled: cancelled, completion: completion)
 }
 
+@available(macOS 11, *)
+public func filePanelContentTypes(for exts: [String]) -> [UTType] {
+    var types: [UTType] = []
+    for ext in exts {
+        guard let type = UTType(filenameExtension: ext.lowercased()), !types.contains(type) else { continue }
+        types.append(type)
+    }
+    return types
+}
+
 private func presentFilePanel(with exts: [String]?, allowMultiple: Bool, canChooseDirectories: Bool, for window: Window, appearance: NSAppearance?, analyticsContext: AnalyticsContext?, cancelled: (() -> Void)?, completion: @escaping ([String]?) -> Void) {
     let analyticsContext = analyticsContext ?? Analytics.shared.unresolvedContext()
     let analyticsPresentation = analyticsContext.beginPresentation()
@@ -30,7 +41,13 @@ private func presentFilePanel(with exts: [String]?, allowMultiple: Bool, canChoo
         panel.canChooseDirectories = canChooseDirectories
         panel.appearance = appearance
         panel.canCreateDirectories = true
-        panel.allowedFileTypes = exts
+        if let exts = exts {
+            if #available(macOS 11, *) {
+                panel.allowedContentTypes = filePanelContentTypes(for: exts)
+            } else {
+                panel.allowedFileTypes = exts
+            }
+        }
         panel.allowsMultipleSelection = allowMultiple
         Analytics.shared.screens.showStandalone(.systemFilePicker, owner: panel, context: analyticsContext)
         panel.beginSheetModal(for: window) { (response) in

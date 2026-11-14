@@ -501,7 +501,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 telegramUpdateTheme(updateTheme(with: themeSettings), window: window, animated: false)
 
                 self.window.makeKeyAndOrderFront(self)
-                NSApp.activate(ignoringOtherApps: true)
+                NSApp.activate()
 
                 showModal(with: ColdStartPasslockController(checkNextValue: { passcode in
                     appEncryption.applyPasscode(passcode)
@@ -866,11 +866,11 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                         } else {
                             navigation.push(ChatController(context: contextValue, chatLocation: .peer(peerId)))
                         }
-                        NSApp.activate(ignoringOtherApps: true)
+                        NSApp.activate()
                         contextValue.window.deminiaturize(nil)
                     } else {
                         sharedContext.switchToAccount(id: account.id, action: .chat(peerId, necessary: true))
-                        NSApp.activate(ignoringOtherApps: true)
+                        NSApp.activate()
                         window.deminiaturize(nil)
                     }
                 }, navigateToThread: { account, threadId, fromId, threadData in
@@ -917,23 +917,23 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                 })
                             }
                         }
-                        NSApp.activate(ignoringOtherApps: true)
+                        NSApp.activate()
                         contextValue.window.deminiaturize(nil)
                     } else {
                         sharedContext.switchToAccount(id: account.id, action: .thread(threadId, fromId, threadData, necessary: true))
-                        NSApp.activate(ignoringOtherApps: true)
+                        NSApp.activate()
                         window.deminiaturize(nil)
                     }
                 }, navigateToStory: { account, peerId in
                     if let contextValue = self.accountContext(for: account.id) {
                         closeAllModals(window: contextValue.window)
                         contextValue.window.makeKeyAndOrderFront(nil)
-                        NSApp.activate(ignoringOtherApps: true)
+                        NSApp.activate()
                         contextValue.window.deminiaturize(nil)
                         StoryModalController.ShowStories(context: contextValue, isHidden: false, initialId: StoryInitialIndex(peerId: peerId, id: nil, messageId: nil, takeControl: nil), singlePeer: true)
                     } else {
                         sharedContext.switchToAccount(id: account.id, action: .story(peerId))
-                        NSApp.activate(ignoringOtherApps: true)
+                        NSApp.activate()
                         window.deminiaturize(nil)
                     }
                 }, updateCurrectController: {
@@ -1221,7 +1221,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                 self.window.makeKeyAndOrderFront(self)
                             }
                             self.window.deminiaturize(self)
-                            NSApp.activate(ignoringOtherApps: true)
+                            NSApp.activate()
                              
                             
                         }
@@ -1554,7 +1554,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         AppDelegate.eventProcessed = url
         
         if let url = AppDelegate.eventProcessed {
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             self.window.deminiaturize(self)
             if let context = self.contextValue?.context {
                 AppDelegate.eventProcessed = nil

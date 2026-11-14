@@ -115,3 +115,10 @@ not re-verified against the code; correct them on the next change in that area.
 - What: video export holds a user-initiated activity and QoS (no App Nap throttling of a send in progress); photo send and WebP size reads stream through ImageIO instead of loading and decoding whole files; subject lift shares one CIContext; async video first-frame thumbnails behind a Debug Settings switch (off).
 - Where: `packages/ImageCanvasUI` (`UserInitiatedActivity`), `packages/ChatHistoryModel` (`PhotoSourceReading`), `packages/TextRecognizing/SubjectLifting.swift`, `packages/TelegramMediaUtils` (`VideoFirstFrameGenerator`).
 - Upstream: no.
+
+### Concurrency cleanups (modernization review)
+- What: `activate()` instead of `activate(ignoringOtherApps:)` (28 sites); `FilePanels` uses `allowedContentTypes`; the share extension no longer blocks main on two semaphores (`continueLaunch`); `TabAllBadgeItem` caches the account count; the four export wait helpers are one `ExportBlocking`; `DecoderQuarantine`/`ReplyBox` are checked `Sendable`; the four packages named by the spec build with `StrictConcurrency` warnings.
+- Why: deprecations, latent main-thread hangs and unchecked concurrency.
+- Where: `TelegramShare/ShareViewController.swift`, `packages/ChatListUI/.../TabBadgeItem.swift`, `packages/ChatExportUI/.../ExportBlocking.swift`, `packages/FilePanels`, `packages/NanogramDecoder`, leaf `Package.swift` files.
+- Upstream: the activate sites, `ShareViewController`, `TabBadgeItem` and `ChatExportManager` are upstream lines we changed.
+- Sync: re-apply the semaphore removals in `ShareViewController` and `TabAllBadgeItem.makeView` after a merge; any new `activate(ignoringOtherApps:)` from upstream becomes `activate()`.

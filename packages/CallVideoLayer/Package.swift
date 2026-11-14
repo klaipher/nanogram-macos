@@ -1,7 +1,11 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
+
+let strictConcurrencySettings: [SwiftSetting] = [
+    .enableUpcomingFeature("StrictConcurrency"),
+]
 
 let callVideoLayerTestLibraries: [(path: String, name: String)] = [
     ("webrtc/build/webrtc", "mac_framework_objc_static"),
@@ -52,7 +56,8 @@ let package = Package(
                            .product(name: "TgVoipWebrtc", package: "TgVoipWebrtc", condition: nil),
                            .product(name: "TelegramVoip", package: "TelegramVoip", condition: nil),
                            .product(name: "YuvConversion", package: "YuvConversion", condition: nil)],
-            path: "Sources/"),
+            path: "Sources/",
+            swiftSettings: strictConcurrencySettings),
         .testTarget(
             name: "CallVideoLayerTests",
             dependencies: ["CallVideoLayer", .product(name: "NanogramDebug", package: "NanogramDebug", condition: nil), .product(name: "rnoise", package: "rnoise")],

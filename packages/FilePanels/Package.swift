@@ -24,5 +24,9 @@ let package = Package(
                 .product(name: "AppAnalytics", package: "AppAnalytics", condition: nil),
             ],
             path: "Sources/FilePanels"),
+        .testTarget(
+            name: "FilePanelsTests",
+            dependencies: ["FilePanels"],
+            path: "Tests/FilePanelsTests"),
     ]
 )

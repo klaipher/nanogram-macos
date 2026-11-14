@@ -23,6 +23,7 @@ class ShareViewController: NSViewController {
     private let context = Promise<AuthorizedApplicationContext?>()
     private var passlock: SEPasslockController? = nil
     private var unavailableController: SEUnauthorizedViewController?
+    private let launchDisposable = MetaDisposable()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -52,29 +53,24 @@ class ShareViewController: NSViewController {
         logger.logToFile = false
         Logger.setSharedLogger(logger)
         
-        let themeSemaphore = DispatchSemaphore(value: 0)
-        var themeSettings: ThemePaletteSettings = ThemePaletteSettings.defaultTheme
-        _ = (themeSettingsView(accountManager: accountManager) |> take(1)).start(next: { settings in
-            themeSettings = settings
-            themeSemaphore.signal()
-        })
-        themeSemaphore.wait()
-        
-        var localization: LocalizationSettings? = nil
-        let localizationSemaphore = DispatchSemaphore(value: 0)
-        _ = (accountManager.transaction { transaction in
-            localization = transaction.getSharedData(SharedDataKeys.localizationSettings)?.get(LocalizationSettings.self)
-            localizationSemaphore.signal()
-        }).start()
-        localizationSemaphore.wait()
-        
+        let themeSettingsSignal = themeSettingsView(accountManager: accountManager) |> take(1)
+        let localizationSignal: Signal<LocalizationSettings?, NoError> = accountManager.transaction { transaction -> LocalizationSettings? in
+            return transaction.getSharedData(SharedDataKeys.localizationSettings)?.get(LocalizationSettings.self)
+        }
+        self.launchDisposable.set((combineLatest(themeSettingsSignal, localizationSignal)
+        |> take(1)
+        |> deliverOnMainQueue).start(next: { [weak self] themeSettings, localization in
+            self?.continueLaunch(accountManager: accountManager, rootPath: rootPath, themeSettings: themeSettings, localization: localization)
+        }))
+    }
+
+    private func continueLaunch(accountManager: AccountManager<TelegramAccountManagerTypes>, rootPath: String, themeSettings: ThemePaletteSettings, localization: LocalizationSettings?) {
         if let localization = localization {
             applyUILocalization(localization)
         }
-        
+
         telegramUpdateTheme(updateTheme(with: themeSettings), window: nil, animated: false)
 
-        
         let appEncryption = AppEncryptionParameters(path: rootPath)
         
         if let deviceSpecificEncryptionParameters = appEncryption.decrypt() {
