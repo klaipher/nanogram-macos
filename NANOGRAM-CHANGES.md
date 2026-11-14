@@ -29,6 +29,7 @@ not re-verified against the code; correct them on the next change in that area.
 - Sync: core moves only through `tg core-bump`; see docs/local-development.md "The shared Telegram core".
 
 ### One source per shared library (iOS, Mac, Android)
+- Checks: the pre-push hook checks every pushed commit with `check_shared --ref` and refuses a stale core checkout; `build.sh` of webrtc preflights crc32c; the tgcalls `.gitmodules` entry is shallow.
 - What: every shared native library has one source and one commit, listed in `shared/shared-libraries.json` of klaipher/nanogram-deps (the core's `shared/` submodule, reached at `submodules/telegram-ios/shared/`). The Mac builds the core's copies (via-ios-core) and has no vendored copy of them. Parity, the manifest check, the cache policy, the feature-parity and development-pipeline documents are no longer copied into this repository: `tools/dev/parity/parity.py` and `tools/dev/native/check_shared.py` are wrappers, and the pre-push hook runs `check_shared.py --side mac`.
 - Where: `tools/dev/parity/`, `tools/dev/native/`, `tools/dev/cachegc/cachegc.py`, `docs/mac-core-paths.txt` (iOS file, byte for byte), `tools/dev/native/native-libs.json`.
 - Highlighter: `CodeSyntax` compiles the fork's C++ core and its one `apple/Syntaxer.{h,mm}` (the Mac keeps no copy); OpenH264 is built from the core's klaipher/openh264 `nanogram` submodule (v2.7.0 plus H.264 level 6.0-6.2 and the sprite mode, off by default); rnnoise is the SwiftPM package in the core.
