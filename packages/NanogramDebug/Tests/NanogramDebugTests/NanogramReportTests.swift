@@ -85,6 +85,18 @@ final class NanogramReportTests: XCTestCase {
         XCTAssertEqual(self.names(in: staged).filter { $0.hasPrefix("call-logs/") }, ["call-logs/2-call.log", "call-logs/call.log"])
     }
 
+    func testReportKeepsTheNewestFilesUnderTheLimitsAndListsWhatIsLeftOut() throws {
+        let old = try self.write(String(repeating: "a", count: 10), "logs/old.txt")
+        let new = try self.write(String(repeating: "b", count: 10), "logs/new.txt")
+        let huge = try self.write(String(repeating: "c", count: 50), "logs/huge.txt")
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 100)], ofItemAtPath: old.path)
+        let staged = try NanogramReport.stage(device: self.device, sections: [NanogramReportSection(folder: "logs", title: "App logs", sources: [old, new, huge])], settings: [], totalBytes: 15, sectionBytes: 15, fileBytes: 20, in: self.directory.appendingPathComponent("staging", isDirectory: true))
+        XCTAssertEqual(self.names(in: staged).filter { $0.hasPrefix("logs/") }, ["logs/new.txt"])
+        let readme = try String(contentsOf: staged.appendingPathComponent("README.txt"), encoding: .utf8)
+        XCTAssertTrue(readme.contains("logs/huge.txt (50 bytes): over the per-file limit"))
+        XCTAssertTrue(readme.contains("logs/old.txt (10 bytes): over the report size limit"))
+    }
+
     func testReportArchiveZipsTheStagedFolderAndStagingIsRemoved() throws {
         let log = try self.write("log", "logs/log-1.txt")
         let root = self.directory.appendingPathComponent("export", isDirectory: true)

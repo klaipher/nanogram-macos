@@ -35,7 +35,7 @@ public struct NanogramReportDevice: Equatable, Sendable {
         guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else {
             return nil
         }
-        return String(cString: buffer)
+        return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 }
 
@@ -56,48 +56,82 @@ public enum NanogramReport {
     public static let readmeFileName = "README.txt"
     public static let settingsFileName = "settings.txt"
 
-    /// Copies every section into `<root>/nanogram-report-<stamp>/<folder>/`, then writes the settings and the README
-    /// listing every file. Returns the staged folder, ready to zip.
-    public static func stage(device: NanogramReportDevice, sections: [NanogramReportSection], settings: [String], date: Date = Date(), in root: URL) throws -> URL {
+    public static let totalByteLimit = 40 * 1024 * 1024
+    public static let sectionByteLimit = 16 * 1024 * 1024
+    public static let fileByteLimit = 8 * 1024 * 1024
+
+    /// Copies every section into `<root>/nanogram-report-<stamp>/<folder>/`, newest files first and under the size caps,
+    /// then writes the settings and the README listing every file and every file left out. Returns the staged folder,
+    /// ready to zip.
+    public static func stage(device: NanogramReportDevice, sections: [NanogramReportSection], settings: [String], date: Date = Date(), totalBytes: Int = totalByteLimit, sectionBytes: Int = sectionByteLimit, fileBytes: Int = fileByteLimit, in root: URL) throws -> URL {
         let fileManager = FileManager.default
         let directory = root.appendingPathComponent("nanogram-report-\(stamp(date))-\(UUID().uuidString.prefix(6))", isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        var counts: [(title: String, files: [(path: String, size: Int)])] = []
-        for section in sections {
-            var files: [(path: String, size: Int)] = []
-            var used = Set<String>()
-            for source in section.sources {
-                var isDirectory: ObjCBool = false
-                let exists = fileManager.fileExists(atPath: source.path, isDirectory: &isDirectory)
-                let base = isDirectory.boolValue ? source.standardizedFileURL.path : source.deletingLastPathComponent().standardizedFileURL.path
-                for file in NanogramLogExportFiles.regularFiles(in: source) where exists {
-                    var relative = String(file.standardizedFileURL.path.dropFirst(base.count))
-                    if relative.hasPrefix("/") {
-                        relative.removeFirst()
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            var counts: [(title: String, files: [(path: String, size: Int)])] = []
+            var omitted: [(path: String, size: Int, reason: String)] = []
+            var total = 0
+            for section in sections {
+                var candidates: [(file: URL, name: String, size: Int, modified: Date)] = []
+                var used = Set<String>()
+                for source in section.sources {
+                    var isDirectory: ObjCBool = false
+                    let exists = fileManager.fileExists(atPath: source.path, isDirectory: &isDirectory)
+                    let base = isDirectory.boolValue ? source.standardizedFileURL.path : source.deletingLastPathComponent().standardizedFileURL.path
+                    for file in NanogramLogExportFiles.regularFiles(in: source) where exists {
+                        var relative = String(file.standardizedFileURL.path.dropFirst(base.count))
+                        if relative.hasPrefix("/") {
+                            relative.removeFirst()
+                        }
+                        if isDirectory.boolValue {
+                            relative = source.lastPathComponent + "/" + relative
+                        }
+                        var name = relative
+                        var suffix = 1
+                        while used.contains(name) {
+                            suffix += 1
+                            name = "\(suffix)-\(relative)"
+                        }
+                        used.insert(name)
+                        let values = try? file.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                        candidates.append((file, name, values?.fileSize ?? 0, values?.contentModificationDate ?? .distantPast))
                     }
-                    if isDirectory.boolValue {
-                        relative = source.lastPathComponent + "/" + relative
-                    }
-                    var name = relative
-                    var suffix = 1
-                    while used.contains(name) {
-                        suffix += 1
-                        name = "\(suffix)-\(relative)"
-                    }
-                    used.insert(name)
-                    let target = directory.appendingPathComponent(section.folder, isDirectory: true).appendingPathComponent(name)
-                    try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-                    try fileManager.copyItem(at: file, to: target)
-                    let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-                    files.append((section.folder + "/" + name, size))
                 }
+                candidates.sort { $0.modified != $1.modified ? $0.modified > $1.modified : $0.name < $1.name }
+                var files: [(path: String, size: Int)] = []
+                var sectionTotal = 0
+                for candidate in candidates {
+                    let path = section.folder + "/" + candidate.name
+                    if candidate.size > fileBytes {
+                        omitted.append((path, candidate.size, "over the per-file limit"))
+                        continue
+                    }
+                    if total + candidate.size > totalBytes || sectionTotal + candidate.size > sectionBytes {
+                        omitted.append((path, candidate.size, "over the report size limit"))
+                        continue
+                    }
+                    let target = directory.appendingPathComponent(section.folder, isDirectory: true).appendingPathComponent(candidate.name)
+                    do {
+                        try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                        try fileManager.copyItem(at: candidate.file, to: target)
+                    } catch {
+                        omitted.append((path, candidate.size, "could not be read"))
+                        continue
+                    }
+                    total += candidate.size
+                    sectionTotal += candidate.size
+                    files.append((path, candidate.size))
+                }
+                counts.append((section.title, files))
             }
-            counts.append((section.title, files))
+            let settingsText = settingsFileText(settings)
+            try Data(settingsText.utf8).write(to: directory.appendingPathComponent(settingsFileName))
+            let readme = readme(device: device, sections: counts, omitted: omitted, date: date)
+            try Data(readme.utf8).write(to: directory.appendingPathComponent(readmeFileName))
+        } catch {
+            try? fileManager.removeItem(at: directory)
+            throw error
         }
-        let settingsText = settingsFileText(settings)
-        try Data(settingsText.utf8).write(to: directory.appendingPathComponent(settingsFileName))
-        let readme = readme(device: device, sections: counts, date: date)
-        try Data(readme.utf8).write(to: directory.appendingPathComponent(readmeFileName))
         return directory
     }
 

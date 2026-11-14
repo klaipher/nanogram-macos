@@ -164,10 +164,10 @@ private func nanogramLogCollector(_ kind: NanogramLogExportKind) -> NanogramLogC
         })
         return {
             let sections = [
-                NanogramReportSection(folder: "logs", title: "App logs and critical logs", sources: logs.map { [$0] } ?? []),
-                NanogramReportSection(folder: "call-logs", title: "Call logs", sources: callDirectories),
-                NanogramReportSection(folder: "crash-reports", title: "Crash and hang reports", sources: nanogramCrashReportStore.allReports().map { $0.url }),
-                NanogramReportSection(folder: "metrickit", title: "MetricKit reports", sources: MetricReportStore.shared.reports().map { URL(fileURLWithPath: $0.path) }),
+                NanogramReportSection(folder: "call-logs", title: "Call logs", sources: callDirectories), //TODOLANG
+                NanogramReportSection(folder: "crash-reports", title: "Crash and hang reports", sources: nanogramCrashReportStore.allReports().map { $0.url }), //TODOLANG
+                NanogramReportSection(folder: "metrickit", title: "MetricKit reports", sources: MetricReportStore.shared.reports().map { URL(fileURLWithPath: $0.path) }), //TODOLANG
+                NanogramReportSection(folder: "logs", title: "App logs and critical logs", sources: logs.map { [$0] } ?? []), //TODOLANG
             ]
             let staging = NanogramLogExportFiles.stagingRoot(under: NanogramLogExportFiles.defaultRoot())
             guard let staged = try? NanogramReport.stage(device: NanogramReportDevice.current(), sections: sections, settings: settingsLines, in: staging) else {
