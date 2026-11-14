@@ -1,6 +1,10 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.9
 
 import PackageDescription
+
+let strictConcurrencySettings: [SwiftSetting] = [
+    .enableUpcomingFeature("StrictConcurrency"),
+]
 
 let deps: [(String, String)] = [
     ("TGUIKit", "../TGUIKit"),
@@ -37,7 +41,8 @@ let package = Package(
                 .product(name: "TelegramCore", package: "TelegramCore", condition: nil),
                 .product(name: "Postbox", package: "Postbox", condition: nil),
             ] + deps.map { .product(name: $0.0, package: $0.0, condition: nil) },
-            path: "Sources/AudioPlayerCore"),
+            path: "Sources/AudioPlayerCore",
+            swiftSettings: strictConcurrencySettings),
         .testTarget(
             name: "AudioPlayerCoreTests",
             dependencies: [
