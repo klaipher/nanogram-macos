@@ -107,7 +107,7 @@ class PinnedVersionsTests(unittest.TestCase):
             self.assertRegex(read(meson), r"version\s*:\s*'1\.5\.4'")
 
     def test_dav1d_cross_file_enables_dotprod_and_i8mm(self):
-        cross = read(CORE / "dav1d" / "dav1d-arm64.meson")
+        cross = read(CORE / "dav1d" / "dav1d" / "build.sh")
         self.assertIn("cpu_family = 'aarch64'", cross)
         self.assertIn("cpu = 'aarch64'", cross)
 
