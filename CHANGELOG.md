@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Build fix**: the WebRTC CMake configure passes `-DCMAKE_CXX_STANDARD=20` (`core-xprojects/webrtc/webrtc/build.sh`). Abseil LTS 20260817 refuses to configure when the compiler default is below C++17 and nothing sets the standard; every WebRTC target already uses C++20. The regenerated `WalletEngineFFI.swift` (UniFFI bindings from the shared wallet-engine pin: encrypt/decrypt envelope) is committed with the binary it matches.
+
 - **Build fix pin**: twidget 58053871 restores litehtml's style::add_length_property (lost in the Apple-layer merge; the Android link failed); nanogram-deps e7783ff2.
 - **Build fix pins**: quickjs 1bc6f4dc (forward declaration of js_set_uncatchable_pending; clang stopped on it), widget-sandbox e358184b, nanogram-deps 64a5d41e.
 - **Store edition review fixes** (2026-11-14, not built; `StorePurchasePolicyTests` pass): the Settings payment block is gated per row instead of by `premiumIsBlocked` alone: Premium and Business stay for Premium accounts, the Stars row stays when there is a balance or history, the TON row follows its balance, "Send a Gift" stays (star gifts from the balance). Premium stickers (panel Saved and packs, full-screen effect, chat effect) are kept for Premium accounts (`context.isPremium || !context.premiumIsBlocked`). `.adsTopUp` is removed from the policy and replaced by the kept entry `.spendEarnedRevenueOnAds`: "Buy ads" spends a channel's own earned Stars revenue, as on iOS and Android.

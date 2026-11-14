@@ -658,6 +658,12 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 public protocol TonConnectDerivedSessionProtocol: AnyObject, Sendable {
 
     /**
+     * Opens an opaque MTProto envelope for hosts that own RPC decoding.
+     * In particular, Gram Wallet also supports relayed `signMessage`.
+     */
+    func decryptEnvelope(body: Data) throws  -> Data
+
+    /**
      * Authenticates and validates one dApp request relayed by the server.
      *
      * `body` is the raw `nonce(24) || box` bytes from the dApp; `now` is the
@@ -688,6 +694,11 @@ public protocol TonConnectDerivedSessionProtocol: AnyObject, Sendable {
      * Encrypts the empty-object result of a dApp-initiated disconnect request.
      */
     func encryptDisconnectSuccess(requestId: String) throws  -> Data
+
+    /**
+     * Seals a host-validated protocol envelope without exporting session keys.
+     */
+    func encryptEnvelope(body: Data) throws  -> Data
 
     /**
      * Encrypts a protocol RPC error response for the selected request.
@@ -789,6 +800,20 @@ open class TonConnectDerivedSession: TonConnectDerivedSessionProtocol, @unchecke
 
 
     /**
+     * Opens an opaque MTProto envelope for hosts that own RPC decoding.
+     * In particular, Gram Wallet also supports relayed `signMessage`.
+     */
+open func decryptEnvelope(body: Data)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeTonConnectSessionError_lift) {
+        uniffiCallStatus in
+    uniffi_wallet_engine_fn_method_tonconnectderivedsession_decrypt_envelope(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(body),uniffiCallStatus
+    )
+})
+}
+
+    /**
      * Authenticates and validates one dApp request relayed by the server.
      *
      * `body` is the raw `nonce(24) || box` bytes from the dApp; `now` is the
@@ -862,6 +887,19 @@ open func encryptDisconnectSuccess(requestId: String)throws  -> Data  {
     uniffi_wallet_engine_fn_method_tonconnectderivedsession_encrypt_disconnect_success(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(requestId),uniffiCallStatus
+    )
+})
+}
+
+    /**
+     * Seals a host-validated protocol envelope without exporting session keys.
+     */
+open func encryptEnvelope(body: Data)throws  -> Data  {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeTonConnectSessionError_lift) {
+        uniffiCallStatus in
+    uniffi_wallet_engine_fn_method_tonconnectderivedsession_encrypt_envelope(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(body),uniffiCallStatus
     )
 })
 }
@@ -1536,7 +1574,8 @@ public protocol WalletClientProtocol: AnyObject, Sendable {
      * and ignores any supplied key, because the contract reports its current
      * key. For an undeployed wallet it uses the supplied key after verifying
      * that the key derives the recipient address with supported default wallet
-     * parameters.
+     * parameters. With `trust_recipient_public_key` and a supplied key, the key is
+     * returned as is, with no HTTP request and no check.
      *
      * `EncryptedCommentUnavailable` means the recipient cannot receive an
      * encrypted comment: its wallet is frozen, its contract did not return a
@@ -1547,7 +1586,8 @@ public protocol WalletClientProtocol: AnyObject, Sendable {
     func resolveEncryptedCommentRecipient(request: EncryptedCommentRecipientRequest) async throws  -> Data
 
     /**
-     * Generates a new signing half and a signed Wallet rev00 key-change message.
+     * Generates one new signing half and both signed Wallet rev00 delivery forms.
+     * `signed_boc` aliases the form selected by `request.message_kind`.
      *
      * The client first fetches fresh account state through its configured
      * provider. Active wallets use the on-chain `seqno` getter, while an
@@ -1601,6 +1641,12 @@ public protocol WalletClientProtocol: AnyObject, Sendable {
     func refreshNfts() async throws  -> WalletUpdate
 
     /**
+     * Validates ownership and emulation, then signs external and internal delivery
+     * alternatives without broadcasting or writing the send journal.
+     */
+    func prepareNftTransfer(request: PrepareNftTransferRequest) async throws  -> PreparedTransfer
+
+    /**
      * Validates current ownership and emulates one typed TEP-62 NFT transfer.
      *
      * Reuse this request's operation ID for [`Self::send_nft_transfer`] after
@@ -1631,6 +1677,12 @@ public protocol WalletClientProtocol: AnyObject, Sendable {
      * Cancels the current send preview and its active provider request.
      */
     func cancelSendPreview() async throws
+
+    /**
+     * Emulates external key rotation using public state and zero signatures.
+     * Never unlocks a secret, generates a replacement phrase, or submits a BOC.
+     */
+    func previewKeyRotation() async throws  -> SendPreview
 
     /**
      * Emulates a transfer without reading the journal or protected secret.
@@ -2048,7 +2100,8 @@ open func decryptComment(request: DecryptCommentRequest)async throws  -> String 
      * and ignores any supplied key, because the contract reports its current
      * key. For an undeployed wallet it uses the supplied key after verifying
      * that the key derives the recipient address with supported default wallet
-     * parameters.
+     * parameters. With `trust_recipient_public_key` and a supplied key, the key is
+     * returned as is, with no HTTP request and no check.
      *
      * `EncryptedCommentUnavailable` means the recipient cannot receive an
      * encrypted comment: its wallet is frozen, its contract did not return a
@@ -2073,7 +2126,8 @@ open func resolveEncryptedCommentRecipient(request: EncryptedCommentRecipientReq
 }
 
     /**
-     * Generates a new signing half and a signed Wallet rev00 key-change message.
+     * Generates one new signing half and both signed Wallet rev00 delivery forms.
+     * `signed_boc` aliases the form selected by `request.message_kind`.
      *
      * The client first fetches fresh account state through its configured
      * provider. Active wallets use the on-chain `seqno` getter, while an
@@ -2202,6 +2256,26 @@ open func refreshNfts()async throws  -> WalletUpdate  {
 }
 
     /**
+     * Validates ownership and emulation, then signs external and internal delivery
+     * alternatives without broadcasting or writing the send journal.
+     */
+open func prepareNftTransfer(request: PrepareNftTransferRequest)async throws  -> PreparedTransfer  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_wallet_engine_fn_method_walletclient_prepare_nft_transfer(
+                        self.uniffiCloneHandle(),FfiConverterTypePrepareNftTransferRequest_lower(request)
+                )
+            },
+            pollFunc: ffi_wallet_engine_rust_future_poll_rust_buffer,
+            completeFunc: ffi_wallet_engine_rust_future_complete_rust_buffer,
+            freeFunc: ffi_wallet_engine_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypePreparedTransfer_lift,
+            errorHandler: FfiConverterTypeWalletClientError_lift
+        )
+}
+
+    /**
      * Validates current ownership and emulates one typed TEP-62 NFT transfer.
      *
      * Reuse this request's operation ID for [`Self::send_nft_transfer`] after
@@ -2289,6 +2363,26 @@ open func cancelSendPreview()async throws   {
             completeFunc: ffi_wallet_engine_rust_future_complete_void,
             freeFunc: ffi_wallet_engine_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeWalletClientError_lift
+        )
+}
+
+    /**
+     * Emulates external key rotation using public state and zero signatures.
+     * Never unlocks a secret, generates a replacement phrase, or submits a BOC.
+     */
+open func previewKeyRotation()async throws  -> SendPreview  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_wallet_engine_fn_method_walletclient_preview_key_rotation(
+                        self.uniffiCloneHandle()
+                )
+            },
+            pollFunc: ffi_wallet_engine_rust_future_poll_rust_buffer,
+            completeFunc: ffi_wallet_engine_rust_future_complete_rust_buffer,
+            freeFunc: ffi_wallet_engine_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeSendPreview_lift,
             errorHandler: FfiConverterTypeWalletClientError_lift
         )
 }
@@ -4680,6 +4774,16 @@ public struct CreateEncryptedCommentRequest: Equatable, Hashable {
      * before authorizing the sender's secret.
      */
     public let recipientPublicKey: Data?
+    /**
+     * Opt in to use `recipient_public_key` as is.
+     *
+     * With `true` and a supplied key, the engine makes no lookup and does not check
+     * that the key derives `recipient`. The caller must supply the key the recipient
+     * decrypts comments with, which for a wallet that rotated its signing key is not the
+     * one its address derives from, and the host authenticates it. Default `false`:
+     * the key is verified as described above.
+     */
+    public let trustRecipientPublicKey: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -4699,10 +4803,20 @@ public struct CreateEncryptedCommentRequest: Equatable, Hashable {
          * verifies that it derives `recipient` with supported default wallet
          * parameters. A mismatch or unsupported wallet configuration is rejected
          * before authorizing the sender's secret.
-         */recipientPublicKey: Data? = nil) {
+         */recipientPublicKey: Data? = nil,
+        /**
+         * Opt in to use `recipient_public_key` as is.
+         *
+         * With `true` and a supplied key, the engine makes no lookup and does not check
+         * that the key derives `recipient`. The caller must supply the key the recipient
+         * decrypts comments with, which for a wallet that rotated its signing key is not the
+         * one its address derives from, and the host authenticates it. Default `false`:
+         * the key is verified as described above.
+         */trustRecipientPublicKey: Bool = false) {
         self.recipient = recipient
         self.comment = comment
         self.recipientPublicKey = recipientPublicKey
+        self.trustRecipientPublicKey = trustRecipientPublicKey
     }
 
 
@@ -4724,7 +4838,8 @@ public struct FfiConverterTypeCreateEncryptedCommentRequest: FfiConverterRustBuf
             try CreateEncryptedCommentRequest(
                 recipient: FfiConverterTypeTonAddressString.read(from: &buf),
                 comment: FfiConverterString.read(from: &buf),
-                recipientPublicKey: FfiConverterOptionData.read(from: &buf)
+                recipientPublicKey: FfiConverterOptionData.read(from: &buf),
+                trustRecipientPublicKey: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -4732,6 +4847,7 @@ public struct FfiConverterTypeCreateEncryptedCommentRequest: FfiConverterRustBuf
         FfiConverterTypeTonAddressString.write(value.recipient, into: &buf)
         FfiConverterString.write(value.comment, into: &buf)
         FfiConverterOptionData.write(value.recipientPublicKey, into: &buf)
+        FfiConverterBool.write(value.trustRecipientPublicKey, into: &buf)
     }
 }
 
@@ -5134,6 +5250,11 @@ public struct EncryptedCommentRecipientRequest: Equatable, Hashable {
      * [`CreateEncryptedCommentRequest::recipient_public_key`] is.
      */
     public let recipientPublicKey: Data?
+    /**
+     * Opt in to use `recipient_public_key` as is, exactly as
+     * [`CreateEncryptedCommentRequest::trust_recipient_public_key`] does.
+     */
+    public let trustRecipientPublicKey: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -5146,9 +5267,14 @@ public struct EncryptedCommentRecipientRequest: Equatable, Hashable {
          *
          * It is used and verified against `recipient` exactly as
          * [`CreateEncryptedCommentRequest::recipient_public_key`] is.
-         */recipientPublicKey: Data? = nil) {
+         */recipientPublicKey: Data? = nil,
+        /**
+         * Opt in to use `recipient_public_key` as is, exactly as
+         * [`CreateEncryptedCommentRequest::trust_recipient_public_key`] does.
+         */trustRecipientPublicKey: Bool = false) {
         self.recipient = recipient
         self.recipientPublicKey = recipientPublicKey
+        self.trustRecipientPublicKey = trustRecipientPublicKey
     }
 
 
@@ -5169,13 +5295,15 @@ public struct FfiConverterTypeEncryptedCommentRecipientRequest: FfiConverterRust
         return
             try EncryptedCommentRecipientRequest(
                 recipient: FfiConverterTypeTonAddressString.read(from: &buf),
-                recipientPublicKey: FfiConverterOptionData.read(from: &buf)
+                recipientPublicKey: FfiConverterOptionData.read(from: &buf),
+                trustRecipientPublicKey: FfiConverterBool.read(from: &buf)
         )
     }
 
     public static func write(_ value: EncryptedCommentRecipientRequest, into buf: inout [UInt8]) {
         FfiConverterTypeTonAddressString.write(value.recipient, into: &buf)
         FfiConverterOptionData.write(value.recipientPublicKey, into: &buf)
+        FfiConverterBool.write(value.trustRecipientPublicKey, into: &buf)
     }
 }
 
@@ -6800,6 +6928,75 @@ public func FfiConverterTypePrepareKeyRotationRequest_lower(_ value: PrepareKeyR
 
 
 /**
+ * Requests signed NFT transfer delivery forms without submitting either one.
+ */
+public struct PrepareNftTransferRequest: Equatable, Hashable {
+    /**
+     * Correlation identifier, shared with the preview for a stable TEP-62 query ID.
+     */
+    public let operationId: NonEmptyString
+    /**
+     * Immutable NFT transfer choices.
+     */
+    public let intent: NftTransferIntent
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Correlation identifier, shared with the preview for a stable TEP-62 query ID.
+         */operationId: NonEmptyString,
+        /**
+         * Immutable NFT transfer choices.
+         */intent: NftTransferIntent) {
+        self.operationId = operationId
+        self.intent = intent
+    }
+
+
+
+
+}
+
+#if compiler(>=6)
+extension PrepareNftTransferRequest: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePrepareNftTransferRequest: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PrepareNftTransferRequest {
+        return
+            try PrepareNftTransferRequest(
+                operationId: FfiConverterTypeNonEmptyString.read(from: &buf),
+                intent: FfiConverterTypeNftTransferIntent.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PrepareNftTransferRequest, into buf: inout [UInt8]) {
+        FfiConverterTypeNonEmptyString.write(value.operationId, into: &buf)
+        FfiConverterTypeNftTransferIntent.write(value.intent, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePrepareNftTransferRequest_lift(_ buf: RustBuffer) throws -> PrepareNftTransferRequest {
+    return try FfiConverterTypePrepareNftTransferRequest.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePrepareNftTransferRequest_lower(_ value: PrepareNftTransferRequest) -> RustBuffer {
+    return FfiConverterTypePrepareNftTransferRequest.lower(value)
+}
+
+
+/**
  * Requests both signed delivery forms for one wallet transfer.
  *
  * The engine resolves one fresh wallet sequence number and one expiration
@@ -6909,6 +7106,14 @@ public struct PreparedKeyRotation: Equatable, Hashable {
      */
     public let signedBoc: Boc
     /**
+     * External delivery form for the same replacement key, sequence and expiration.
+     */
+    public let externalBoc: Boc
+    /**
+     * Internal alternative; submit only one of the two delivery forms.
+     */
+    public let internalBoc: Boc
+    /**
      * Sequence number covered by the signed request.
      */
     public let seqno: UInt32
@@ -6937,6 +7142,12 @@ public struct PreparedKeyRotation: Equatable, Hashable {
          * wallet-address proof signature and the encrypted old private key.
          */signedBoc: Boc,
         /**
+         * External delivery form for the same replacement key, sequence and expiration.
+         */externalBoc: Boc,
+        /**
+         * Internal alternative; submit only one of the two delivery forms.
+         */internalBoc: Boc,
+        /**
          * Sequence number covered by the signed request.
          */seqno: UInt32,
         /**
@@ -6948,6 +7159,8 @@ public struct PreparedKeyRotation: Equatable, Hashable {
         self.replacementRecoveryPhrase = replacementRecoveryPhrase
         self.newPublicKey = newPublicKey
         self.signedBoc = signedBoc
+        self.externalBoc = externalBoc
+        self.internalBoc = internalBoc
         self.seqno = seqno
         self.validUntil = validUntil
         self.messageKind = messageKind
@@ -6973,6 +7186,8 @@ public struct FfiConverterTypePreparedKeyRotation: FfiConverterRustBuffer {
                 replacementRecoveryPhrase: FfiConverterTypeRecoveryPhrase.read(from: &buf),
                 newPublicKey: FfiConverterData.read(from: &buf),
                 signedBoc: FfiConverterTypeBoc.read(from: &buf),
+                externalBoc: FfiConverterTypeBoc.read(from: &buf),
+                internalBoc: FfiConverterTypeBoc.read(from: &buf),
                 seqno: FfiConverterUInt32.read(from: &buf),
                 validUntil: FfiConverterUInt64.read(from: &buf),
                 messageKind: FfiConverterTypeKeyRotationMessageKind.read(from: &buf)
@@ -6983,6 +7198,8 @@ public struct FfiConverterTypePreparedKeyRotation: FfiConverterRustBuffer {
         FfiConverterTypeRecoveryPhrase.write(value.replacementRecoveryPhrase, into: &buf)
         FfiConverterData.write(value.newPublicKey, into: &buf)
         FfiConverterTypeBoc.write(value.signedBoc, into: &buf)
+        FfiConverterTypeBoc.write(value.externalBoc, into: &buf)
+        FfiConverterTypeBoc.write(value.internalBoc, into: &buf)
         FfiConverterUInt32.write(value.seqno, into: &buf)
         FfiConverterUInt64.write(value.validUntil, into: &buf)
         FfiConverterTypeKeyRotationMessageKind.write(value.messageKind, into: &buf)
@@ -17359,10 +17576,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_wallet_engine_checksum_method_walletclient_decrypt_comment() != 56301) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_wallet_engine_checksum_method_walletclient_resolve_encrypted_comment_recipient() != 48846) {
+    if (uniffi_wallet_engine_checksum_method_walletclient_resolve_encrypted_comment_recipient() != 1844) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_wallet_engine_checksum_method_walletclient_prepare_key_rotation() != 48426) {
+    if (uniffi_wallet_engine_checksum_method_walletclient_prepare_key_rotation() != 44629) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_wallet_engine_checksum_method_walletclient_cancel_load_more_nfts() != 55435) {
@@ -17377,6 +17594,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_wallet_engine_checksum_method_walletclient_refresh_nfts() != 19017) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_wallet_engine_checksum_method_walletclient_prepare_nft_transfer() != 62136) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_wallet_engine_checksum_method_walletclient_preview_nft_transfer() != 55191) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -17387,6 +17607,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_wallet_engine_checksum_method_walletclient_cancel_send_preview() != 28394) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_wallet_engine_checksum_method_walletclient_preview_key_rotation() != 9076) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_wallet_engine_checksum_method_walletclient_preview_send() != 55971) {
@@ -17482,6 +17705,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_wallet_engine_checksum_method_tonconnectsession_reject_connect() != 45812) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_wallet_engine_checksum_method_tonconnectderivedsession_decrypt_envelope() != 42978) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_wallet_engine_checksum_method_tonconnectderivedsession_decrypt_request() != 40213) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -17495,6 +17721,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_wallet_engine_checksum_method_tonconnectderivedsession_encrypt_disconnect_success() != 11931) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_wallet_engine_checksum_method_tonconnectderivedsession_encrypt_envelope() != 50506) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_wallet_engine_checksum_method_tonconnectderivedsession_encrypt_error() != 24657) {
