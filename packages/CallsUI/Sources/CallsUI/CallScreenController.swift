@@ -244,21 +244,20 @@ public func callScreen(_ result:PCallResult, source: CallWindowSource? = nil) {
                 }
             }
         }, endcall: { [weak session] state in
-            
+            guard let session else {
+                return
+            }
             if case .ringing = state.state {
                 Analytics.shared.send(AnalyticsEvents.callDecline())
             }
-            
-            switch state.state {
-            case let .terminated(reason):
-                if let reason = reason, reason.recall {
-                    session?.setToRemovableState()
+            for step in peerCallEndSteps(for: state.state) {
+                switch step {
+                case .hangUp:
+                    _ = session.hangUpCurrentCall().start()
+                case .markRemovable:
+                    session.setToRemovableState()
                 }
-            default:
-                session?.setToRemovableState()
-                _ = session?.hangUpCurrentCall().start()
             }
-            
         }, recall: { [weak session] in
             guard let session = session else {
                 return

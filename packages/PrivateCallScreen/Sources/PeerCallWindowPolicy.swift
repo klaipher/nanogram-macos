@@ -20,6 +20,25 @@ public func peerCallCloseAction(for state: ExternalPeerCallState.State) -> PeerC
     }
 }
 
+public enum PeerCallEndStep: Equatable {
+    case hangUp
+    case markRemovable
+}
+
+// Hang-up goes first: marking the session removable tears the window down synchronously and can free the
+// session, whose deinit would then discard the call as a disconnect ("Call failed" for the other side).
+public func peerCallEndSteps(for state: ExternalPeerCallState.State) -> [PeerCallEndStep] {
+    switch state {
+    case let .terminated(reason):
+        if let reason = reason, reason.recall {
+            return [.markRemovable]
+        }
+        return []
+    default:
+        return [.hangUp, .markRemovable]
+    }
+}
+
 public func peerCallShowsIncomingCard(_ state: ExternalPeerCallState) -> Bool {
     if state.canBeRemoved {
         return false

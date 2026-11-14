@@ -30,6 +30,28 @@ final class PeerCallWindowPolicyTests: XCTestCase {
         }
     }
 
+    func testEndingALiveCallHangsUpBeforeTheSessionBecomesRemovable() {
+        let states: [ExternalPeerCallState.State] = [
+            .ringing,
+            .waiting,
+            .requesting(ringing: true),
+            .connecting,
+            .active(startTime: 0, reception: nil, emoji: ""),
+            .reconnecting(startTime: 0, reception: nil, emoji: ""),
+            .terminating(.ended(.hungUp))
+        ]
+        for state in states {
+            XCTAssertEqual(peerCallEndSteps(for: state), [.hangUp, .markRemovable], "\(state)")
+        }
+    }
+
+    func testEndingAnEndedCallSendsNothing() {
+        XCTAssertEqual(peerCallEndSteps(for: .terminated(.ended(.busy))), [.markRemovable])
+        XCTAssertEqual(peerCallEndSteps(for: .terminated(.error(.disconnected))), [.markRemovable])
+        XCTAssertEqual(peerCallEndSteps(for: .terminated(nil)), [])
+        XCTAssertEqual(peerCallEndSteps(for: .terminated(.ended(.hungUp))), [])
+    }
+
     func testIncomingCardShowsOnlyWhileRinging() {
         XCTAssertTrue(peerCallShowsIncomingCard(makeExternal(.ringing)))
         XCTAssertFalse(peerCallShowsIncomingCard(makeExternal(.ringing, canBeRemoved: true)))
