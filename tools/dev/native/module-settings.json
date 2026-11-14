@@ -171,6 +171,10 @@
    "ios": "5",
    "mac": "5"
   },
+  "HLSPlayback": {
+   "ios": "5",
+   "mac": "5"
+  },
   "HardenedMedia": {
    "ios": "6",
    "mac": "5"
@@ -323,9 +327,9 @@
  "counts": {
   "ios_swift_modules": 903,
   "ios_swift6": 44,
-  "mac_swift_targets": 258,
+  "mac_swift_targets": 263,
   "mac_swift6": 8,
-  "built_by_both": 43,
+  "built_by_both": 44,
   "modes_differ": 6
  }
 }
