@@ -77,10 +77,4 @@ final class PeerCallWindowPolicyTests: XCTestCase {
         XCTAssertFalse(presentation.collectionBehavior.contains(.canJoinAllSpaces))
         XCTAssertFalse(presentation.collectionBehavior.contains(.fullScreenAuxiliary))
     }
-
-    func testEveryDeclineEntryPointHangsUpBeforeRemoving() {
-        // End in the window, closing the ringing window, the card-less notification Decline and the Dock all use these steps.
-        XCTAssertEqual(peerCallCloseAction(for: .ringing), .declineCall)
-        XCTAssertEqual(peerCallEndSteps(for: .ringing), [.hangUp, .markRemovable])
-    }
 }

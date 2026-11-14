@@ -245,6 +245,7 @@ public func callScreen(_ result:PCallResult, source: CallWindowSource? = nil) {
             }
         }, endcall: { [weak session] state in
             guard let session else {
+                CallDiagnostics.log("call window End ignored: the call session is already gone, state \(state.state)")
                 return
             }
             if case .ringing = state.state {
@@ -269,6 +270,9 @@ public func callScreen(_ result:PCallResult, source: CallWindowSource? = nil) {
                 callScreen(result)
             })
         }, acceptcall: { [weak session] in
+            if session == nil {
+                CallDiagnostics.log("call window Accept ignored: the call session is already gone")
+            }
             if let session {
                 Analytics.shared.send(AnalyticsEvents.callAccept(video: session.isVideo))
             }

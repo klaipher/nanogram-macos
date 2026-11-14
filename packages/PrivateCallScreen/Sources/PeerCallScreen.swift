@@ -121,11 +121,17 @@ public final class PeerCallScreen : ViewController {
                 case .mute:
                     callback = { self?.external.toggleMute() }
                 case .accept:
-                    callback = { self?.external.acceptcall() }
+                    callback = {
+                        CallDiagnostics.log("call window Accept clicked, window alive \(self != nil), state \(external.state)")
+                        self?.external.acceptcall()
+                    }
                 case .redial:
                     callback = { self?.external.recall() }
                 case .end:
-                    callback = { self?.external.endcall(external) }
+                    callback = {
+                        CallDiagnostics.log("call window End clicked, window alive \(self != nil), state \(external.state)")
+                        self?.external.endcall(external)
+                    }
                 }
                 return makeAction(type: spec.type, text: spec.type.title, resource: spec.type.resource, active: spec.active, enabled: spec.enabled, interactive: spec.interactive, attract: spec.attract, action: callback)
             }
