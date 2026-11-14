@@ -61,8 +61,12 @@ for RUST_TARGET in aarch64-apple-darwin; do
     if [ -x "$RUSTUP_BIN" ]; then
         "$RUSTUP_BIN" target add "$RUST_TARGET" >/dev/null 2>&1 || true
     fi
-    env -u MACOSX_DEPLOYMENT_TARGET CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" build \
+    # cargo rustc with --crate-type staticlib only: the crate also declares rlib, and Cargo never runs LTO for a
+    # crate whose types include rlib (it emits object plus bitcode and ignores profile.release.lto).
+    env -u MACOSX_DEPLOYMENT_TARGET CARGO_TARGET_DIR="$BUILD_DIR/lib" "$CARGO_BIN" rustc \
         --package mtproto-ffi \
+        --lib \
+        --crate-type staticlib \
         --release \
         --locked \
         --target "$RUST_TARGET" \
