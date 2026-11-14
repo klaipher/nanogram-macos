@@ -63,7 +63,6 @@ for RUST_TARGET in aarch64-apple-darwin; do
         --features c-api \
         --crate-type staticlib \
         --target "$RUST_TARGET" \
-        --config 'profile.release.lto=false' \
         --config 'profile.release.panic="abort"'
 done
 

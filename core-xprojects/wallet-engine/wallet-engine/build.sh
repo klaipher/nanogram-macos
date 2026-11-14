@@ -69,7 +69,9 @@ for RUST_TARGET in aarch64-apple-darwin; do
         --crate-type staticlib \
         --release \
         --locked \
-        --target "$RUST_TARGET"
+        --target "$RUST_TARGET" \
+        --config 'profile.release.opt-level=3' \
+        --config 'profile.release.lto="fat"'
 done
 
 cp "$BUILD_DIR/lib/aarch64-apple-darwin/release/libwallet_engine.a" "$BUILD_DIR/libwallet_engine.a"

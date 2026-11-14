@@ -65,7 +65,8 @@ for RUST_TARGET in aarch64-apple-darwin; do
         --package mtproto-ffi \
         --release \
         --locked \
-        --target "$RUST_TARGET"
+        --target "$RUST_TARGET" \
+        --config 'profile.release.lto="fat"'
 done
 
 cp "$BUILD_DIR/lib/aarch64-apple-darwin/release/libmtproto_engine_ffi.a" "$BUILD_DIR/libmtproto_engine_ffi.a"

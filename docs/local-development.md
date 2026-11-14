@@ -714,3 +714,7 @@ that defaults to off until it is proven on a real account.
 ## Cache cleanup
 
 Stale build caches clean themselves up after every build and test command, with no scheduled job. See [cache-cleanup.md](cache-cleanup.md); `tg cache-cleanup --dry-run` shows what would go.
+
+## Rust LTO in the Mac native libraries
+
+All three Rust staticlibs are built with fat LTO and opt-level 3 (same as iOS): `core-xprojects/tlottie/build.sh` (crate release profile; no override except `panic="abort"`), `core-xprojects/wallet-engine/wallet-engine/build.sh` (`--config 'profile.release.opt-level=3' --config 'profile.release.lto="fat"'`) and `core-xprojects/mtproto-engine/mtproto-engine/build.sh` (`--config 'profile.release.lto="fat"'`). To verify in a final build, run the script with `cargo -v` output visible and look for `-C lto=fat` (and `-C opt-level=3`), and check that `ar t` on `libtlottie.a` lists only a few members. Libraries are cached by stamp, so the link time is paid only when a library is rebuilt.

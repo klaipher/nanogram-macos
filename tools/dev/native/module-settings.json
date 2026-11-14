@@ -86,8 +86,8 @@
   "rust_lto": {
    "label": "Rust LTO, Release",
    "ios": "fat",
-   "mac": "thin (Cargo.toml release profile)",
-   "equal": "no, by design",
+   "mac": "fat (--config in core-xprojects scripts)",
+   "equal": "yes",
    "probes": {
     "ios": [
      {
@@ -98,9 +98,9 @@
     ],
     "mac": [
      {
-      "id": "Cargo.toml",
-      "file": "submodules/telegram-ios/third-party/mtproto-engine/Cargo.toml",
-      "regex": "lto = \"(thin)\""
+      "id": "wallet-engine build.sh",
+      "file": "core-xprojects/wallet-engine/wallet-engine/build.sh",
+      "regex": "profile\\.release\\.lto=\"(fat)\""
      }
     ]
    }
