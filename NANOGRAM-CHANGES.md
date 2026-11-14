@@ -122,3 +122,9 @@ not re-verified against the code; correct them on the next change in that area.
 - Where: `TelegramShare/ShareViewController.swift`, `packages/ChatListUI/.../TabBadgeItem.swift`, `packages/ChatExportUI/.../ExportBlocking.swift`, `packages/FilePanels`, `packages/NanogramDecoder`, leaf `Package.swift` files.
 - Upstream: the activate sites, `ShareViewController`, `TabBadgeItem` and `ChatExportManager` are upstream lines we changed.
 - Sync: re-apply the semaphore removals in `ShareViewController` and `TabAllBadgeItem.makeView` after a merge; any new `activate(ignoringOtherApps:)` from upstream becomes `activate()`.
+
+### Experimental modernization flags (macOS UI)
+- What: four opt-in flags, all default off (`defaults write <bundle id> nanogram.experimental.<flag> -bool YES`): `deferredResizeRelayout` (chunked table relayout after live resize), `scaledImageCaches` (photo cache limits scale with memory), `coalescedMediaProgress` (30 Hz, 1% progress updates), `mediaFilePromiseDrag` (NSFilePromiseProvider for dragging media out). Also fixes `TableView.remove(range:)` (MACOS-LIST-2), not behind a flag.
+- Where: `TGUIKit` (`ModernizationFlag.swift`, `TableRelayoutPlan.swift`, `TableView.layoutItems`, `TableView.remove(range:)`), `TelegramTheme/PhotoCacheSizing.swift` (+ `TelegramThemeShare` symlink), `TelegramMediaUtils/CoalescedProgress.swift`, `ChatUI/ChatMediaFilePromise.swift`, `ChatFileContentView`, `ChatInteractiveContentView`, `ChatMediaContentView`.
+- Upstream: no.
+- Sync: conflicts possible in `TableView.swift` and `ChatMediaContentView.swift`.
