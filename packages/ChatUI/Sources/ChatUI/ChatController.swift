@@ -8130,32 +8130,47 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 }), forKey: messageId)
                 }
 
-                if let file = message.media.first as? TelegramMediaFile, LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled, isPremium: context.isPremium, isVoice: file.isVoice, hasServerTranscription: message.audioTranscription != nil), let path = context.account.postbox.mediaBox.completedResourcePath(file.resource) {
+                if let file = message.media.first as? TelegramMediaFile, LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled, isVoice: file.isVoice, hasServerTranscription: message.audioTranscription != nil) {
                     strongSelf.updateState { state in
                         var state = state
                         state.transribe[messageId] = .loading
                         return state
                     }
-                    let signal = LocalAudioTranscription.shared.transcribe(path: path, localeIdentifiers: LocalAudioTranscription.localeCandidates(appLanguage: appAppearance.languageCode))
-                    |> mapToSignal { text -> Signal<Bool, NoError> in
-                        guard let text = text else {
-                            return .single(false)
+                    let mediaBox = context.account.postbox.mediaBox
+                    let fetch = fetchedMediaResource(mediaBox: mediaBox, userLocation: .peer(messageId.peerId), userContentType: .audio, reference: .media(media: .message(message: MessageReference(message), media: file), resource: file.resource))
+                    let languages = LocalAudioTranscription.localeCandidates(appLanguage: appAppearance.languageCode)
+                    // Switch on means the audio stays on this Mac: a local failure is reported, never sent to Telegram.
+                    let signal = mediaBox.resourceData(file.resource)
+                    |> filter { $0.complete }
+                    |> take(1)
+                    |> mapToSignal { data -> Signal<Bool, NoError> in
+                        return LocalAudioTranscription.shared.transcribe(path: data.path, localeIdentifiers: languages)
+                        |> mapToSignal { text -> Signal<Bool, NoError> in
+                            guard let text = text else {
+                                return .single(false)
+                            }
+                            return context.engine.messages.storeLocallyTranscribedAudio(messageId: messageId, text: text, isFinal: true, error: nil) |> map { _ -> Bool in return true } |> then(.single(true))
                         }
-                        return context.engine.messages.storeLocallyTranscribedAudio(messageId: messageId, text: text, isFinal: true, error: nil) |> map { _ -> Bool in return true } |> then(.single(true))
                     }
                     |> deliverOnMainQueue
-                    strongSelf.transcribeDisposable.set(signal.start(next: { [weak strongSelf] success in
+                    let disposable = DisposableSet()
+                    disposable.add(fetch.start())
+                    disposable.add(signal.start(next: { [weak strongSelf] success in
                         guard let strongSelf = strongSelf else { return }
-                        if success {
-                            strongSelf.updateState { state in
-                                var state = state
+                        strongSelf.updateState { state in
+                            var state = state
+                            if success {
                                 state.transribe[messageId] = .revealed(true)
-                                return state
+                            } else {
+                                state.transribe.removeValue(forKey: messageId)
                             }
-                        } else {
-                            transcribeOnServer()
+                            return state
                         }
-                    }), forKey: messageId)
+                        if !success {
+                            showModalText(for: context.window, text: "Not available on this Mac yet. The speech model for your language may still be downloading, or speech recognition is not allowed in System Settings > Privacy & Security. Try again in a moment.")
+                        }
+                    }))
+                    strongSelf.transcribeDisposable.set(disposable, forKey: messageId)
                 } else {
                     transcribeOnServer()
                 }

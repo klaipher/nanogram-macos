@@ -111,11 +111,11 @@ final class LocalAudioTranscriptionTests: XCTestCase {
     }
 
     func testTheActionUsesTheLocalEngineOnlyWhenTheSwitchIsOn() {
-        XCTAssertTrue(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: true, isPremium: false, isVoice: true, hasServerTranscription: false))
-        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: false, isPremium: false, isVoice: true, hasServerTranscription: false))
-        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: true, isPremium: true, isVoice: true, hasServerTranscription: false))
-        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: true, isPremium: false, isVoice: false, hasServerTranscription: false))
-        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: true, isPremium: false, isVoice: true, hasServerTranscription: true))
+        XCTAssertTrue(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: true, isVoice: true, hasServerTranscription: false))
+        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: false, isVoice: true, hasServerTranscription: false))
+        XCTAssertTrue(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: true, isVoice: true, hasServerTranscription: false))
+        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: true, isVoice: false, hasServerTranscription: false))
+        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: true, isVoice: true, hasServerTranscription: true))
     }
 
     private func spokenVoiceNote() throws -> (path: String, seconds: Double) {

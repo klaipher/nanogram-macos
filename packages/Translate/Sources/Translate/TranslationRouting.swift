@@ -18,12 +18,7 @@ public enum ServerTranslationFailure: Error, Equatable {
 
 public enum TranslationRouting {
     public static func steps(mode: TranslationManualMode, onDeviceAvailable: Bool) -> [TranslationStep] {
-        switch mode {
-        case .enabled:
-            return onDeviceAvailable ? [.server, .onDevice] : [.server]
-        case .alternative:
-            return onDeviceAvailable ? [.onDevice, .server] : [.server]
-        }
+        return onDeviceAvailable ? [.onDevice] : [.server]
     }
 
     public static func run<T>(_ steps: [TranslationStep], server: @escaping () -> Signal<T?, ServerTranslationFailure>, onDevice: @escaping () -> Signal<T?, NoError>) -> Signal<T, Translate.Error> {

@@ -39,9 +39,9 @@ final class TranslationRoutingTests: XCTestCase {
 
     func testAlternativeConfigWithoutOnDeviceUsesTheServer() {
         XCTAssertEqual(TranslationRouting.steps(mode: .alternative, onDeviceAvailable: false), [.server])
-        XCTAssertEqual(TranslationRouting.steps(mode: .alternative, onDeviceAvailable: true), [.onDevice, .server])
+        XCTAssertEqual(TranslationRouting.steps(mode: .alternative, onDeviceAvailable: true), [.onDevice])
         XCTAssertEqual(TranslationRouting.steps(mode: .enabled, onDeviceAvailable: false), [.server])
-        XCTAssertEqual(TranslationRouting.steps(mode: .enabled, onDeviceAvailable: true), [.server, .onDevice])
+        XCTAssertEqual(TranslationRouting.steps(mode: .enabled, onDeviceAvailable: true), [.onDevice])
     }
 
     func testOnDeviceNilFallsBackToTheServer() {

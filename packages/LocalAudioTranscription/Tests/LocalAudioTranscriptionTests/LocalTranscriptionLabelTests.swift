@@ -26,10 +26,10 @@ final class LocalTranscriptionLabelTests: XCTestCase {
         let (settings, cleanup) = self.settings()
         defer { cleanup() }
         settings.register(LocalAudioTranscription.debugOption)
-        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled(in: settings), isPremium: false, isVoice: true, hasServerTranscription: false))
+        XCTAssertFalse(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled(in: settings), isVoice: true, hasServerTranscription: false))
         settings.set(LocalAudioTranscription.debugOption.id, bool: true)
         XCTAssertTrue(LocalAudioTranscription.isEnabled(in: settings))
-        XCTAssertTrue(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled(in: settings), isPremium: false, isVoice: true, hasServerTranscription: false))
+        XCTAssertTrue(LocalAudioTranscription.shouldTranscribeLocally(isEnabled: LocalAudioTranscription.isEnabled(in: settings), isVoice: true, hasServerTranscription: false))
         settings.reset(LocalAudioTranscription.debugOption.id)
         XCTAssertFalse(LocalAudioTranscription.isEnabled(in: settings))
     }

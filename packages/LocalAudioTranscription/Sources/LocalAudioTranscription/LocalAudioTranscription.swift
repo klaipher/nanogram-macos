@@ -11,7 +11,7 @@ public protocol LocalSpeechRecognizer: AnyObject, Sendable {
 
 
 public final class LocalAudioTranscription: @unchecked Sendable {
-    public static let debugOption = NanogramDebugOption.toggle(id: "voice.onDeviceTranscription", section: "Voice", title: "On-device voice transcription", detail: "Non-Premium accounts transcribe voice messages with Apple's speech recognition on this Mac; the audio is not sent to Telegram and results are labelled on-device. The language model downloads the first time it is needed. Off: Telegram's server transcription (Premium or trial).", defaultValue: false)
+    public static let debugOption = NanogramDebugOption.toggle(id: "voice.onDeviceTranscription", section: "Voice", title: "On-device voice transcription", detail: "All accounts transcribe voice messages with Apple's speech recognition on this Mac; the audio is not sent to Telegram and results are labelled on-device. The language model downloads the first time it is needed. A local failure is reported and nothing is uploaded. Off: Telegram's server transcription (Premium or trial).", defaultValue: false)
 
     public static let shared = LocalAudioTranscription(recognizer: LocalAudioTranscription.systemRecognizer())
 
@@ -49,8 +49,8 @@ public final class LocalAudioTranscription: @unchecked Sendable {
         }
     }
 
-    public static func shouldTranscribeLocally(isEnabled: Bool, isPremium: Bool, isVoice: Bool, hasServerTranscription: Bool) -> Bool {
-        return isEnabled && !isPremium && isVoice && !hasServerTranscription
+    public static func shouldTranscribeLocally(isEnabled: Bool, isVoice: Bool, hasServerTranscription: Bool) -> Bool {
+        return isEnabled && isVoice && !hasServerTranscription
     }
 
     public static func localeCandidates(appLanguage: String?, preferred: [String] = Locale.preferredLanguages + [Locale.current.identifier]) -> [String] {
