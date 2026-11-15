@@ -635,6 +635,12 @@ behind `#if os(macOS)` there.
 
 Rules for the core checkout:
 
+- `tg setup` and `tg submodules` leave the core's nested copies of webrtc, tgcalls, twidget, widget-sandbox and QuickJS
+  unchecked-out (the core's `submodule.active` pathspec excludes them; about 250 MB less, and no second object store):
+  this repository pins and builds its own checkouts at the same commits. tlottie is not on the list, because the build
+  compiles the core's copy. Use `tg submodules`, not a bare `git submodule update --init --recursive`, which would
+  check them out again only if the pathspec were missing (it is stored in the core's own git config). The core's
+  `TelegramVoip` package reaches the Mac's `submodules/tgcalls` through its relative path `../../../tgcalls`.
 - The core is changed in the iOS repository (`~/Projects/nanogram-ios`), on `main` or a branch merged into it, never in
   this checkout. Never merge or rebase anything that carries Telegram's history into it (no `Telegram-iOS` branches,
   no `fetch` of tags; fetch with `--no-tags`).

@@ -114,13 +114,45 @@ cmd_sparkle_key() {
   if [ "${1:-}" = sign ]; then py sparkle sign "${@:2}"; else py sparkle public-key; fi
 }
 
+# The core's nested copies of libraries this repository pins itself, at the same commits (webrtc, tgcalls, twidget,
+# widget-sandbox and its QuickJS): the Mac builds its own checkouts, so the core's stay unchecked-out (one working tree
+# and object store each, about 250 MB). Never tlottie: the build compiles the core's copy. Done with the core's
+# `submodule.active` pathspec (a per-submodule `submodule.<path>.active=false` is switched back on by `update --init`).
+CORE_DUPLICATE_SUBMODULES=(
+  third-party/webrtc/webrtc
+  submodules/TgVoipWebrtc/tgcalls
+  third-party/twidget/twidget
+  third-party/widget-sandbox/widget-sandbox
+  third-party/quickjs-ng/quickjs
+)
+
+core_skip_duplicate_submodules() {
+  local core=submodules/telegram-ios path
+  [ -e "$core/.git" ] || return 0
+  git -C "$core" config --unset-all submodule.active || true
+  git -C "$core" config --add submodule.active .
+  for path in "${CORE_DUPLICATE_SUBMODULES[@]}"; do
+    git -C "$core" config --add submodule.active ":(exclude)$path"
+    if [ -e "$core/$path/.git" ]; then
+      git -C "$core" submodule deinit -- "$path" >/dev/null 2>&1 || warn "could not deinit the core's duplicate checkout $core/$path (local changes?): remove it by hand"
+    fi
+  done
+}
+
+# tg submodules: every submodule at its recorded commit, without the core's duplicates of what this repository pins.
+cmd_submodules() {
+  git submodule sync --recursive >/dev/null
+  git submodule update --init --jobs 8 submodules/telegram-ios
+  core_skip_duplicate_submodules
+  git submodule update --init --recursive --jobs 8
+}
+
 cmd_setup() {
   # Recorded conflict resolutions are replayed on the next upstream merge (tg sync-upstream).
   git config rerere.enabled true
   git config rerere.autoupdate true
   say "Fetching submodules"
-  git submodule sync --recursive >/dev/null
-  git submodule update --init --recursive --jobs 8
+  cmd_submodules
   local toolchain
   toolchain="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' core-xprojects/rust-toolchain.toml)"
   [ -n "$toolchain" ] || die "cannot read the Rust toolchain pinned in core-xprojects/rust-toolchain.toml"
@@ -252,8 +284,7 @@ cmd_sync_upstream() {
   fi
   [ "$build" = 1 ] || { say "Merged; skipped the post-merge build (--no-build)"; return 0; }
   say "Updating submodules to the merged pins"
-  git submodule sync --recursive >/dev/null
-  git submodule update --init --recursive --jobs 8
+  cmd_submodules
   cmd_frameworks
   cmd_warnings --update
   "$ROOT/tools/dev/tg" check
@@ -420,6 +451,7 @@ usage() {
 usage: tools/dev/tg <command> [options]
 
   setup            submodules, Rust toolchain, native libraries, git rerere
+  submodules       update every submodule to its pin, leaving out the core's duplicates of webrtc, tgcalls, twidget, widget-sandbox and QuickJS
   upstream-sync    dry run of an upstream release merge: conflicts by area, bumped pins (changes nothing)
   doctor           check prerequisites
   frameworks       native libraries (arm64): current, restored from the shared cache, or built [--no-cache] [--verify-only]
@@ -491,6 +523,7 @@ main() {
   case "$cmd" in
     doctor) cmd_doctor "$@" ;;
     setup) cmd_setup "$@" ;;
+    submodules) cmd_submodules ;;
     upstream-sync) cmd_upstream_sync "$@" ;;
     frameworks) cmd_frameworks "$@" ;;
     clean) cmd_clean "$@" ;;
