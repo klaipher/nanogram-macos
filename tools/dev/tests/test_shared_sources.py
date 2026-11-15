@@ -19,6 +19,8 @@ LINKED = {
     "packages/EDSunriseSet/CoreSources": "submodules/Sunrise",
     "packages/HLSPlayback/Sources": "submodules/HLSPlayback/Sources",
     "packages/HLSPlayback/Tests": "submodules/HLSPlayback/Tests",
+    "packages/NanogramFeatures/Sources": "submodules/NanogramFeatures/Sources",
+    "packages/NanogramFeatures/Tests": "submodules/NanogramFeatures/Tests",
     "packages/SwiftMath/Sources/SwiftMath/MathBundle": "third-party/SwiftMath/Sources/MathBundle",
     "packages/SwiftMath/Sources/SwiftMath/MathRender": "third-party/SwiftMath/Sources/MathRender",
     "packages/VP9Hardware/Sources/VP9Hardware/VP9HardwareDecoder.swift": "submodules/AnimatedStickerNode/VP9Hardware/Sources/VP9HardwareDecoder.swift",
@@ -63,7 +65,9 @@ class SharedSourcesTests(unittest.TestCase):
 
     def test_no_copy_of_a_shared_source_remains(self):
         for old in ("packages/HLSPlayback/Sources/HLSPlayback", "packages/HLSPlayback/Tests/HLSPlaybackTests",
-                    "packages/RingBuffer/Sources", "packages/EDSunriseSet/Sources"):
+                    "packages/RingBuffer/Sources", "packages/EDSunriseSet/Sources",
+                    "packages/NanogramRuntime/Sources/NanogramRuntime/LinkHygiene.swift",
+                    "packages/NanogramRuntime/Sources/NanogramRuntime/SearchOperators.swift"):
             self.assertFalse((ROOT / old).exists(), old)
 
     def test_the_mac_only_files_stay_regular_files(self):

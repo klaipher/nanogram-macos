@@ -577,7 +577,7 @@ public class ChatControllerView : View, ChatInputDelegate {
                 return .never()
             }
             let isSecretChat = chatInteraction.chatLocation.peerId.namespace == Namespaces.Peer.SecretChat
-            let parsed = SearchOperators.isEnabled && !isSecretChat ? SearchOperators.parse(query) : SearchOperatorQuery(text: query)
+            let parsed = SearchOperators.isEnabled && !isSecretChat ? SearchOperators.parse(query, supportedTypes: SearchOperators.macSupportedTypes) : ParsedSearchQuery(text: query)
             return chatSearchSender(parsed, fallback: fromId, accountPeerId: context.peerId, engine: context.engine) |> mapToSignal { sender -> Signal<([Message], SearchMessagesState?, Int32), NoError> in
                 if parsed.isEmptyRange {
                     return .single(([], nil, 0))
