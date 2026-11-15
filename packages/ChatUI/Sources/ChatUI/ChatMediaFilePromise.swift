@@ -55,7 +55,7 @@ enum ChatMediaPromiseError: Error {
     case unavailable
 }
 
-final class ChatMediaFilePromise: NSObject, NSFilePromiseProviderDelegate {
+final class ChatMediaFilePromise: NSObject, NSFilePromiseProviderDelegate, @unchecked Sendable {
     static let defaultTimeout: Double = 30 * 60
 
     private let fileName: String

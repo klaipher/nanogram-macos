@@ -376,8 +376,8 @@ final class AppMenuController : NSObject  {
     private let betterInside: Bool
     private let appearMode: AppMenu.AppearMode
     
-    private var keyDisposable: Disposable?
-    private var windowMoveObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var keyDisposable: Disposable?
+    nonisolated(unsafe) private var windowMoveObserver: NSObjectProtocol?
     private let search = MetaDisposable()
     var onClose:()->Void = {}
     var onShow:()->Void = {}
@@ -399,7 +399,7 @@ final class AppMenuController : NSObject  {
     private var previousCopyHandler: (()->Void)? = nil
 
     private weak var parentView: NSView?
-    private let delayDisposable = MetaDisposable()
+    nonisolated(unsafe) private let delayDisposable = MetaDisposable()
     
     private var tick: SwiftSignalKit.Timer?
     
@@ -1076,7 +1076,7 @@ final class AppMenuController : NSObject  {
 
         if let parent = self.parent {
             self.windowMoveObserver = NotificationCenter.default.addObserver(forName: NSWindow.willMoveNotification, object: parent, queue: .main) { [weak self] _ in
-                self?.closeAll()
+                _ = MainActor.assumeIsolated { self?.closeAll() }
             }
         }
     }

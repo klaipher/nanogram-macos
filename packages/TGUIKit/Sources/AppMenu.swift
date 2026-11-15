@@ -152,7 +152,7 @@ public final class AppMenu {
                 })
                 self.timerDisposable = delaySignal(3.0).start(completed: { [weak self] in
                     self?.observation?.invalidate()
-                    MainActor.assumeIsolated { self?.controller?.close() }
+                    self?.controller?.close()
                 })
             }
           }
@@ -161,12 +161,12 @@ public final class AppMenu {
         
     }
     private func presentIfNeeded(event: NSEvent, view: NSView) {
-        MainActor.assumeIsolated { self.controller?.present(event: event, view: view) }
+        _ = MainActor.assumeIsolated { self.controller?.present(event: event, view: view) }
     }
     
     /// Closes the menu unless the pointer is over it (so a pill that appeared under the cursor stays clickable).
     public func closeIfPointerOutside() {
-        MainActor.assumeIsolated { controller?.closeIfPointerOutside() }
+        _ = MainActor.assumeIsolated { controller?.closeIfPointerOutside() }
     }
 
     public static func closeAll() {
