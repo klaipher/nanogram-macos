@@ -30,9 +30,21 @@ echo 'PACKAGE_VERSION="1.6.1"' > "$SOURCE_DIR/package_version"
 
 SDKROOT="$(xcode-select -p)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
-# The one option list iOS builds with (shared/opus/opus-options.sh in the core, from nanogram-deps), so the apps cannot drift.
-. "${SCRIPT_LOCATION}/../../../submodules/telegram-ios/shared/opus/opus-options.sh"
-COMMON_ARGS="$OPUS_COMMON_ARGS"
+# The one option list iOS builds with: nanogram-deps (the core's shared/ submodule, shared/opus/opus-options.sh), so the
+# apps cannot drift. OSCE (the opt-in voice-message enhancer: LACE + NoLACE + bandwidth extension, no deep PLC) is its own
+# variable; it is compiled in and off until a caller raises the decoder complexity.
+SHARED_OPUS_DIR="${SCRIPT_LOCATION}/../../../submodules/telegram-ios/shared/opus"
+if [ ! -f "$SHARED_OPUS_DIR/opus-options.sh" ]; then
+  echo "error: $SHARED_OPUS_DIR/opus-options.sh is missing (the core's shared/ submodule is not checked out)" >&2
+  echo "       run: git submodule update --init --recursive" >&2
+  exit 1
+fi
+. "$SHARED_OPUS_DIR/opus-options.sh"
+COMMON_ARGS="$OPUS_COMMON_ARGS $OPUS_OSCE_ARGS"
+
+# The model weights the OSCE build compiles in: fetched once (cache ~/.cache/nanogram-deps/opus-models), sha256-verified,
+# checked against the opus pin and extracted into this build COPY only (SOURCE_DIR), never into the submodule.
+sh "$SHARED_OPUS_DIR/fetch-models.sh" "$SOURCE_DIR"
 
 for ARCH in $ARCHS
 do
@@ -45,7 +57,7 @@ do
     -DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET \
     -DCMAKE_OSX_SYSROOT="$SDKROOT" \
     $COMMON_ARGS \
-    -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG"
+    -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG $OPUS_OSCE_C_FLAGS"
 
   ninja -C "$OUT_DIR/$ARCH"
 

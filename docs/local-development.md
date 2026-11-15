@@ -712,6 +712,7 @@ UserDefaults as `nanogram.debug.<id>`; an unset key means the default. Reset all
 | `media.jpegWideGamut` | Media | off | Display P3 photos are sent with their ICC profile instead of being flattened to sRGB |
 | `media.systemPictureInPicture` | Media | off | gallery videos use macOS picture-in-picture instead of Telegram's floating player (web and HLS videos keep Telegram's) |
 | `translation.onDevice` | Translation | off | translate on device with Apple's Translation models (macOS 15+, installed language pairs); off uses Telegram's server |
+| `voice.enhancement` | Voice | off | voice messages play through Opus speech enhancement (LACE/NoLACE at decoder complexity 7, plus bandwidth extension of SILK-only wideband messages); read when a message starts, so a change applies to the next one played; the transcription never uses it |
 | `voice.onDeviceTranscription` | Voice | off | non-Premium accounts transcribe voice messages with Apple's on-device speech recognition, labelled on-device; off uses Telegram's server (Premium or trial) |
 
 User choices are switches marked `.userFacing()`: they show on **Settings > Nanogram Features** (not the Developer screen),
@@ -719,7 +720,7 @@ keep the same `nanogram.debug.<id>` keys, and are reset by that screen's Reset t
 `search.operators` (Search, **on**: `from:`, `before:`, `after:`, `date:`, `type:` in chat search, see
 `docs/specs/search-operators.md`), `links.stripTracking` and `links.confirmTelegramLinks` (Links, off, see
 `docs/specs/link-hygiene.md`), `media.jpegWideGamut`, `media.systemPictureInPicture`, `decoding.isolatedXPC`,
-`translation.onDevice`, `voice.onDeviceTranscription`. Everything else in the table stays an experiment on the
+`translation.onDevice`, `voice.onDeviceTranscription`, `voice.enhancement`. Everything else in the table stays an experiment on the
 Developer screen.
 
 Add a switch by declaring a `static let debugOption = NanogramDebugOption.toggle(…)` (or `.choice`) next to the

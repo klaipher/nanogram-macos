@@ -28,6 +28,7 @@ import WebKit
 import CodeSyntax
 import MetalEngine
 import TelegramMedia
+import TelegramMediaPlayer
 import TelegramMediaUtils
 import TLottie
 import KeyboardKey
@@ -1443,6 +1444,15 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         settings.register(DecoderIsolation.debugOption.userFacing("Opens animated stickers in a separate locked-down helper, so a broken sticker cannot harm the app. Applies to stickers opened after the change."))
         settings.register(OnDeviceTranslation.debugOption.userFacing("Translates messages in the Translate window on this Mac, so the text is not sent to Telegram. Needs the language installed in System Settings > General > Language & Region > Translation Languages (about 50-100 MB per language, downloaded by macOS); if it is missing the translation fails instead of going to Telegram. Translating a whole chat live can still use Telegram when the language is not installed or a tone is chosen. Off: Telegram translates."))
         settings.register(LocalAudioTranscription.debugOption.userFacing("Turns voice messages into text on this Mac for every account, so the audio is not sent to Telegram. Needs a speech model for your language (about 50-150 MB, downloaded by macOS the first time; until it is ready you see a message and can try again). Off: Telegram transcribes (Premium or trial)."))
+        settings.register(.toggle(id: "voice.enhancement", section: "Voice", title: "Enhance voice messages", detail: "Cleans up the voice in voice messages while they play, using Opus speech enhancement (LACE and NoLACE, plus bandwidth extension of narrow messages) on this Mac. Uses a little more CPU during playback. Applies from the next message you play. Off: unchanged sound.", defaultValue: false).userFacing())
+        let applyVoiceEnhancement = {
+            // Read by the core's Opus decoders when a playback opens one (OpusSpeechEnhancement); transcription never uses it.
+            OpusSpeechEnhancement.isEnabled = settings.bool("voice.enhancement")
+        }
+        applyVoiceEnhancement()
+        nanogramDebugObservations.append(settings.observe("voice.enhancement") { _ in
+            applyVoiceEnhancement()
+        })
         settings.register(SystemPictureInPicture.debugOption.userFacing("Pops videos out into the macOS picture-in-picture window, which works with Spaces and Stage Manager."))
         nanogramDebugObservations.append(contentsOf: installCallVideoDebugOptions(settings))
         NanogramExperimentEnergy.install()

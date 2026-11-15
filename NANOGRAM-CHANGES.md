@@ -169,7 +169,7 @@ not re-verified against the code; correct them on the next change in that area.
 - Upstream: no; `VideoMessageConfig` and the server reading are untouched.
 - Sync: re-apply the policy calls in `VideoRecorderPipeline` (init, `_configureFps`, `configureRecorderTracks`, `writerSide`) after a merge.
 
-- libopus builds from the core's xiph/opus v1.6.1 submodule with CMake + Ninja and the shared option file `opus-cmake-args.sh` (NEON presumed), floating point (was fixed-point); libwebp builds with Ninja (2026-11-14). Where: `core-xprojects/libopus`, `core-xprojects/libwebp`. Upstream: no. Sync: keep ours.
+- libopus builds from the core's xiph/opus v1.6.1 submodule with CMake + Ninja and the shared options from nanogram-deps (`shared/opus/opus-options.sh`, NEON presumed; OSCE speech enhancement compiled in behind the opt-in "Enhance voice messages" switch), floating point (was fixed-point); libwebp builds with Ninja (2026-11-14). Where: `core-xprojects/libopus`, `core-xprojects/libwebp`. Upstream: no. Sync: keep ours.
 
 ## One Send Report button (macOS)
 - What: Help > Send Report… bundles app logs with critical logs, call logs, crash and hang reports, MetricKit reports and debug-switch values into one zip with a README (Mac model, chip, macOS, app build). A note before sending lists what is included; no messages, contacts or phone numbers. The crash card and the Developer screen use it too; the four fine-grained exports stay on the Developer screen only.

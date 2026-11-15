@@ -36,8 +36,11 @@ class SharedNativeSourcesTests(unittest.TestCase):
     def test_libopus_script_builds_the_core_submodule_with_the_shared_options(self):
         text = read(ROOT / "core-xprojects/libopus/libopus/build.sh")
         self.assertIn("submodules/telegram-ios/third-party/opus/opus", text)
-        self.assertIn("submodules/telegram-ios/shared/opus/opus-options.sh", text)
-        self.assertIn('COMMON_ARGS="$OPUS_COMMON_ARGS"', text)
+        self.assertIn("shared/opus/opus-options.sh", text)
+        self.assertIn('COMMON_ARGS="$OPUS_COMMON_ARGS $OPUS_OSCE_ARGS"', text)
+        self.assertIn("shared/opus", text)
+        self.assertIn('fetch-models.sh" "$SOURCE_DIR"', text)
+        self.assertIn("$OPUS_OSCE_C_FLAGS", text)
         self.assertNotIn("opus-1.6.1.tar.gz", text)
         self.assertNotIn("shasum -a 256 -c", text)
         self.assertNotIn("curl", text)
