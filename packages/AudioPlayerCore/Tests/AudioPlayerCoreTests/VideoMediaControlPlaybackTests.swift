@@ -73,7 +73,8 @@ final class VideoMediaControlPlaybackTests: XCTestCase {
 
     func testMediaCommandsPauseAndResumeRealVideoPlayback() throws {
         XCTAssertTrue(Thread.isMainThread)
-        _ = NSApplication.shared
+        // The xctest host defaults to the .prohibited activation policy, whose windows are never composited.
+        NSApplication.shared.setActivationPolicy(.accessory)
         let file = try makeVideo()
         defer { TempBox.shared.dispose(file) }
         let part = ChunkMediaPlayerPart(startTime: 0, endTime: 8, content: .init(file: file), codecName: "h264", offsetTime: 0)
@@ -82,7 +83,7 @@ final class VideoMediaControlPlaybackTests: XCTestCase {
         let window = NSWindow(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = view
-        window.orderFront(nil)
+        window.orderFrontRegardless()
         defer { window.close() }
         let player = ChunkMediaPlayerV2(params: .init(useV2Reader: true), source: .externalParts(.single(.init(duration: 8, content: .parts([part])))), video: true, enableSound: false, playerNode: view)
         let owner = MediaPlaybackControlCenter()
@@ -104,7 +105,13 @@ final class VideoMediaControlPlaybackTests: XCTestCase {
         player.play()
         XCTAssertTrue(waitUntil { latest?.status == .playing && (latest?.timestamp ?? 0) > 0.2 })
         if #available(macOS 14.4, *) {
-            XCTAssertTrue(waitUntil { view.videoLayer?.sampleBufferRenderer.displayedPixelBuffer() != nil })
+            // The layer shows a frame only while WindowServer composites its window. A locked or sleeping
+            // display (or a window covered by others) never reports it visible, so the displayed-frame check
+            // only applies when the window is actually visible; playback itself is asserted above regardless.
+            let isComposited = waitUntil(timeout: 2) { window.occlusionState.contains(.visible) }
+            if isComposited {
+                XCTAssertTrue(waitUntil { view.videoLayer?.sampleBufferRenderer.displayedPixelBuffer() != nil })
+            }
         }
         XCTAssertEqual(MPNowPlayingInfoCenter.default().playbackState, .playing)
         let generation = owner.commandGeneration
