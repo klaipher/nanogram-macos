@@ -67,7 +67,7 @@
    "path": "submodules/tgcalls",
    "upstream_url": "https://github.com/TelegramMessenger/tgcalls.git",
    "fork_url": "https://github.com/klaipher/tgcalls.git",
-   "fork_branch": "nanogram-shared"
+   "fork_branch": "nanogram"
   },
   {
    "name": "webrtc",
@@ -90,6 +90,26 @@
    "name": "tlottie",
    "path": "submodules/tlottie",
    "upstream_url": "https://github.com/dkaraush/tlottie.git"
+  }
+ ],
+ "moved_libraries": [
+  {
+   "name": "OpenSSL (replaced by the shared BoringSSL)",
+   "paths": [
+    "core-xprojects/openssl/",
+    "submodules/openssl/"
+   ],
+   "fork_url": "https://github.com/klaipher/boringssl.git",
+   "fork_branch": "nanogram",
+   "note": "the Mac links BoringSSL from the core (third-party/boringssl/src, core-xprojects/boringssl); an OpenSSL change upstream has no target here"
+  },
+  {
+   "name": "tg_owt (replaced by the webrtc fork)",
+   "paths": [
+    "submodules/tg_owt"
+   ],
+   "fork_url": "https://github.com/klaipher/webrtc.git",
+   "fork_branch": "nanogram"
   }
  ]
 }

@@ -50,7 +50,7 @@ instead (which part got better, never how).
 
 1. The development pipeline (`submodules/telegram-ios/shared/development-pipeline.md`) makes writing both files part of the fix, and the
    report of every round lists which entries were added.
-2. `tools/dev/lint/changelog_reminder.py`, run by the pre-push hook of both app repositories, warns when a push
+2. `shared/tools/changelog_reminder.py` (klaipher/nanogram-deps; `tools/dev/lint/changelog_reminder.py` is the thin wrapper tglint imports), run by the pre-push hook of the app repositories, warns when a push
    changes product code and touches neither file. Forks have no hook; their `AGENTS.md` carries the same rule.
 3. A submodule pin bump in an app repository is written up in that app's CHANGELOG.md with the old and new fork
    commit, and the fork's own CHANGELOG.md has the matching entry.
