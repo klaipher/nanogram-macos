@@ -31,7 +31,7 @@ framework_source_roots() {
             ;;
         libopus)
             echo "$1/submodules/telegram-ios/third-party/opus/opus"
-            echo "$1/submodules/telegram-ios/third-party/opus/opus-cmake-args.sh"
+            echo "$1/submodules/telegram-ios/shared/opus/opus-options.sh"
             ;;
         dav1d)
             echo "$1/submodules/telegram-ios/third-party/dav1d/dav1d"

@@ -36,7 +36,7 @@ class SharedNativeSourcesTests(unittest.TestCase):
     def test_libopus_script_builds_the_core_submodule_with_the_shared_options(self):
         text = read(ROOT / "core-xprojects/libopus/libopus/build.sh")
         self.assertIn("submodules/telegram-ios/third-party/opus/opus", text)
-        self.assertIn("opus-cmake-args.sh", text)
+        self.assertIn("submodules/telegram-ios/shared/opus/opus-options.sh", text)
         self.assertIn('COMMON_ARGS="$OPUS_COMMON_ARGS"', text)
         self.assertNotIn("opus-1.6.1.tar.gz", text)
         self.assertNotIn("shasum -a 256 -c", text)
@@ -71,7 +71,7 @@ class SharedNativeSourcesTests(unittest.TestCase):
         mac_vpx = {p["file"] for p in libs["libvpx"]["probes"]["mac"]}
         mac_opus = {p["file"] for p in libs["opus"]["probes"]["mac"]}
         self.assertIn(f"{CORE}/libvpx/libvpx/CHANGELOG", mac_vpx)
-        self.assertTrue(any(p.startswith("submodules/telegram-ios/") and "opus" in p for p in mac_opus), mac_opus)
+        self.assertIn("submodules/telegram-ios/shared/opus/opus-options.sh", mac_opus)
         for probe in mac_vpx | mac_opus:
             self.assertNotIn("core-xprojects/libvpx/source", probe)
             self.assertNotIn("core-xprojects/libopus/opus-", probe)
