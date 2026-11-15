@@ -51,7 +51,8 @@ cmd_cache_cleanup() {
 
 cache_cleanup_auto() {
   [ -z "${NANOGRAM_TG_LOCKED:-}" ] || return 0
-  shared_tool cachegc/cachegc.py auto --repo "$ROOT" || true
+  [ -f "$SHARED_TOOLS/cachegc/cachegc.py" ] || return 0  # nothing to clean without the core; the build reports that itself
+  python3 "$SHARED_TOOLS/cachegc/cachegc.py" auto --repo "$ROOT" || true
 }
 
 # tg apps [--dry-run]: one Nanogram in Spotlight and Launchpad. Every build, archive, export and mounted disk image
