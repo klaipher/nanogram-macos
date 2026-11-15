@@ -1,6 +1,6 @@
 # Module build settings
 
-Generated from `tools/dev/native/module-settings.json` by `tools/dev/native/module_settings.py --write`. The same file and doc live in the iOS and the Mac repo. Do not edit by hand.
+Generated from `shared/tools/native/module-settings.json` by `shared/tools/native/module_settings.py --write`. The table is shared; each repo renders its own doc. Do not edit by hand.
 
 ## Platform-wide settings
 
@@ -21,7 +21,7 @@ Why the platform differences stay:
 
 ## Swift language mode per module
 
-iOS builds 908 Swift modules (48 in Swift 6 mode); the Mac builds 278 package targets (8 in Swift 6 mode). 45 modules are built by both apps; 7 of them differ in language mode.
+iOS builds 908 Swift modules (48 in Swift 6 mode); the Mac builds 279 package targets (9 in Swift 6 mode). 46 modules are built by both apps; 7 of them differ in language mode.
 
 | Module | iOS | Mac | Status |
 |---|---|---|---|
@@ -47,6 +47,7 @@ iOS builds 908 Swift modules (48 in Swift 6 mode); the Mac builds 278 package ta
 | MediaPreuploadRegistry | Swift 6 | Swift 5 | differs (allow-listed) |
 | MetalEngine | Swift 5 | Swift 5 | equal |
 | MosaicLayout | Swift 5 | Swift 5 | equal |
+| NanogramFeatures | Swift 6 | Swift 6 | equal |
 | PasscodeCore | Swift 5 | Swift 5 | equal |
 | PasscodeUI | Swift 5 | Swift 5 | equal |
 | PassportUI | Swift 5 | Swift 5 | equal |
