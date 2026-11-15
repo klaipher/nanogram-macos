@@ -97,7 +97,7 @@ private final class GifPanelLabSession<Context: AccountContextProtocol> {
         controller.viewWillAppear(false)
         window.contentView?.addSubview(controller.view)
         window.makeKeyAndOrderFront(nil)
-        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
+        activateApp()
         controller.viewDidAppear(false)
         self.window = window
         self.controller = controller

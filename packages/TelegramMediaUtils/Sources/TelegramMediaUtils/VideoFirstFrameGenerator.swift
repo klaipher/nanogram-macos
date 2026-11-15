@@ -3,6 +3,15 @@ import AVFoundation
 import CoreGraphics
 import SwiftSignalKit
 
+/// Carries a reference that is only touched through thread-safe entry points, so the task closures
+/// below capture nothing but Sendable values.
+private final class UncheckedSendableBox<Value>: @unchecked Sendable {
+    let value: Value
+    init(_ value: Value) {
+        self.value = value
+    }
+}
+
 public enum VideoFirstFrameGenerator {
     public static let debugOptionId = "media.asyncVideoFirstFrame"
 
@@ -20,21 +29,23 @@ public enum VideoFirstFrameGenerator {
         let generator = AVAssetImageGenerator(asset: makeAsset(path: path, mimeType: mimeType))
         generator.maximumSize = maxSize
         generator.appliesPreferredTrackTransform = true
+        let box = UncheckedSendableBox(generator)
         return await withTaskCancellationHandler {
-            return try? await generator.image(at: .zero).image
+            return try? await box.value.image(at: .zero).image
         } onCancel: {
-            generator.cancelAllCGImageGeneration()
+            box.value.cancelAllCGImageGeneration()
         }
     }
 
     @available(macOS 14.0, *)
     public static func signal(path: String, maxSize: CGSize, mimeType: String) -> Signal<CGImage?, NoError> {
         return Signal { subscriber in
+            let box = UncheckedSendableBox(subscriber)
             let task = Task {
                 let image = await firstFrame(path: path, maxSize: maxSize, mimeType: mimeType)
                 if !Task.isCancelled {
-                    subscriber.putNext(image)
-                    subscriber.putCompletion()
+                    box.value.putNext(image)
+                    box.value.putCompletion()
                 }
             }
             return ActionDisposable {

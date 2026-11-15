@@ -368,6 +368,7 @@ final class MenuView: Control, TableViewDelegate {
     var dismissed: Bool = false
 }
 
+@MainActor
 final class AppMenuController : NSObject  {
     let menu:ContextMenu
     var parent: Window?

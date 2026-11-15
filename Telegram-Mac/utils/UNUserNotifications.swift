@@ -112,11 +112,11 @@ class UNUserNotifications : NSObject {
                 }
                 
                 manager.find(accountId)?.window.makeKeyAndOrderFront(nil)
-                NSApp.activate()
+                activateApp()
             }
         } else {
             manager.find(nil)?.window.makeKeyAndOrderFront(nil)
-            NSApp.activate()
+            activateApp()
         }
     }
     

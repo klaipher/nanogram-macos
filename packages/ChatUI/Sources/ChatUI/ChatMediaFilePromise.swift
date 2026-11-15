@@ -135,16 +135,16 @@ final class ChatMediaFilePromise: NSObject, NSFilePromiseProviderDelegate {
             }
             _ = received.swap(true)
             let path = data.path
-            self.queue.addOperation {
+            self.queue.addOperation { [weak self] in
                 do {
                     let manager = FileManager.default
                     if manager.fileExists(atPath: url.path) {
                         try manager.removeItem(at: url)
                     }
                     try manager.copyItem(atPath: path, toPath: url.path)
-                    self.finish(nil)
+                    self?.finish(nil)
                 } catch {
-                    self.finish(error)
+                    self?.finish(error)
                 }
             }
         }, completed: { [weak self] in

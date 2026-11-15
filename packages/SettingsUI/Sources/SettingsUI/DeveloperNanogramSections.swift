@@ -1,11 +1,13 @@
 import Cocoa
 import TGUIKit
-import InputDataUI
+@preconcurrency import InputDataUI
 import GeneralRows
 import TelegramTheme
 import ColorPalette
 
-private let _id_nanogram_reset = InputDataIdentifier("_id_nanogram_reset")
+private enum NanogramResetIds {
+    static let reset = InputDataIdentifier("_id_nanogram_reset")
+}
 
 /// Nanogram's debug switches as ordinary settings sections; the one upstream hook calls this.
 func nanogramDeveloperEntries(sectionId: inout Int32, index: inout Int32, changed: @escaping () -> Void) -> [InputDataEntry] {
@@ -14,7 +16,7 @@ func nanogramDeveloperEntries(sectionId: inout Int32, index: inout Int32, change
     }
     var entries = nanogramOptionEntries(sections: makeSections(), sectionId: &sectionId, index: &index, changed: changed)
     if !entries.isEmpty, let reset = DeveloperHooks.shared.resetNanogramSections {
-        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_nanogram_reset, data: InputDataGeneralData(name: "Reset Nanogram Switches", color: theme.colors.redUI, type: .none, viewType: .singleItem, action: {
+        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: NanogramResetIds.reset, data: InputDataGeneralData(name: "Reset Nanogram Switches", color: theme.colors.redUI, type: .none, viewType: .singleItem, action: {
             reset()
             changed()
         })))

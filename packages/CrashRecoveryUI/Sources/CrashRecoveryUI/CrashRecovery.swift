@@ -205,7 +205,7 @@ private final class CrashRecoveryWindowController: NSObject, NSWindowDelegate {
         }, with: self, for: .Escape, priority: .high)
         window.setContentSize(NSMakeSize(CrashRecoveryView.width, view.requiredHeight))
         window.center()
-        if #available(macOS 14.0, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
+        activateApp()
         window.makeKeyAndOrderFront(nil)
         let quitMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.charactersIgnoringModifiers == "q" {

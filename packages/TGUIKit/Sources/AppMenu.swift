@@ -114,6 +114,7 @@ public final class AppMenu {
                 NSMenu.popUpContextMenu(self.menu, with: event, for: view)
             }
         } else {
+          MainActor.assumeIsolated {
             let controller = AppMenuController(self.menu, presentation: menu.presentation, holder: self, betterInside: menu.betterInside, appearMode: self.appearMode, parentView: view)
             
             self.controller = controller
@@ -151,23 +152,24 @@ public final class AppMenu {
                 })
                 self.timerDisposable = delaySignal(3.0).start(completed: { [weak self] in
                     self?.observation?.invalidate()
-                    self?.controller?.close()
+                    MainActor.assumeIsolated { self?.controller?.close() }
                 })
             }
+          }
         }
         
         
     }
     private func presentIfNeeded(event: NSEvent, view: NSView) {
-        self.controller?.present(event: event, view: view)
+        MainActor.assumeIsolated { self.controller?.present(event: event, view: view) }
     }
     
     /// Closes the menu unless the pointer is over it (so a pill that appeared under the cursor stays clickable).
     public func closeIfPointerOutside() {
-        controller?.closeIfPointerOutside()
+        MainActor.assumeIsolated { controller?.closeIfPointerOutside() }
     }
 
     public static func closeAll() {
-        AppMenuController.closeAll()
+        MainActor.assumeIsolated { AppMenuController.closeAll() }
     }
 }
