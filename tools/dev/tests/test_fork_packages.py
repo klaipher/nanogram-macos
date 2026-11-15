@@ -16,6 +16,7 @@ PACKAGES = config.ROOT / "packages"
 FORK_PACKAGES = ("NanogramKit", "ChatAppIntents", "NanogramDebug", "VoiceRecorderInput", "VP9Hardware",
                  "LocalAudioTranscription", "NanogramAppIcons", "NanogramDecoder")
 PENDING_SWIFT6 = ("NanogramRuntime",)
+CORE_SYMLINKED = ("NanogramFeatures",)  # Sources and Tests are symlinks into the iOS core, like HLSPlayback
 UPSTREAM_DEPENDENTS_KEEP_FLOOR = ("NanogramDebug", "VoiceRecorderInput", "VP9Hardware", "LocalAudioTranscription",
                                   "NanogramRuntime", "NanogramAppIcons")
 
@@ -44,6 +45,14 @@ class ForkPackageTests(unittest.TestCase):
                 self.assertIn("swiftLanguageModes: [.v6]", text)
                 self.assertIn(".treatAllWarnings(as: .error)", text)
 
+    def test_core_symlinked_packages_build_in_swift_6_like_the_ios_module(self):
+        for name in CORE_SYMLINKED:
+            text = manifest(name)
+            with self.subTest(package=name):
+                self.assertTrue(text.startswith("// swift-tools-version:6.2"), name)
+                self.assertIn("swiftLanguageModes: [.v6]", text)
+                self.assertIn(".treatAllWarnings(as: .error)", text)
+
     def test_floor_is_15_unless_an_upstream_package_depends_on_it(self):
         for name in FORK_PACKAGES + PENDING_SWIFT6:
             text = manifest(name)
@@ -55,7 +64,7 @@ class ForkPackageTests(unittest.TestCase):
 
     def test_nanogram_packages_are_all_listed(self):
         for path in PACKAGES.glob("Nanogram*/Package.swift"):
-            self.assertIn(path.parent.name, FORK_PACKAGES + PENDING_SWIFT6)
+            self.assertIn(path.parent.name, FORK_PACKAGES + PENDING_SWIFT6 + CORE_SYMLINKED)
 
 
 if __name__ == "__main__":

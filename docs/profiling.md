@@ -278,8 +278,8 @@ XCTest performance tests (`measure(metrics:options:block:)`) take `XCTClockMetri
 `XCTMemoryMetric`, `XCTStorageMetric` (bytes written), `XCTOSSignpostMetric` (one of our intervals), and in UI
 tests `XCTApplicationLaunchMetric(waitUntilResponsive: true)` and `XCTHitchMetric(application:)` (Xcode 26+,
 iOS and macOS). Xcode keeps baselines in `xcshareddata/xcbaselines` per machine, which neither Bazel nor
-`swift test` reads, so ours are in the repo: `tools/dev/perf/baselines.json`, keyed by machine model
-(`sysctl hw.model`), compared by `tools/dev/perfgate.py`. Run performance tests with code coverage and
+`swift test` reads, so ours are in the repo: `shared/tools/perf/baselines.json` (klaipher/nanogram-deps, one file for iOS and Mac), keyed by machine model
+(`sysctl hw.model`), compared by `shared/tools/perfgate.py`. Run performance tests with code coverage and
 sanitizers off, Release where the runner allows it, nothing else running.
 
 ### The tests
@@ -306,14 +306,14 @@ and free of timing noise).
 - Nothing here is in `tg check` or the pre-push hook yet; a wall-clock gate would flake until the baselines
   have a few runs behind them.
 
-### perfgate (`tools/dev/perfgate.py`, pure Python, tests in `tools/dev/tests/test_perfgate.py`)
+### perfgate (`shared/tools/perfgate.py` in klaipher/nanogram-deps, pure Python, tests in its `tests/test_perfgate.py`)
 
 - Input: the XCTest log lines (`Test Case '-[C t]' measured [Time, seconds] average: ..., values: [...]`, from
   `swift test`, `xcodebuild` and Bazel `test.log`), a result bundle (`--xcresult`, read with
   `xcrun xcresulttool get test-results metrics`), or JSON (that tool's output, or `{"measurements": [...]}`).
 - Key: `<suite>/<Class.test>/<metric id>` under the machine model. `--suite` keeps the same test of different
   bundles apart (`swift-host` is the default of `tg perf run`).
-- Baselines: `tools/dev/perf/baselines.json`, `owner_models` = `Mac16,1` (MacBook Pro M4) and `iPhone18,2`
+- Baselines: `shared/tools/perf/baselines.json`, `owner_models` = `Mac16,1` (MacBook Pro M4) and `iPhone18,2`
   (iPhone 17 Pro Max). **Only owner devices get stored baselines.** Other machines are compared when a baseline
   for their model exists, otherwise skipped.
 - A missing baseline is recorded (on an owner device, with a note to commit the file), never a failure.

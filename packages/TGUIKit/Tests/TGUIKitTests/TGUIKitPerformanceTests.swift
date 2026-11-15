@@ -8,7 +8,7 @@ import protocol TGUIKit.Identifiable
 /// DisplayTests/TextLayoutPerformanceTests). Each measures wall clock, CPU and peak memory.
 ///
 /// Skipped unless TG_PERF=1, so `tg test` stays fast and free of timing noise. Run with `tools/dev/tg perf run`
-/// (docs/profiling.md, "Tests that measure"); tools/dev/perfgate.py compares the numbers with the repository baselines.
+/// (docs/profiling.md, "Tests that measure"); shared perfgate (nanogram-deps tools/perfgate.py) compares the numbers with the repository baselines.
 final class TGUIKitPerformanceTests: XCTestCase {
     private struct Row: Comparable, Identifiable {
         let stableId: Int

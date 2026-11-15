@@ -2,8 +2,10 @@
 
 The grammar is shared by iOS, Mac and Android. The iOS repository owns it: `docs/specs/search-operators.md` in
 klaipher/nanogram, with the test vectors that every app ports. This file is only a pointer plus the Mac's own choices.
-Parser: `packages/NanogramRuntime/Sources/NanogramRuntime/SearchOperators.swift`; tests: `NanogramRuntimeTests/SearchOperatorsTests`
-(the shared vectors).
+Parser: the iOS core's `NanogramFeatures` module, compiled here through `packages/NanogramFeatures` (symlinks; one implementation).
+The Mac keeps the switch and the type list in `NanogramRuntime/SearchOperatorOptions.swift`. Tests: the core's `SearchOperatorsTests`
+(NanogramFeatures package) and `NanogramRuntimeTests/LinkSearchOptionsTests` (the shared vectors, `data/search-operator-vectors.json`
+in klaipher/nanogram-deps). A query without operators comes back whitespace-normalized (iOS behaviour).
 
 ## Mac choices inside the shared grammar
 

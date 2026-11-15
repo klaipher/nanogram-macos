@@ -112,6 +112,7 @@ share third-party/SwiftMath
 share submodules/TelegramUI/Resources/Fonts/latinmodern-math.otf
 share submodules/TelegramUI/Resources/Fonts/latinmodern-math.plist
 share submodules/HLSPlayback
+share submodules/NanogramFeatures
 share submodules/RingBuffer
 share submodules/Sunrise
 share submodules/AnimatedStickerNode/VP9Hardware

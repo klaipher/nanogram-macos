@@ -30,8 +30,8 @@ echo 'PACKAGE_VERSION="1.6.1"' > "$SOURCE_DIR/package_version"
 
 SDKROOT="$(xcode-select -p)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 
-# The one option list iOS builds with (third-party/opus/opus-cmake-args.sh in the core), so the apps cannot drift.
-. "${SCRIPT_LOCATION}/../../../submodules/telegram-ios/third-party/opus/opus-cmake-args.sh"
+# The one option list iOS builds with (shared/opus/opus-options.sh in the core, from nanogram-deps), so the apps cannot drift.
+. "${SCRIPT_LOCATION}/../../../submodules/telegram-ios/shared/opus/opus-options.sh"
 COMMON_ARGS="$OPUS_COMMON_ARGS"
 
 for ARCH in $ARCHS

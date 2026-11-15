@@ -52,7 +52,7 @@ class PinnedVersionsTests(unittest.TestCase):
         script = read(CORE / "libopus" / "libopus" / "build.sh")
         self.assertRegex(script, r"CMAKE_C_FLAGS_RELEASE=\"-O2 -DNDEBUG")
         self.assertNotIn("-Os", script)
-        args = TG_IOS / "third-party" / "opus" / "opus-cmake-args.sh"
+        args = TG_IOS / "shared" / "opus" / "opus-options.sh"
         if args.is_file():
             text = read(args)
             self.assertIn("-DOPUS_PRESUME_NEON=ON", text)

@@ -106,8 +106,9 @@ class PreMacOS26IconTests(unittest.TestCase):
 
     def test_the_share_extension_and_installer_use_the_same_artwork(self):
         self.assertTrue((ROOT / "TelegramShare" / "icon.icns").is_file())
-        source = (ROOT / "nanogram" / "icon" / f"{PRIMARY}.svg").read_text()
-        self.assertNotIn("clip-path", source)
+        source_file = ROOT / "submodules" / "telegram-ios" / "Telegram" / "Telegram-iOS" / "AlternateIconSources" / f"{PRIMARY}.svg"
+        if source_file.is_file():  # the SVGs come from the core (one source for iOS and Mac)
+            self.assertNotIn("clip-path", source_file.read_text())
         self.assertIn(f'defaultIconName = "{PRIMARY}"', (ROOT / "tools" / "dev" / "nanogram" / "render-mac-icon.swift").read_text())
 
 

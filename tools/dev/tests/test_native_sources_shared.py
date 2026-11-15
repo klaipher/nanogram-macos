@@ -36,7 +36,7 @@ class SharedNativeSourcesTests(unittest.TestCase):
     def test_libopus_script_builds_the_core_submodule_with_the_shared_options(self):
         text = read(ROOT / "core-xprojects/libopus/libopus/build.sh")
         self.assertIn("submodules/telegram-ios/third-party/opus/opus", text)
-        self.assertIn("opus-cmake-args.sh", text)
+        self.assertIn("submodules/telegram-ios/shared/opus/opus-options.sh", text)
         self.assertIn('COMMON_ARGS="$OPUS_COMMON_ARGS"', text)
         self.assertNotIn("opus-1.6.1.tar.gz", text)
         self.assertNotIn("shasum -a 256 -c", text)
@@ -64,11 +64,14 @@ class SharedNativeSourcesTests(unittest.TestCase):
         self.assertIn("f5d4636bfc4d30c622c9ad238ce947848c2b90b10aecd387dc62cdee2584359b", text)
 
     def test_native_libs_probes_point_at_the_core(self):
-        libs = json.loads(read(ROOT / "tools/dev/native/native-libs.json"))["libs"]
+        data = ROOT / "submodules/telegram-ios/shared/tools/native/native-libs.json"  # one file for iOS and Mac (nanogram-deps)
+        if not data.is_file():
+            self.skipTest("the core's shared/ submodule is not checked out")
+        libs = json.loads(read(data))["libs"]
         mac_vpx = {p["file"] for p in libs["libvpx"]["probes"]["mac"]}
         mac_opus = {p["file"] for p in libs["opus"]["probes"]["mac"]}
         self.assertIn(f"{CORE}/libvpx/libvpx/CHANGELOG", mac_vpx)
-        self.assertIn(f"{CORE}/opus/opus-cmake-args.sh", mac_opus)
+        self.assertIn("submodules/telegram-ios/shared/opus/opus-options.sh", mac_opus)
         for probe in mac_vpx | mac_opus:
             self.assertNotIn("core-xprojects/libvpx/source", probe)
             self.assertNotIn("core-xprojects/libopus/opus-", probe)

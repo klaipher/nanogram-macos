@@ -96,7 +96,7 @@ ThinLTO and dead-code stripping):
 
 `buildcheck` fails a Debug build whose log has a `VerifyModule`, `GenerateDSYMFile` or `ExtractAppIntentsMetadata` task.
 
-**Native library builds** (`tg frameworks`): the CMake libraries (tg_owt, tde2e, libjpeg-turbo, libwebp) build with Ninja (libwebp keeps its Makefiles) and, when
+**Native library builds** (`tg frameworks`): the CMake libraries (webrtc, tde2e, libjpeg-turbo, libwebp) build with Ninja (libwebp keeps its Makefiles) and, when
 `ccache` is installed, through it (`CMAKE_{C,CXX,OBJC,OBJCXX}_COMPILER_LAUNCHER` from the environment; `CCACHE_DIR`
 `~/.cache/nanogram-macos/ccache`, `CCACHE_MAXSIZE=3G`, `CCACHE_COMPRESS=1`, `CCACHE_BASEDIR` the checkout, so worktrees share
 entries). With `CCACHE_BASEDIR`, ccache rewrites absolute paths under the checkout to checkout-relative ones, so `__FILE__`
@@ -259,8 +259,9 @@ app that ships a `.metal` file.
   `appName` (TelegramUtils) is "Nanogram" under `NANOGRAM`, which renames window titles, alerts and About.
 - Icon: the Sphere. `Telegram-Mac/AppIcon.icon` (macOS 26+) is the iOS fork's layered `Nanogram.icon` (Background,
   Light, Sphere, Sparkle; dark and tinted variants; check it with `ictool`, `Icon Composer.app/Contents/Executables`);
-  the pre-26 PNGs in `AppIcon.appiconset` and `TelegramShare/icon.icns` are rendered from `nanogram/icon/NanogramSphere.svg`
-  by `swift tools/dev/nanogram/render-mac-icon.swift` (re-run after changing any SVG there). The same script
+  the pre-26 PNGs in `AppIcon.appiconset` and `TelegramShare/icon.icns` are rendered from the core's `NanogramSphere.svg`
+  (`submodules/telegram-ios/Telegram/Telegram-iOS/AlternateIconSources`, one source for iOS and Mac; `nanogram/icon` keeps only the Mac-only
+  Classic, Dash, Forward and Streak) by `swift tools/dev/nanogram/render-mac-icon.swift` (re-run after changing any SVG in either folder). The same script
   renders the menu bar glyph (`StatusIcon`), the share extension's sign-in logo (`Icon_TelegramLogin`) and the
   App Icon picker's icons. Both editions use `AppIcon` (project-level `ASSETCATALOG_COMPILER_APPICON_NAME`).
 - App Icon picker (Settings > Appearance): the iOS fork's icons in its order, Sphere first and default, then Comet
@@ -376,7 +377,7 @@ Xcode's automatic signing through the App Store Connect API key (`~/.config/tele
 
 ## Native libraries
 
-`tg frameworks` brings the 12 native libraries plus tlottie up to date, then checks that every required output
+`tg frameworks` brings the native libraries up to date (tlottie is built inside nanogram-rust, not separately), then checks that every required output
 exists and is arm64 only. `tg frameworks --verify-only` runs just the check. Per-library build times go to
 `build-output/frameworks-timing.tsv`, the full log to `build-output/frameworks.log`.
 
@@ -416,10 +417,10 @@ restoring all 13 into a checkout with no `core-xprojects/*/build`, xcframeworks 
 What we changed in the build scripts:
 
 - arm64 only: the scripts that hard-coded `arm64 x86_64` (OpenH264, dav1d, tde2e, the three Rust libraries) build
-  one slice; the others follow `ARCHS` from the xcconfig. The OpenSSL and mozjpeg single-architecture paths were
-  broken upstream (outputs in the wrong place) and are fixed.
+  one slice; the others follow `ARCHS` from the xcconfig. The mozjpeg single-architecture path was
+  broken upstream (outputs in the wrong place) and is fixed. OpenSSL is gone (BoringSSL replaced it, `core-xprojects/boringssl`).
 - The minimum macOS comes from `MACOSX_DEPLOYMENT_TARGET` (15.0 from the xcconfig) instead of hard-coded
-  10.13 (OpenSSL, dav1d).
+  10.13 (dav1d).
 - Rust: every cargo call runs under `env -u MACOSX_DEPLOYMENT_TARGET`. With the variable at 12.0 or higher, host
   proc-macro crates fail to load ("can't find crate for `zeroize_derive`", Rust 1.91 and 1.96). The Rust objects
   then default to macOS 11.0, which links fine into a 15.0 app.
@@ -429,7 +430,7 @@ What we changed in the build scripts:
   into the 15.0 app and behave exactly as upstream's (which builds them for 10.13 against the same SDK). Moving
   it to ScreenCaptureKit belongs upstream.
 
-### Measured (2026-11-02, M-series 10 cores, Xcode 27.2, clean `core-xprojects/*/build`)
+### Measured (2026-11-02, M-series 10 cores, Xcode 27.2, clean `core-xprojects/*/build`; dated: it still lists OpenSSL, which BoringSSL has since replaced)
 
 | Library | Universal (upstream) | arm64 only |
 |---|---:|---:|
@@ -478,7 +479,7 @@ use and what `tg prune` would do; `tg doctor` warns when the root is over its ca
 | `tmp/frameworks-<pid>/` | upstream's `configure_frameworks.sh` (per-library DerivedData, deleted when the script exits normally) | — | `tg prune` after 6 hours |
 | `spm-*/`, `swiftpm/` | `swift build --scratch-path` runs outside the checkout | whole root | `tg prune` (unused 7 days, or over the cap) |
 | `CompilationCache/` | Debug compilation caching, if enabled | whole root | `tg prune`, only when over the cap, last |
-| `ccache/` | `tg frameworks` when `ccache` is installed: compiler cache of the CMake-built libraries (tg_owt, tde2e, libjpeg-turbo, libwebp) | 3 GB, prunes itself | not touched by `tg prune`; counts toward the whole root |
+| `ccache/` | `tg frameworks` when `ccache` is installed: compiler cache of the CMake-built libraries (webrtc, tde2e, libjpeg-turbo, libwebp) | 3 GB, prunes itself | not touched by `tg prune`; counts toward the whole root |
 | everything else (`bin/`, `build-*.lock`, `sparkle-ed25519/` (the signing helper binary), `launch-home`, tools, logs) | tools and workflows | — | never removed; `tg prune` refuses `sparkle-ed25519`, `sparkle_ed25519` and `launch-home` by name |
 
 `tg prune` keeps the whole root under 40 GB (`NANOGRAM_CACHE_MAX_GB`, or `--max-gb N`): first it removes DerivedData
@@ -501,7 +502,7 @@ scratch first), and decides "in use" per directory (a running command naming it,
 `.lock` or the checkout's build lock), so a build running in another worktree no longer stops the cleanup of the rest.
 Below 50 GB free it runs every rule; below 20 GB free it prints what uses the space and the build does not start
 (`TG_ALLOW_LOW_DISK=1` overrides). `tg worktree add <name>` makes `~/Projects/wt/mac-<name>` on `night/<name>` with its
-submodules borrowed (`--reference`) from this checkout's clones, then runs `tg credentials`, `tg localfixes` and
+submodules borrowed (`--reference`) from this checkout's clones, then runs `tg credentials` and
 `tg frameworks` (native libraries restored from the cache in seconds); `tg worktree remove <name>` deletes the
 worktree together with its DerivedData, scratch and Xcode DerivedData, and refuses a dirty or unpushed one, or one
 holding release archives. `tg prune` stays as the manual equivalent. Details: [cache-cleanup.md](cache-cleanup.md).
@@ -607,15 +608,14 @@ What it does (`tools/dev/nanogram/sync.py`, then `tools/dev/tg`):
    a compare-and-swap `update-ref`. If `upstream` is ahead of or has diverged from `telegram/master` it stops:
    upstream rewrote history, or one of our commits landed on `upstream` — look before resetting anything.
 2. `git merge upstream` into the current branch. A merge with nothing new exits quietly; uncommitted changes to
-   tracked files stop it (a dirty submodule working tree, such as the local MetalEngine fix, does not).
+   tracked files stop it (a dirty submodule working tree does not).
 3. On conflicts nothing is resolved or committed: the merge stays in progress, the conflicted paths are listed
    and the exit status is 1. Resolve, `git add`, `git commit`, then `tools/dev/tg sync-upstream --after-merge`;
    or `git merge --abort`. Our changes sit in our own files and small hook lines, so conflicts should be few.
 4. If upstream moved its `submodules/telegram-ios` pin, ignore the pin: our core comes from the iOS repository
    (see The shared Telegram core below). Do not run the rebase commands it prints; a rebase onto upstream's pin
    would pull Telegram's history into the core.
-5. After a clean merge: `git submodule update --init --recursive`, the local submodule fixes (`localfixes.py`),
-   `tg frameworks` (rebuilds only libraries whose stamp changed), `tg warnings --update` (a clean debug build with
+5. After a clean merge: `git submodule update --init --recursive`, `tg frameworks` (rebuilds only libraries whose stamp changed), `tg warnings --update` (a clean debug build with
    buildcheck and the edition checks; warnings that arrive with upstream code join
    `nanogram/warnings-baseline.json` and never block a sync), then `tg check`. Commit the baseline if it changed.
 
@@ -635,6 +635,12 @@ behind `#if os(macOS)` there.
 
 Rules for the core checkout:
 
+- `tg setup` and `tg submodules` leave the core's nested copies of webrtc, tgcalls, twidget, widget-sandbox and QuickJS
+  unchecked-out (the core's `submodule.active` pathspec excludes them; about 250 MB less, and no second object store):
+  this repository pins and builds its own checkouts at the same commits. tlottie is not on the list, because the build
+  compiles the core's copy. Use `tg submodules` (not a bare `git submodule update --init --recursive`): the pathspec lives in the core's own
+  git config, so on a fresh clone it can only be set after the core is checked out. The core's
+  `TelegramVoip` package reaches the Mac's `submodules/tgcalls` through its relative path `../../../tgcalls`.
 - The core is changed in the iOS repository (`~/Projects/nanogram-ios`), on `main` or a branch merged into it, never in
   this checkout. Never merge or rebase anything that carries Telegram's history into it (no `Telegram-iOS` branches,
   no `fetch` of tags; fetch with `--no-tags`).

@@ -1,6 +1,6 @@
 # Cache cleanup (iOS and Mac)
 
-One implementation, `tools/dev/cachegc/cachegc.py`, and one configuration, `shared/cache-policy.json` (the klaipher/nanogram-deps submodule, one copy for iOS, Mac and Android; the Mac reads it through the core at `submodules/telegram-ios/shared/`). `tg cache-cleanup verify` fails when the implementation differs from the iOS copy, or when `.bazelrc` / `Nanogram.xcconfig` disagree with the policy). Stale build caches clean themselves up; nothing runs on a schedule (no launchd agent, no cron, no daily job).
+One implementation, `shared/tools/cachegc/cachegc.py`, and one configuration, `shared/cache-policy.json` (the klaipher/nanogram-deps submodule, one copy for iOS, Mac and Android; the Mac reads it through the core at `submodules/telegram-ios/shared/`). `tg cache-cleanup verify` fails when `.bazelrc` / `Nanogram.xcconfig` disagree with the policy). Stale build caches clean themselves up; nothing runs on a schedule (no launchd agent, no cron, no daily job).
 
 ## When it runs
 
@@ -43,9 +43,9 @@ Bazel also trims the disk cache itself when its server has been idle for 5 minut
 
 ## Worktrees: `tg worktree add` and `remove`
 
-One module, `tools/dev/worktree/worktree.py`, the same in both repos. Nothing is built.
+One module, `shared/tools/worktree/worktree.py` (klaipher/nanogram-deps, reached at `submodules/telegram-ios/shared/tools/`), for every app repository. Nothing is built.
 
-- `tg worktree add <name> [--branch B] [--from REF]` makes `~/Projects/wt/<ios|mac>-<name>` on branch `night/<name>` (or B, from REF). iOS: shallow submodules, symlinks to the main checkout's `build-system/dev-configuration.json` and `user.bazelrc`. Mac: submodules initialised with `--reference` to the main checkout's submodule clones (those clones get `extensions.preciousObjects`, so git never prunes the objects the worktrees borrow; this saves 0.5-0.9 GB per worktree), then `tg credentials`, `tg localfixes` and `tg frameworks` (the content-addressed native-library cache restores the libraries in seconds; no native rebuild). It prints the DerivedData, scratch and output-base paths the worktree will use.
+- `tg worktree add <name> [--branch B] [--from REF]` makes `~/Projects/wt/<ios|mac>-<name>` on branch `night/<name>` (or B, from REF). iOS: shallow submodules, symlinks to the main checkout's `build-system/dev-configuration.json` and `user.bazelrc`. Mac: submodules initialised with `--reference` to the main checkout's submodule clones (those clones get `extensions.preciousObjects`, so git never prunes the objects the worktrees borrow; this saves 0.5-0.9 GB per worktree), then `tg credentials` and `tg frameworks` (the content-addressed native-library cache restores the libraries in seconds; no native rebuild). It prints the DerivedData, scratch and output-base paths the worktree will use.
 - `tg worktree remove <name> [--force]` refuses a dirty worktree and commits that are on no remote (`--force` overrides these two), a worktree whose `build-output/{testflight,direct}/<build>` holds archives (move them out first; never overridden), a worktree a process is working in, and a checkout whose build lock is held. Then it deletes what the checkout made: iOS stops the Bazel server and deletes the output base (found by its `DO_NOT_BUILD_HERE` marker); Mac deletes `DerivedData-<suffix>`, `spm-<name>-*` (not those of a longer-named checkout such as `mac-integ` when removing `mac`) and Xcode's own `DerivedData/*` whose WorkspacePath is inside. It ends with `git worktree remove` and `prune`; the branch stays.
 - A worktree removed by hand leaves the same things behind; the guard's orphan rules remove them on the next build.
 
@@ -55,7 +55,7 @@ One module, `tools/dev/worktree/worktree.py`, the same in both repos. Nothing is
 - Never `launch-home` (the signed-in test profile), the Sparkle keys, `~/Library/Application Support/Nanogram`, or any ancestor of them.
 - Nothing in use: build locks, running bazel/xcodebuild/swift processes, open handles, working directories of processes.
 - Every removal is checked a second time right before it runs, and `--dry-run` lists what would go.
-- Tests for the selection logic: `tools/dev/tests/test_cachegc.py`.
+- Tests for the selection logic: `tests/test_cachegc.py` in klaipher/nanogram-deps (run by `tools/dev/tests/run.sh`).
 
 ## Compilation cache (Xcode 27)
 

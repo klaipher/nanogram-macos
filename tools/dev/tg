@@ -21,25 +21,38 @@ die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 py() { python3 -m "nanogram.$1" "${@:2}"; }
 
+# The cache cleanup, worktree, native-library, performance and pre-push tools are one copy for iOS, Mac and Android:
+# klaipher/nanogram-deps, reached through the core (submodules/telegram-ios/shared/tools). Each takes this repository
+# with --repo or --root.
+SHARED_TOOLS="$ROOT/submodules/telegram-ios/shared/tools"
+export NANOGRAM_REPO_ROOT="$ROOT"
+shared_tool() {
+  local tool="$SHARED_TOOLS/$1"
+  [ -f "$tool" ] || die "$tool is missing; run: git submodule update --init submodules/telegram-ios && git -C submodules/telegram-ios submodule update --init shared"
+  shift
+  python3 "$tool" "$@"
+}
+
 not_yet() { die "tg $1 is not implemented yet"; }
 
 config_value() { python3 -c "from nanogram import config; print(config.$1)"; }
 
 cmd_doctor() { py doctor; }
 
-# tg cache-cleanup [--dry-run] [--only A,B]: the shared cache cleanup (tools/dev/cachegc, policy in submodules/telegram-ios/shared/cache-policy.json).
+# tg cache-cleanup [--dry-run] [--only A,B]: the shared cache cleanup (shared/tools/cachegc in the core, policy in submodules/telegram-ios/shared/cache-policy.json).
 # It also runs by itself, throttled and time-boxed, after build, test, check and release commands. There is no
 # scheduled job.
 cmd_cache_cleanup() {
   case "${1:-}" in
-    verify|report|guard) python3 "$ROOT/tools/dev/cachegc/cachegc.py" "$1" --repo "$ROOT" ;;
-    *) python3 "$ROOT/tools/dev/cachegc/cachegc.py" run --repo "$ROOT" "$@" ;;
+    verify|report|guard) shared_tool cachegc/cachegc.py "$1" --repo "$ROOT" ;;
+    *) shared_tool cachegc/cachegc.py run --repo "$ROOT" "$@" ;;
   esac
 }
 
 cache_cleanup_auto() {
   [ -z "${NANOGRAM_TG_LOCKED:-}" ] || return 0
-  python3 "$ROOT/tools/dev/cachegc/cachegc.py" auto --repo "$ROOT" || true
+  [ -f "$SHARED_TOOLS/cachegc/cachegc.py" ] || return 0  # nothing to clean without the core; the build reports that itself
+  python3 "$SHARED_TOOLS/cachegc/cachegc.py" auto --repo "$ROOT" || true
 }
 
 # tg apps [--dry-run]: one Nanogram in Spotlight and Launchpad. Every build, archive, export and mounted disk image
@@ -64,18 +77,21 @@ cache_guard() {
   [ -z "${NANOGRAM_TG_LOCKED:-}" ] || return 0
   [ -z "${TG_CACHE_GUARDED:-}" ] || return 0
   export TG_CACHE_GUARDED=1
-  [ -f "$ROOT/tools/dev/cachegc/cachegc.py" ] || return 0
+  # Without the core checked out there is nothing to build yet; the build command fails on its own with a clear message.
+  [ -f "$SHARED_TOOLS/cachegc/cachegc.py" ] || { warn "cache guard skipped: the shared tools are not checked out"; return 0; }
   local status=0
-  python3 "$ROOT/tools/dev/cachegc/cachegc.py" guard --repo "$ROOT" || status=$?
+  python3 "$SHARED_TOOLS/cachegc/cachegc.py" guard --repo "$ROOT" || status=$?
   # Exit 1 is the refusal (too little free disk); any other failure of the guard itself must not stop a build.
   [ "$status" -ne 1 ] || exit 1
 }
 
-# tg worktree add <name> [--branch B] [--from REF] | remove <name> [--force]: tools/dev/worktree/worktree.py (the same
-# module in both repos). Nothing is built.
-cmd_worktree() { python3 "$ROOT/tools/dev/worktree/worktree.py" --repo "$ROOT" --flavor mac "$@"; }
+# tg worktree add <name> [--branch B] [--from REF] | remove <name> [--force]: shared/tools/worktree/worktree.py (the
+# same module for every app repository). Nothing is built.
+cmd_worktree() { shared_tool worktree/worktree.py --repo "$ROOT" --flavor mac "$@"; }
 
-cmd_native() { python3 "$ROOT/tools/dev/native/check_native_libs.py" "$@" && python3 "$ROOT/tools/dev/native/module_settings.py" --check && py manifestpaths; }
+cmd_native() {
+  shared_tool native/check_native_libs.py --root "$ROOT" "$@" && shared_tool native/module_settings.py --check --root "$ROOT" && py manifestpaths
+}
 
 cmd_frameworks() { py frameworks "$@"; }
 
@@ -99,17 +115,48 @@ cmd_sparkle_key() {
   if [ "${1:-}" = sign ]; then py sparkle sign "${@:2}"; else py sparkle public-key; fi
 }
 
-# Idempotent working-tree fixes inside submodules (tools/dev/nanogram/localfixes.py).
-cmd_localfixes() { py localfixes || die "cannot apply local submodule fixes"; }
+# The core's nested copies of libraries this repository pins itself, at the same commits (webrtc, tgcalls, twidget,
+# widget-sandbox and its QuickJS): the Mac builds its own checkouts, so the core's stay unchecked-out (one working tree
+# and object store each in a fresh clone; an existing checkout loses only its working trees, about 250 MB, since the
+# modules/ stores stay for worktrees' --reference). Never tlottie: the build compiles the core's copy. Done with the core's
+# `submodule.active` pathspec (a per-submodule `submodule.<path>.active=false` is switched back on by `update --init`).
+CORE_DUPLICATE_SUBMODULES=(
+  third-party/webrtc/webrtc
+  submodules/TgVoipWebrtc/tgcalls
+  third-party/twidget/twidget
+  third-party/widget-sandbox/widget-sandbox
+  third-party/quickjs-ng/quickjs
+)
+
+core_skip_duplicate_submodules() {
+  local core=submodules/telegram-ios path
+  [ -e "$core/.git" ] || return 0
+  git -C "$core" config --unset-all submodule.active || true
+  git -C "$core" config --add submodule.active .
+  for path in "${CORE_DUPLICATE_SUBMODULES[@]}"; do
+    git -C "$core" config --add submodule.active ":(exclude)$path"
+    # A registered-but-unchecked-out duplicate (an earlier `submodule init`) has an explicit active=true that beats the pathspec.
+    git -C "$core" config --unset "submodule.$path.active" 2>/dev/null || true
+    if [ -e "$core/$path/.git" ]; then
+      git -C "$core" submodule deinit -- "$path" >/dev/null 2>&1 || warn "could not deinit the core's duplicate checkout $core/$path (local changes?): remove it by hand"
+    fi
+  done
+}
+
+# tg submodules: every submodule at its recorded commit, without the core's duplicates of what this repository pins.
+cmd_submodules() {
+  git submodule sync --recursive >/dev/null
+  git submodule update --init --jobs 8 submodules/telegram-ios
+  core_skip_duplicate_submodules
+  git submodule update --init --recursive --jobs 8
+}
 
 cmd_setup() {
   # Recorded conflict resolutions are replayed on the next upstream merge (tg sync-upstream).
   git config rerere.enabled true
   git config rerere.autoupdate true
   say "Fetching submodules"
-  git submodule sync --recursive >/dev/null
-  git submodule update --init --recursive --jobs 8
-  cmd_localfixes
+  cmd_submodules
   local toolchain
   toolchain="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' core-xprojects/rust-toolchain.toml)"
   [ -n "$toolchain" ] || die "cannot read the Rust toolchain pinned in core-xprojects/rust-toolchain.toml"
@@ -161,7 +208,6 @@ cmd_build() {
   derived="$(config_value DERIVED_DATA)"
   mkdir -p "$ROOT/build-output"
   log="$ROOT/build-output/last-build.log"
-  cmd_localfixes
   cmd_credentials
   if [ "$clean" = 1 ]; then
     say "Cleaning ${derived}/Build"
@@ -212,12 +258,13 @@ cmd_warnings() {
 
 # tg upstream-sync --tag <upstream tag> [--offline] [--json]: dry run of an upstream release merge (conflicts by area,
 # bumped pins against our fork branches) in a scratch repository; changes and fetches nothing in this repo. The real
-# merge is tg sync-upstream below.
-cmd_upstream_sync() { python3 "$ROOT/tools/dev/upstream-sync/sync.py" --repo "$ROOT" "$@"; }
+# merge is tg sync-upstream below. The script is the shared one (shared/tools/upstream-sync); the settings stay in
+# tools/dev/upstream-sync/upstream-sync.json.
+cmd_upstream_sync() { shared_tool upstream-sync/sync.py --repo "$ROOT" "$@"; }
 
 # tg sync-upstream [--no-build] [--after-merge]: fast-forward `upstream` to telegram/master (real history),
 # merge it into the current branch (tools/dev/nanogram/sync.py; stops on conflicts, never resolves them), then
-# submodules, local fixes, native libraries, a clean build whose new upstream warnings join the baseline, tg check.
+# submodules, native libraries, a clean build whose new upstream warnings join the baseline, tg check.
 # --after-merge runs only the post-merge steps (after you resolved and committed a conflicted merge).
 cmd_sync_upstream() {
   local build=1 merge=1
@@ -241,9 +288,7 @@ cmd_sync_upstream() {
   fi
   [ "$build" = 1 ] || { say "Merged; skipped the post-merge build (--no-build)"; return 0; }
   say "Updating submodules to the merged pins"
-  git submodule sync --recursive >/dev/null
-  git submodule update --init --recursive --jobs 8
-  cmd_localfixes
+  cmd_submodules
   cmd_frameworks
   cmd_warnings --update
   "$ROOT/tools/dev/tg" check
@@ -410,6 +455,7 @@ usage() {
 usage: tools/dev/tg <command> [options]
 
   setup            submodules, Rust toolchain, native libraries, git rerere
+  submodules       update every submodule to its pin, leaving out the core's duplicates of webrtc, tgcalls, twidget, widget-sandbox and QuickJS
   upstream-sync    dry run of an upstream release merge: conflicts by area, bumped pins (changes nothing)
   doctor           check prerequisites
   frameworks       native libraries (arm64): current, restored from the shared cache, or built [--no-cache] [--verify-only]
@@ -422,7 +468,7 @@ usage: tools/dev/tg <command> [options]
   lint             SwiftLint on changed Swift lines [--base REV | --commits A..B] [--strict]
   warnings         clean debug build, compare upstream warnings with the baseline [--update] [--log FILE]
   check            tests, lint, clean build + warnings, package tests (pre-push gate) [--base REV]
-  perf             performance tests with repository baselines per machine model: run|check|record|model (tools/dev/perfgate.py; not part of check)
+  perf             performance tests with repository baselines per machine model: run|check|record|model (shared/tools/perfgate.py; not part of check)
   parity           iOS/macOS parity gate: roots, published pins, shared SHAs, core pin lag, shared files [--release]
   core-bump        move the core pin to a newer iOS main commit, test, gate, commit [REF|SHA] [--dry-run] [--commit]
   sync-upstream    fast-forward upstream, merge it, rebuild, update the warning baseline [--no-build] [--after-merge]
@@ -440,13 +486,13 @@ USAGE
 
 # tg perf run [--package DIR ...] | check | record | model [perfgate options]: the performance tests that need no app
 # (docs/profiling.md, "Tests that measure"). `run` runs the *PerformanceTests of the SwiftPM packages (default: TGUIKit and
-# the core's Postbox) on this machine with TG_PERF=1 and compares the numbers with tools/dev/perf/baselines.json
-# (tools/dev/perfgate.py); a missing baseline is recorded on the owner's devices, never a failure. Not part of
+# the core's Postbox) on this machine with TG_PERF=1 and compares the numbers with shared/tools/perf/baselines.json
+# (shared/tools/perfgate.py); a missing baseline is recorded on the owner's devices, never a failure. Not part of
 # `tg check` or the pre-push gate.
 cmd_perf() {
   local sub="${1:-}"
   case "$sub" in
-    check|record|model) python3 "$ROOT/tools/dev/perfgate.py" "$@" ;;
+    check|record|model) shared_tool perfgate.py "$@" ;;
     run)
       shift
       local packages=() gate_args=() log package
@@ -463,7 +509,7 @@ cmd_perf() {
         say "Performance tests in $package"
         TG_PERF=1 swift test --package-path "$ROOT/$package" --filter PerformanceTests 2>&1 | tee -a "$log"
       done
-      python3 "$ROOT/tools/dev/perfgate.py" check --suite swift-host --log "$log" ${gate_args[@]+"${gate_args[@]}"}
+      shared_tool perfgate.py check --suite swift-host --log "$log" ${gate_args[@]+"${gate_args[@]}"}
       ;;
     *) die "usage: tools/dev/tg perf run [--package DIR ...] [perfgate options] | check|record|model [perfgate options]" ;;
   esac
@@ -481,6 +527,7 @@ main() {
   case "$cmd" in
     doctor) cmd_doctor "$@" ;;
     setup) cmd_setup "$@" ;;
+    submodules) cmd_submodules ;;
     upstream-sync) cmd_upstream_sync "$@" ;;
     frameworks) cmd_frameworks "$@" ;;
     clean) cmd_clean "$@" ;;
@@ -491,7 +538,6 @@ main() {
     native) cmd_native "$@" ;;
     tests-audit) py testsaudit "$@" ;;
     credentials) cmd_credentials ;;
-    localfixes) cmd_localfixes ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;
     sparkle-key) cmd_sparkle_key "$@" ;;

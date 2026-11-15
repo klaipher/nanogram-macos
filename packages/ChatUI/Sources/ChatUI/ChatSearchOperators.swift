@@ -5,7 +5,8 @@ import SwiftSignalKit
 import NanogramRuntime
 
 extension SearchOperatorType {
-    var messageTags: MessageTags {
+    // nil for the operator types the Mac does not parse (`SearchOperators.macSupportedTypes`).
+    var messageTags: MessageTags? {
         switch self {
         case .photo:
             return .photo
@@ -27,6 +28,8 @@ extension SearchOperatorType {
             return .polls
         case .pinned:
             return .pinned
+        case .contact, .geo, .mention:
+            return nil
         }
     }
 }
@@ -37,7 +40,7 @@ struct ChatSearchSender {
 }
 
 // A name that does not resolve leaves the `from:` token in the text, so the search never gets wider than the words typed.
-func chatSearchSender(_ parsed: SearchOperatorQuery, fallback: PeerId?, accountPeerId: PeerId, engine: TelegramEngine) -> Signal<ChatSearchSender, NoError> {
+func chatSearchSender(_ parsed: ParsedSearchQuery, fallback: PeerId?, accountPeerId: PeerId, engine: TelegramEngine) -> Signal<ChatSearchSender, NoError> {
     guard parsed.fromName != nil else {
         return .single(ChatSearchSender(restoresFromToken: false, peerId: fallback))
     }

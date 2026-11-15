@@ -1,5 +1,6 @@
-// Renders Nanogram's macOS icons from the SVGs in nanogram/icon (the iOS fork's AlternateIconSources, plus Classic,
-// Dash, Forward and Streak redrawn from its PNGs). Re-run after changing a source:
+// Renders Nanogram's macOS icons from two folders of SVGs: the iOS core's AlternateIconSources (submodules/telegram-ios/
+// Telegram/Telegram-iOS/AlternateIconSources, one source for both apps) and nanogram/icon (the Mac-only Classic, Dash,
+// Forward and Streak, redrawn from the iOS PNGs). Re-run after changing a source:
 //   swift tools/dev/nanogram/render-mac-icon.swift
 // Writes:
 // - Telegram-Mac/Assets.xcassets/AppIcon.appiconset/Logo_*.png (the icon before macOS 26, which uses
@@ -33,7 +34,10 @@ func attempt<T>(_ what: String, _ body: () throws -> T) -> T {
 
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
     .deletingLastPathComponent().deletingLastPathComponent()
-let sources = root.appendingPathComponent("nanogram/icon")
+let sourceFolders = [
+    root.appendingPathComponent("submodules/telegram-ios/Telegram/Telegram-iOS/AlternateIconSources"),
+    root.appendingPathComponent("nanogram/icon"),
+]
 let defaultIconName = "NanogramSphere"
 let assets = root.appendingPathComponent("Telegram-Mac/Assets.xcassets")
 let appIconSet = assets.appendingPathComponent("AppIcon.appiconset")
@@ -155,7 +159,9 @@ attempt("temp folder") { try FileManager.default.createDirectory(at: temp, withI
 defer { try? FileManager.default.removeItem(at: temp) }
 attempt("icons folder") { try FileManager.default.createDirectory(at: pickerIcons, withIntermediateDirectories: true) }
 
-let svgs = attempt("listing sources") { try FileManager.default.contentsOfDirectory(at: sources, includingPropertiesForKeys: nil) }
+let svgs = sourceFolders.flatMap { folder in
+    attempt("listing \(folder.path) (is the core checked out?)") { try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) }
+}
     .filter { $0.pathExtension == "svg" }
     .sorted { $0.lastPathComponent < $1.lastPathComponent }
 for svg in svgs {
