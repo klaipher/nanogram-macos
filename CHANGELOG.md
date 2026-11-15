@@ -4,6 +4,9 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Shared core moved to published iOS main c2e4d5b5** (from 8cbfdb5f, 28 commits: Send Report keeps crash-frame offsets and info/energy outside the caps, the widget layout budget, the watch ATS fix, store-build Premium display split and more; `tg core-bump`, all Mac package tests run on it once, the failures below fixed and their packages re-run). **twidget 4913fd0e -> 96c4bbb** (shared manifest 31392ab): Telegram's hostile-markup fixes (root bolder/lighter crash, endless SVG closepath path, infinite blurs), collapsed table borders and the bidi fallback as opt-in hooks (LHContainer opts in, so the Mac keeps its behaviour), unresolved `var()` unsets, `dir=auto` yields, LHContainer ring sides.
+- **Fixes found by the first full Mac test run** (the 13.2.0 release was built with TG_KEEP_GOING, so these tests had never run): a dragged-out image without a file name lost its extension (`ChatMediaPromiseNaming.fileName` took the fallback stem's "01.00.00" for an extension; ChatMediaFilePromiseTests); the Send Report omitted-file reasons are marked `//TODOLANG`; tests: the real-video media-control test requires a displayed frame only when its window is composited, the theme benchmark skips without display-link callbacks, the trailing-pane tests drive the shared display link from the timer source (CADisplayLink does not tick while the display sleeps; R2-16), the tde2e generator test reads the Ninja configure line, the tgcalls branch is `nanogram`.
+
 ## 13.2.0 (202611142334) — 2026-11-14
 
 Source: `nanogram/integration` @ f098d353 · core `klaipher/nanogram` @ 8cbfdb5f (iOS integration; twidget 4913fd0e, nanogram-deps 484b22e9).
