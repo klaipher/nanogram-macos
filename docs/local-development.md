@@ -259,8 +259,9 @@ app that ships a `.metal` file.
   `appName` (TelegramUtils) is "Nanogram" under `NANOGRAM`, which renames window titles, alerts and About.
 - Icon: the Sphere. `Telegram-Mac/AppIcon.icon` (macOS 26+) is the iOS fork's layered `Nanogram.icon` (Background,
   Light, Sphere, Sparkle; dark and tinted variants; check it with `ictool`, `Icon Composer.app/Contents/Executables`);
-  the pre-26 PNGs in `AppIcon.appiconset` and `TelegramShare/icon.icns` are rendered from `nanogram/icon/NanogramSphere.svg`
-  by `swift tools/dev/nanogram/render-mac-icon.swift` (re-run after changing any SVG there). The same script
+  the pre-26 PNGs in `AppIcon.appiconset` and `TelegramShare/icon.icns` are rendered from the core's `NanogramSphere.svg`
+  (`submodules/telegram-ios/Telegram/Telegram-iOS/AlternateIconSources`, one source for iOS and Mac; `nanogram/icon` keeps only the Mac-only
+  Classic, Dash, Forward and Streak) by `swift tools/dev/nanogram/render-mac-icon.swift` (re-run after changing any SVG in either folder). The same script
   renders the menu bar glyph (`StatusIcon`), the share extension's sign-in logo (`Icon_TelegramLogin`) and the
   App Icon picker's icons. Both editions use `AppIcon` (project-level `ASSETCATALOG_COMPILER_APPICON_NAME`).
 - App Icon picker (Settings > Appearance): the iOS fork's icons in its order, Sphere first and default, then Comet
