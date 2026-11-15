@@ -117,7 +117,8 @@ cmd_sparkle_key() {
 
 # The core's nested copies of libraries this repository pins itself, at the same commits (webrtc, tgcalls, twidget,
 # widget-sandbox and its QuickJS): the Mac builds its own checkouts, so the core's stay unchecked-out (one working tree
-# and object store each, about 250 MB). Never tlottie: the build compiles the core's copy. Done with the core's
+# and object store each in a fresh clone; an existing checkout loses only its working trees, about 250 MB, since the
+# modules/ stores stay for worktrees' --reference). Never tlottie: the build compiles the core's copy. Done with the core's
 # `submodule.active` pathspec (a per-submodule `submodule.<path>.active=false` is switched back on by `update --init`).
 CORE_DUPLICATE_SUBMODULES=(
   third-party/webrtc/webrtc
@@ -134,6 +135,8 @@ core_skip_duplicate_submodules() {
   git -C "$core" config --add submodule.active .
   for path in "${CORE_DUPLICATE_SUBMODULES[@]}"; do
     git -C "$core" config --add submodule.active ":(exclude)$path"
+    # A registered-but-unchecked-out duplicate (an earlier `submodule init`) has an explicit active=true that beats the pathspec.
+    git -C "$core" config --unset "submodule.$path.active" 2>/dev/null || true
     if [ -e "$core/$path/.git" ]; then
       git -C "$core" submodule deinit -- "$path" >/dev/null 2>&1 || warn "could not deinit the core's duplicate checkout $core/$path (local changes?): remove it by hand"
     fi

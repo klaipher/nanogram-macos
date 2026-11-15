@@ -12,4 +12,4 @@ What stays on the Mac lives in `NanogramRuntime` (`LinkHygieneOptions.swift`, `S
 `NanogramDebugOption` switches, their defaults, and the Mac's supported operator types. The shared tracking list and the
 shared test vectors are `data/link-tracking-params.txt`, `data/link-hygiene-vectors.json` and
 `data/search-operator-vectors.json` in klaipher/nanogram-deps (`submodules/telegram-ios/shared/data/`);
-`NanogramRuntimeTests/SharedLinkSearchDataTests.swift` runs the Mac against them.
+`NanogramRuntimeTests/LinkSearchOptionsTests.swift` runs the Mac against them.

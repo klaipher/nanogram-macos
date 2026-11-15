@@ -1,6 +1,10 @@
-// swift-tools-version:5.5
+// swift-tools-version:6.2
 
 import PackageDescription
+
+let nanogramSwiftSettings: [SwiftSetting] = [
+    .treatAllWarnings(as: .error),
+]
 
 // Link hygiene and search operators: the iOS core's NanogramFeatures sources, compiled here through symlinks (one
 // implementation for iOS and Mac). The Mac-only glue (debug options, defaults) is in NanogramRuntime.
@@ -13,10 +17,13 @@ let package = Package(
     targets: [
         .target(
             name: "NanogramFeatures",
-            path: "Sources"),
+            path: "Sources",
+            swiftSettings: nanogramSwiftSettings),
         .testTarget(
             name: "NanogramFeaturesTests",
             dependencies: ["NanogramFeatures"],
-            path: "Tests"),
-    ]
+            path: "Tests",
+            swiftSettings: nanogramSwiftSettings),
+    ],
+    swiftLanguageModes: [.v6]
 )

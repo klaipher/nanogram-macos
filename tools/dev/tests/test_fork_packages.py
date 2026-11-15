@@ -45,6 +45,14 @@ class ForkPackageTests(unittest.TestCase):
                 self.assertIn("swiftLanguageModes: [.v6]", text)
                 self.assertIn(".treatAllWarnings(as: .error)", text)
 
+    def test_core_symlinked_packages_build_in_swift_6_like_the_ios_module(self):
+        for name in CORE_SYMLINKED:
+            text = manifest(name)
+            with self.subTest(package=name):
+                self.assertTrue(text.startswith("// swift-tools-version:6.2"), name)
+                self.assertIn("swiftLanguageModes: [.v6]", text)
+                self.assertIn(".treatAllWarnings(as: .error)", text)
+
     def test_floor_is_15_unless_an_upstream_package_depends_on_it(self):
         for name in FORK_PACKAGES + PENDING_SWIFT6:
             text = manifest(name)

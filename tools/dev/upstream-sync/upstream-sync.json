@@ -1,5 +1,5 @@
 {
- "description": "Settings for tools/dev/upstream-sync/sync.py (the upstream sync dry run). base_commit is the upstream commit our tree was imported from (the 13.1 merge). The real merge is still tg sync-upstream; this only reports, in a scratch repository, what that merge would conflict on and which pins upstream bumped.",
+ "description": "Settings for the shared upstream-sync script (nanogram-deps tools/upstream-sync/sync.py) (the upstream sync dry run). base_commit is the upstream commit our tree was imported from (the 13.1 merge). The real merge is still tg sync-upstream; this only reports, in a scratch repository, what that merge would conflict on and which pins upstream bumped.",
  "upstream_url": "https://github.com/TelegramMessenger/telegram-macos.git",
  "base_commit": "24295527",
  "base_label": "13.1",
