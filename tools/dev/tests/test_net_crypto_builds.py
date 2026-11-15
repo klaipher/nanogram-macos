@@ -82,7 +82,7 @@ class TdE2eBuildTests(unittest.TestCase):
         self.assertIn('-DCMAKE_CXX_FLAGS="$HARDENING_FLAGS"', self.script)
 
     def test_the_host_source_generators_stay_plain(self):
-        generators = self.script.index("cmake -DTD_GENERATE_SOURCE_FILES=ON")
+        generators = self.script.index("cmake -G Ninja -DTD_GENERATE_SOURCE_FILES=ON")
         flags = self.script.index("HARDENING_FLAGS=")
         target = self.script.index("cmake --build . --target tde2e")
         self.assertLess(generators, flags)
