@@ -10,7 +10,7 @@ Generated from `tools/dev/native/module-settings.json` by `tools/dev/native/modu
 | Swift optimisation, Debug | -Onone (fastbuild/dbg) | -Onone | yes |
 | Whole-module optimisation, Release | on (swift.opt_uses_wmo) | on (SWIFT_COMPILATION_MODE=wholemodule) | yes |
 | C, C++, Objective-C LTO, Release | ThinLTO (-flto=thin) | ThinLTO (LLVM_LTO=YES_THIN), also -O3 | yes |
-| Rust LTO, Release | fat | fat (--config in core-xprojects scripts) | yes |
+| Rust LTO, Release | fat | fat (one nanogram-rust staticlib, crate profile) | yes |
 | Dead-code stripping, Release | on (--features=dead_strip) | on (DEAD_CODE_STRIPPING=YES) | yes |
 
 Why the platform differences stay:
@@ -21,7 +21,7 @@ Why the platform differences stay:
 
 ## Swift language mode per module
 
-iOS builds 903 Swift modules (44 in Swift 6 mode); the Mac builds 263 package targets (8 in Swift 6 mode). 44 modules are built by both apps; 6 of them differ in language mode.
+iOS builds 908 Swift modules (48 in Swift 6 mode); the Mac builds 278 package targets (8 in Swift 6 mode). 45 modules are built by both apps; 7 of them differ in language mode.
 
 | Module | iOS | Mac | Status |
 |---|---|---|---|
@@ -43,6 +43,7 @@ iOS builds 903 Swift modules (44 in Swift 6 mode); the Mac builds 263 package ta
 | MTProtoRustEngine | Swift 5 | Swift 5 | equal |
 | MTProtoRustEngineMapping | Swift 5 | Swift 5 | equal |
 | ManagedFile | Swift 6 | Swift 5 | differs (allow-listed) |
+| MediaCapabilities | Swift 6 | Swift 5 | differs (allow-listed) |
 | MediaPreuploadRegistry | Swift 6 | Swift 5 | differs (allow-listed) |
 | MetalEngine | Swift 5 | Swift 5 | equal |
 | MosaicLayout | Swift 5 | Swift 5 | equal |

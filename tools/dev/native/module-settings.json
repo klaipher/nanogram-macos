@@ -201,6 +201,10 @@
    "ios": "6",
    "mac": "5"
   },
+  "MediaCapabilities": {
+   "ios": "6",
+   "mac": "5"
+  },
   "MediaPreuploadRegistry": {
    "ios": "6",
    "mac": "5"
@@ -311,15 +315,16 @@
   "HardenedMedia": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
   "LocalAudioTranscription": "iOS still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
   "ManagedFile": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
+  "MediaCapabilities": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
   "MediaPreuploadRegistry": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk",
   "RangeSet": "Mac still builds it in the lower Swift language mode (the Mac core's manifests are tools-version 5.5 from upstream); raised module by module with its tests (shared-codebase plan 3.2), never in bulk"
  },
  "counts": {
-  "ios_swift_modules": 903,
-  "ios_swift6": 44,
-  "mac_swift_targets": 263,
+  "ios_swift_modules": 908,
+  "ios_swift6": 48,
+  "mac_swift_targets": 278,
   "mac_swift6": 8,
-  "built_by_both": 44,
-  "modes_differ": 6
+  "built_by_both": 45,
+  "modes_differ": 7
  }
 }
