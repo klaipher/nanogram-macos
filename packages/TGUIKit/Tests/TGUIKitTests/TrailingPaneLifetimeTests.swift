@@ -7,7 +7,17 @@ private final class PaneLifetimeController: ViewController {
 }
 
 final class TrailingPaneLifetimeTests: XCTestCase {
-    override func setUp() { TGUIKitTestBootstrap.install() }
+    // See TrailingChatLayoutTests: the pane is removed and released only when its slide-out animator finishes, which needs
+    // a ticking display link even while the display sleeps.
+    override func setUp() {
+        TGUIKitTestBootstrap.install()
+        SharedDisplayLinkDriver.shared.useTimerSource(true)
+    }
+
+    override func tearDown() {
+        SharedDisplayLinkDriver.shared.useTimerSource(false)
+        super.tearDown()
+    }
 
     private func settle(_ split: SplitView) {
         for _ in 0..<30 {

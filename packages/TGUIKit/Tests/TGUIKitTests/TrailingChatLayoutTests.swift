@@ -58,8 +58,17 @@ private final class Chat: ViewController {
 }
 
 final class TrailingChatLayoutTests: XCTestCase {
+    // The trailing pane animators finish only on display-link ticks, and the CADisplayLink source (R2-16) does not tick
+    // while the display sleeps or is locked: an unattended run never finishes a slide. The timer source ticks always;
+    // it is switched back after each test so the display-rate tests still measure the real display link.
     override func setUp() {
         TGUIKitTestBootstrap.install()
+        SharedDisplayLinkDriver.shared.useTimerSource(true)
+    }
+
+    override func tearDown() {
+        SharedDisplayLinkDriver.shared.useTimerSource(false)
+        super.tearDown()
     }
 
     func testNativeReplyTableUpdatesDoNotRestoreOldDocumentWidth() throws {
