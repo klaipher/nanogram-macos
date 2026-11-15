@@ -24,7 +24,9 @@ enum ChatMediaPromiseNaming {
     static func fileName(preferred: String?, mimeType: String?, fallbackStem: String) -> String {
         let cleaned = sanitized(preferred ?? "")
         let stem = cleaned.isEmpty ? fallbackStem : cleaned
-        if !(stem as NSString).pathExtension.isEmpty {
+        // The fallback stem contains dots (e.g. "01.00.00"), so "00" would look like an extension; only a
+        // caller-supplied name can already carry one.
+        if !cleaned.isEmpty, !(stem as NSString).pathExtension.isEmpty {
             return stem
         }
         let ext = preferredExtension(mimeType: mimeType)
