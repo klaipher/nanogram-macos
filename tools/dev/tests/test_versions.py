@@ -183,7 +183,7 @@ class PinnedVersionsTests(unittest.TestCase):
     def test_tgcalls_is_the_klaipher_fork_pin_shared_with_ios(self):
         self.assertEqual(gitlink(ROOT, "submodules/tgcalls"), gitlink(TG_IOS, "submodules/TgVoipWebrtc/tgcalls"))
         modules = read(ROOT / ".gitmodules")
-        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls.git\n\tbranch = nanogram-shared\n\tshallow = true\n', modules)
+        self.assertIn('[submodule "submodules/tgcalls"]\n\tpath = submodules/tgcalls\n\turl = https://github.com/klaipher/tgcalls.git\n\tbranch = nanogram\n\tshallow = true\n', modules)
 
     def test_widget_stack_is_the_klaipher_forks_shared_with_ios(self):
         modules = read(ROOT / ".gitmodules")
