@@ -558,36 +558,6 @@ class DirectReleaseTests(unittest.TestCase):
             (top / "untracked.txt").write_text("u\n")
             self.assertEqual(release.tracked_changes(top), ["a.txt"])
 
-    def local_pin_tree(self, tmp):
-        quickjs = make_repo(tmp / "quickjs", {"q.c": "1\n"})
-        old = git(quickjs, "rev-parse", "HEAD").strip()
-        (quickjs / "q.c").write_text("2\n")
-        git(quickjs, "commit", "-q", "-am", "fix")
-        new = git(quickjs, "rev-parse", "HEAD").strip()
-        sandbox = make_repo(tmp / "sandbox", {"README": "s\n"})
-        git(sandbox, "submodule", "add", "-q", str(quickjs), "q")
-        git(sandbox, "-C", "q", "checkout", "-q", old)
-        git(sandbox, "add", "q")
-        git(sandbox, "commit", "-q", "-m", "q")
-        top = make_repo(tmp / "top", {"a.txt": "a\n"})
-        git(top, "submodule", "add", "-q", str(sandbox), "third-party/ws")
-        git(top, "commit", "-q", "-m", "ws")
-        git(top, "submodule", "update", "--init", "--recursive", "-q")
-        git(top / "third-party/ws/q", "checkout", "-q", new)
-        return top, old, new
-
-    def test_a_nested_checkout_at_its_local_fix_pin_is_not_a_change(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            top, old, new = self.local_pin_tree(Path(tmp))
-            self.assertEqual(release.tracked_changes(top, {"third-party/ws/q": new}), [])
-            self.assertEqual(release.tracked_changes(top, {"third-party/ws/q": old}), ["third-party/ws"])
-            self.assertEqual(release.tracked_changes(top, {}), ["third-party/ws"])
-            (top / "third-party/ws/README").write_text("changed\n")
-            self.assertEqual(release.tracked_changes(top, {"third-party/ws/q": new}), ["third-party/ws"])
-
-    def test_no_nested_checkout_is_moved_by_localfixes(self):
-        self.assertEqual(release.LOCAL_PINS, {})
-
     def test_make_dmg(self):
         import subprocess
         with tempfile.TemporaryDirectory() as tmp:

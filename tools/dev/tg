@@ -99,9 +99,6 @@ cmd_sparkle_key() {
   if [ "${1:-}" = sign ]; then py sparkle sign "${@:2}"; else py sparkle public-key; fi
 }
 
-# Idempotent working-tree fixes inside submodules (tools/dev/nanogram/localfixes.py).
-cmd_localfixes() { py localfixes || die "cannot apply local submodule fixes"; }
-
 cmd_setup() {
   # Recorded conflict resolutions are replayed on the next upstream merge (tg sync-upstream).
   git config rerere.enabled true
@@ -109,7 +106,6 @@ cmd_setup() {
   say "Fetching submodules"
   git submodule sync --recursive >/dev/null
   git submodule update --init --recursive --jobs 8
-  cmd_localfixes
   local toolchain
   toolchain="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' core-xprojects/rust-toolchain.toml)"
   [ -n "$toolchain" ] || die "cannot read the Rust toolchain pinned in core-xprojects/rust-toolchain.toml"
@@ -161,7 +157,6 @@ cmd_build() {
   derived="$(config_value DERIVED_DATA)"
   mkdir -p "$ROOT/build-output"
   log="$ROOT/build-output/last-build.log"
-  cmd_localfixes
   cmd_credentials
   if [ "$clean" = 1 ]; then
     say "Cleaning ${derived}/Build"
@@ -243,7 +238,6 @@ cmd_sync_upstream() {
   say "Updating submodules to the merged pins"
   git submodule sync --recursive >/dev/null
   git submodule update --init --recursive --jobs 8
-  cmd_localfixes
   cmd_frameworks
   cmd_warnings --update
   "$ROOT/tools/dev/tg" check
@@ -491,7 +485,6 @@ main() {
     native) cmd_native "$@" ;;
     tests-audit) py testsaudit "$@" ;;
     credentials) cmd_credentials ;;
-    localfixes) cmd_localfixes ;;
     build) cmd_build "$@" ;;
     xcode) cmd_xcode "$@" ;;
     sparkle-key) cmd_sparkle_key "$@" ;;

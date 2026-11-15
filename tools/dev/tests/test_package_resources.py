@@ -44,5 +44,24 @@ class PackageResourceTests(unittest.TestCase):
         self.assertTrue(copies_asset_catalog(PACKAGES / "DataUsageUI", "Resources"))
 
 
+
+SHADER_MANIFESTS = (
+    "packages/CallVideoLayer/Package.swift",
+    "packages/DustLayer/Package.swift",
+    "submodules/telegram-ios/submodules/MetalEngine/Package.swift",
+)
+
+
+class ShaderManifestTests(unittest.TestCase):
+    """Xcode 27 copies `.copy("*.metal")` resources as source instead of compiling them, and MetalEngine then traps at
+    launch (upstream XCODE27.md item 3). The fix is committed in every manifest; this guards against it coming back."""
+
+    def test_every_shader_manifest_compiles_its_metal_files(self):
+        for relative in SHADER_MANIFESTS:
+            manifest = config.ROOT / relative
+            if not manifest.is_file():
+                continue  # the core checkout is optional here
+            self.assertNotIn('.metal")', manifest.read_text(), relative)
+
 if __name__ == "__main__":
     unittest.main()
