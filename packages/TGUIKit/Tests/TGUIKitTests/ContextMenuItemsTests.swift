@@ -3,6 +3,8 @@ import XCTest
 import SwiftSignalKit
 @testable import TGUIKit
 
+// AppMenuController is main-actor isolated (87dc1b4d); XCTest runs these on the main thread.
+@MainActor
 final class ContextMenuItemsTests: XCTestCase {
     private var previousLegacyMenu = true
 

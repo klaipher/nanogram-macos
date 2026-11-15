@@ -65,6 +65,8 @@ private final class RightClickMenuRow: TableRowView {
     override func mouseInside() -> Bool { true }
 }
 
+// AppMenuController is main-actor isolated (87dc1b4d); XCTest runs these on the main thread.
+@MainActor
 final class TableRowMenuLifecycleTests: XCTestCase {
     private var previousLegacyMenu = true
 
