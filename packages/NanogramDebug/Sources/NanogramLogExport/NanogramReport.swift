@@ -104,11 +104,11 @@ public enum NanogramReport {
                 for candidate in candidates {
                     let path = section.folder + "/" + candidate.name
                     if candidate.size > fileBytes {
-                        omitted.append((path, candidate.size, "over the per-file limit"))
+                        omitted.append((path, candidate.size, "over the per-file limit")) //TODOLANG
                         continue
                     }
                     if total + candidate.size > totalBytes || sectionTotal + candidate.size > sectionBytes {
-                        omitted.append((path, candidate.size, "over the report size limit"))
+                        omitted.append((path, candidate.size, "over the report size limit")) //TODOLANG
                         continue
                     }
                     let target = directory.appendingPathComponent(section.folder, isDirectory: true).appendingPathComponent(candidate.name)
@@ -116,7 +116,7 @@ public enum NanogramReport {
                         try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
                         try fileManager.copyItem(at: candidate.file, to: target)
                     } catch {
-                        omitted.append((path, candidate.size, "could not be read"))
+                        omitted.append((path, candidate.size, "could not be read")) //TODOLANG
                         continue
                     }
                     total += candidate.size
