@@ -10,7 +10,6 @@
   "ColorPalette": 7,
   "Colors": 9,
   "EntertainmentUI": 5,
-  "FilePanels": 1,
   "FoundationUtils": 1,
   "GalleryUI": 9,
   "GraphCore": 4,
@@ -50,5 +49,5 @@
   "WalletUI": 1,
   "WallpaperUI": 4,
   "app": 33,
-  "tgcalls": 10
+  "tgcalls": 70
 }
