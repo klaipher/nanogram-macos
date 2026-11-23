@@ -4,6 +4,18 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+## 13.2.0 (202611240014) — 2026-11-24
+
+Source: `nanogram/integration` @ 9634f659 · core `klaipher/nanogram` @ 3b24935e (iOS main; shared nanogram-deps ff036aa, tgcalls 9f88f1d, ffmpeg e19b1c17, twidget 96c4bbb).
+Artifacts: `Nanogram-13.2.0-202611240014.dmg` (Developer ID, notarized and stapled, app submission 72a1fc47, dmg submission 6f6c4c64; Sparkle EdDSA-signed), `appcast.xml`, `Nanogram-13.2.0-202611240014-source.tar.gz` (kept locally), `BUILD-INFO.txt`; published as https://github.com/klaipher/nanogram-releases/releases/tag/v13.2.0-202611240014 (Latest; the latest/download appcast serves 202611240014).
+Changes since 13.2.0 (202611152159, c6240a1d): `git log c6240a1d..9634f659` and the core from 6ae32217 to 3b24935e (entries below).
+Public notes (short): more reliable sending on weak or unstable connections (temporary errors retried); uploads adapt to the connection; stability fixes.
+Verification: `tg core-bump` (NanogramKit tests; no Mac package changed), parity gate, `tg check` on push (tooling tests, lint, clean debug build + warnings, tests), release archive + buildcheck + notarization. Core tests ran in the iOS pre-push hook (TelegramCoreTests, incl. UploadPartWindowTests, MultipartUploadTests, PendingSendFailurePolicyTests; Postbox UnsentMessageExpiryTests). Not verified yet: sending on a slow or lossy link on the Mac; in-app update from 202611152159.
+
+- **Core bump to iOS main 3b24935e** (`mac-core: 0f96ca7e7c`, then `mac-core: 3b24935ec7`; 25 iOS commits). Shared-core changes the Mac gets: send failures are classified like TDLib/Desktop/Android (negative or 500+ codes and engine-made errors retried; the send RPC up to 5 times with the same random id, an upload up to 3 times, each `saveFilePart` 4 times; `FILE_PART_*_MISSING` re-uploads once), the real error code and network type are logged, multiplexed upload parts opt out of the 5 s no-incoming-bytes guard, the Rust bridge resubmits lost answers of safe-to-repeat calls with a growing delay, Postbox expires unsent messages at open only in the main process, and `MultipartUploadManager` uses an adaptive in-flight window (`UploadPartWindow`: starts at the old 6 / 3 parts on Wi-Fi or unknown, 4 / 2 on cellular, grows per clean fast part up to 8 parts / 1.5 MB, halves on slow, retried, stalled or failed parts; one `upload end ...` line per upload in the critical log; the hard first-answer deadline is off by default). iOS-only parts of the range (CoreList, floating buttons, navigation recovery, the `nanogram://` scheme, the Retry menu reason line) are not compiled on the Mac; the Mac's own failed-message menu does not show the reason yet.
+- **Core fix found by the Mac build**: `PendingFailureNetworkObserver` is `@unchecked Sendable` (iOS 3b24935e); its shared instance raised a new concurrency warning in the Mac's checked TelegramCore build.
+- **Warning baseline** (9634f659): EntertainmentUI, GalleryUI, SettingsUI and WalletUI +1 each. None of them uses an API the bump changed; the baseline was last measured at 7af3ee15 and the two pushes after it ran lint only. Two clean builds gave the same counts; StarsUI stays at 471 (it reads 470 or 471 between identical builds).
+
 ## 13.2.0 (202611152159) — 2026-11-15
 
 Source: `nanogram/integration` @ c6240a1d · core `klaipher/nanogram` @ 6ae32217 (iOS main; shared nanogram-deps ff036aa, tgcalls 9f88f1d, ffmpeg e19b1c17, twidget 96c4bbb).
