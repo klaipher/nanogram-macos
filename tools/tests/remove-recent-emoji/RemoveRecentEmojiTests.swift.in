@@ -295,6 +295,28 @@ final class RemoveRecentEmojiTests: XCTestCase {
         }
     }
 
+    func testClearRecentEmojiShowsRecentHeaderWithClearAction() throws {
+        for (recent, expected, headerRow) in [
+            (settings(["✅"]), ["segment_0", "block_0", "segment_1", "block_1"], 0),
+            (settings(["✅"], animated: [a]), ["block_100", "segment_0", "block_0", "segment_1", "block_1"], 1),
+        ] {
+            for mode in [PickerMode.emoji, .stories] {
+                var clears = 0
+                var state = SectionState(recent: recent)
+                state.itemsDict = Dictionary(uniqueKeysWithValues: recent.animated.map { ($0, StickerPackItem(file: TelegramMediaFile(fileId: $0))) })
+                var arguments = SectionArguments(mode: mode)
+                arguments.clearRecentEmoji = { clears += 1 }
+                let rows = emojiSectionEntries(state: state, arguments: arguments, rendered: nil)
+                XCTAssertEqual(rows.map { $0.identifier.value }, expected)
+                let header = try XCTUnwrap(rows[headerRow].makeItem() as? EStickItem)
+                XCTAssertEqual(header.segmentName, "Frequently Used Emoji")
+                try XCTUnwrap(header.clearCallback)()
+                XCTAssertEqual(clears, 1)
+                XCTAssertNil((rows[headerRow + 2].makeItem() as? EStickItem)?.clearCallback)
+            }
+        }
+    }
+
     func testEmptyRenderedRecentDoesNotCreatePlaceholderRows() {
         let recent = settings([], animated: [a])
         for mode in [PickerMode.emoji, .stories] {
