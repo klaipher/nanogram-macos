@@ -424,6 +424,18 @@ public final class ChatInputAttachButton: View, MorphHoldObserving {
                     items.append(item)
                 }
 
+                // Nanogram: send a contact from the attach menu (iOS parity)
+                if canAttachLocation {
+                    items.append(ContextMenuItem(strings().chatListContact, handler: { [weak self] in
+                        guard let self = self else { return }
+                        if let permissionText = permissionText(from: peer, for: .banSendText) {
+                            showModalText(for: context.window, text: permissionText)
+                            return
+                        }
+                        ChatNavigationHooks.shared.showContactPicker(self.chatInteraction, self.chatInteraction.interactionContext.window, { [weak self] in self?.button })
+                    }, itemImage: MenuAnimation.menu_open_profile.value))
+                }
+
                 if canAttachLocation {
                     items.append(ContextMenuItem(strings().inputAttachPopoverLocation, handler: { [weak self] in
                         if let permissionText = permissionText(from: peer, for: .banSendText) {

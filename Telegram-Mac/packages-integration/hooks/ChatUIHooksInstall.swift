@@ -507,6 +507,21 @@ private func makeChatNavigationHooks() -> ChatNavigationHooks {
     hooks.showLocationPicker = { chatInteraction, window, morphSource in
         showModal(with: LocationModalController(chatInteraction, analyticsContext: chatInteraction.captureAnalyticsContext()), for: window, morphSource: morphSource)
     }
+    // Nanogram: attach menu "Contact" (iOS parity). Picks one of the user's contacts and sends it as a contact card.
+    hooks.showContactPicker = { chatInteraction, window, morphSource in
+        let context = chatInteraction.interactionContext
+        _ = (selectModalPeers(window: window, context: context, title: strings().chatListContact, settings: [.contacts], limit: 1, morphSource: morphSource)
+             |> map { $0.first }
+             |> filter { $0 != nil }
+             |> mapToSignal { peerId -> Signal<EnginePeer?, NoError> in
+                 return context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId!))
+             }
+             |> deliverOnMainQueue).start(next: { peer in
+            if let user = peer?._asPeer() as? TelegramUser {
+                chatInteraction.shareContact(user)
+            }
+        })
+    }
     hooks.showLocationSelector = { chatInteraction, select, window in
         let picker = LocationModalController(chatInteraction, destination: .select)
         picker.selectCallback = select

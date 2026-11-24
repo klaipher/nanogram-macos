@@ -276,6 +276,8 @@ public struct ChatNavigationHooks {
     public var pushMessagePollStats: (any AccountContextProtocol, MessageId) -> Void = { _, _ in }
     public var showLocationPreview: (any AccountContextProtocol, TelegramMediaMap, Peer?, MessageId, Window) -> Void = { _, _, _, _, _ in }
     public var showLocationPicker: (ChatInteraction, Window, (() -> NSView?)?) -> Void = { _, _, _ in }
+    // Nanogram: contact picker for the attach menu (iOS parity); result goes to chatInteraction.shareContact
+    public var showContactPicker: (ChatInteraction, Window, (() -> NSView?)?) -> Void = { _, _, _ in }
     public var showLocationSelector: (ChatInteraction, @escaping (TelegramMediaMap) -> Void, Window) -> Void = { _, _, _ in }
     public var showLocationSelectorWithContext: ((ChatInteraction, @escaping (TelegramMediaMap) -> Void, Window, AnalyticsContext) -> Void)?
 
