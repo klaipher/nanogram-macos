@@ -339,11 +339,16 @@ fileprivate enum ChatListSearchEntry: Comparable, Identifiable {
 }
 
 
-private func peerContextMenuItems(peer: Peer, chatPeerId: PeerId? = nil, arguments: SearchControllerArguments, isRecent: Bool, adPeer: AdPeer? = nil) -> Signal<[ContextMenuItem], NoError> {
+private func peerContextMenuItems(peer: Peer, chatPeerId: PeerId? = nil, arguments: SearchControllerArguments, isRecent: Bool, isRecentApp: Bool = false, adPeer: AdPeer? = nil) -> Signal<[ContextMenuItem], NoError> {
     let remove: ContextMenuItem?
     if isRecent {
         remove = ContextMenuItem(strings().searchRemoveFromRecent, handler: {
-            arguments.removeRecentPeerId(peer.id)
+            // Nanogram: recent apps live in their own list (iOS parity, removeRecentlyUsedApp), not in recent searches.
+            if isRecentApp {
+                _ = arguments.context.engine.peers.removeRecentlyUsedApp(peerId: peer.id).start()
+            } else {
+                arguments.removeRecentPeerId(peer.id)
+            }
         }, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value)
     } else {
         remove = nil
@@ -481,7 +486,7 @@ fileprivate func prepareEntries(from:[AppearanceWrapperEntry<ChatListSearchEntry
                     arguments.removeRecentPeerId(peer.id)
                 }
             }, contextMenuItems: {
-                return peerContextMenuItems(peer: peer, chatPeerId: secretChat?.peerId ?? renderedPeer.peerId, arguments: arguments, isRecent: true)
+                return peerContextMenuItems(peer: peer, chatPeerId: secretChat?.peerId ?? renderedPeer.peerId, arguments: arguments, isRecent: true, isRecentApp: isRecentApp)
             }, unreadBadge: badge, storyStats: storyStats, openStory: arguments.openStory, customAction: customAction, isGrossingApp: isGrossingApp, isRecentApp: isRecentApp, monoforumPeer: chatOrMonoforum)
         case let .savedMessages(peer):
             return RecentPeerRowItem(initialSize, peer: peer, account: arguments.context.account, context: arguments.context, stableId: entry.stableId, titleStyle: ControlStyle(font: .medium(.text), foregroundColor: theme.colors.text, highlightColor:.white), borderType: [.Right], drawCustomSeparator: true, isLookSavedMessage: true, contextMenuItems: {
