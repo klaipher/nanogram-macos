@@ -199,6 +199,16 @@ not re-verified against the code; correct them on the next change in that area.
 - Upstream: no (the engines are separate libraries upstream).
 - Sync: keep the `tlottie` unit and `core-xprojects/tlottie` deleted; the core's `MTProtoRustEngine/Package.swift` points at `packages/RustLibraries` (a Mac-only path; iOS builds it with Bazel).
 
+## nanogram:// link scheme (macOS)
+- What: the Mac app registers `nanogram://` like iOS, so launchers and scripts can open Nanogram even when official Telegram also claims `tg://`. `nanogram://` alone brings the app to the front; `nanogram://x` is handled as `tg://x`.
+- Where: `Telegram-Mac/Info.plist` (URL type `$(PRODUCT_BUNDLE_IDENTIFIER).nanogram`), `Telegram-Mac/app/AppDelegate.swift` `processURL` (uses the shared `NanogramAppScheme` from the core's NanogramFeatures, re-exported by NanogramRuntime; tests live with it in the core).
+- Upstream: no.
+
+## Call options on the Nanogram Features screen (macOS)
+- What: "Group noise suppression" and "Thermal video limits" now show on Nanogram ▸ Features (they were only on the Developer screen), matching the iOS CALLS section. Defaults unchanged (RNNoise only; limits on).
+- Where: `packages/CallVideoLayer/Sources/CallAudioDebugOptions.swift`, `CallSystemDebugOptions.swift` (`.userFacing(...)`).
+- Upstream: no.
+
 ## Forward options in the share picker (macOS)
 - What: long-press/right-click on Send in the forward picker and in the message Share picker (Share button on posts, gallery Share) now offers Show/Hide Sender Name and Show/Hide Captions (captions only when a forwarded message has media with a caption), like iOS. A checkmark marks the current choice; selecting only changes it, the menu still offers Send without sound and Schedule. Hiding captions implies hiding names; showing captions again restores the earlier name choice (as the in-chat forward panel does). The choice reaches the multi-chat send (also silent/scheduled), Saved Messages, the message Share send, and the open-chat paths (draft in the current chat, `ChatInitialAction.forward` for a new chat or topic). Rich-text messages keep the sender for non-premium users, so the options are hidden then (same rule as the in-chat forward panel).
 - Where: `packages/ShareUI/.../ShareModalController.swift` (`ShareForwardOptions` protocol adopted by `ForwardMessagesObject` and `ShareMessageObject`, send menu), `packages/ChatModeTypes/.../ChatInitialAction.swift` (`.forward` gained defaulted `hideNames`/`hideCaptions`), `packages/ChatUI/.../ChatInterfaceInteraction.swift` (applies them to the chat interface state). Tests: `tools/tests/forward-object-context` (stubs + forward-option cases).

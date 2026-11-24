@@ -7,7 +7,7 @@ public enum CallAudioDebugOptions {
         NanogramDebugChoice(id: "both", title: "Both"),
         NanogramDebugChoice(id: "apm", title: "WebRTC suppressor only"),
         NanogramDebugChoice(id: "rnnoise", title: "RNNoise only (default)")
-    ], defaultValue: "rnnoise")
+    ], defaultValue: "rnnoise").userFacing("Which noise suppressors run in group calls. RNNoise only is the default and uses the least CPU. Applies to the next group call.")
 
     public static let all: [NanogramDebugOption] = [
         CallAudioDebugOptions.groupNoiseMode

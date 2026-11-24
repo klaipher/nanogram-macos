@@ -1565,7 +1565,22 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         processURL(url)
     }
     
-    private func processURL(_ url: String?) {
+    private func processURL(_ incomingUrl: String?) {
+        // Nanogram: nanogram:// (our own scheme, for launchers) only brings the app up; nanogram://x is tg://x.
+        // Same rule as iOS (NanogramFeatures/AppScheme.swift, shared through the core).
+        var url = incomingUrl
+        if let incomingUrl, let parsed = URL(string: incomingUrl) {
+            switch NanogramAppScheme.action(for: parsed) {
+            case .openApp:
+                activateApp()
+                self.window.deminiaturize(self)
+                return
+            case let .open(resolved):
+                if resolved != parsed {
+                    url = resolved.absoluteString
+                }
+            }
+        }
         AppDelegate.eventProcessed = url
         
         if let url = AppDelegate.eventProcessed {
