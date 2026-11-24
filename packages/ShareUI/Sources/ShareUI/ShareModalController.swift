@@ -96,6 +96,32 @@ fileprivate class ShareModalView : Control, TokenizedProtocol {
             
             var items:[ContextMenuItem] = []
 
+            // Nanogram: forward options (iOS parity). Selecting only changes state; the menu still offers Send.
+            if let forward = shareObject as? ForwardMessagesObject, forward.canChangeForwardOptions {
+                let authors = Set(forward.forwardedMessages.compactMap { $0.author?.id }).count
+                let hideNames = forward.hideNames || forward.hideCaptions
+                items.append(ContextMenuItem(strings().chatAlertForwardActionShow1Other(authors), handler: {
+                    forward.hideNames = false
+                    forward.hideCaptions = false
+                }, itemImage: !hideNames ? MenuAnimation.menu_check_selected.value : nil))
+                items.append(ContextMenuItem(strings().chatAlertForwardActionHide1Other(authors), handler: {
+                    forward.hideNames = true
+                }, itemImage: hideNames ? MenuAnimation.menu_check_selected.value : nil))
+                items.append(ContextSeparatorItem())
+
+                let messagesWithCaption = forward.messagesWithCaptionCount
+                if messagesWithCaption > 0 {
+                    items.append(ContextMenuItem(strings().chatAlertForwardActionShowCaptionOther(messagesWithCaption), handler: {
+                        forward.hideCaptions = false
+                    }, itemImage: !forward.hideCaptions ? MenuAnimation.menu_check_selected.value : nil))
+                    items.append(ContextMenuItem(strings().chatAlertForwardActionHideCaptionOther(messagesWithCaption), handler: {
+                        forward.hideCaptions = true
+                        forward.hideNames = true
+                    }, itemImage: forward.hideCaptions ? MenuAnimation.menu_check_selected.value : nil))
+                    items.append(ContextSeparatorItem())
+                }
+            }
+
             items.append(ContextMenuItem(strings().chatSendWithoutSound, handler: {
                 self?.sendWithoutSound?()
             }, itemImage: MenuAnimation.menu_mute.value))
@@ -1205,6 +1231,29 @@ public final class ForwardMessagesObject : ShareObject {
     public var messageIds: [MessageId] {
         return messages.map { $0.id }
     }
+    // Nanogram: forward options chosen in the picker's send menu (iOS parity: Show/Hide Sender Name, Show/Hide Captions).
+    public var hideNames: Bool = false
+    public var hideCaptions: Bool = false
+    fileprivate var forwardedMessages: [Message] {
+        return messages
+    }
+    fileprivate var messagesWithCaptionCount: Int {
+        return messages.filter { !$0.text.isEmpty && $0.anyMedia != nil }.count
+    }
+    // Rich-text messages keep the sender shown for non-premium users (same rule as the in-chat forward panel).
+    fileprivate var canChangeForwardOptions: Bool {
+        let hasRichText = messages.contains(where: { message in
+            message.attributes.contains(where: { $0 is RichTextMessageAttribute })
+        })
+        return !(hasRichText && !context.isPremium)
+    }
+    // Effective values passed to every forward path; hidden captions imply hidden names.
+    fileprivate var effectiveHideCaptions: Bool {
+        return canChangeForwardOptions && hideCaptions
+    }
+    fileprivate var effectiveHideNames: Bool {
+        return canChangeForwardOptions && (hideNames || hideCaptions)
+    }
     private let disposable = MetaDisposable()
     private let album: Bool
     private let getMessages:(([MessageId], Bool)->Signal<[Message], NoError>)?
@@ -1282,6 +1331,8 @@ public final class ForwardMessagesObject : ShareObject {
             let context = self.context
             let album = self.album
             let messageIds = self.messageIds
+            let hideNames = self.effectiveHideNames
+            let hideCaptions = self.effectiveHideCaptions
             let comment = comment != nil ? comment!.inputText.isEmpty ? nil : comment : nil
             let peers = context.account.postbox.transaction { transaction -> Peer? in
                 for peerId in peerIds {
@@ -1355,7 +1406,7 @@ public final class ForwardMessagesObject : ShareObject {
                                 expectedCommentCount = 0
                                 commentResult = .single([])
                             }
-                            let forwardResult = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: context.account.peerId, replyId: nil, threadId: threadId)
+                            let forwardResult = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: context.account.peerId, replyId: nil, threadId: threadId, hideNames: hideNames, hideCaptions: hideCaptions)
                             let accepted = combineLatest(shareFirstResult(commentResult |> map(Optional.some), or: nil), shareFirstResult(forwardResult |> map(Optional.some), or: nil))
                             |> take(1)
                             |> deliverOnMainQueue
@@ -1389,13 +1440,13 @@ public final class ForwardMessagesObject : ShareObject {
                                 controller.inheritAnalyticsContext(origin)
                                 controller.chatInteraction.update({ current in
                                     current.withoutSelectionState().updatedInterfaceState {
-                                        $0.withUpdatedForwardMessageIds(messageIds).withUpdatedInputState(comment ?? current.effectiveInput)
+                                        $0.withUpdatedForwardMessageIds(messageIds).withUpdatedHideSendersName(hideNames, saveTempValue: false).withUpdatedHideCaption(hideCaptions).withUpdatedInputState(comment ?? current.effectiveInput)
                                     }
                                 })
                                 observedResult?(.draftPrepared)
                             } else {
                                 
-                                let initialAction: ChatInitialAction = .forward(messageIds: messageIds, text: comment, behavior: .automatic)
+                                let initialAction: ChatInitialAction = .forward(messageIds: messageIds, text: comment, behavior: .automatic, hideNames: hideNames, hideCaptions: hideCaptions)
                                 
                                 if let threadId = threadId {
                                     return ForumUI.openTopic(threadId, peerId: peerId, context: context, animated: true, addition: true, initialAction: initialAction, isMonoforum: peer.isMonoForum, analyticsContext: origin) |> filter {$0}
@@ -1430,7 +1481,7 @@ public final class ForwardMessagesObject : ShareObject {
                     } else {
                         if let controller = navigation.controller as? ChatInterfaceController {
                             controller.inheritAnalyticsContext(origin)
-                            controller.chatInteraction.update({$0.withoutSelectionState().updatedInterfaceState({$0.withUpdatedForwardMessageIds(messageIds)})})
+                            controller.chatInteraction.update({$0.withoutSelectionState().updatedInterfaceState({$0.withUpdatedForwardMessageIds(messageIds).withUpdatedHideSendersName(hideNames, saveTempValue: false).withUpdatedHideCaption(hideCaptions)})})
                         }
                     }
                     return .complete()
@@ -1444,6 +1495,8 @@ public final class ForwardMessagesObject : ShareObject {
             
             let context = self.context
             let messageIds = self.messageIds
+            let hideNames = self.effectiveHideNames
+            let hideCaptions = self.effectiveHideCaptions
             var signals: [Signal<[MessageId?], NoError>] = []
             let attrs:(PeerId)->[MessageAttribute] = { [weak self] peerId in
                 return self?.attributes(peerId, sendPaidMessageStars: sendPaidMessageStars[peerId]) ?? []
@@ -1466,7 +1519,7 @@ public final class ForwardMessagesObject : ShareObject {
                     let origin = analyticsContext.restricting(peerId: peer.id)
                     let presentation = origin.beginPresentation()
                     defer { presentation.end() }
-                    let forward: Signal<[MessageId?], NoError> = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: peerId, replyId: nil, threadId: threadId, silent: FastSettings.isChannelMessagesMuted(peerId) || withoutSound, atDate: date, sendAsPeerId: sendAs)
+                    let forward: Signal<[MessageId?], NoError> = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: peerId, replyId: nil, threadId: threadId, hideNames: hideNames, hideCaptions: hideCaptions, silent: FastSettings.isChannelMessagesMuted(peerId) || withoutSound, atDate: date, sendAsPeerId: sendAs)
                     var caption: Signal<[MessageId?], NoError>?
                     if let comment = comment, !comment.inputText.isEmpty, peer.canSendMessage() {
                         let parsingUrlType: ParsingType

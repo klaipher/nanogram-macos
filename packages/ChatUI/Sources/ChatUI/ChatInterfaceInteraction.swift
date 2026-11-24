@@ -1242,10 +1242,11 @@ public final class ChatInteraction : InterfaceObserver  {
                         $0.withoutInitialAction()
                     })
                 }
-            case let .forward(messageIds, inputState, _):
+            case let .forward(messageIds, inputState, _, hideNames, hideCaptions):
                 update(animated: animated, {
                     $0.updatedInterfaceState({
-                        $0.withUpdatedForwardMessageIds(messageIds).withUpdatedInputState(inputState ?? $0.inputState)
+                        // Nanogram: apply the options chosen in the forward picker.
+                        $0.withUpdatedForwardMessageIds(messageIds).withUpdatedHideSendersName(hideNames, saveTempValue: false).withUpdatedHideCaption(hideCaptions).withUpdatedInputState(inputState ?? $0.inputState)
                     }).withoutInitialAction()
                 })
             case let .reply(subject, _):
