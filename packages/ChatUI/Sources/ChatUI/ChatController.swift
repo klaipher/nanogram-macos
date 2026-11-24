@@ -7704,6 +7704,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             self?.chatInteraction.sendMediasWithAnalytics?(medias, caption, isCollage, additionText, silent, atDate, isSpoiler, messageEffect, leadingText, nil, 0)
         }
         chatInteraction.sendMediasWithAnalytics = { [weak self] medias, caption, isCollage, additionText, silent, atDate, isSpoiler, messageEffect, leadingText, submission, part in
+            // Nanogram: one-shot view-once / self-destruct timeout set by the media preview
+            let autoremoveTimeout = self?.chatInteraction.pendingMediaAutoremoveTimeout
+            self?.chatInteraction.pendingMediaAutoremoveTimeout = nil
             let deferredSendAction = self?.chatInteraction.captureDeferredSendAction()
             let inherited = submission?.context ?? self?.chatInteraction.captureAnalyticsContext() ?? Analytics.shared.unresolvedContext()
             let schedulingAnalyticsContext = self?.chatInteraction.captureAnalyticsContext(inherited: inherited) ?? Analytics.shared.unresolvedContext()
@@ -7732,7 +7735,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                             defer { analyticsPresentation.end() }
                             let sendObservation = controller.makeMessageSendObservation(medias.count > 1 && isCollage ? .album : chatAnalyticsMessageKind(medias.first), analyticsContext: schedulingAnalyticsContext.restricting(peerId: destinationPeerId), scheduled: atDate != nil, silent: silent)
                             let resultGroup = submission?.group(part: part, count: 1)
-                            let _ = schedulingAnalyticsContext.preservingPresentation(Sender.enqueue(media: medias, caption: caption, context: context, peerId: destinationPeerId, replyId: takeReplyId(), threadId: threadId64(), isCollage: isCollage, additionText: additionText, silent: silent, atDate: atDate, repeatPeriod: repeatPeriod, isSpoiler: isSpoiler, customChatContents: customChatContents, messageEffect: messageEffect, leadingText: leadingText, sendPaidMessageStars: takePaidMessageStars(), suggestPost: presentation.interfaceState.suggestPost, observedResult: { expectedCount, ids in
+                            let _ = schedulingAnalyticsContext.preservingPresentation(Sender.enqueue(media: medias, caption: caption, context: context, peerId: destinationPeerId, replyId: takeReplyId(), threadId: threadId64(), isCollage: isCollage, additionText: additionText, silent: silent, atDate: atDate, repeatPeriod: repeatPeriod, isSpoiler: isSpoiler, customChatContents: customChatContents, messageEffect: messageEffect, leadingText: leadingText, sendPaidMessageStars: takePaidMessageStars(), suggestPost: presentation.interfaceState.suggestPost, autoremoveTimeout: autoremoveTimeout, observedResult: { expectedCount, ids in
                                 sendObservation?.complete(expectedCount: expectedCount, resultCount: ids.count, acceptedCount: ids.compactMap { $0 }.count)
                             }) |> deliverOnMainQueue).start(next: { ids in
                                 resultGroup?.complete(index: 0, buildResult: { chatAnalyticsEnqueueResult(ids) })

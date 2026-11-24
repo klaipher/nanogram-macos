@@ -540,6 +540,8 @@ public final class ChatInteraction : InterfaceObserver  {
             sendAppFile(file, silent, query, scheduled, collectionId, caption, schedule)
         }
     }
+    /// Nanogram: one-shot self-destruct / view-once timeout for the next single-media send from the preview; taken by ChatController.
+    public var pendingMediaAutoremoveTimeout: Int32?
     public var sendMedias:([Media], ChatTextInputState, Bool, ChatTextInputState?, Bool, Schedule?, Bool, AvailableMessageEffects.MessageEffect?, Bool) -> Void = {_,_,_,_,_,_,_,_, _ in}
     public var sendMediasWithAnalytics: (([Media], ChatTextInputState, Bool, ChatTextInputState?, Bool, Schedule?, Bool, AvailableMessageEffects.MessageEffect?, Bool, AnalyticsMediaSubmission?, Int) -> Void)?
     public func sendMediasObserved(_ medias: [Media], _ caption: ChatTextInputState, _ collage: Bool, _ additionalText: ChatTextInputState?, _ silent: Bool, _ schedule: Schedule?, _ spoiler: Bool, _ effect: AvailableMessageEffects.MessageEffect?, _ leadingText: Bool, submission: AnalyticsMediaSubmission?, part: Int) {
