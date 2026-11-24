@@ -719,6 +719,13 @@ public func NotificationCategorySettingsController(context: any AccountContextPr
             }))
         }, itemImage: MenuAnimation.menu_music.value))
 
+        if category != .stories, exception.peer._asPeer().isForum {
+            // Nanogram: per-topic exceptions of a forum, like iOS.
+            items.append(ContextMenuItem("Topic Exceptions", handler: { //TODOLANG
+                context.bindings.rootNavigation().push(NotificationTopicExceptionsController(context: context, peer: exception.peer))
+            }, itemImage: MenuAnimation.menu_edit.value))
+        }
+
         if !isAutomatic {
             items.append(ContextSeparatorItem())
             items.append(ContextMenuItem(strings().notificationSettingsExceptionsRemove, handler: {
