@@ -92,7 +92,7 @@ final class Controller: Base {
     var analyticsContext: Context? = Context()
     var sent = false
     var window: Window? = Window()
-    var sendCurrentMedia: ((Bool, ChatInteraction.Schedule?, Bool?, Via) -> Void)?
+    var sendCurrentMedia: ((Bool, ChatInteraction.Schedule?, Bool?, Via, Int32?) -> Void)?
     var onSend: (() -> Void)?
 __EFFECT_PREMIUM__
 __PRICE__
@@ -138,6 +138,7 @@ __SUBMIT_PREFIX__
         let silent = false
         let asSpoiler: Bool? = nil
         let via = Via.sendControl
+        let autoremoveTimeout: Int32? = nil
 __SCHEDULE__
     }
 }
@@ -272,7 +273,7 @@ final class PendingTests: XCTestCase {
     func testScheduleSelectionCancelAndDismissalAreMutuallyExclusive() {
         let controller = Controller()
         var dates: [Int32] = []
-        controller.sendCurrentMedia = { _, schedule, _, _ in dates.append(schedule!.date) }
+        controller.sendCurrentMedia = { _, schedule, _, _, _ in dates.append(schedule!.date) }
         controller.schedule()
         let callbacks = FeatureNavigationHooks.shared.dates[0]
         callbacks.selected(10, nil); callbacks.selected(20, nil); callbacks.cancelled(); callbacks.dismissed()
@@ -283,7 +284,7 @@ final class PendingTests: XCTestCase {
     func testOldScheduleCannotAffectNewAttemptOrClosedPreview() {
         let controller = Controller()
         var sends = 0
-        controller.sendCurrentMedia = { _, _, _, _ in sends += 1 }
+        controller.sendCurrentMedia = { _, _, _, _, _ in sends += 1 }
         controller.schedule()
         let old = FeatureNavigationHooks.shared.dates[0]
         controller.schedule()

@@ -43,10 +43,10 @@ fixture += '\n' + price_fixture
 start = source.index('        guard !pendingActions.isClosed, !sent else { return }', source.index('    func send(_ silent:'))
 end = source.index('        pendingActions.invalidate()', start)
 fixture = fixture.replace('__SEND_ENTRY__', source[start:end])
-start = source.index('            guard let self, !self.pendingActions.isClosed', source.index('        self.sendCurrentMedia = { [weak self] silent, atDate, asSpoiler, via in'))
+start = source.index('            guard let self, !self.pendingActions.isClosed', source.index('        self.sendCurrentMedia = { [weak self] silent, atDate, asSpoiler, via, autoremoveTimeout in'))
 end = source.index('            if stateValue.with', start)
 fixture = fixture.replace('__CURRENT_ENTRY__', source[start:end])
-start = source.index('                guard let self, !self.pendingActions.isClosed', source.index('            self.sendCurrentMedia = { [weak self] silent, atDate, _, _ in'))
+start = source.index('                guard let self, !self.pendingActions.isClosed', source.index('            self.sendCurrentMedia = { [weak self] silent, atDate, _, _, _ in'))
 end = source.index('                let inputState =', start)
 fixture = fixture.replace('__APP_FILE_ENTRY__', source[start:end])
 

@@ -1481,7 +1481,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
         return .modal
     }
     
-    private var sendCurrentMedia:((Bool, ChatInteraction.Schedule?, Bool?, AnalyticsMediaJourney.Spec.SubmitVia)->Void)? = nil
+    private var sendCurrentMedia:((Bool, ChatInteraction.Schedule?, Bool?, AnalyticsMediaJourney.Spec.SubmitVia, Int32?)->Void)? = nil
     private let placeholderSuccessorIds = Atomic<[MediaId: MediaId]>(value: [:])
     private let mediaPreparationQueue: OperationQueue = {
         let queue = OperationQueue()
@@ -1586,7 +1586,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
         super.close(animationType: self.sent ? .noMorph : .common)
     }
     
-    func send(_ silent: Bool, atDate: ChatInteraction.Schedule? = nil, asSpoiler: Bool? = nil, via: AnalyticsMediaJourney.Spec.SubmitVia = .unknown) {
+    func send(_ silent: Bool, atDate: ChatInteraction.Schedule? = nil, asSpoiler: Bool? = nil, via: AnalyticsMediaJourney.Spec.SubmitVia = .unknown, autoremoveTimeout: Int32? = nil) {
         guard !pendingActions.isClosed, !sent else { return }
         guard validateSendSource() else {
             self.genericView.sendButton.shake(beep: false)
@@ -1594,7 +1594,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
         }
         if isRenderingEdit || getMediaUrls() != urls {
             pendingRenderSend = { [weak self] in
-                self?.send(silent, atDate: atDate, asSpoiler: asSpoiler)
+                self?.send(silent, atDate: atDate, asSpoiler: asSpoiler, autoremoveTimeout: autoremoveTimeout)
             }
             genericView.sendButton.alphaValue = 0.5
             return
@@ -1651,7 +1651,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
                 let analyticsContext = self.analyticsContext ?? Analytics.shared.unresolvedContext()
                 FeatureNavigationHooks.shared.selectDateObserved(context, context.window, nil, nil, .schedule(peer.id), analyticsContext: analyticsContext, selectedAt: { [weak self] date, repeatPeriod in
                     guard scheduleAction() else { return }
-                    self?.sendCurrentMedia?(silent, .init(date: date, repeatPeriod: repeatPeriod), asSpoiler, via)
+                    self?.sendCurrentMedia?(silent, .init(date: date, repeatPeriod: repeatPeriod), asSpoiler, via, autoremoveTimeout)
                 }, cancelled: { [weak self] in
                     guard scheduleAction() else { return }
                     self?.analyticsMediaJourney?.step(.cancelSchedule)
@@ -1661,7 +1661,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
                 })
             }
         case .history, .thread, .customChatContents:
-            sendCurrentMedia?(silent, atDate, asSpoiler, via)
+            sendCurrentMedia?(silent, atDate, asSpoiler, via, autoremoveTimeout)
         case .pinned:
             break
         case .customLink:
@@ -1671,6 +1671,23 @@ public class PreviewSenderController: ModalViewController, Notifable {
         }
     }
     
+    /// Nanogram: same rule as iOS chatMediaGalleryHasTimer (one-to-one cloud chat, not Saved Messages), narrowed to a single photo or video sent as media without paid content.
+    private func canSendWithTimer(peer: Peer, accountPeerId: PeerId) -> Bool {
+        guard peer.id.namespace == Namespaces.Peer.CloudUser, peer.id != accountPeerId, chatInteraction.mode == .history || chatInteraction.mode.isThreadMode else {
+            return false
+        }
+        let medias = getMedias()
+        guard medias.count == 1, genericView.state.state == .media, genericView.state.payAmount == nil else {
+            return false
+        }
+        if medias[0] is TelegramMediaImage {
+            return true
+        }
+        if let file = medias[0] as? TelegramMediaFile {
+            return file.isVideo && !file.isInstantVideo && !file.isAnimated
+        }
+        return false
+    }
     
     public override func measure(size: NSSize) {
         self.modal?.resize(with:NSMakeSize(genericView.frame.width, min(size.height - 70, genericView.tableView.listHeight + genericView.additionHeight)), animated: false)
@@ -1813,6 +1830,22 @@ public class PreviewSenderController: ModalViewController, Notifable {
                         items.append(ContextMenuItem(strings().previewSenderSendAsSpoiler, handler: { [weak self] in
                             self?.send(false, asSpoiler: true, via: .sendMenu)
                         }, itemImage: MenuAnimation.menu_send_spoiler.value))
+                        
+                        // Nanogram: view once / self-destruct timer for one photo or video in a private chat (iOS parity)
+                        if self.canSendWithTimer(peer: peer, accountPeerId: context.peerId) {
+                            let timerItem = ContextMenuItem("Send with Timer", itemImage: MenuAnimation.menu_autodelete_customize.value) //TODOLANG
+                            let timerMenu = ContextMenu()
+                            timerMenu.addItem(ContextMenuItem("View Once", handler: { [weak self] in //TODOLANG
+                                self?.send(false, via: .sendMenu, autoremoveTimeout: viewOnceTimeout)
+                            }))
+                            for seconds in [3, 5, 10, 15, 30, 60] as [Int32] {
+                                timerMenu.addItem(ContextMenuItem(timeIntervalString(Int(seconds)), handler: { [weak self] in
+                                    self?.send(false, via: .sendMenu, autoremoveTimeout: seconds)
+                                }))
+                            }
+                            timerItem.submenu = timerMenu
+                            items.append(timerItem)
+                        }
                         
                         
                     }
@@ -2001,7 +2034,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
             genericView.applyOptions([], count: 1, canCollage: false, canSpoiler: false)
             genericView.actions.isHidden = true
 
-            self.sendCurrentMedia = { [weak self] silent, atDate, _, _ in
+            self.sendCurrentMedia = { [weak self] silent, atDate, _, _, _ in
                 guard let self, !self.pendingActions.isClosed, !self.sent, self.validateSendSource() else { return }
                 let inputState = self.genericView.textView.interactions.presentation
                 var input = inputState.textInputState().subInputState(from: NSMakeRange(0, inputState.inputText.length))
@@ -2333,7 +2366,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
             self.urlsAndStateValue.set(UrlAndState(self.urls, state, previews: self.previews))
         }
         
-        self.sendCurrentMedia = { [weak self] silent, atDate, asSpoiler, via in
+        self.sendCurrentMedia = { [weak self] silent, atDate, asSpoiler, via, autoremoveTimeout in
             guard let self, !self.pendingActions.isClosed, !self.sent, self.validateSendSource() else { return }
             
             if stateValue.with({ $0.medias.contains(where: isPreviewPlaceholder) }) {
@@ -2486,6 +2519,10 @@ public class PreviewSenderController: ModalViewController, Notifable {
                             submission?.discard()
                             self.closeModal()
                             return
+                        }
+                        // Nanogram: view-once / self-destruct timer for a single photo or video (iOS parity); consumed by ChatController.sendMedias
+                        if medias.count == 1, amount == nil, let autoremoveTimeout {
+                            self.chatInteraction.pendingMediaAutoremoveTimeout = autoremoveTimeout
                         }
                         self.chatInteraction.sendMediasObserved(makeMedia(medias, false), input, false, additionalMessage, silent, atDate, asSpoiler ?? state.isSpoiler, effect, state.sortValue == .up, submission: submission, part: 1)
                     }

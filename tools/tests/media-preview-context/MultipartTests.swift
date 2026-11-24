@@ -16,7 +16,7 @@ final class SendObservation {
     func complete(expectedCount: Int, resultCount: Int, acceptedCount: Int) {}
 }
 extension Sender {
-    static func enqueue(media: [Media], caption: ChatTextInputState, context: Account, peerId: PeerId, replyId: Int?, threadId: Int64?, isCollage: Bool, additionText: ChatTextInputState?, silent: Bool, atDate: Date?, repeatPeriod: Int32?, isSpoiler: Bool, customChatContents: Int?, messageEffect: AvailableMessageEffects.MessageEffect?, leadingText: Bool, sendPaidMessageStars: Int?, suggestPost: Int?, observedResult: @escaping (Int, [Int?]) -> Void) -> Signal<[Int?], NoError> {
+    static func enqueue(media: [Media], caption: ChatTextInputState, context: Account, peerId: PeerId, replyId: Int?, threadId: Int64?, isCollage: Bool, additionText: ChatTextInputState?, silent: Bool, atDate: Date?, repeatPeriod: Int32?, isSpoiler: Bool, customChatContents: Int?, messageEffect: AvailableMessageEffects.MessageEffect?, leadingText: Bool, sendPaidMessageStars: Int?, suggestPost: Int?, autoremoveTimeout: Int32?, observedResult: @escaping (Int, [Int?]) -> Void) -> Signal<[Int?], NoError> {
         destinations.append(peerId)
         onBuild?()
         return Signal { subscriber in
@@ -66,6 +66,7 @@ __MEDIA_ENTRY__
         let takePaidMessageStars: () -> Int? = { nil }
         let scrollAfterSend = {}, afterSentTransition = {}
         let submission: AnalyticsMediaSubmission? = submission
+        let autoremoveTimeout: Int32? = nil
 __APPLY_BATCH__
         apply(self, atDate: nil, repeatPeriod: nil)
     }
