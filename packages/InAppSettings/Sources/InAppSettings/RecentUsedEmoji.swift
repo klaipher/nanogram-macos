@@ -240,6 +240,16 @@ public func removeUsedEmoji(_ emoji: String, postbox: Postbox) -> Signal<Void, N
     }
 }
 
+// Nanogram: clears the recent emoji (static and custom) shown in the emoji panel, keeps skin tone choices.
+public func clearUsedEmoji(postbox: Postbox) -> Signal<Void, NoError> {
+    return postbox.transaction { transaction -> Void in
+        transaction.updatePreferencesEntry(key: ApplicationSpecificPreferencesKeys.recentEmoji, { entry in
+            let value = entry?.get(RecentUsedEmoji.self) ?? RecentUsedEmoji.defaultSettings
+            return PreferencesEntry(RecentUsedEmoji(emojies: [], animated: [], skinModifiers: value.skinModifiers))
+        })
+    }
+}
+
 public func removeAnimatedUsedEmoji(_ id: MediaId, postbox: Postbox) -> Signal<Void, NoError> {
     return postbox.transaction { transaction -> Void in
         transaction.updatePreferencesEntry(key: ApplicationSpecificPreferencesKeys.recentEmoji, { entry in
