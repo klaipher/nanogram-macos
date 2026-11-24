@@ -181,5 +181,15 @@ func installGalleryUIHooks() {
         controller.setAnalyticsShareJourney(journey)
         showModal(with: controller, for: window)
     }
+    // Nanogram: Share from the gallery video with its playback position ("Start at" in the Send menu).
+    hooks.showShareWithVideoTimestamp = { context, message, window, analyticsContext, timestamp in
+        guard let context = context as? AccountContext else { return }
+        let journey = AnalyticsShareJourney(context: analyticsContext, entry: .gallerySelection, source: .mediaViewer)
+        let object = ShareMessageObject(context, message, [])
+        object.videoStartTimestamp = timestamp
+        let controller = ShareModalController(object, analyticsContext: analyticsContext)
+        controller.setAnalyticsShareJourney(journey)
+        showModal(with: controller, for: window)
+    }
     GalleryHooks.install(hooks)
 }

@@ -214,6 +214,8 @@ private final class Arguments {
     let clearRecent:()->Void
     let selectEmojiCategory:(EmojiSearchCategories.Group?)->Void
     var staticEmojiFilter: ((String) -> Bool)?
+    // Nanogram: Clear button on the Recent emoji header (emoji and stories panels).
+    var clearRecentEmoji: (() -> Void)?
     var sendLarge: (() -> ((StickerPackItem, NSRect?) -> Void)?)?
     var drag: ((StickerPackItem, EntertainmentStickerDrag) -> Bool)?
     var dragEmoji: ((String, EntertainmentStickerDrag) -> Bool)?
@@ -842,9 +844,11 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
                 continue
             }
 
-            if key != .Recent || !recentAnimated.isEmpty, arguments.mode == .emoji || arguments.mode == .stories {
+            // Nanogram: the Recent header is always shown here, because it carries the Clear button.
+            if key != .Recent || !recentAnimated.isEmpty || arguments.clearRecentEmoji != nil, arguments.mode == .emoji || arguments.mode == .stories {
+                let clearCallback: (() -> Void)? = key == .Recent ? arguments.clearRecentEmoji : nil
                 entries.append(.custom(sectionId: sectionId, index: index, value: .none, identifier: _id_emoji_segment(key.rawValue), equatable: InputDataEquatable(key), comparable: nil, item: { initialSize, stableId in
-                    return EStickItem(initialSize, stableId: stableId, segmentName:key.localizedString)
+                    return EStickItem(initialSize, stableId: stableId, segmentName:key.localizedString, clearCallback: clearCallback)
                 }))
                 index += 1
             }
@@ -2358,6 +2362,12 @@ public final class EmojiesController<Context: AccountContextProtocol> : Telegram
             self?.updateSearchState(searchState)
         })
         arguments.staticEmojiFilter = self.staticEmojiFilter
+        // Nanogram: clear recent emoji (iOS parity, StickerPickerScreen). Mac keeps recent emoji in app preferences
+        // (RecentUsedEmoji), so clear that and the shared core list too.
+        arguments.clearRecentEmoji = {
+            _ = context.engine.stickers.clearRecentlyUsedEmoji().start()
+            _ = clearUsedEmoji(postbox: context.account.postbox).start()
+        }
         arguments.sendLarge = { [weak self] in
             return self?.interactions?.sendLargeReaction
         }

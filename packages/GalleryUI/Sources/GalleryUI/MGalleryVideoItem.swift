@@ -49,6 +49,21 @@ public class MGalleryVideoItem: MGalleryItem {
         } |> deliverOnMainQueue
     }
     
+    // Nanogram: whole seconds played so far, only for videos long enough to be worth sharing from a position
+    // (10 minutes or more, same threshold as iOS). Reads the player's current status synchronously.
+    public func shareStartTimestamp() -> Int32? {
+        guard controller.isPlayerCreated else {
+            return nil
+        }
+        var result: Int32?
+        _ = (controller.status |> take(1)).start(next: { status in
+            if status.duration >= 60.0 * 10.0, status.timestamp.isFinite, status.timestamp >= 0 {
+                result = Int32(clamping: Int(status.timestamp))
+            }
+        })
+        return result
+    }
+
     public func videoQualityState() -> (current: Int, preferred: UniversalVideoContentVideoQuality, available: [Int])? {
         guard controller.isPlayerCreated else {
             return nil

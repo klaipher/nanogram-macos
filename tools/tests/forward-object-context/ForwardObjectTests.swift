@@ -155,8 +155,8 @@ enum Sender {
     static func enqueue(message: EnqueueMessage, context: any AccountContextProtocol, peerId: PeerId) -> Signal<[MessageId?], NoError> {
         UI.onSendSetup?(); UI.sentMessages.append((peerId, message)); UI.comments += 1; return UI.targetComments[peerId] ?? UI.commentResult ?? UI.sendResult
     }
-    static func forwardMessages(messageIds: [MessageId], context: any AccountContextProtocol, peerId: PeerId, replyId: Int?, threadId: Int64?, hideNames: Bool = false, hideCaptions: Bool = false, silent: Bool = false, atDate: Date? = nil, sendAsPeerId: PeerId? = nil, sendPaidMessageStars: StarsAmount? = nil) -> Signal<[MessageId?], NoError> {
-        UI.onSendSetup?(); UI.targets.append(peerId); UI.forwarded.append(messageIds); UI.forwardOptions.append([hideNames, hideCaptions]); return UI.targetResults[peerId] ?? UI.sendResult
+    static func forwardMessages(messageIds: [MessageId], context: any AccountContextProtocol, peerId: PeerId, replyId: Int?, threadId: Int64?, hideNames: Bool = false, hideCaptions: Bool = false, silent: Bool = false, atDate: Date? = nil, sendAsPeerId: PeerId? = nil, sendPaidMessageStars: StarsAmount? = nil, videoTimestamp: Int32? = nil) -> Signal<[MessageId?], NoError> {
+        UI.onSendSetup?(); UI.targets.append(peerId); UI.forwarded.append(messageIds); UI.forwardOptions.append([hideNames, hideCaptions]); UI.forwardTimestamps.append(videoTimestamp); return UI.targetResults[peerId] ?? UI.sendResult
     }
 }
 enum Behavior { case automatic }
@@ -331,6 +331,8 @@ class ShareMessageObject: ShareObject, ShareDeliveryProviding, ShareForwardOptio
     let message: Message
     let messageIds: [MessageId]
     var hideNames = false, hideCaptions = false
+    var videoStartTimestamp: Int32?
+    var startAtVideoTimestamp = false
     var forwardOptionMessages: [Message] { [message] }
     init(_ context: any AccountContextProtocol, _ message: Message, _ group: [Message] = []) {
         self.message = message; self.messageIds = group.isEmpty ? [message.id] : group.map { $0.id }; super.init(context)
@@ -506,6 +508,7 @@ enum UI {
     static var onPush: ((ViewController) -> Void)?
     static var targets: [PeerId] = [], forwarded: [[MessageId]] = [], delayed: [() -> Void] = []
     static var forwardOptions: [[Bool]] = [], initialActions: [ChatInitialAction] = []
+    static var forwardTimestamps: [Int32?] = []
     static var comments = 0, successes = 0, fullChats = 0, additionalChats = 0
     static var forumContext: AnalyticsContext?, inputOrigin: AnalyticsContext?
     static var forumResult: Signal<Bool, NoError> = .single(true)
@@ -538,7 +541,7 @@ enum UI {
         onConfirmation = nil; onPurchase = nil; confirmations = []; confirmationTexts = []; blockers = []; failedTargets = []; purchaseAmounts = []; purchaseOrigin = nil
         alertClosures = []; onAlert = nil; onPremiumText = nil; closed = 0; alerts = 0; premiumOpened = 0; toggled = []; popped = []; premiumTextCallbacks = []; premiumOrigin = nil
         onSendSetup = nil; onConstruct = nil; onUpdate = nil; onSuccess = nil; onForum = nil; onEmoji = nil; onPush = nil
-        targets = []; forwarded = []; delayed = []; forwardOptions = []; initialActions = []; comments = 0; successes = 0; fullChats = 0; additionalChats = 0
+        targets = []; forwarded = []; delayed = []; forwardOptions = []; forwardTimestamps = []; initialActions = []; comments = 0; successes = 0; fullChats = 0; additionalChats = 0
         forumContext = nil; inputOrigin = nil; forumResult = .single(true); sendResult = .complete(); commentResult = nil
     }
 }
@@ -1212,6 +1215,14 @@ extension ForwardObjectTests {
         let disposable = messageShare().performWithResults(to: [3, -1], threadId: nil, comment: nil, sendPaidMessageStars: [:], analyticsContext: origin()).start()
         XCTAssertEqual(Set(UI.targets), [3, -1]); disposable.dispose()
         let legacy = messageShare().perform(to: [3], threadId: nil).start(); legacy.dispose()
+    }
+    func testMessageShareSendsVideoStartTimestampOnlyWhenEnabled() {
+        let value = messageShare(group: []); value.videoStartTimestamp = 754
+        var disposable = value.performWithResults(to: [2], threadId: nil, comment: nil, sendPaidMessageStars: [:], analyticsContext: origin()).start()
+        XCTAssertEqual(UI.forwardTimestamps, [nil]); disposable.dispose()
+        value.startAtVideoTimestamp = true
+        disposable = value.performWithResults(to: [2, 3], threadId: nil, comment: nil, sendPaidMessageStars: [:], analyticsContext: origin()).start()
+        XCTAssertEqual(UI.forwardTimestamps, [nil, 754, 754]); disposable.dispose()
     }
     func testMessageSharePrimarySecretSourceCannotBeHiddenByOrdinaryAlbum() {
         let value = ShareMessageObject(account, Message(id: MessageId(peerId: -1, id: 1)), [Message(id: sourceId)])
@@ -2561,7 +2572,8 @@ enum AppMenu { static var menu: ContextMenu?; static func show(menu: ContextMenu
 final class GalleryApplication { var currentEvent: Int? = 1 }
 let NSApp = GalleryApplication()
 struct GalleryEntry { var message: Message? }
-final class GalleryItem { var entry: GalleryEntry; init(_ message: Message?) { entry = GalleryEntry(message: message) } }
+class GalleryItem { var entry: GalleryEntry; init(_ message: Message?) { entry = GalleryEntry(message: message) } }
+final class MGalleryVideoItem: GalleryItem { func shareStartTimestamp() -> Int32? { nil } }
 final class GalleryThumbs { var items: [GalleryItem] = [] }
 final class GalleryPager { var selectedItem: GalleryItem?; let thumbsControl = GalleryThumbs() }
 enum GalleryAppearType { case alone, history, profile(PeerId), secret, recentDownloaded, messages([Message]) }

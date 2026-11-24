@@ -121,6 +121,14 @@ fileprivate class ShareModalView : Control, TokenizedProtocol {
                 }
             }
 
+            // Nanogram: forward a single long video from the position it was playing at (iOS parity).
+            if let object = shareObject as? ShareMessageObject, let timestamp = object.videoStartTimestamp {
+                items.append(ContextMenuItem("Start at \(shareVideoTimestampText(timestamp))", handler: { //TODOLANG
+                    object.startAtVideoTimestamp.toggle()
+                }, itemImage: object.startAtVideoTimestamp ? MenuAnimation.menu_check_selected.value : nil))
+                items.append(ContextSeparatorItem())
+            }
+
             items.append(ContextMenuItem(strings().chatSendWithoutSound, handler: {
                 self?.sendWithoutSound?()
             }, itemImage: MenuAnimation.menu_mute.value))
@@ -845,12 +853,27 @@ public class ShareCallbackPeerTypesObject : ShareObject {
 }
 
 
+// Nanogram: "m:ss" / "h:mm:ss" like iOS ShareControllerNode.textForTimeout.
+func shareVideoTimestampText(_ value: Int32) -> String {
+    let hours = value / 3600
+    let minutes = (value % 3600) / 60
+    let seconds = value % 60
+    if hours > 0 {
+        return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+    }
+    return String(format: "%d:%02d", value / 60, seconds)
+}
+
 public class ShareMessageObject : ShareObject, ShareDeliveryProviding, ShareForwardOptions {
     fileprivate let messageIds:[MessageId]
     private let message:Message
     // Nanogram: forward options chosen in the picker's send menu (ShareForwardOptions).
     public var hideNames: Bool = false
     public var hideCaptions: Bool = false
+    // Nanogram: playback position the gallery opened Share at (single long video only) and whether the
+    // sent forward should start from it (ForwardVideoTimestampAttribute).
+    public var videoStartTimestamp: Int32?
+    public var startAtVideoTimestamp: Bool = false
     private let groupMessages: [Message]
     var forwardOptionMessages: [Message] {
         return groupMessages.isEmpty ? [message] : groupMessages
@@ -930,6 +953,7 @@ public class ShareMessageObject : ShareObject, ShareDeliveryProviding, ShareForw
         let messageIds = self.messageIds
         let hideNames = self.effectiveHideNames
         let hideCaptions = self.effectiveHideCaptions
+        let videoTimestamp: Int32? = self.startAtVideoTimestamp ? self.videoStartTimestamp : nil
         var signals: [Signal<ShareRecipientDelivery, NoError>] = []
         let date = self.scheduleDate
         let withoutSound = self.withoutSound
@@ -954,7 +978,7 @@ public class ShareMessageObject : ShareObject, ShareDeliveryProviding, ShareForw
                 let origin = origin.restricting(peerId: peer.id)
                 let presentation = origin.beginPresentation()
                 defer { presentation.end() }
-                let forward: Signal<[MessageId?], NoError> = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: peerId, replyId: nil, threadId: threadId, hideNames: hideNames, hideCaptions: hideCaptions, silent: FastSettings.isChannelMessagesMuted(peerId) || withoutSound, atDate: date, sendAsPeerId: sendAs, sendPaidMessageStars: sendPaidMessageStars[peerId])
+                let forward: Signal<[MessageId?], NoError> = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: peerId, replyId: nil, threadId: threadId, hideNames: hideNames, hideCaptions: hideCaptions, silent: FastSettings.isChannelMessagesMuted(peerId) || withoutSound, atDate: date, sendAsPeerId: sendAs, sendPaidMessageStars: sendPaidMessageStars[peerId], videoTimestamp: videoTimestamp)
                 var caption: Signal<[MessageId?], NoError>?
                 if let comment = comment, !comment.inputText.isEmpty, peer.canSendMessage() {
                     let parsingUrlType: ParsingType

@@ -4,6 +4,9 @@ import TelegramCore
 import TelegramContext
 import TelegramTheme
 import AvatarUI
+import SwiftSignalKit
+import Localization
+import LocalAnimations
 
 public class ContextHashtagRowItem: TableRowItem {
 
@@ -43,6 +46,19 @@ public class ContextHashtagRowItem: TableRowItem {
 
     public override var accessibilityLabel: String? {
         return hashtag
+    }
+
+    // Nanogram: remove a single recently used hashtag from the suggestions (iOS parity,
+    // HashtagChatInputContextPanelNode removeRequested). Only rows without a peer are recent hashtags.
+    public override func menuItems(in location: NSPoint) -> Signal<[ContextMenuItem], NoError> {
+        guard peer == nil else {
+            return super.menuItems(in: location)
+        }
+        let context = self.context
+        let value = hashtag.hasPrefix("#") ? String(hashtag.dropFirst()) : hashtag
+        return .single([ContextMenuItem(strings().searchRemoveFromRecent, handler: {
+            _ = context.engine.messages.removeRecentlyUsedHashtag(string: value).start()
+        }, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value)])
     }
 
     public override var accessibilityIncludesChildren: Bool {

@@ -48,7 +48,7 @@ def check_wiring(controller, builtin, animated, row, source_revision):
     if not source_revision:
         guard = controller.index("guard let lines = seg[key], !lines.isEmpty else {")
         assert controller.index("if key == .Recent, !recentAnimated.isEmpty, hasAnimatedRecent {") < guard
-        assert guard < controller.index("if key != .Recent || !recentAnimated.isEmpty,") < controller.index(builtin_scope)
+        assert guard < controller.index("if key != .Recent || !recentAnimated.isEmpty") < controller.index(builtin_scope)
         assert "emojiUnderMouse" not in row
         assert "private var itemUnderMouse:" in row
     print("PASS source wiring: search/category defaults, Recent emoji/stories guards, transaction calls, equality refresh chain", flush=True)

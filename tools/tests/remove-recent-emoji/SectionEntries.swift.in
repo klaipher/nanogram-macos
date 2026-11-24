@@ -46,6 +46,7 @@ struct SectionArguments {
     let drag: Int? = nil
     var ignorePremium = false
     var clearRecent: () -> Void = {}
+    var clearRecentEmoji: (() -> Void)? = nil
     var showAllItems: (Int64) -> Void = { _ in }
     var staticEmojiFilter: ((String) -> Bool)? = nil
 }

@@ -547,7 +547,7 @@ public class Sender: NSObject {
         return attrs
     }
     
-    public static func forwardMessages(messageIds:[MessageId], context: any AccountContextProtocol, peerId:PeerId, replyId: EngineMessageReplySubject?, threadId: Int64?, hideNames: Bool = false, hideCaptions: Bool = false, silent: Bool = false, atDate: Date? = nil, repeatPeriod: Int32? = nil, sendAsPeerId: PeerId? = nil, sendPaidMessageStars: StarsAmount? = nil) -> Signal<[MessageId?], NoError> {
+    public static func forwardMessages(messageIds:[MessageId], context: any AccountContextProtocol, peerId:PeerId, replyId: EngineMessageReplySubject?, threadId: Int64?, hideNames: Bool = false, hideCaptions: Bool = false, silent: Bool = false, atDate: Date? = nil, repeatPeriod: Int32? = nil, sendAsPeerId: PeerId? = nil, sendPaidMessageStars: StarsAmount? = nil, videoTimestamp: Int32? = nil) -> Signal<[MessageId?], NoError> {
         
         var fwdMessages:[EnqueueMessage] = []
         
@@ -570,6 +570,10 @@ public class Sender: NSObject {
         }
         if let sendAsPeerId = sendAsPeerId {
             attributes.append(SendAsMessageAttribute(peerId: sendAsPeerId))
+        }
+        // Nanogram: forward a video starting from a chosen time (iOS parity).
+        if let videoTimestamp {
+            attributes.append(ForwardVideoTimestampAttribute(timestamp: videoTimestamp))
         }
         
         let threadId: Int64? = threadId
