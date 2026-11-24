@@ -95,7 +95,7 @@ func NotificationTopicExceptionsController(context: any AccountContextProtocol, 
         entries.append(.desc(sectionId: sectionId, index: index, text: .plain(strings().notificationSettingsExceptionsHeader), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
         index += 1
 
-        let now = Int32(Date().timeIntervalSince1970)
+        let now = Int32(clamping: Int64(Date().timeIntervalSince1970))
         let rows = state.exceptions
         for (i, exception) in rows.enumerated() {
             let threadId = exception.threadId

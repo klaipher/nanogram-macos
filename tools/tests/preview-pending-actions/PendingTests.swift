@@ -273,7 +273,7 @@ final class PendingTests: XCTestCase {
     func testScheduleSelectionCancelAndDismissalAreMutuallyExclusive() {
         let controller = Controller()
         var dates: [Int32] = []
-        controller.sendCurrentMedia = { _, schedule, _, _, _ in dates.append(schedule!.date) }
+        controller.sendCurrentMedia = { _, schedule, _, _, _ in if let schedule { dates.append(schedule.date) } }
         controller.schedule()
         let callbacks = FeatureNavigationHooks.shared.dates[0]
         callbacks.selected(10, nil); callbacks.selected(20, nil); callbacks.cancelled(); callbacks.dismissed()

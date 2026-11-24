@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -45,6 +46,20 @@ def package_of(path: str, root: str) -> str:
     return "app"
 
 
+def is_cut_path(path: str, root: str) -> bool:
+    """A path whose start was cut off by interleaved xcodebuild output (`ces/StarsUI/A.swift`, `/EntertainmentUI/A.swift`).
+
+    Such a fragment is outside the repo, so it would land in `app` and make that count wobble. Real paths outside the repo
+    (SDK headers, DerivedData) are absolute and start with a top-level directory that exists.
+    """
+    if path.startswith(root.rstrip("/") + "/"):
+        return False
+    if not path.startswith("/"):
+        return True
+    top = path.split("/")[1]
+    return not os.path.isdir("/" + top)
+
+
 def count(log: str, root: str | None = None, only=None) -> dict[str, int]:
     """Unique warning lines per package (`app` for app sources and paths outside the repo).
 
@@ -60,6 +75,8 @@ def count(log: str, root: str | None = None, only=None) -> dict[str, int]:
         by_position.setdefault(position, (match.group("path"), set()))[1].add(line)
     counts: dict[str, int] = {}
     for path, lines in by_position.values():
+        if is_cut_path(path, root):
+            continue
         package = package_of(path, root)
         if is_ours(package):
             continue

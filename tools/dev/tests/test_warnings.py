@@ -31,6 +31,12 @@ class CountTests(unittest.TestCase):
         self.assertEqual(warnings.count(cut + full, root="/ROOT"), {"InviteLinksUI": 1})
         self.assertEqual(warnings.count(cut, root="/ROOT"), {"InviteLinksUI": 1})
 
+    def test_paths_cut_at_the_start_are_not_counted(self):
+        log = ("/EntertainmentUI/EmojiesSectionRowItem.swift:398:80: warning: main actor-isolated property\n"
+               "ces/StarsUI/PeerMediaGiftsController.swift:1206:76: warning: main actor-isolated property 'frame'\n"
+               "/ROOT/Telegram-Mac/A.swift:1:2: warning: w\n")
+        self.assertEqual(warnings.count(log, root="/ROOT"), {"app": 1})
+
     def test_package_attribution(self):
         self.assertEqual(warnings.count(fixture_log(), root="/ROOT"), {
             "TGUIKit": 2,             # packages/<P>/ (one line repeated, the indented excerpt not counted)

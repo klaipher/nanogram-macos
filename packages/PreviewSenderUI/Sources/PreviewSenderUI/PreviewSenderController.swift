@@ -1677,7 +1677,9 @@ public class PreviewSenderController: ModalViewController, Notifable {
             return false
         }
         let medias = getMedias()
-        guard medias.count == 1, genericView.state.state == .media, genericView.state.payAmount == nil else {
+        // The send menu is built on the main thread; the view state is main-actor isolated.
+        let (isMedia, isPaid) = MainActor.assumeIsolated { (self.genericView.state.state == .media, self.genericView.state.payAmount != nil) }
+        guard medias.count == 1, isMedia, !isPaid else {
             return false
         }
         if medias[0] is TelegramMediaImage {
