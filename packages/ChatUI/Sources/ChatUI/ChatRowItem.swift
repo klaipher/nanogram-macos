@@ -3739,16 +3739,19 @@ public class ChatRowItem: TableRowItem {
             let _ = chatInteraction.interactionContext.engine.messages.retryEphemeralOutgoingMessage(messageId: messageId).startStandalone()
             return
         }
-        let signal = chatInteraction.interactionContext.account.postbox.transaction { transaction -> ([MessageId], String?, Peer?) in
+        let signal = chatInteraction.interactionContext.account.postbox.transaction { transaction -> ([MessageId], String?, String?, Peer?) in
             let group = transaction.getMessageFailedGroup(messageId) ?? []
-            let code = group.first(where: { $0.id == messageId })?.attributes.lazy.compactMap {
-                ($0 as? OutgoingMessageInfoAttribute)?.sendErrorCode
+            let info = group.first(where: { $0.id == messageId })?.attributes.lazy.compactMap {
+                $0 as? OutgoingMessageInfoAttribute
             }.first
-            return (group.map(\.id), code, transaction.getPeer(messageId.peerId))
+            let code = info?.sendErrorCode
+            // Nanogram: same reason text as iOS. No stored code means the message expired while the app was closed or suspended.
+            let reason = info.map { pendingMessageFailureDescription(sendErrorCode: $0.sendErrorCode).text }
+            return (group.map(\.id), code, reason, transaction.getPeer(messageId.peerId))
         } |> deliverOnMainQueue
 
         
-        _ = signal.start(next: { [weak self] ids, code, peer in
+        _ = signal.start(next: { [weak self] ids, code, reason, peer in
             guard let context = self?.chatInteraction.interactionContext else {
                 return
             }
@@ -3764,7 +3767,7 @@ public class ChatRowItem: TableRowItem {
                     return
                 }
                 
-                verifyAlert_button(for: context.window, header: strings().alertSendErrorHeader, information: failure?.text ?? strings().alertSendErrorText, ok: strings().alertSendErrorResend, option: strings().alertSendErrorDelete, successHandler: { result in
+                verifyAlert_button(for: context.window, header: strings().alertSendErrorHeader, information: failure?.text ?? reason ?? strings().alertSendErrorText, ok: strings().alertSendErrorResend, option: strings().alertSendErrorDelete, successHandler: { result in
                     switch result {
                     case .basic:
                         self?.resendMessage([messageId])
