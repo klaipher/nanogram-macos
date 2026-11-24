@@ -97,9 +97,9 @@ fileprivate class ShareModalView : Control, TokenizedProtocol {
             var items:[ContextMenuItem] = []
 
             // Nanogram: forward options (iOS parity). Selecting only changes state; the menu still offers Send.
-            if let forward = shareObject as? ForwardMessagesObject, forward.canChangeForwardOptions {
-                let authors = Set(forward.forwardedMessages.compactMap { $0.author?.id }).count
-                let hideNames = forward.hideNames || forward.hideCaptions
+            if let forward = shareObject as? ShareForwardOptions, forward.canChangeForwardOptions {
+                let authors = forward.forwardOptionAuthorsCount
+                let hideNames = forward.displayedHideNames
                 items.append(ContextMenuItem(strings().chatAlertForwardActionShow1Other(authors), handler: {
                     forward.hideNames = false
                     forward.hideCaptions = false
@@ -116,7 +116,6 @@ fileprivate class ShareModalView : Control, TokenizedProtocol {
                     }, itemImage: !forward.hideCaptions ? MenuAnimation.menu_check_selected.value : nil))
                     items.append(ContextMenuItem(strings().chatAlertForwardActionHideCaptionOther(messagesWithCaption), handler: {
                         forward.hideCaptions = true
-                        forward.hideNames = true
                     }, itemImage: forward.hideCaptions ? MenuAnimation.menu_check_selected.value : nil))
                     items.append(ContextSeparatorItem())
                 }
@@ -846,9 +845,16 @@ public class ShareCallbackPeerTypesObject : ShareObject {
 }
 
 
-public class ShareMessageObject : ShareObject, ShareDeliveryProviding {
+public class ShareMessageObject : ShareObject, ShareDeliveryProviding, ShareForwardOptions {
     fileprivate let messageIds:[MessageId]
     private let message:Message
+    // Nanogram: forward options chosen in the picker's send menu (ShareForwardOptions).
+    public var hideNames: Bool = false
+    public var hideCaptions: Bool = false
+    private let groupMessages: [Message]
+    var forwardOptionMessages: [Message] {
+        return groupMessages.isEmpty ? [message] : groupMessages
+    }
     public let link:String?
     private let exportLinkDisposable = MetaDisposable()
     
@@ -859,6 +865,7 @@ public class ShareMessageObject : ShareObject, ShareDeliveryProviding {
     public init(_ context: any AccountContextProtocol, _ message:Message, _ groupMessages:[Message] = []) {
         self.messageIds = groupMessages.isEmpty ? [message.id] : groupMessages.map{$0.id}
         self.message = message
+        self.groupMessages = groupMessages
         var peer = coreMessageMainPeer(message) as? TelegramChannel
         var messageId = message.id
         if let author = message.forwardInfo?.author as? TelegramChannel {
@@ -921,6 +928,8 @@ public class ShareMessageObject : ShareObject, ShareDeliveryProviding {
         
         let context = self.context
         let messageIds = self.messageIds
+        let hideNames = self.effectiveHideNames
+        let hideCaptions = self.effectiveHideCaptions
         var signals: [Signal<ShareRecipientDelivery, NoError>] = []
         let date = self.scheduleDate
         let withoutSound = self.withoutSound
@@ -945,7 +954,7 @@ public class ShareMessageObject : ShareObject, ShareDeliveryProviding {
                 let origin = origin.restricting(peerId: peer.id)
                 let presentation = origin.beginPresentation()
                 defer { presentation.end() }
-                let forward: Signal<[MessageId?], NoError> = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: peerId, replyId: nil, threadId: threadId, silent: FastSettings.isChannelMessagesMuted(peerId) || withoutSound, atDate: date, sendAsPeerId: sendAs, sendPaidMessageStars: sendPaidMessageStars[peerId])
+                let forward: Signal<[MessageId?], NoError> = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: peerId, replyId: nil, threadId: threadId, hideNames: hideNames, hideCaptions: hideCaptions, silent: FastSettings.isChannelMessagesMuted(peerId) || withoutSound, atDate: date, sendAsPeerId: sendAs, sendPaidMessageStars: sendPaidMessageStars[peerId])
                 var caption: Signal<[MessageId?], NoError>?
                 if let comment = comment, !comment.inputText.isEmpty, peer.canSendMessage() {
                     let parsingUrlType: ParsingType
@@ -1224,35 +1233,57 @@ public enum ForwardMessagesResult {
     case completionUnknown
 }
 
-public final class ForwardMessagesObject : ShareObject {
+// Nanogram: share objects that forward messages offer Show/Hide Sender Name and Show/Hide Captions in the
+// picker's Send menu (iOS parity). Kept inside the ForwardMessagesResult..SelectablePeersEntryStableId range
+// so tools/tests/forward-object-context splices it with ForwardMessagesObject.
+protocol ShareForwardOptions: AnyObject {
+    var context: any AccountContextProtocol { get }
+    var forwardOptionMessages: [Message] { get }
+    var hideNames: Bool { get set }
+    var hideCaptions: Bool { get set }
+}
+
+extension ShareForwardOptions {
+    var forwardOptionAuthorsCount: Int {
+        return Set(forwardOptionMessages.compactMap { $0.author?.id }).count
+    }
+    // Same filter as the in-chat forward panel (ChatInputAccessory).
+    var messagesWithCaptionCount: Int {
+        return forwardOptionMessages.filter { !$0.text.isEmpty && $0.anyMedia != nil }.count
+    }
+    // Rich-text messages keep the sender shown for non-premium users (same rule as the in-chat forward panel).
+    var canChangeForwardOptions: Bool {
+        let hasRichText = forwardOptionMessages.contains(where: { message in
+            message.attributes.contains(where: { $0 is RichTextMessageAttribute })
+        })
+        return !(hasRichText && !context.isPremium)
+    }
+    // Hidden captions imply hidden names. hideNames keeps the user's own name choice, so showing captions
+    // again restores it (like ChatInterfaceState.tempSenderName in the chat panel).
+    var displayedHideNames: Bool {
+        return hideNames || hideCaptions
+    }
+    // Effective values passed to every forward path.
+    var effectiveHideCaptions: Bool {
+        return canChangeForwardOptions && hideCaptions
+    }
+    var effectiveHideNames: Bool {
+        return canChangeForwardOptions && displayedHideNames
+    }
+}
+
+public final class ForwardMessagesObject : ShareObject, ShareForwardOptions {
     fileprivate let messages: [Message]
     public let forwardingAnalyticsContext: AnalyticsContext
     
     public var messageIds: [MessageId] {
         return messages.map { $0.id }
     }
-    // Nanogram: forward options chosen in the picker's send menu (iOS parity: Show/Hide Sender Name, Show/Hide Captions).
+    // Nanogram: forward options chosen in the picker's send menu (ShareForwardOptions).
     public var hideNames: Bool = false
     public var hideCaptions: Bool = false
-    fileprivate var forwardedMessages: [Message] {
+    var forwardOptionMessages: [Message] {
         return messages
-    }
-    fileprivate var messagesWithCaptionCount: Int {
-        return messages.filter { !$0.text.isEmpty && $0.anyMedia != nil }.count
-    }
-    // Rich-text messages keep the sender shown for non-premium users (same rule as the in-chat forward panel).
-    fileprivate var canChangeForwardOptions: Bool {
-        let hasRichText = messages.contains(where: { message in
-            message.attributes.contains(where: { $0 is RichTextMessageAttribute })
-        })
-        return !(hasRichText && !context.isPremium)
-    }
-    // Effective values passed to every forward path; hidden captions imply hidden names.
-    fileprivate var effectiveHideCaptions: Bool {
-        return canChangeForwardOptions && hideCaptions
-    }
-    fileprivate var effectiveHideNames: Bool {
-        return canChangeForwardOptions && (hideNames || hideCaptions)
     }
     private let disposable = MetaDisposable()
     private let album: Bool

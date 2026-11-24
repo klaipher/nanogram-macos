@@ -17,6 +17,8 @@ struct Message {
     var isPublicPoll = false
     var containsSecretMedia = false
     var groupInfo: Bool?
+    var text = ""
+    var author: Peer? = nil
     var anyMedia: GalleryMedia? { TelegramMediaImage() }
     var effectiveMedia: [GalleryMedia] { [] }
 }
@@ -61,7 +63,7 @@ final class EngineMessages {
 }
 final class Engine { let account = Account(); let messages = EngineMessages() }
 final class Window {}
-protocol AccountContextProtocol { var engine: Engine { get }; var account: Account { get }; var peerId: PeerId { get }; var bindings: Bindings { get }; var window: Window { get } }
+protocol AccountContextProtocol { var engine: Engine { get }; var account: Account { get }; var peerId: PeerId { get }; var bindings: Bindings { get }; var window: Window { get }; var isPremium: Bool { get } }
 extension AccountContextProtocol { var concrete: AccountContext { self as! AccountContext } }
 struct StarsState { let balance: StarsAmount }
 final class StarsContext { var state: Signal<StarsState?, NoError> = .single(nil) }
@@ -73,6 +75,7 @@ final class AccountContext: AccountContextProtocol {
     let starState = StarsContext()
     let engine = Engine(); let bindings = Bindings(); let window = Window()
     let peerId: PeerId = 1
+    var isPremium = false
     var account: Account { engine.account }
 }
 class Peer {
@@ -129,6 +132,7 @@ func getCachedDataView(peerId: PeerId, postbox: Postbox) -> Signal<AnyObject?, N
 struct ChatTextInputState: Equatable { var hasExcludedAnalytics = false; var inputText = ""; var inlineMedia: [Int: Int] = [:]; func messageTextEntities(_ type: ParsingType) -> [Int] { [] } }
 struct ParsingType: OptionSet { let rawValue: Int; static let Hashtags = Self(rawValue: 1), Links = Self(rawValue: 2) }
 protocol MessageAttribute {}
+struct RichTextMessageAttribute: MessageAttribute {}
 struct TextEntitiesMessageAttribute: MessageAttribute { let entities: [Int] }
 struct SendAsMessageAttribute: MessageAttribute { let peerId: PeerId }
 struct NotificationInfoMessageAttribute: MessageAttribute {
@@ -152,11 +156,11 @@ enum Sender {
         UI.onSendSetup?(); UI.sentMessages.append((peerId, message)); UI.comments += 1; return UI.targetComments[peerId] ?? UI.commentResult ?? UI.sendResult
     }
     static func forwardMessages(messageIds: [MessageId], context: any AccountContextProtocol, peerId: PeerId, replyId: Int?, threadId: Int64?, hideNames: Bool = false, hideCaptions: Bool = false, silent: Bool = false, atDate: Date? = nil, sendAsPeerId: PeerId? = nil, sendPaidMessageStars: StarsAmount? = nil) -> Signal<[MessageId?], NoError> {
-        UI.onSendSetup?(); UI.targets.append(peerId); UI.forwarded.append(messageIds); return UI.targetResults[peerId] ?? UI.sendResult
+        UI.onSendSetup?(); UI.targets.append(peerId); UI.forwarded.append(messageIds); UI.forwardOptions.append([hideNames, hideCaptions]); return UI.targetResults[peerId] ?? UI.sendResult
     }
 }
 enum Behavior { case automatic }
-enum ChatInitialAction { case forward(messageIds: [MessageId], text: ChatTextInputState?, behavior: Behavior) }
+enum ChatInitialAction { case forward(messageIds: [MessageId], text: ChatTextInputState?, behavior: Behavior, hideNames: Bool = false, hideCaptions: Bool = false) }
 enum ChatLocation: Equatable { case peer(PeerId); var peerId: PeerId { switch self { case let .peer(id): return id } } }
 struct FixtureEditState { let message: Message }
 struct ComposerReplySubject { let messageId: MessageId }
@@ -167,7 +171,10 @@ struct InterfaceState {
     var forwardMessages: [Message] = []
     var editState: FixtureEditState?
     var ids: [MessageId] = [], input = ChatTextInputState()
+    var hideSendersName = false, hideCaptions = false
     var inputState: ChatTextInputState { input }
+    func withUpdatedHideSendersName(_ hide: Bool, saveTempValue: Bool) -> Self { var value = self; value.hideSendersName = hide; return value }
+    func withUpdatedHideCaption(_ hide: Bool) -> Self { var value = self; value.hideCaptions = hide; return value }
     func withUpdatedForwardMessageIds(_ ids: [MessageId]) -> Self { var value = self; value.ids = ids; return value }
     func withUpdatedInputState(_ input: ChatTextInputState) -> Self { var value = self; value.input = input; return value }
 }
@@ -277,7 +284,7 @@ func tooltip(for view: PickerView, text: String) { UI.blockers.append(text) }
 func strings() -> Strings { Strings() }
 enum ForumUI {
     static func openTopic(_ threadId: Int64, peerId: PeerId, context: any AccountContextProtocol, animated: Bool, addition: Bool, initialAction: ChatInitialAction, isMonoforum: Bool, analyticsContext: AnalyticsContext?) -> Signal<Bool, NoError> {
-        UI.forumContext = analyticsContext; UI.onForum?(); return UI.forumResult
+        UI.forumContext = analyticsContext; UI.initialActions.append(initialAction); UI.onForum?(); return UI.forumResult
     }
 }
 struct TelegramPresentationTheme {}
@@ -320,9 +327,11 @@ class ShareContactObject: ShareObject, ShareDeliveryProviding {
 __CONTACT_SHARE__
 }
 __DELIVERY__
-class ShareMessageObject: ShareObject, ShareDeliveryProviding {
+class ShareMessageObject: ShareObject, ShareDeliveryProviding, ShareForwardOptions {
     let message: Message
     let messageIds: [MessageId]
+    var hideNames = false, hideCaptions = false
+    var forwardOptionMessages: [Message] { [message] }
     init(_ context: any AccountContextProtocol, _ message: Message, _ group: [Message] = []) {
         self.message = message; self.messageIds = group.isEmpty ? [message.id] : group.map { $0.id }; super.init(context)
     }
@@ -469,8 +478,8 @@ __MODAL_INIT__
 }
 final class ShareUIHooks {
     static let shared = ShareUIHooks()
-    func makeChatController(_ context: any AccountContextProtocol, _ location: ChatLocation, _ initialAction: ChatInitialAction) -> ChatInterfaceController { UI.onConstruct?(); UI.fullChats += 1; return ChatController(context, location) }
-    func makeChatAdditionController(_ context: any AccountContextProtocol, _ location: ChatLocation, _ initialAction: ChatInitialAction) -> ChatInterfaceController { UI.onConstruct?(); UI.additionalChats += 1; return ChatController(context, location) }
+    func makeChatController(_ context: any AccountContextProtocol, _ location: ChatLocation, _ initialAction: ChatInitialAction) -> ChatInterfaceController { UI.onConstruct?(); UI.fullChats += 1; UI.initialActions.append(initialAction); return ChatController(context, location) }
+    func makeChatAdditionController(_ context: any AccountContextProtocol, _ location: ChatLocation, _ initialAction: ChatInitialAction) -> ChatInterfaceController { UI.onConstruct?(); UI.additionalChats += 1; UI.initialActions.append(initialAction); return ChatController(context, location) }
     func makeEmojies(_ context: any AccountContextProtocol, _ presentation: TelegramPresentationTheme?) -> ViewController { UI.onEmoji?(); return ViewController() }
 }
 struct ChatUIHooks {
@@ -496,6 +505,7 @@ enum UI {
     static var premiumOrigin: AnalyticsContext?
     static var onPush: ((ViewController) -> Void)?
     static var targets: [PeerId] = [], forwarded: [[MessageId]] = [], delayed: [() -> Void] = []
+    static var forwardOptions: [[Bool]] = [], initialActions: [ChatInitialAction] = []
     static var comments = 0, successes = 0, fullChats = 0, additionalChats = 0
     static var forumContext: AnalyticsContext?, inputOrigin: AnalyticsContext?
     static var forumResult: Signal<Bool, NoError> = .single(true)
@@ -528,7 +538,7 @@ enum UI {
         onConfirmation = nil; onPurchase = nil; confirmations = []; confirmationTexts = []; blockers = []; failedTargets = []; purchaseAmounts = []; purchaseOrigin = nil
         alertClosures = []; onAlert = nil; onPremiumText = nil; closed = 0; alerts = 0; premiumOpened = 0; toggled = []; popped = []; premiumTextCallbacks = []; premiumOrigin = nil
         onSendSetup = nil; onConstruct = nil; onUpdate = nil; onSuccess = nil; onForum = nil; onEmoji = nil; onPush = nil
-        targets = []; forwarded = []; delayed = []; comments = 0; successes = 0; fullChats = 0; additionalChats = 0
+        targets = []; forwarded = []; delayed = []; forwardOptions = []; initialActions = []; comments = 0; successes = 0; fullChats = 0; additionalChats = 0
         forumContext = nil; inputOrigin = nil; forumResult = .single(true); sendResult = .complete(); commentResult = nil
     }
 }
@@ -3548,5 +3558,61 @@ extension ForwardObjectTests {
         var reported: [MessageId] = []; controller.chatInteraction.reportMessages = { _, ids in reported = ids }
         controller.chatInteraction.forwardMessagesObserved([Message(id: sourceId)], analyticsContext: origin(), entry: .messageSelection)
         XCTAssertEqual(reported, [sourceId]); XCTAssertTrue(UI.presented.isEmpty); XCTAssertTrue(UI.forwardPickerResults.isEmpty)
+    }
+}
+
+// Nanogram: forward options (Show/Hide Sender Name, Show/Hide Captions) reach every forward path.
+extension ForwardObjectTests {
+    func testForwardOptionsReachMultiChatSend() {
+        let value = object(); value.hideCaptions = true
+        let disposable = value.perform(to: [2, 3], threadId: nil).start()
+        XCTAssertEqual(UI.forwardOptions, [[true, true], [true, true]]); disposable.dispose()
+    }
+    func testHiddenNamesKeepCaptionsAndShowingCaptionsRestoresNameChoice() {
+        let value = object(); value.hideNames = true
+        let disposable = value.perform(to: [2, 3], threadId: nil).start()
+        XCTAssertEqual(UI.forwardOptions, [[true, false], [true, false]]); disposable.dispose()
+        let other = object(); other.hideCaptions = true
+        XCTAssertTrue(other.displayedHideNames); other.hideCaptions = false
+        XCTAssertFalse(other.effectiveHideNames); XCTAssertFalse(other.effectiveHideCaptions)
+    }
+    func testSavedMessagesForwardReceivesOptions() {
+        let value = object(); value.hideNames = true
+        let disposable = value.perform(to: [1], threadId: nil).start()
+        XCTAssertEqual(UI.forwardOptions, [[true, false]]); disposable.dispose()
+    }
+    func testOpenChatDraftReceivesOptions() {
+        let controller = ChatController(account, .peer(3))
+        account.bindings.navigation.controllers = [controller]
+        let value = object(); value.hideCaptions = true
+        let disposable = value.perform(to: [3], threadId: nil).start()
+        XCTAssertTrue(controller.chatInteraction.state.interface.hideSendersName)
+        XCTAssertTrue(controller.chatInteraction.state.interface.hideCaptions)
+        XCTAssertTrue(UI.targets.isEmpty); disposable.dispose()
+    }
+    func testNewChatAndTopicInitialActionsCarryOptions() {
+        let value = object(); value.hideNames = true
+        let disposable = value.perform(to: [3], threadId: nil).start()
+        account.bindings.navigation.controller?.ready.set(true); disposable.dispose()
+        let topic = object(); topic.hideCaptions = true
+        topic.perform(to: [3], threadId: 8).start().dispose()
+        XCTAssertEqual(UI.initialActions.count, 2)
+        guard case let .forward(_, _, _, chatNames, chatCaptions)? = UI.initialActions.first, case let .forward(_, _, _, topicNames, topicCaptions)? = UI.initialActions.last else { return XCTFail("expected forward actions") }
+        XCTAssertTrue(chatNames); XCTAssertFalse(chatCaptions)
+        XCTAssertTrue(topicNames); XCTAssertTrue(topicCaptions)
+    }
+    func testRichTextForwardKeepsSenderForNonPremium() {
+        let value = ForwardMessagesObject(account, messages: [Message(id: sourceId, attributes: [RichTextMessageAttribute()])], analyticsContext: origin())
+        value.hideNames = true; value.hideCaptions = true
+        XCTAssertFalse(value.canChangeForwardOptions)
+        let disposable = value.perform(to: [2, 3], threadId: nil).start()
+        XCTAssertEqual(UI.forwardOptions, [[false, false], [false, false]]); disposable.dispose()
+        account.isPremium = true
+        XCTAssertTrue(value.canChangeForwardOptions); XCTAssertTrue(value.effectiveHideNames)
+    }
+    func testMessageShareReceivesOptions() {
+        let value = messageShare(); value.hideNames = true
+        let disposable = value.performWithResults(to: [2, 3], threadId: nil, comment: nil, sendPaidMessageStars: [:], analyticsContext: origin()).start()
+        XCTAssertEqual(UI.forwardOptions, [[true, false], [true, false]]); disposable.dispose()
     }
 }
