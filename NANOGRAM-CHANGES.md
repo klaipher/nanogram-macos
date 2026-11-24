@@ -199,6 +199,41 @@ not re-verified against the code; correct them on the next change in that area.
 - Upstream: no (the engines are separate libraries upstream).
 - Sync: keep the `tlottie` unit and `core-xprojects/tlottie` deleted; the core's `MTProtoRustEngine/Package.swift` points at `packages/RustLibraries` (a Mac-only path; iOS builds it with Bazel).
 
+## Send a contact from the attach menu (macOS)
+- What: the attach menu has a "Contact" entry (shown where Location is, permission-checked) that opens the contacts picker and sends the chosen contact as a contact card, as on iOS.
+- Where: `packages/ChatUI/.../ChatInputAttachView.swift`, `ChatNavigationHooks.swift` (`showContactPicker` hook), `Telegram-Mac/packages-integration/hooks/ChatUIHooksInstall.swift` (uses `selectModalPeers`, then `chatInteraction.shareContact`).
+- Upstream: no.
+
+## View-once and self-destruct timer for photos and videos (macOS)
+- What: in a private 1:1 chat, the send-preview menu has "Send with Timer" for a single photo or video: View Once, or 3 s to 60 s. Not offered for albums, files, GIFs/round videos, paid media, groups, channels, secret chats or Saved Messages (iOS rule `chatMediaGalleryHasTimer`). The attribute has no countdown start, so the countdown starts when the recipient opens the media (as on iOS).
+- Where: `packages/PreviewSenderUI/.../PreviewSenderController.swift` (menu, `send(autoremoveTimeout:)`), `ChatUI/.../ChatInterfaceInteraction.swift` (one-shot `pendingMediaAutoremoveTimeout`), `ChatController.swift`, `ChatHistoryModel/.../SenderController.swift` (`Sender.enqueue(autoremoveTimeout:)`). Test fixtures updated (media-preview-context, media-send-observation, preview-pending-actions).
+- Upstream: no.
+
+## Share a video from its playback time (macOS)
+- What: sharing a video of 10 minutes or longer from the media viewer adds "Start at m:ss" (current position, off by default) to the picker's Send menu; when on, the recipient's video opens at that time (`ForwardVideoTimestampAttribute`), as on iOS. Only the media viewer has a playback position on Mac.
+- Where: `packages/ShareUI/.../ShareModalController.swift` (`ShareMessageObject.videoStartTimestamp`), GalleryUI (`MGalleryVideoItem.shareStartTimestamp`, `GalleryHooks`, `GalleryViewer`), `SenderController.swift` (`forwardMessages(videoTimestamp:)`), `GalleryUIHooksInstall.swift`.
+- Upstream: no.
+
+## Clear recent emoji (macOS)
+- What: the Recent header of the emoji panel (emoji and stories modes) has a clear button that removes all recently used emoji, standard and custom; skin tones are kept. Mac keeps recents in `RecentUsedEmoji` app preferences, so both that and the core list are cleared.
+- Where: `packages/EntertainmentUI/.../EmojiesController.swift`, `packages/InAppSettings/.../RecentUsedEmoji.swift` (`clearUsedEmoji`). Test: remove-recent-emoji.
+- Upstream: no.
+
+## Remove single recent hashtags and apps (macOS)
+- What: right-click a recent hashtag suggestion to remove it (`removeRecentlyUsedHashtag`). "Remove from Recent" on a recent app in Search now removes it from recent apps (`removeRecentlyUsedApp`); it used to remove it from recent searches instead.
+- Where: `packages/ChatUI/.../ContextHashtagRowItem.swift`, `packages/ChatListUI/.../SearchController.swift` (`peerContextMenuItems(isRecentApp:)`).
+- Upstream: no.
+
+## Topic notification exceptions (macOS)
+- What: in Settings > Notifications, right-click a forum's exception and choose "Topic Exceptions" to see its per-topic exceptions and remove one or all (list and remove only, like the core of iOS NotificationExceptionsScreen).
+- Where: `packages/SettingsUI/.../NotificationTopicExceptionsController.swift` (new), `NotificationCategorySettingsController.swift` (menu item); `forumChannelTopicNotificationExceptions`, `removeCustomThreadNotificationSettings`.
+- Upstream: no.
+
+## Failed-send reason when no error code is stored (macOS)
+- What: the failed-message alert shows the shared Nanogram reason ("Not sent in time.", without the iOS "Tap to retry." hint because the alert has its own Resend button) instead of the generic text when no send error code was stored. Specific codes keep their detailed Mac text.
+- Where: `packages/ChatUI/.../ChatRowItem.swift` (`resendFailed`), core `pendingMessageFailureDescription` (PendingSendFailurePolicy.swift), same as iOS.
+- Upstream: no.
+
 ## nanogram:// link scheme (macOS)
 - What: the Mac app registers `nanogram://` like iOS, so launchers and scripts can open Nanogram even when official Telegram also claims `tg://`. `nanogram://` alone brings the app to the front; `nanogram://x` is handled as `tg://x`.
 - Where: `Telegram-Mac/Info.plist` (URL type `$(PRODUCT_BUNDLE_IDENTIFIER).nanogram`), `Telegram-Mac/app/AppDelegate.swift` `processURL` (uses the shared `NanogramAppScheme` from the core's NanogramFeatures, re-exported by NanogramRuntime; tests live with it in the core).
