@@ -511,10 +511,11 @@ private func makeChatNavigationHooks() -> ChatNavigationHooks {
     hooks.showContactPicker = { chatInteraction, window, morphSource in
         let context = chatInteraction.interactionContext
         _ = (selectModalPeers(window: window, context: context, title: strings().chatListContact, settings: [.contacts], limit: 1, morphSource: morphSource)
-             |> map { $0.first }
-             |> filter { $0 != nil }
-             |> mapToSignal { peerId -> Signal<EnginePeer?, NoError> in
-                 return context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId!))
+             |> mapToSignal { peerIds -> Signal<EnginePeer?, NoError> in
+                 guard let peerId = peerIds.first else {
+                     return .complete()
+                 }
+                 return context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId))
              }
              |> deliverOnMainQueue).start(next: { peer in
             if let user = peer?._asPeer() as? TelegramUser {

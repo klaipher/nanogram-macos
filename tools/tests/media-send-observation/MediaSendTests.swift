@@ -29,6 +29,7 @@ struct PaidStarsMessageAttribute: MessageAttribute { let stars: StarsAmount; let
 struct MediaSpoilerMessageAttribute: MessageAttribute {}
 struct EffectMessageAttribute: MessageAttribute { let id: Int }
 struct InvertMediaMessageAttribute: MessageAttribute {}
+struct AutoremoveTimeoutMessageAttribute: MessageAttribute { let timeout: Int32; let countdownBeginTime: Int32? }
 enum AvailableMessageEffects { struct MessageEffect { let id: Int } }
 enum ChatInterfaceState { struct ChannelSuggestPost { let attribute: MessageAttribute? } }
 final class Media { let isInteractiveMedia: Bool; init(_ interactive: Bool = false) { isInteractiveMedia = interactive } }

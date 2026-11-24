@@ -711,7 +711,8 @@ public class Sender: NSObject {
         }
         // Nanogram: view-once / self-destruct timer for photos and videos (iOS parity)
         if let autoremoveTimeout {
-            attributes.append(AutoremoveTimeoutMessageAttribute(timeout: autoremoveTimeout, countdownBeginTime: 0))
+            // countdownBeginTime must stay nil until the recipient opens it; a value here makes the local copy expire at once.
+            attributes.append(AutoremoveTimeoutMessageAttribute(timeout: autoremoveTimeout, countdownBeginTime: nil))
         }
                 
         let localGroupingKey = isCollage ? arc4random64() : nil

@@ -1586,24 +1586,6 @@ public class PreviewSenderController: ModalViewController, Notifable {
         super.close(animationType: self.sent ? .noMorph : .common)
     }
     
-    /// Nanogram: same rule as iOS chatMediaGalleryHasTimer (one-to-one cloud chat, not Saved Messages), narrowed to a single photo or video sent as media without paid content.
-    private func canSendWithTimer(peer: Peer, accountPeerId: PeerId) -> Bool {
-        guard peer.id.namespace == Namespaces.Peer.CloudUser, peer.id != accountPeerId, chatInteraction.mode == .history || chatInteraction.mode.isThreadMode else {
-            return false
-        }
-        let medias = getMedias()
-        guard medias.count == 1, genericView.state.state == .media, genericView.state.payAmount == nil else {
-            return false
-        }
-        if medias[0] is TelegramMediaImage {
-            return true
-        }
-        if let file = medias[0] as? TelegramMediaFile {
-            return file.isVideo && !file.isInstantVideo && !file.isAnimated
-        }
-        return false
-    }
-    
     func send(_ silent: Bool, atDate: ChatInteraction.Schedule? = nil, asSpoiler: Bool? = nil, via: AnalyticsMediaJourney.Spec.SubmitVia = .unknown, autoremoveTimeout: Int32? = nil) {
         guard !pendingActions.isClosed, !sent else { return }
         guard validateSendSource() else {
@@ -1689,6 +1671,23 @@ public class PreviewSenderController: ModalViewController, Notifable {
         }
     }
     
+    /// Nanogram: same rule as iOS chatMediaGalleryHasTimer (one-to-one cloud chat, not Saved Messages), narrowed to a single photo or video sent as media without paid content.
+    private func canSendWithTimer(peer: Peer, accountPeerId: PeerId) -> Bool {
+        guard peer.id.namespace == Namespaces.Peer.CloudUser, peer.id != accountPeerId, chatInteraction.mode == .history || chatInteraction.mode.isThreadMode else {
+            return false
+        }
+        let medias = getMedias()
+        guard medias.count == 1, genericView.state.state == .media, genericView.state.payAmount == nil else {
+            return false
+        }
+        if medias[0] is TelegramMediaImage {
+            return true
+        }
+        if let file = medias[0] as? TelegramMediaFile {
+            return file.isVideo && !file.isInstantVideo && !file.isAnimated
+        }
+        return false
+    }
     
     public override func measure(size: NSSize) {
         self.modal?.resize(with:NSMakeSize(genericView.frame.width, min(size.height - 70, genericView.tableView.listHeight + genericView.additionHeight)), animated: false)
@@ -1834,7 +1833,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
                         
                         // Nanogram: view once / self-destruct timer for one photo or video in a private chat (iOS parity)
                         if self.canSendWithTimer(peer: peer, accountPeerId: context.peerId) {
-                            let timerItem = ContextMenuItem("Send with Timer", itemImage: MenuAnimation.menu_clear_history.value) //TODOLANG
+                            let timerItem = ContextMenuItem("Send with Timer", itemImage: MenuAnimation.menu_autodelete_customize.value) //TODOLANG
                             let timerMenu = ContextMenu()
                             timerMenu.addItem(ContextMenuItem("View Once", handler: { [weak self] in //TODOLANG
                                 self?.send(false, via: .sendMenu, autoremoveTimeout: viewOnceTimeout)
