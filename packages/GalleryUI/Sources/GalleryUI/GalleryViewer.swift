@@ -1609,7 +1609,7 @@ public class GalleryViewer: NSResponder {
                 
                 items.append(ContextMenuItem(thisTitle, handler: { [weak self] in
                     guard let self, viewer === self, self.presentationGeneration == generation else { return }
-                    GalleryHooks.shared.showShareObserved(self.context, message, nil, self.window, analyticsContext: origin)
+                    GalleryHooks.shared.showShareObserved(self.context, message, nil, self.window, analyticsContext: origin, videoTimestamp: (self.pager.selectedItem as? MGalleryVideoItem)?.shareStartTimestamp())
                 }, itemImage: MenuAnimation.menu_share.value))
                 
                 let allTitle: String
@@ -1637,7 +1637,7 @@ public class GalleryViewer: NSResponder {
                     AppMenu.show(menu: menu, event: event, for: control)
                 }
             } else {
-                GalleryHooks.shared.showShareObserved(self.context, message, nil, self.window, analyticsContext: origin)
+                GalleryHooks.shared.showShareObserved(self.context, message, nil, self.window, analyticsContext: origin, videoTimestamp: (self.pager.selectedItem as? MGalleryVideoItem)?.shareStartTimestamp())
             }
         }
     }

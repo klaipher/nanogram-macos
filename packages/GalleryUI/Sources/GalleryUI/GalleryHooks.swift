@@ -26,12 +26,17 @@ public struct GalleryHooks {
     public let showShare: (any AccountContextProtocol, Message, [Message]?, Window) -> Void
     public var showShareWithContext: ((any AccountContextProtocol, Message, [Message]?, Window, AnalyticsContext) -> Void)?
 
-    public func showShareObserved(_ context: any AccountContextProtocol, _ message: Message, _ messages: [Message]?, _ window: Window, analyticsContext: AnalyticsContext) {
+    // Nanogram: opens Share for a single video with its current playback position, so the picker can offer "Start at".
+    public var showShareWithVideoTimestamp: ((any AccountContextProtocol, Message, Window, AnalyticsContext, Int32) -> Void)?
+
+    public func showShareObserved(_ context: any AccountContextProtocol, _ message: Message, _ messages: [Message]?, _ window: Window, analyticsContext: AnalyticsContext, videoTimestamp: Int32? = nil) {
         let origin = GalleryAnalyticsContext(accountContext: context, inherited: analyticsContext)
         origin.restrict(messages: [message] + (messages ?? []))
         let presentation = origin.context.beginPresentation()
         defer { presentation.end() }
-        if let showShareWithContext {
+        if let videoTimestamp, messages == nil, let showShareWithVideoTimestamp {
+            showShareWithVideoTimestamp(context, message, window, origin.context, videoTimestamp)
+        } else if let showShareWithContext {
             showShareWithContext(context, message, messages, window, origin.context)
         } else {
             showShare(context, message, messages, window)
