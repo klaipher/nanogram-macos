@@ -4,6 +4,27 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+## 13.2.0 (202611241346) — 2026-11-24
+
+Source: `nanogram/integration` @ 7baf6ff0 · core `klaipher/nanogram` @ 3b24935e (unchanged since 202611240014).
+Artifacts: `Nanogram-13.2.0-202611241346.dmg` (Developer ID, notarized and stapled, app submission 736b924c, dmg submission 20743f67; Sparkle EdDSA-signed), `appcast.xml`, `Nanogram-13.2.0-202611241346-source.tar.gz` (kept locally), `BUILD-INFO.txt`. The first `tg release-direct` run stopped at the dmg codesign (the timestamp server did not answer); the remaining steps (dmg, dmg notarization, spctl, Sparkle signature, appcast, source archive) were run from `release.release_direct` on the same notarized app.
+Changes since 13.2.0 (202611240014, 9634f659): `git log 9634f659..7baf6ff0` (Mac only; no core change).
+Public notes (short): hide sender name or captions when forwarding; send a contact from the attach menu; self-destruct timer / view once for photos and videos; share a long video from where you paused; clear recent emoji, remove recent hashtags and apps; forum topic notification exceptions; clearer failed-send reason; nanogram:// links; call options on the Nanogram Features screen.
+Verification: `tg check` (tooling tests, parity, lint 0 findings, clean debug build, warnings 20784 none above baseline, package tests; one ChatListUI run had a timing flake in `StoryRevealTableTests` under load and passes alone, 205 tests), release archive + buildcheck + notarization. Not verified on a running app (no Telegram account on this Mac): every new menu and screen below.
+
+- **iOS parity audit (2026-11-24)**: three auditors compared iOS and Mac (messaging, chats/media, Nanogram features), an Opus verifier kept 12 real gaps and rejected 5 the Mac already has (reply in another chat, HD photos, edit stickers, voice trim, bot preview media); 57 features checked equal. Shipped here: the items below. Open: next unread channel/topic at the end of a channel, rate a transcription, the News tab.
+- **Forward options in the share pickers** (e37730f6, 5e287cfa): Send menu of the forward picker and the message Share picker has Show/Hide Sender Name and Show/Hide Captions (`ShareForwardOptions`, passed to every forward path incl. `ChatInitialAction.forward(hideNames:hideCaptions:)`); hiding captions implies hiding names and showing them restores the earlier name choice; hidden for non-premium rich-text forwards. Only in multi-select, as upstream.
+- **`nanogram://` scheme and call options** (6ffd22c0): URL type in Info.plist, `processURL` uses the shared `NanogramAppScheme`; group noise suppression and thermal video limits are `.userFacing`.
+- **Send a contact from the attach menu** (parity-a 62ee6210, 18d3d8e3): `showContactPicker` hook, `selectModalPeers([.contacts], limit: 1)`, `chatInteraction.shareContact`.
+- **View-once / self-destruct timer** (parity-a 07747c66, 18d3d8e3, 7baf6ff0): "Send with Timer" in the send-preview menu for one photo or video in a 1:1 cloud chat (not Saved Messages, secret chats, groups, channels, albums, files, GIFs, round videos, paid media); `AutoremoveTimeoutMessageAttribute(countdownBeginTime: nil)` through `Sender.enqueue(autoremoveTimeout:)` (review fixed a `0` begin time that would have deleted the sender's copy at once).
+- **Share a video from its playback time** (parity-b 42d5880b, 60ec55e0): media viewer Share of a video ≥ 10 min offers "Start at m:ss" (`ForwardVideoTimestampAttribute` via `forwardMessages(videoTimestamp:)`).
+- **Clear recent emoji** (parity-b 1cb4e1c6, c8199944): clear button on the Recent header; clears `RecentUsedEmoji` and the core list, keeps skin tones.
+- **Recent hashtags and apps** (parity-b d6a76cff): remove one recent hashtag; "Remove from Recent" on a recent app now calls `removeRecentlyUsedApp` (it removed a recent search before).
+- **Topic notification exceptions** (parity-c 4de0e9fa): new `NotificationTopicExceptionsController` (list, remove one, remove all) from a forum exception's context menu.
+- **Failed-send reason** (parity-c a8aa504e, 80e8a47b): `resendFailed` falls back to the shared `pendingMessageFailureDescription` ("Not sent in time.") instead of the generic text.
+- **Gate fixes** (8fce2f1f, 7baf6ff0): main-actor reads in the timer check, a clamping timestamp, a test without force unwrap; `warnings.py` skips paths cut at the start by interleaved xcodebuild output (`is_cut_path`), which made `app` wobble 1753/1754/1755; app baseline back to 1753.
+- New English-only strings (//TODOLANG): "Send with Timer", "View Once", "Start at …", "Topic Exceptions".
+
 ## 13.2.0 (202611240014) — 2026-11-24
 
 Source: `nanogram/integration` @ 9634f659 · core `klaipher/nanogram` @ 3b24935e (iOS main; shared nanogram-deps ff036aa, tgcalls 9f88f1d, ffmpeg e19b1c17, twidget 96c4bbb).
