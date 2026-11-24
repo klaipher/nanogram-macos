@@ -3746,7 +3746,8 @@ public class ChatRowItem: TableRowItem {
             }.first
             let code = info?.sendErrorCode
             // Nanogram: same reason text as iOS. No stored code means the message expired while the app was closed or suspended.
-            let reason = info.map { pendingMessageFailureDescription(sendErrorCode: $0.sendErrorCode).text }
+            // The iOS "Tap to retry." hint is dropped: this alert has its own Resend button.
+            let reason = info.map { pendingMessageFailureDescription(sendErrorCode: $0.sendErrorCode).text.replacingOccurrences(of: " Tap to retry.", with: "") }
             return (group.map(\.id), code, reason, transaction.getPeer(messageId.peerId))
         } |> deliverOnMainQueue
 
