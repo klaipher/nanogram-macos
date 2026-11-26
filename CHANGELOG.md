@@ -4,6 +4,8 @@ Nanogram for macOS releases, newest first.
 
 ## Unreleased
 
+- **Core 3b24935e -> fcff00b2 and tgcalls 9f88f1d -> ab989f37 (tester log report fixes from iOS, 2026-11-26)** (02513c72, 12238f7a): the shared core brings the iOS log-report round (detail in the core's CHANGELOG.md, "Tester log report 2026-11-25"): Postbox transactions no longer outlive the background task that covers them (drain waits up to the remaining background time, `runningTransaction()` names a transaction that is still open), MtProtoKit keeps the API layer initialised on every connection and keeps backup addresses after a failed connection, read-state sync backs off 1 to 30 s instead of retrying in a loop, sticker/GIF/favourite sync queues one entry and sends the stored hashes for sticker packs and the premium emoticon lists, the chat-open full-peer refresh is skipped when the peer view's fetch is under 5 s old, an unchanged stories state is not written again, the media-cache reindex runs once, the gallery playback position is stored every 5 s instead of every 0.5 s, typing activity is sent every 4.5 s, the logger holds no lines when Log to File is off and the critical log is about a third smaller. tgcalls (same commit on iOS and Android): outgoing video raises the start bitrate to 600 kbps (camera) / 700 kbps (screen) after an audio-only phase, and call logs shorten IP addresses and drop the ICE password and DTLS fingerprints. Verification: `tg core-bump --build` (74 package tests, parity, debug build, buildcheck ok); iOS ran the 46 affected Bazel test targets on fcff00b2. Not checked on a running app.
+
 ## 13.2.0 (202611241346) — 2026-11-24
 
 Source: `nanogram/integration` @ 7baf6ff0 · core `klaipher/nanogram` @ 3b24935e (unchanged since 202611240014).
